@@ -2203,20 +2203,27 @@
         });
       };
 
+      /* Nella prima cella della riga sta **una** cosa per volta, mai due. Finché non
+         hai scelto c'è la ricerca; appena scegli, la ricerca lascia il posto al
+         nome, che si tocca per cambiarlo. La versione precedente mostrava insieme
+         la ricerca e una casella «Scegli il prodotto…»: quella casella non aveva
+         niente da mostrare e il suo unico effetto era chiudere la ricerca. */
       const dipingi = () => {
         ol.innerHTML = draft.map((l, i) => {
           const nome = etichetta(l);
+          const cerca = !l.manuale && (!nome || l.aperto);
           return `<div class="oitem" data-i="${i}">
             <div class="oline">
               ${l.manuale
                 ? `<input data-role="n" type="text" value="${esc(l.nome || "")}" placeholder="nome del prodotto">`
-                : `<button type="button" class="btn btn-sm pick ${nome ? "" : "vuoto"}" data-role="pick">
-                    ${nome || "Scegli il prodotto…"}</button>`}
+                : cerca
+                  ? `<input data-role="cerca" type="search" value="${esc(l.q || "")}"
+                      placeholder="cerca un prodotto…" autocomplete="off">`
+                  : `<button type="button" class="btn btn-sm pick" data-role="pick">${nome}</button>`}
               <input data-role="q" type="number" min="1" max="99" value="${l.qty}" aria-label="Quantità">
               <button type="button" class="btn btn-sm btn-quiet" data-role="x" aria-label="Togli la riga">✕</button>
             </div>
-            ${l.aperto ? `<div class="picker">
-              <input data-role="cerca" type="search" value="${esc(l.q || "")}" placeholder="cerca: omega, ammorbidente, dentifricio…" autocomplete="off">
+            ${cerca ? `<div class="picker">
               <div class="pick-list">${listaRisultati(l.q || "", "ordine")}</div>
             </div>` : ""}
           </div>`;
@@ -2250,7 +2257,8 @@
         }
         if (ev.target.closest("[data-role=pick]")) {
           leggi();
-          draft.forEach((x, j) => { x.aperto = j === i ? !l.aperto : false; });
+          draft.forEach((x, j) => { x.aperto = j === i; });
+          l.q = "";
           dipingi(); return;
         }
         const mio = ev.target.closest("[data-pick-mio]");
