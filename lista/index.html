@@ -1,0 +1,1989 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dalla Lista al Sì</title>
+<style>
+  /* ── Tokens: light is the base set ─────────────────────────────────── */
+  :root {
+    --ground: #EDF0EC;
+    --surface: #FFFFFF;
+    --surface-2: #F6F8F5;
+    --ink: #131A16;
+    --ink-2: #4C5852;
+    --ink-3: #66726B;
+    --rule: #DBE1DA;
+    --rule-soft: #E8ECE6;
+    --accent: #1D6A52;
+    --accent-ink: #FFFFFF;
+    --accent-wash: #E2EDE6;
+    --good: #0F7A45;
+    --warn: #8A6410;
+    --crit: #9E2B25;
+    --off: #66726B;
+    --focus: #1D6A52;
+    --shadow: 0 1px 2px rgba(19, 26, 22, .05), 0 8px 24px rgba(19, 26, 22, .07);
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --r: 8px;
+    --gap: 16px;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0E1310;
+      --surface: #161D19;
+      --surface-2: #1D2621;
+      --ink: #E6EBE6;
+      --ink-2: #A3AEA7;
+      --ink-3: #8A968F;
+      --rule: #29332D;
+      --rule-soft: #222B26;
+      --accent: #63BF9B;
+      --accent-ink: #0E1310;
+      --accent-wash: #1B2E26;
+      --good: #4FB477;
+      --warn: #C79A3E;
+      --crit: #D9756B;
+      --off: #8A968F;
+      --focus: #63BF9B;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .45);
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0E1310;
+    --surface: #161D19;
+    --surface-2: #1D2621;
+    --ink: #E6EBE6;
+    --ink-2: #A3AEA7;
+    --ink-3: #8A968F;
+    --rule: #29332D;
+    --rule-soft: #222B26;
+    --accent: #63BF9B;
+    --accent-ink: #0E1310;
+    --accent-wash: #1B2E26;
+    --good: #4FB477;
+    --warn: #C79A3E;
+    --crit: #D9756B;
+    --off: #8A968F;
+    --focus: #63BF9B;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .45);
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] { color-scheme: light; }
+
+  /* ── Base ──────────────────────────────────────────────────────────── */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+  }
+  h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -.015em; text-wrap: balance; }
+  h1 { font-size: 25px; }
+  h2 { font-size: 17px; }
+  h3 { font-size: 15px; }
+  p { margin: 0; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+
+  /* I campi si vestono da soli: appoggiarsi a un contenitore lasciava i campi
+     fuori da esso con l'aspetto di default del browser — fondo bianco e sopra
+     il testo chiaro del tema scuro, cioè illeggibili. */
+  input[type="text"], input[type="search"], input[type="date"], input[type="number"],
+  input:not([type]), select, textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  input[type="date"] { -webkit-appearance: textfield; appearance: auto; }
+  select { -webkit-appearance: menulist; appearance: auto; }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  ::placeholder { color: var(--ink-3); opacity: 1; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--ink-3);
+    font-weight: 500;
+  }
+  .muted { color: var(--ink-3); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+  /* ── Shell ─────────────────────────────────────────────────────────── */
+  .app { display: flex; min-height: 100vh; }
+
+  .rail {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 208px;
+    flex: none;
+    padding: 22px 14px;
+    border-right: 1px solid var(--rule);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .brand { padding: 0 8px 18px; display: flex; flex-direction: column; gap: 2px; }
+  .brand b { font-size: 15px; font-weight: 650; letter-spacing: -.02em; }
+  .rail-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ink-2);
+    text-align: left;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .rail-btn:hover { background: var(--surface-2); color: var(--ink); }
+  .rail-btn[aria-current="page"] { background: var(--accent-wash); color: var(--accent); font-weight: 600; }
+  .rail-btn .tally { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 0 4px; }
+
+  main { flex: 1; min-width: 0; padding: 26px 28px 48px; }
+  .wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .page-head .lede { color: var(--ink-2); font-size: 14px; margin-top: 3px; }
+
+  /* ── Cards ─────────────────────────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .card > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: var(--gap); align-items: start; }
+
+  /* ── Buttons ───────────────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 8px 13px;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--ink-3); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .btn-primary:hover { filter: brightness(1.08); border-color: var(--accent); }
+  .btn-sm { padding: 5px 10px; font-size: 12.5px; }
+  .btn-quiet { border-color: transparent; background: transparent; color: var(--ink-2); }
+  .btn-quiet:hover { background: var(--surface-2); border-color: transparent; color: var(--ink); }
+  .btn-danger { color: var(--crit); border-color: var(--rule); }
+  .btn-danger:hover { border-color: var(--crit); }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ── KPI tiles ─────────────────────────────────────────────────────── */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap); }
+  .kpi { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r); padding: 15px; display: flex; flex-direction: column; gap: 9px; }
+  .kpi-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .kpi-val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 30px; line-height: 1; font-weight: 550; letter-spacing: -.03em; }
+  .kpi-goal { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .kpi-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; }
+  .delta { font-family: var(--mono); font-size: 11px; display: inline-flex; align-items: center; gap: 3px; }
+  .delta.up { color: var(--good); }
+  .delta.down { color: var(--warn); }
+  .delta.flat { color: var(--ink-3); }
+
+  /* ── Bars ──────────────────────────────────────────────────────────── */
+  .track { height: 8px; background: var(--rule-soft); border-radius: 4px; overflow: hidden; }
+  .track > i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+  .track.thin { height: 5px; border-radius: 3px; }
+  .track.thin > i { border-radius: 3px; }
+
+  /* ── Funnel ────────────────────────────────────────────────────────── */
+  .funnel { display: flex; flex-direction: column; gap: 2px; }
+  .fstep { display: flex; flex-direction: column; gap: 5px; padding: 7px 0; }
+  .fstep-top { display: flex; align-items: baseline; gap: 8px; }
+  .fstep-top .fl { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-2); }
+  .fstep-top .fn { margin-left: auto; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 550; }
+  .fstep-top .fhere { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+  .fconv { display: flex; align-items: center; gap: 6px; padding-left: 2px; font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+  .fconv::before { content: ""; width: 1px; height: 11px; background: var(--rule); }
+
+  /* ── Chips ─────────────────────────────────────────────────────────── */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+  .chip .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--ink-3); flex: none; }
+  .chip.t-accent { color: var(--accent); border-color: var(--accent); background: var(--accent-wash); }
+  .chip.t-accent .dot { background: var(--accent); }
+  .chip.t-good { color: var(--good); border-color: var(--good); background: transparent; }
+  .chip.t-good .dot { background: var(--good); }
+  .chip.t-warn { color: var(--warn); border-color: var(--warn); background: transparent; }
+  .chip.t-warn .dot { background: var(--warn); }
+  .chip.t-crit { color: var(--crit); border-color: var(--crit); background: transparent; }
+  .chip.t-crit .dot { background: var(--crit); }
+  .chip.t-off { color: var(--off); }
+
+  /* ── Person rows ───────────────────────────────────────────────────── */
+  .rows { display: flex; flex-direction: column; }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 4px;
+    border-top: 1px solid var(--rule-soft);
+    cursor: pointer;
+  }
+  .rows > .row:first-child { border-top: 0; }
+  .row:hover { background: var(--surface-2); }
+  .row-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .row-name { font-weight: 550; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-sub { font-size: 12.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-side { display: flex; align-items: center; gap: 8px; flex: none; }
+  .stepper { display: flex; gap: 3px; align-items: center; }
+  .stepper i { width: 13px; height: 3px; border-radius: 2px; background: var(--rule); display: block; }
+  .stepper i.on { background: var(--accent); }
+  .due { font-family: var(--mono); font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+  .due.late { color: var(--crit); }
+  .due.now { color: var(--warn); }
+
+  /* ── Filters / search ──────────────────────────────────────────────── */
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .search { flex: 1; min-width: 180px; display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; }
+  .search input { border: 0; padding: 0; background: transparent; width: 100%; outline: none; }
+  .search input:focus { border: 0; }
+  .fchips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .fchip {
+    padding: 5px 10px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface);
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--ink-2); cursor: pointer;
+  }
+  .fchip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+  /* ── Table ─────────────────────────────────────────────────────────── */
+  .tscroll { overflow-x: auto; margin: 0 -4px; }
+  .solo-stretti { display: none; }
+  @media (max-width: 560px) {
+    .solo-larghi { display: none; }
+    .solo-stretti { display: flex; }
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 10px; border-top: 1px solid var(--rule-soft); vertical-align: top; }
+  thead th { border-top: 0; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); font-weight: 500; white-space: nowrap; }
+  td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tbody tr:hover { background: var(--surface-2); }
+
+  /* ── Sheet (person detail) ─────────────────────────────────────────── */
+  .scrim { position: fixed; inset: 0; background: rgba(10, 16, 13, .42); z-index: 40; }
+  .sheet {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 41;
+    width: min(460px, 100%);
+    background: var(--surface);
+    border-left: 1px solid var(--rule);
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column;
+  }
+  .sheet-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--rule); display: flex; flex-direction: column; gap: 10px; }
+  .sheet-body { padding: 18px 20px 28px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+  .sheet-x { position: absolute; top: 14px; right: 14px; }
+  .kv { display: grid; grid-template-columns: 92px 1fr; gap: 5px 12px; font-size: 13.5px; }
+  .kv dt { color: var(--ink-3); font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding-top: 2px; }
+  .kv dd { margin: 0; }
+
+  .stage-path { display: flex; flex-direction: column; gap: 0; }
+  .sp-item { display: grid; grid-template-columns: 22px 1fr; gap: 10px; }
+  .sp-mark { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .sp-dot { width: 9px; height: 9px; border-radius: 999px; border: 1.5px solid var(--rule); background: var(--surface); margin-top: 5px; flex: none; }
+  .sp-item.done .sp-dot { background: var(--accent); border-color: var(--accent); }
+  .sp-item.cur .sp-dot { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+  .sp-line { flex: 1; width: 1.5px; background: var(--rule); min-height: 14px; }
+  .sp-item.done .sp-line { background: var(--accent); }
+  .sp-body { padding-bottom: 12px; display: flex; flex-direction: column; gap: 3px; }
+  .sp-label { font-size: 13.5px; font-weight: 500; }
+  .sp-item:not(.done):not(.cur) .sp-label { color: var(--ink-3); font-weight: 400; }
+  .sp-when { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .sp-note { font-size: 13px; color: var(--ink-2); }
+
+  .next-box { background: var(--surface-2); border: 1px solid var(--rule); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 9px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field > label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+  .field textarea { min-height: 68px; resize: vertical; font-size: 14px; }
+  .field-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* ── Modal ─────────────────────────────────────────────────────────── */
+  .modal-scrim { z-index: 45; }
+  .modal-box {
+    position: fixed; z-index: 46; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(520px, calc(100% - 24px));
+    max-height: calc(100vh - 40px); overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 10px;
+    box-shadow: var(--shadow); padding: 20px;
+  }
+  .modal-box h2 { margin-bottom: 2px; }
+  .modal-form { display: flex; flex-direction: column; gap: 13px; margin-top: 14px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+
+  /* Scelta del passo: righe cliccabili, quella consigliata bordata d'accento. */
+  .choices { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .choice {
+    display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left;
+    padding: 11px 13px; border: 1px solid var(--rule); border-radius: 7px;
+    background: var(--surface); cursor: pointer; width: 100%;
+  }
+  .choice:hover { border-color: var(--accent); background: var(--surface-2); }
+  .choice[data-suggested] { border-color: var(--accent); background: var(--accent-wash); }
+  .choice-t { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 550; font-size: 14.5px; }
+  .choice-d { font-size: 12.5px; color: var(--ink-3); }
+
+  /* Scelta secca fra poche risposte: pastiglie, non un menù a tendina. */
+  .opts { display: flex; flex-wrap: wrap; gap: 7px; }
+  .opts input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .opts label {
+    padding: 7px 13px; border: 1px solid var(--rule); border-radius: 999px;
+    background: var(--surface); cursor: pointer; font-size: 13.5px;
+  }
+  .opts label:hover { border-color: var(--ink-3); }
+  .opts input:checked + label { border-color: var(--accent); background: var(--accent-wash); color: var(--accent); font-weight: 600; }
+  .opts input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ── Misc ──────────────────────────────────────────────────────────── */
+  .empty { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; padding: 8px 0; }
+  .empty p { color: var(--ink-2); max-width: 52ch; }
+  .banner {
+    display: flex; gap: 10px; align-items: flex-start;
+    border: 1px solid var(--warn); border-radius: var(--r);
+    background: var(--surface); padding: 12px 14px; font-size: 13.5px; color: var(--ink-2);
+  }
+  .banner b { color: var(--ink); }
+  .toast {
+    position: fixed; z-index: 60; left: 50%; bottom: 26px; transform: translateX(-50%);
+    background: var(--ink); color: var(--ground); padding: 9px 16px; border-radius: 999px;
+    font-size: 13.5px; box-shadow: var(--shadow);
+  }
+  .grp-label { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  .grp-label::after { content: ""; flex: 1; height: 1px; background: var(--rule-soft); }
+  .outcomes { display: flex; flex-direction: column; gap: 11px; }
+  .orow { display: flex; flex-direction: column; gap: 5px; }
+  .orow-top { display: flex; align-items: baseline; gap: 8px; font-size: 13.5px; }
+  .orow-top .on { margin-left: auto; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  /* Un suggerimento, non un allarme: prende i colori dell'accento come le altre
+     cose consigliate dell'app, non quelli dell'avviso. */
+  .nudge {
+    border: 1px solid var(--accent); background: var(--accent-wash);
+    border-radius: var(--r); padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .nudge-t { font-weight: 600; font-size: 14.5px; }
+  .nudge-d { font-size: 13px; color: var(--ink-2); max-width: 62ch; }
+
+  .sum { margin: 12px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+  .fold { border-top: 1px solid var(--rule-soft); padding-top: 12px; }
+  .fold > summary { cursor: pointer; font-size: 13.5px; color: var(--ink-2); width: fit-content; }
+  .fold > summary:hover { color: var(--ink); }
+  .fold-body { display: flex; flex-direction: column; gap: 11px; padding-top: 12px; }
+  .backup-json { width: 100%; min-height: 110px; font-family: var(--mono); font-size: 11px; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface-2); resize: vertical; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .btn, .row, .rail-btn { transition: background-color .12s ease, border-color .12s ease, color .12s ease; }
+  }
+
+  /* ── Narrow ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .app { flex-direction: column; }
+    .rail {
+      position: fixed; bottom: 0; left: 0; right: 0; top: auto;
+      width: auto; height: auto; flex-direction: row; gap: 2px;
+      padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+      border-right: 0; border-top: 1px solid var(--rule);
+      z-index: 30;
+    }
+    .brand, .rail-foot { display: none; }
+    .rail-btn { flex: 1; flex-direction: column; gap: 3px; justify-content: center; font-size: 11px; padding: 6px 2px; }
+    .rail-btn .tally { display: none; }
+    main { padding: 20px 16px 92px; }
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .cols { grid-template-columns: 1fr; }
+    h1 { font-size: 22px; }
+    .sheet { width: 100%; border-left: 0; }
+  }
+  /* Su uno schermo di telefono nome e informazioni di stato non stanno sulla
+     stessa riga: il nome si strozza e la pastiglia della fase finisce fuori
+     schermo. Vanno a capo. Le tacche di avanzamento spariscono: sono un doppione
+     della pastiglia, che dice la fase a parole. */
+  @media (max-width: 560px) {
+    .row { flex-wrap: wrap; gap: 6px 10px; }
+    .row-main { flex: 1 1 100%; }
+    .row-side { width: 100%; justify-content: flex-start; flex-wrap: wrap; row-gap: 6px; }
+    .stepper { display: none; }
+    .fstep-top { flex-wrap: wrap; }
+    .fstep-top .fn { margin-left: auto; }
+
+    /* Un dito non è un puntatore: sotto i 44px si sbaglia bersaglio, e qui si
+       sbaglia su cose come «Elimina». Tutto ciò che si tocca cresce. */
+    /* Titolo e indicazione si spezzavano male l'uno accanto all'altro: impilati
+       si leggono, e l'indicazione resta legata al titolo che qualifica. */
+    .card > header { flex-direction: column; align-items: flex-start; gap: 3px; }
+
+    .btn { min-height: 44px; padding: 10px 16px; }
+    .btn-sm { min-height: 40px; padding: 8px 14px; font-size: 13.5px; }
+    .fchip { min-height: 40px; padding: 9px 14px; display: inline-flex; align-items: center; }
+    .opts label { min-height: 44px; padding: 11px 16px; display: inline-flex; align-items: center; }
+    .choice { padding: 14px; }
+    .fold > summary { min-height: 40px; display: flex; align-items: center; }
+    /* La riga della cronologia ha un ✕ che cancella: va preso solo di proposito,
+       quindi grande da colpire ma visivamente discreto. */
+    .row .btn-sm { min-width: 44px; justify-content: center; }
+    .sheet-body, .sheet-head { padding-left: 16px; padding-right: 16px; }
+
+    /* Le finestre diventano fogli ancorati in basso: dove arriva il pollice, e
+       dove la tastiera non le spinge fuori schermo. */
+    .modal-box {
+      top: auto; bottom: 0; left: 0; right: 0;
+      transform: none; width: auto;
+      max-height: 88vh;
+      border-radius: 14px 14px 0 0;
+      border-bottom: 0;
+      padding: 18px 16px calc(20px + env(safe-area-inset-bottom));
+    }
+    .modal-actions { flex-direction: column-reverse; align-items: stretch; gap: 10px; }
+    .modal-actions .btn { width: 100%; }
+  }
+
+  @media (max-width: 440px) {
+    .field-2 { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="app">
+  <nav class="rail" id="rail" aria-label="Sezioni"></nav>
+  <main id="main"></main>
+</div>
+<div id="layer"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ══ Modello ══════════════════════════════════════════════════════════ */
+
+  const STAGES = [
+    { id: "lista",    label: "In lista",    action: null },
+    { id: "contatto", label: "Contattato",  action: "Registra contatto" },
+    { id: "invito",   label: "Invitato",    action: "Registra invito" },
+    { id: "piano",    label: "Piano fatto", action: "Registra piano" },
+    { id: "followup", label: "Follow-up",   action: "Registra follow-up" },
+  ];
+  const FUNNEL_LABELS = ["In lista", "Contattati", "Invitati", "Piano fatto", "Follow-up", "Chiusi"];
+
+  const OUTCOMES = [
+    { id: "partner", label: "Partner",  tone: "good", positive: true },
+    { id: "cliente", label: "Cliente",  tone: "good", positive: true },
+    { id: "non_ora", label: "Non ora",  tone: "warn", positive: false },
+    { id: "no",      label: "No",       tone: "crit", positive: false },
+  ];
+
+  const PLAN_RESULTS = [
+    { id: "molto",       label: "Molto interessato" },
+    { id: "interessato", label: "Interessato" },
+    { id: "pensarci",    label: "Deve pensarci" },
+    { id: "freddo",      label: "Poco interessato" },
+    { id: "assente",     label: "Non si è presentato" },
+  ];
+
+  const EVENT_TYPES = [
+    { id: "contatto", label: "Contatto" },
+    { id: "invito",   label: "Invito" },
+    { id: "piano",    label: "Piano" },
+    { id: "followup", label: "Follow-up" },
+    { id: "nota",     label: "Nota" },
+    { id: "esito",    label: "Chiusura" },
+    { id: "lista",    label: "Inserito in lista" },
+  ];
+
+  /* Ogni passo ha la sua finestra, con le domande che hanno senso per quel passo
+     e non per gli altri: "dove hai fatto il piano" non serve a una nota, "ha
+     accettato?" non serve a una chiusura. `how` e `react` sono le due domande
+     ricorrenti — con che mezzo, e come è andata — riempite con parole diverse. */
+  const FORMS = {
+    contatto: {
+      title: "Contatto", lead: "Ti sei fatto sentire.",
+      how: { label: "Come l'hai contattato", opts: ["Telefono", "Messaggio", "Di persona", "Social"] },
+      react: { label: "Come ha reagito", opts: ["Aperto, incuriosito", "Gentile ma tiepido", "Dice che ha poco tempo", "Non ha risposto"] },
+      noteLabel: "Cosa vi siete detti",
+      nextLabel: "Quando ci ritorni sopra",
+    },
+    invito: {
+      title: "Invito", lead: "Gli hai proposto di vedere il piano.",
+      how: { label: "A cosa l'hai invitato", opts: ["Piano a casa", "Videochiamata", "Uno-a-uno, al bar", "Evento"] },
+      react: { label: "Ha accettato?", opts: ["Sì, appuntamento fissato", "Deve confermare", "Ha rimandato", "No"] },
+      noteLabel: "Note sull'invito",
+      nextLabel: "Data dell'appuntamento",
+      nextHint: "Se avete fissato, mettila qui: te la ritrovi nel «Da fare».",
+    },
+    piano: {
+      title: "Piano", lead: "Gli hai mostrato il piano.",
+      how: { label: "Dove", opts: ["A casa sua", "A casa mia", "Videochiamata", "Al bar", "Evento"] },
+      plan: true,
+      noteLabel: "Cosa l'ha colpito, che obiezioni ha fatto",
+      nextLabel: "Quando lo risenti",
+    },
+    followup: {
+      title: "Follow-up", lead: "Ci sei tornato sopra dopo il piano.",
+      how: { label: "Come", opts: ["Telefono", "Messaggio", "Di persona", "Videochiamata"] },
+      react: { label: "Dove siamo", opts: ["Vuole partire", "Ha ancora dubbi", "Deve parlarne in famiglia", "Ha rimandato", "Non ha risposto"] },
+      noteLabel: "Cosa vi siete detti",
+      nextLabel: "Quando lo risenti",
+    },
+    esito: {
+      title: "Chiusura", lead: "Il percorso arriva a una risposta.",
+      outcome: true,
+      noteLabel: "Com'è andata",
+      nextLabel: "Prossimo passo",
+    },
+    nota: {
+      title: "Nota", lead: "Qualcosa da ricordare, senza cambiare fase.",
+      noteLabel: "Nota",
+      nextLabel: "Prossimo passo",
+    },
+  };
+
+  /* La chiusura è l'unico passo in cui la scelta cambia le domande che seguono:
+     a un «non ora» serve sapere quando riprovare, a un «no» il perché. */
+  const CLOSE_COPY = {
+    partner: { note: "Come è andata la chiusura", next: "Primo passo insieme", hint: "Primo ordine, presentazione al gruppo…" },
+    cliente: { note: "Cosa gli serve, cosa ha ordinato", next: "Quando risentirlo", hint: "Di solito quando finisce il prodotto." },
+    non_ora: { note: "Perché non è il momento", next: "Quando riprovare", hint: "Mettila: è l'unica cosa che ti fa tornare da lui." },
+    no: { note: "Perché ha detto no", next: "Prossimo passo", hint: "Puoi lasciarlo vuoto." },
+  };
+
+  const DEFAULT_GOALS = { contatto: 10, invito: 6, piano: 3, chiusura: 1 };
+  const KEY = "dalla-lista-al-si.v1";
+
+  const emptyState = () => ({ v: 1, people: [], deleted: [], settings: { nome: "", goals: { ...DEFAULT_GOALS }, lastBackup: "", snoozeBackup: "" } });
+
+  let state = emptyState();
+  let view = "cruscotto";
+  let persistent = null;
+  let filter = "tutti";
+  let query = "";
+  let openId = null;
+  let storageOk = true;
+
+  /* ══ Persistenza ══════════════════════════════════════════════════════ */
+
+  function load() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); }
+    catch (e) { storageOk = false; return; }
+    if (!raw) return;
+    try {
+      const d = JSON.parse(raw);
+      if (d && Array.isArray(d.people)) state = normalize(d);
+    } catch (e) { /* dato illeggibile: si riparte vuoti, il backup resta l'unica via */ }
+  }
+
+  function saveLocal() {
+    if (!storageOk) return;
+    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch (e) { storageOk = false; render(); }
+  }
+
+  const save = saveLocal;
+
+
+  function normalize(d) {
+    const s = d.settings || {};
+    /* Le pietre tombali tengono memoria delle persone cancellate: senza di loro
+       l'unione con l'archivio dell'altro dispositivo le farebbe tornare in vita. */
+    const cutoff = new Date(Date.now() - 180 * 86400000).toISOString();
+    return {
+      v: 1,
+      deleted: (Array.isArray(d.deleted) ? d.deleted : [])
+        .filter(x => x && x.id && (x.at || "") > cutoff)
+        .map(x => ({ id: x.id, at: x.at })),
+      people: d.people.map(p => ({
+        updatedAt: p.updatedAt || nowISO(),
+        id: p.id || uid(),
+        name: String(p.name || "").trim() || "Senza nome",
+        contact: p.contact || "",
+        origine: p.origine || "",
+        note: p.note || "",
+        reached: clamp(Number(p.reached) || 0, 0, 4),
+        outcome: OUTCOMES.some(o => o.id === p.outcome) ? p.outcome : null,
+        nextDate: p.nextDate || "",
+        nextNote: p.nextNote || "",
+        createdAt: p.createdAt || todayISO(),
+        events: Array.isArray(p.events) ? p.events.map(e => ({
+          id: e.id || uid(),
+          type: EVENT_TYPES.some(t => t.id === e.type) ? e.type : "nota",
+          date: e.date || todayISO(),
+          note: e.note || "",
+          plan: e.plan || "",
+          outcome: e.outcome || "",
+          how: e.how || "",
+          react: e.react || "",
+          reopen: !!e.reopen,
+        })) : [],
+      })),
+      settings: {
+        nome: s.nome || "",
+        goals: { ...DEFAULT_GOALS, ...(s.goals || {}) },
+        lastBackup: s.lastBackup || "",
+        snoozeBackup: s.snoozeBackup || "",
+      },
+    };
+  }
+
+  /* ══ Unione di due archivi ════════════════════════════════════════════
+
+     Sostituire distrugge: se importi il telefono sul Mac perdi il lavoro fatto
+     sul Mac. Qui invece i due archivi si sommano. I passi registrati sono
+     aggiunte con un identificativo proprio, quindi si uniscono senza conflitto;
+     sui dati della scheda (nome, note, prossimo passo) vince chi è stato
+     modificato più tardi; la fase e l'esito si ricavano dai passi uniti, così il
+     risultato è lo stesso da qualunque parte si faccia l'unione.            */
+
+  function mergeStates(local, incoming) {
+    const tombs = new Map();
+    for (const t of [...(local.deleted || []), ...(incoming.deleted || [])]) {
+      if (!tombs.has(t.id) || t.at > tombs.get(t.id)) tombs.set(t.id, t.at);
+    }
+
+    const pairs = new Map();
+    for (const p of local.people) pairs.set(p.id, { a: p });
+    for (const p of incoming.people) pairs.set(p.id, { ...(pairs.get(p.id) || {}), b: p });
+
+    const people = [];
+    const stats = { nuovi: 0, aggiornati: 0, rimossi: 0 };
+
+    for (const [id, { a, b }] of pairs) {
+      const winner = !a ? b : !b ? a : ((b.updatedAt || "") > (a.updatedAt || "") ? b : a);
+      const tomb = tombs.get(id);
+      if (tomb && tomb > (winner.updatedAt || "")) { stats.rimossi++; continue; }
+
+      if (!a || !b) {
+        people.push(winner);
+        if (!a) stats.nuovi++;
+        continue;
+      }
+
+      const loser = winner === b ? a : b;
+      const evs = new Map();
+      for (const e of [...loser.events, ...winner.events]) evs.set(e.id, e);
+      const merged = {
+        ...winner,
+        events: [...evs.values()].sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0)),
+      };
+      recompute(merged);
+      people.push(merged);
+      if (winner === b || merged.events.length !== a.events.length) stats.aggiornati++;
+    }
+
+    /* Lo stesso nome inserito a mano su due dispositivi ha due identificativi
+       diversi: unirli d'ufficio rischierebbe di fondere due persone omonime, per
+       cui li segnalo e lascio decidere. */
+    const seen = new Set(), dupes = [];
+    for (const p of people) {
+      const k = p.name.trim().toLowerCase();
+      if (seen.has(k)) { if (!dupes.includes(p.name)) dupes.push(p.name); } else seen.add(k);
+    }
+
+    return {
+      state: {
+        v: 1,
+        people,
+        deleted: [...tombs].map(([id, at]) => ({ id, at })),
+        settings: local.settings,
+      },
+      stats, dupes,
+    };
+  }
+
+  /* ══ Utilità ══════════════════════════════════════════════════════════ */
+
+  const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  /* Una sola fonte dell'ora, così i timestamp scritti e i confronti fra date
+     leggono sempre lo stesso orologio. */
+  const nowISO = () => new Date(Date.now()).toISOString();
+  const touch = p => { if (p) p.updatedAt = nowISO(); };
+  const daysSince = stamp => stamp ? Math.floor((Date.now() - new Date(stamp).getTime()) / 86400000) : null;
+
+  /* Il browser è una memoria buona per l'uso quotidiano ma non è un backup: chi
+     svuota i dati di navigazione perde la lista, e non c'è niente da cui
+     recuperarla. Il promemoria sposta questa disciplina dalla buona volontà
+     dell'utente all'app. Tace quando c'è un file collegato che scrive bene: quel
+     file è già una copia fuori dal browser. */
+  function backupNudge() {
+    if (!state.people.length) return null;
+    const snooze = daysSince(state.settings.snoozeBackup);
+    if (snooze !== null && snooze < 3) return null;
+    const age = daysSince(state.settings.lastBackup);
+    if (age === null) return state.people.length >= 3 ? { mai: true } : null;
+    return age >= 14 ? { giorni: age } : null;
+  }
+
+  function markBackup() {
+    state.settings.lastBackup = nowISO();
+    state.settings.snoozeBackup = "";
+    saveLocal();
+  }
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  function todayISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  const parseISO = s => { const [y, m, d] = String(s).split("-").map(Number); return new Date(y, (m || 1) - 1, d || 1); };
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const daysBetween = (a, b) => Math.round((parseISO(b) - parseISO(a)) / 86400000);
+
+  function mondayOf(d) {
+    const x = new Date(d);
+    const wd = (x.getDay() + 6) % 7;
+    x.setDate(x.getDate() - wd);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  }
+
+  const fmtDay = new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "short" });
+  const fmtLong = new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long" });
+  const dshort = s => (s ? fmtDay.format(parseISO(s)) : "—");
+
+  function relDue(s) {
+    if (!s) return null;
+    const n = daysBetween(todayISO(), s);
+    if (n < 0) return { cls: "late", text: n === -1 ? "ieri" : `${-n} gg in ritardo` };
+    if (n === 0) return { cls: "now", text: "oggi" };
+    if (n === 1) return { cls: "now", text: "domani" };
+    return { cls: "", text: `fra ${n} gg` };
+  }
+
+  const stageLabel = p => (p.outcome ? outcomeOf(p.outcome).label : STAGES[p.reached].label);
+  const outcomeOf = id => OUTCOMES.find(o => o.id === id) || OUTCOMES[3];
+  const planLabel = id => (PLAN_RESULTS.find(r => r.id === id) || {}).label || "";
+  const typeLabel = id => (EVENT_TYPES.find(t => t.id === id) || {}).label || id;
+  const eventDetail = e => [e.how, e.react].filter(Boolean).join(" · ");
+  const isOpen = p => !p.outcome;
+  const stageIndexOf = type => STAGES.findIndex(s => s.id === type);
+  const byId = id => state.people.find(p => p.id === id);
+  const lastTouch = p => p.events.reduce((m, e) => (e.date > m ? e.date : m), p.createdAt);
+
+  /* La fase raggiunta e l'esito vivono nella cronologia: dopo aver cancellato un
+     evento vanno ricavati di nuovo da lì, altrimenti la persona resta a una fase
+     che non ha più nessun passo a sostenerla. */
+  function recompute(p) {
+    let reached = 0, outcome = null, mark = null;
+    for (const e of p.events) {
+      const i = stageIndexOf(e.type);
+      if (i > 0) reached = Math.max(reached, i);
+      if (e.type === "esito" || e.reopen) {
+        if (mark === null || e.date >= mark) { mark = e.date; outcome = e.reopen ? null : (e.outcome || null); }
+      }
+    }
+    p.reached = reached;
+    p.outcome = OUTCOMES.some(o => o.id === outcome) ? outcome : null;
+  }
+
+  function personTone(p) {
+    if (!p.outcome) return "accent";
+    return outcomeOf(p.outcome).tone;
+  }
+
+  /* ══ Conteggi ═════════════════════════════════════════════════════════ */
+
+  function eventsIn(type, fromISO, toISO) {
+    let n = 0;
+    for (const p of state.people) for (const e of p.events) {
+      if (e.date < fromISO || e.date > toISO) continue;
+      if (type === "chiusura") {
+        if (e.type === "esito" && OUTCOMES.some(o => o.id === e.outcome && o.positive)) n++;
+      } else if (e.type === type) n++;
+    }
+    return n;
+  }
+
+  function weeklySeries(type, weeks) {
+    const out = [];
+    const thisMon = mondayOf(new Date());
+    for (let i = weeks - 1; i >= 0; i--) {
+      const from = addDays(thisMon, -7 * i);
+      out.push(eventsIn(type, iso(from), iso(addDays(from, 6))));
+    }
+    return out;
+  }
+
+  function funnelCounts() {
+    const c = [0, 0, 0, 0, 0, 0];
+    for (const p of state.people) {
+      for (let i = 0; i <= p.reached; i++) c[i]++;
+      if (p.outcome && outcomeOf(p.outcome).positive) c[5]++;
+    }
+    return c;
+  }
+
+  function occupancy() {
+    const o = [0, 0, 0, 0, 0];
+    for (const p of state.people) if (isOpen(p)) o[p.reached]++;
+    return o;
+  }
+
+  function allPlans() {
+    const out = [];
+    for (const p of state.people) for (const e of p.events) if (e.type === "piano") out.push({ e, p });
+    return out.sort((a, b) => (a.e.date < b.e.date ? 1 : a.e.date > b.e.date ? -1 : 0));
+  }
+
+  function todo() {
+    const t = todayISO(), limit = iso(addDays(new Date(), 4));
+    const late = [], now = [], soon = [], stale = [];
+    for (const p of state.people) {
+      if (!isOpen(p) && p.outcome !== "non_ora") continue;
+      if (p.nextDate) {
+        if (p.nextDate < t) late.push(p);
+        else if (p.nextDate === t) now.push(p);
+        else if (p.nextDate <= limit) soon.push(p);
+      } else if (isOpen(p) && p.reached >= 1 && daysBetween(lastTouch(p), t) >= 14) {
+        stale.push(p);
+      }
+    }
+    const byDate = (a, b) => (a.nextDate < b.nextDate ? -1 : a.nextDate > b.nextDate ? 1 : 0);
+    return { late: late.sort(byDate), now, soon: soon.sort(byDate), stale: stale.sort((a, b) => (lastTouch(a) < lastTouch(b) ? -1 : 1)) };
+  }
+
+  /* ══ Frammenti ════════════════════════════════════════════════════════ */
+
+  function chip(label, tone) {
+    return `<span class="chip t-${tone}"><i class="dot"></i>${esc(label)}</span>`;
+  }
+
+  function stepper(p) {
+    let h = '<span class="stepper" aria-hidden="true">';
+    for (let i = 0; i < 5; i++) h += `<i class="${i <= p.reached ? "on" : ""}"></i>`;
+    return h + "</span>";
+  }
+
+  function sparkline(values, goal) {
+    const W = 6, G = 3, H = 22;
+    const max = Math.max(1, ...values, goal || 0);
+    const w = values.length * (W + G) - G;
+    let bars = "";
+    values.forEach((v, i) => {
+      const h = Math.max(v > 0 ? 2 : 1, Math.round((v / max) * H));
+      const last = i === values.length - 1;
+      bars += `<rect x="${i * (W + G)}" y="${H - h}" width="${W}" height="${h}" rx="1.5"
+        fill="${v > 0 ? "var(--accent)" : "var(--rule)"}" opacity="${last ? 1 : v > 0 ? .34 : 1}"></rect>`;
+    });
+    let gl = "";
+    if (goal > 0) {
+      const y = H - (goal / max) * H;
+      gl = `<line x1="0" y1="${y.toFixed(1)}" x2="${w}" y2="${y.toFixed(1)}" stroke="var(--ink-3)" stroke-width="1" stroke-dasharray="2 2" opacity=".6"></line>`;
+    }
+    return `<svg width="${w}" height="${H}" viewBox="0 0 ${w} ${H}" role="img"
+      aria-label="Ultime ${values.length} settimane: ${values.join(", ")}">${gl}${bars}</svg>`;
+  }
+
+  function kpiTile(key, title, goal) {
+    const mon = mondayOf(new Date());
+    const wk = eventsIn(key, iso(mon), iso(addDays(mon, 6)));
+    const prev = eventsIn(key, iso(addDays(mon, -7)), iso(addDays(mon, -1)));
+    const m0 = new Date(); m0.setDate(1);
+    const month = eventsIn(key, iso(m0), todayISO());
+    const d = wk - prev;
+    const dcls = d > 0 ? "up" : d < 0 ? "down" : "flat";
+    const dtxt = d === 0 ? "= sett. scorsa" : `${d > 0 ? "+" : "−"}${Math.abs(d)} vs sett. scorsa`;
+    const pct = goal > 0 ? clamp(Math.round((wk / goal) * 100), 0, 100) : 0;
+    return `<div class="kpi">
+      <div class="kpi-top">
+        <div><div class="eyebrow">${esc(title)}</div><div class="kpi-val">${wk}</div></div>
+        ${sparkline(weeklySeries(key, 8), goal)}
+      </div>
+      ${goal > 0 ? `<div><div class="track thin"><i style="width:${pct}%"></i></div>
+        <div class="kpi-goal" style="margin-top:5px">obiettivo ${goal} · ${pct}%</div></div>` : ""}
+      <div class="kpi-foot">
+        <span class="delta ${dcls}">${esc(dtxt)}</span>
+        <span class="muted num">${month} nel mese</span>
+      </div>
+    </div>`;
+  }
+
+  function personRow(p) {
+    const due = relDue(p.nextDate);
+    const sub = [];
+    if (p.origine) sub.push(p.origine);
+    if (p.nextNote) sub.push(p.nextNote);
+    else if (p.contact) sub.push(p.contact);
+    return `<div class="row" data-act="open" data-id="${p.id}" tabindex="0" role="button">
+      <div class="row-main">
+        <span class="row-name">${esc(p.name)}</span>
+        <span class="row-sub">${esc(sub.join(" · ") || "—")}</span>
+      </div>
+      <div class="row-side">
+        ${due ? `<span class="due ${due.cls}">${esc(due.text)}</span>` : ""}
+        ${p.outcome ? chip(outcomeOf(p.outcome).label, outcomeOf(p.outcome).tone) : stepper(p)}
+        ${p.outcome ? "" : `<span class="chip">${esc(STAGES[p.reached].label)}</span>`}
+      </div>
+    </div>`;
+  }
+
+  /* ══ Vista: Cruscotto ═════════════════════════════════════════════════ */
+
+  function viewCruscotto() {
+    const g = state.settings.goals;
+    const nome = state.settings.nome.trim();
+    const head = `<div class="page-head">
+      <div>
+        <h1>${nome ? `Ciao ${esc(nome.split(" ")[0])}` : "Cruscotto"}</h1>
+        <p class="lede">${esc(fmtLong.format(new Date()))} · ${state.people.length} nomi in lista</p>
+      </div>
+      <div class="btn-row">
+        <button class="btn" data-act="add-one">+ Un nome</button>
+        <button class="btn btn-primary" data-act="add-bulk">Aggiungi lista nomi</button>
+      </div>
+    </div>`;
+
+    if (!state.people.length) {
+      return head + `<div class="card">
+        <div class="empty">
+          <div class="eyebrow">Si parte da qui</div>
+          <h2>Scrivi la tua lista nomi</h2>
+          <p>Butta dentro tutti i nomi che ti vengono in mente, senza filtrare e senza decidere niente su di loro.
+             Poi ogni nome cammina da solo: contatto, invito, piano, follow-up, esito.</p>
+          <div class="btn-row">
+            <button class="btn btn-primary" data-act="add-bulk">Scrivi la lista</button>
+            <button class="btn" data-act="demo">Guarda un esempio</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    const nudge = backupNudge();
+    const promemoria = nudge ? `<div class="nudge">
+      <div class="nudge-t">
+        ${nudge.mai
+          ? "Non hai ancora salvato una copia dei tuoi dati."
+          : `Ultima copia salvata ${nudge.giorni} giorni fa.`}
+      </div>
+      <p class="nudge-d">La lista vive solo nella memoria di questo browser. Se lo pulisci o cambi dispositivo,
+        senza una copia non c'è niente da cui recuperarla.</p>
+      <div class="btn-row">
+        <button class="btn btn-sm btn-primary" data-act="backup-file">Salva una copia</button>
+        <button class="btn btn-sm btn-quiet" data-act="snooze-backup">Più tardi</button>
+      </div>
+    </div>` : "";
+
+    const kpis = promemoria + `<div class="kpis">
+      ${kpiTile("contatto", "Contatti", g.contatto)}
+      ${kpiTile("invito", "Inviti", g.invito)}
+      ${kpiTile("piano", "Piani fatti", g.piano)}
+      ${kpiTile("chiusura", "Chiusure", g.chiusura)}
+    </div>`;
+
+    return head + kpis + `<div class="cols">${cardTodo()}${cardFunnel()}</div>
+      <div class="cols">${cardOutcomes()}${cardRecentPlans()}</div>`;
+  }
+
+  function cardTodo() {
+    const t = todo();
+    const total = t.late.length + t.now.length + t.soon.length;
+    const group = (label, list) => list.length
+      ? `<div class="grp-label"><span class="eyebrow">${esc(label)}</span></div>
+         <div class="rows">${list.map(personRow).join("")}</div>` : "";
+    const body = total + t.stale.length === 0
+      ? `<div class="empty"><p class="muted">Niente in scadenza. Quando registri un passo, imposta il prossimo:
+           è quello che tiene in movimento la lista.</p></div>`
+      : group("In ritardo", t.late) + group("Oggi", t.now) + group("Prossimi giorni", t.soon)
+        + group("Fermi da due settimane", t.stale);
+    return `<section class="card">
+      <header><h2>Da fare</h2><span class="eyebrow">${total} in scadenza</span></header>
+      ${body}
+    </section>`;
+  }
+
+  function cardFunnel() {
+    const c = funnelCounts(), occ = occupancy();
+    const max = Math.max(1, c[0]);
+    let rows = "";
+    for (let i = 0; i < 6; i++) {
+      if (i > 0) {
+        const prev = c[i - 1];
+        const pct = prev > 0 ? Math.round((c[i] / prev) * 100) : 0;
+        rows += `<div class="fconv">${prev > 0 ? `↓ ${pct}% · ${c[i]} su ${prev}` : "—"}</div>`;
+      }
+      rows += `<div class="fstep">
+        <div class="fstep-top">
+          <span class="fl">${esc(FUNNEL_LABELS[i])}</span>
+          ${i < 5 && occ[i] ? `<span class="fhere">ora qui: ${occ[i]}</span>` : ""}
+          <span class="fn">${c[i]}</span>
+        </div>
+        <div class="track"><i style="width:${Math.round((c[i] / max) * 100)}%;${i === 5 ? "background:var(--good)" : ""}"></i></div>
+      </div>`;
+    }
+    return `<section class="card">
+      <header><h2>Imbuto</h2><span class="eyebrow">quanti sono arrivati fin qui</span></header>
+      <div class="funnel">${rows}</div>
+    </section>`;
+  }
+
+  function cardOutcomes() {
+    const closed = state.people.filter(p => p.outcome);
+    const tot = closed.length;
+    const rows = OUTCOMES.map(o => {
+      const n = closed.filter(p => p.outcome === o.id).length;
+      const pct = tot ? Math.round((n / tot) * 100) : 0;
+      return `<div class="orow">
+        <div class="orow-top">${chip(o.label, o.tone)}<span class="on">${n}${tot ? ` · ${pct}%` : ""}</span></div>
+        <div class="track thin"><i style="width:${pct}%;background:var(--${o.tone === "off" ? "off" : o.tone})"></i></div>
+      </div>`;
+    }).join("");
+    const reachedPlan = state.people.filter(p => p.reached >= 3).length;
+    const won = closed.filter(p => outcomeOf(p.outcome).positive).length;
+    return `<section class="card">
+      <header><h2>Come sono andate le chiusure</h2><span class="eyebrow">${tot} chiusi</span></header>
+      ${tot ? `<div class="outcomes">${rows}</div>` : `<p class="muted">Ancora nessuna chiusura registrata.</p>`}
+      ${reachedPlan ? `<p class="muted" style="font-size:13px">Su ${reachedPlan} person${reachedPlan === 1 ? "a a cui hai fatto" : "e a cui hai fatto"} il piano,
+        ${won} ${won === 1 ? "ha" : "hanno"} detto sì — ${Math.round((won / reachedPlan) * 100)}%.</p>` : ""}
+    </section>`;
+  }
+
+  function cardRecentPlans() {
+    const plans = allPlans().slice(0, 5);
+    return `<section class="card">
+      <header><h2>Ultimi piani</h2>${plans.length ? `<button class="btn btn-sm btn-quiet" data-act="nav" data-view="piani">Tutti</button>` : ""}</header>
+      ${plans.length ? `<div class="rows">${plans.map(({ e, p }) => `
+        <div class="row" data-act="open" data-id="${p.id}" tabindex="0" role="button">
+          <div class="row-main">
+            <span class="row-name">${esc(p.name)}</span>
+            <span class="row-sub">${esc(e.note || planLabel(e.plan) || "—")}</span>
+          </div>
+          <div class="row-side">
+            <span class="due">${esc(dshort(e.date))}</span>
+            ${e.plan ? `<span class="chip">${esc(planLabel(e.plan))}</span>` : ""}
+          </div>
+        </div>`).join("")}</div>`
+        : `<p class="muted">Nessun piano registrato per ora.</p>`}
+    </section>`;
+  }
+
+  /* ══ Vista: Nomi ══════════════════════════════════════════════════════ */
+
+  function viewNomi() {
+    const filters = [
+      { id: "tutti", label: `Tutti ${state.people.length}` },
+      ...STAGES.map((s, i) => ({ id: s.id, label: `${s.label} ${state.people.filter(p => isOpen(p) && p.reached === i).length}` })),
+      { id: "chiusi", label: `Chiusi ${state.people.filter(p => p.outcome).length}` },
+      { id: "riprendere", label: `Da riprendere ${state.people.filter(p => p.outcome === "non_ora").length}` },
+    ];
+
+    let list = state.people.slice();
+    if (filter === "chiusi") list = list.filter(p => p.outcome);
+    else if (filter === "riprendere") list = list.filter(p => p.outcome === "non_ora");
+    else if (filter !== "tutti") {
+      const i = stageIndexOf(filter);
+      list = list.filter(p => isOpen(p) && p.reached === i);
+    }
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      list = list.filter(p => [p.name, p.contact, p.origine, p.note, p.nextNote].join(" ").toLowerCase().includes(q));
+    }
+    list.sort((a, b) => {
+      const ao = isOpen(a) ? 0 : 1, bo = isOpen(b) ? 0 : 1;
+      if (ao !== bo) return ao - bo;
+      const ad = a.nextDate || "9999", bd = b.nextDate || "9999";
+      if (ad !== bd) return ad < bd ? -1 : 1;
+      return a.name.localeCompare(b.name, "it");
+    });
+
+    return `<div class="page-head">
+        <div><h1>Nomi</h1><p class="lede">Ogni riga è una persona e il punto in cui si trova.</p></div>
+        <div class="btn-row">
+          <button class="btn" data-act="add-bulk">Aggiungi lista</button>
+          <button class="btn btn-primary" data-act="add-one">+ Un nome</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <label class="search"><span class="sr">Cerca</span>
+          <input id="q" type="search" placeholder="Cerca un nome, un dettaglio…" value="${esc(query)}">
+        </label>
+      </div>
+      <div class="fchips">${filters.map(f =>
+        `<button class="fchip" data-act="filter" data-f="${f.id}" aria-pressed="${filter === f.id}">${esc(f.label)}</button>`).join("")}</div>
+      <section class="card">
+        ${list.length ? `<div class="rows">${list.map(personRow).join("")}</div>`
+          : `<div class="empty"><p class="muted">${state.people.length ? "Nessun nome con questo filtro." : "La lista è vuota."}</p>
+             ${state.people.length ? "" : `<button class="btn btn-primary" data-act="add-bulk">Scrivi la lista</button>`}</div>`}
+      </section>`;
+  }
+
+  /* ══ Vista: Piani ═════════════════════════════════════════════════════ */
+
+  function viewPiani() {
+    const plans = allPlans();
+    const t = todayISO(), from30 = iso(addDays(new Date(), -29));
+    const last30 = plans.filter(x => x.e.date >= from30 && x.e.date <= t).length;
+    const reachedPlan = state.people.filter(p => p.reached >= 3);
+    const won = reachedPlan.filter(p => p.outcome && outcomeOf(p.outcome).positive).length;
+    const rate = reachedPlan.length ? Math.round((won / reachedPlan.length) * 100) : 0;
+
+    const tile = (lab, val, sub) => `<div class="kpi">
+      <div class="eyebrow">${esc(lab)}</div><div class="kpi-val">${esc(String(val))}</div>
+      <div class="kpi-goal">${esc(sub)}</div></div>`;
+
+    const after = p => p.outcome
+      ? chip(outcomeOf(p.outcome).label, outcomeOf(p.outcome).tone)
+      : `<span class="chip">${esc(STAGES[p.reached].label)}</span>${p.nextDate ? ` <span class="due">${esc(dshort(p.nextDate))}</span>` : ""}`;
+
+    return `<div class="page-head">
+        <div><h1>Piani</h1><p class="lede">Quanti ne hai fatti, come sono andati, cosa è successo dopo.</p></div>
+      </div>
+      <div class="kpis">
+        ${tile("Piani totali", plans.length, "da quando usi l'app")}
+        ${tile("Ultimi 30 giorni", last30, "piani fatti")}
+        ${tile("Persone al piano", reachedPlan.length, "hanno visto il piano")}
+        ${tile("Chiusure sul piano", rate + "%", `${won} sì su ${reachedPlan.length}`)}
+      </div>
+      <section class="card">
+        <header><h2>Storico</h2><span class="eyebrow">${plans.length} piani</span></header>
+        ${plans.length ? `
+          <div class="tscroll solo-larghi"><table>
+            <thead><tr><th>Data</th><th>Persona</th><th>Com'è andato</th><th>Nota</th><th>Poi</th></tr></thead>
+            <tbody>${plans.map(({ e, p }) => `<tr data-act="open" data-id="${p.id}" style="cursor:pointer">
+              <td class="n">${esc(dshort(e.date))}</td>
+              <td>${esc(p.name)}</td>
+              <td>${e.plan ? `<span class="chip">${esc(planLabel(e.plan))}</span>` : `<span class="muted">—</span>`}</td>
+              <td>${esc(e.note) || `<span class="muted">—</span>`}</td>
+              <td>${after(p)}</td>
+            </tr>`).join("")}</tbody>
+          </table></div>
+
+          <!-- Su telefono la stessa storia in righe: una tabella a cinque colonne
+               si può solo trascinare di lato, che su uno schermo così è inservibile. -->
+          <div class="rows solo-stretti">${plans.map(({ e, p }) => `
+            <div class="row" data-act="open" data-id="${p.id}" tabindex="0" role="button">
+              <div class="row-main">
+                <span class="row-name">${esc(p.name)}</span>
+                ${e.note ? `<span class="row-sub" style="white-space:normal">${esc(e.note)}</span>` : ""}
+              </div>
+              <div class="row-side">
+                <span class="due">${esc(dshort(e.date))}</span>
+                ${e.plan ? `<span class="chip">${esc(planLabel(e.plan))}</span>` : ""}
+                ${after(p)}
+              </div>
+            </div>`).join("")}</div>`
+          : `<p class="muted">Nessun piano registrato. Appena ne fai uno, apri la persona e registralo:
+          finisce qui con data, esito e quello che è successo dopo.</p>`}
+      </section>`;
+  }
+
+  /* ══ Vista: Dati ══════════════════════════════════════════════════════ */
+
+  function viewDati() {
+    const g = state.settings.goals;
+    return `<div class="page-head"><div><h1>Impostazioni e dati</h1>
+      <p class="lede">I tuoi dati restano su questo dispositivo, in questo browser. Nessuno li vede.</p></div></div>
+
+      ${!storageOk ? `<div class="banner"><div><b>Questo browser non salva i dati.</b>
+        Puoi lavorare, ma chiudendo la pagina perdi tutto. Salva una copia prima di chiudere,
+        oppure apri l'app dal file sul tuo computer.</div></div>` : ""}
+
+      <section class="card">
+        <header><h2>Il tuo nome</h2></header>
+        <div class="field" style="max-width:280px">
+          <label for="s-nome">Come ti chiami</label>
+          <input id="s-nome" type="text" value="${esc(state.settings.nome)}" placeholder="Il tuo nome">
+        </div>
+        <div class="btn-row"><button class="btn btn-sm" data-act="theme">${document.documentElement.getAttribute("data-theme") === "dark" ? "☀ Passa al chiaro" : "☾ Passa allo scuro"}</button></div>
+      </section>
+
+      <section class="card">
+        <header><h2>Obiettivi della settimana</h2><span class="eyebrow">guidano il cruscotto</span></header>
+        <div class="field-2">
+          <div class="field"><label for="g-contatto">Contatti nuovi</label><input id="g-contatto" type="number" min="0" max="999" value="${g.contatto}"></div>
+          <div class="field"><label for="g-invito">Inviti</label><input id="g-invito" type="number" min="0" max="999" value="${g.invito}"></div>
+          <div class="field"><label for="g-piano">Piani</label><input id="g-piano" type="number" min="0" max="999" value="${g.piano}"></div>
+          <div class="field"><label for="g-chiusura">Chiusure</label><input id="g-chiusura" type="number" min="0" max="999" value="${g.chiusura}"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <header><h2>La tua copia</h2></header>
+        <p class="muted" style="font-size:13.5px">La lista vive nella memoria di questo telefono. <b>Salva una copia</b>
+          ogni tanto e mandala dove vuoi — a te stesso su WhatsApp è il modo più semplice. Ti serve per cambiare
+          telefono, per guardare i dati dal computer, e per non perdere niente se il browser viene pulito.</p>
+        <p class="muted" style="font-size:13.5px">Caricare una copia non sostituisce quello che hai qui: i due si
+          uniscono. Tutti i nomi restano, i passi registrati si sommano, e sulle schede presenti in entrambi vince
+          quella modificata più tardi. Quindi caricare non fa mai danni, in nessun ordine e quante volte vuoi.</p>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" data-act="backup-file">Salva una copia</button>
+          <button class="btn" data-act="pick-import">Carica da un file</button>
+          <input id="file-in" type="file" hidden>
+        </div>
+
+        <p class="muted" style="font-size:13px">
+          ${state.settings.lastBackup
+            ? `Ultima copia salvata: ${esc(new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(new Date(state.settings.lastBackup)))}.`
+            : "Non hai ancora salvato nessuna copia."}
+          ${persistent === true
+            ? "Il browser tratta questi dati come persistenti: non li butterà via per fare spazio."
+            : persistent === false
+              ? "Il browser non ha concesso la protezione dei dati contro la pulizia automatica per spazio: la copia salvata conta il doppio."
+              : ""}
+          Cancellando a mano i dati di navigazione la lista sparisce comunque, in ogni caso: da questo nessuna
+          impostazione protegge.
+        </p>
+
+        <details class="fold">
+          <summary>Oppure passa il testo a mano</summary>
+          <div class="fold-body">
+            <p class="muted" style="font-size:13px">Utile fra telefono e Mac con gli appunti condivisi, o se il
+              salvataggio del file non è disponibile.</p>
+            <div class="btn-row"><button class="btn btn-sm" data-act="copy-json">Copia il testo</button></div>
+            <textarea class="backup-json" id="json-out" readonly spellcheck="false">${esc(JSON.stringify(state))}</textarea>
+            <div class="field">
+              <label for="json-in">Incolla un archivio da unire</label>
+              <textarea class="backup-json" id="json-in" placeholder="Incolla qui il testo" spellcheck="false"></textarea>
+            </div>
+            <div class="btn-row"><button class="btn btn-sm" data-act="import">Unisci</button></div>
+          </div>
+        </details>
+      </section>
+
+      <section class="card">
+        <header><h2>Ricomincia</h2></header>
+        <div class="btn-row">
+          <button class="btn" data-act="demo">Carica dati di esempio</button>
+          <button class="btn btn-danger" data-act="reset">Cancella tutto</button>
+        </div>
+      </section>`;
+  }
+
+  /* ══ Scheda persona ═══════════════════════════════════════════════════ */
+
+  function renderSheet() {
+    const layer = document.getElementById("layer");
+    if (!openId) { if (!document.querySelector(".modal-box")) layer.innerHTML = ""; return; }
+    const p = byId(openId);
+    if (!p) { openId = null; layer.innerHTML = ""; return; }
+
+    const events = p.events.slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    const firstOf = t => p.events.filter(e => e.type === t).sort((a, b) => (a.date < b.date ? -1 : 1))[0];
+
+    const path = STAGES.map((s, i) => {
+      const done = i <= p.reached;
+      const cur = i === p.reached && isOpen(p);
+      const ev = i === 0 ? { date: p.createdAt } : firstOf(s.id);
+      return `<div class="sp-item ${done ? "done" : ""} ${cur ? "cur" : ""}">
+        <div class="sp-mark"><span class="sp-dot"></span><span class="sp-line"></span></div>
+        <div class="sp-body">
+          <span class="sp-label">${esc(s.label)}</span>
+          ${done && ev ? `<span class="sp-when">${esc(dshort(ev.date))}</span>` : ""}
+          ${done && ev && ev.plan ? `<span class="sp-note">${esc(planLabel(ev.plan))}</span>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+
+    const closeStep = `<div class="sp-item ${p.outcome ? "done cur" : ""}">
+      <div class="sp-mark"><span class="sp-dot"></span></div>
+      <div class="sp-body"><span class="sp-label">${p.outcome ? outcomeOf(p.outcome).label : "Esito"}</span>
+      ${p.outcome ? `<span class="sp-when">${esc(dshort((firstOf("esito") || {}).date || ""))}</span>` : ""}</div>
+    </div>`;
+
+    const due = relDue(p.nextDate);
+
+    layer.innerHTML = `<div class="scrim" data-act="close-layer"></div>
+      <aside class="sheet" role="dialog" aria-label="Scheda di ${esc(p.name)}">
+        <div class="sheet-head">
+          <button class="btn btn-sm btn-quiet sheet-x" data-act="close-layer" aria-label="Chiudi">Chiudi ✕</button>
+          <div style="padding-right:80px">
+            <div class="eyebrow">${esc(stageLabel(p))}</div>
+            <h1 style="font-size:21px;margin-top:3px">${esc(p.name)}</h1>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" data-act="progress" data-id="${p.id}">Progressi</button>
+            ${isOpen(p) ? "" : `<button class="btn" data-act="reopen" data-id="${p.id}">Riapri il percorso</button>`}
+          </div>
+        </div>
+        <div class="sheet-body">
+          <dl class="kv">
+            ${p.contact ? `<dt>Contatto</dt><dd>${esc(p.contact)}</dd>` : ""}
+            ${p.origine ? `<dt>Da dove</dt><dd>${esc(p.origine)}</dd>` : ""}
+            <dt>In lista da</dt><dd>${esc(dshort(p.createdAt))}</dd>
+            ${p.note ? `<dt>Note</dt><dd>${esc(p.note)}</dd>` : ""}
+          </dl>
+
+          <div class="next-box">
+            <div class="eyebrow">Prossimo passo${due ? ` · ${esc(due.text)}` : ""}</div>
+            <div class="field-2">
+              <input id="np-date" type="date" value="${esc(p.nextDate)}" aria-label="Data del prossimo passo">
+              <input id="np-note" type="text" value="${esc(p.nextNote)}" placeholder="Cosa devi fare" aria-label="Cosa devi fare">
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-sm" data-act="save-next" data-id="${p.id}">Salva</button>
+              ${p.nextDate ? `<button class="btn btn-sm btn-quiet" data-act="clear-next" data-id="${p.id}">Togli</button>` : ""}
+            </div>
+          </div>
+
+          <div>
+            <div class="eyebrow" style="margin-bottom:9px">Il percorso</div>
+            <div class="stage-path">${path}${closeStep}</div>
+          </div>
+
+          <div>
+            <div class="eyebrow" style="margin-bottom:9px">Cronologia · ${events.length}</div>
+            <div class="rows">
+              ${events.map(e => `<div class="row" style="cursor:default">
+                <div class="row-main">
+                  <span class="row-name" style="font-size:13.5px">${esc(typeLabel(e.type))}${e.plan ? ` — ${esc(planLabel(e.plan))}` : ""}${e.outcome ? ` — ${esc(outcomeOf(e.outcome).label)}` : ""}</span>
+                  ${eventDetail(e) ? `<span class="row-sub">${esc(eventDetail(e))}</span>` : ""}
+                  ${e.note ? `<span class="row-sub" style="white-space:normal">${esc(e.note)}</span>` : ""}
+                </div>
+                <div class="row-side"><span class="due">${esc(dshort(e.date))}</span>
+                  <button class="btn btn-sm btn-quiet" data-act="del-event" data-id="${p.id}" data-eid="${e.id}" aria-label="Elimina">✕</button>
+                </div>
+              </div>`).join("")}
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-sm" data-act="edit" data-id="${p.id}">Modifica dati</button>
+            <button class="btn btn-sm btn-danger" data-act="del-person" data-id="${p.id}">Elimina persona</button>
+          </div>
+        </div>
+      </aside>`;
+  }
+
+  /* ══ Modali ═══════════════════════════════════════════════════════════ */
+
+  /* La finestra si aggiunge accanto alla scheda senza riscriverla: così una
+     finestra può sostituirne un'altra (la scelta che apre il passo) e la scheda
+     sotto resta intatta, con i valori che l'utente aveva già nei campi. */
+  function openModal(html, onMount) {
+    const layer = document.getElementById("layer");
+    layer.querySelectorAll(".modal-box, .modal-scrim").forEach(n => n.remove());
+    layer.insertAdjacentHTML("beforeend",
+      `<div class="scrim modal-scrim" data-act="close-modal"></div>
+       <div class="modal-box" role="dialog" aria-modal="true">${html}</div>`);
+    const box = layer.querySelector(".modal-box");
+    if (onMount) onMount(box);
+    const f = box.querySelector("input, select, textarea, button");
+    if (f) f.focus();
+  }
+
+  function closeModal() {
+    const layer = document.getElementById("layer");
+    layer.querySelectorAll(".modal-box, .modal-scrim").forEach(n => n.remove());
+    if (!openId) layer.innerHTML = "";
+  }
+
+  function modalPerson(p) {
+    const isNew = !p;
+    openModal(`<div class="eyebrow">${isNew ? "Nuovo nome" : "Modifica"}</div>
+      <h2>${isNew ? "Aggiungi una persona" : esc(p.name)}</h2>
+      <form class="modal-form" id="f-person">
+        <div class="field"><label for="p-name">Nome</label>
+          <input id="p-name" type="text" required value="${esc(p ? p.name : "")}" placeholder="Nome e cognome"></div>
+        <div class="field-2">
+          <div class="field"><label for="p-contact">Telefono o email</label>
+            <input id="p-contact" type="text" value="${esc(p ? p.contact : "")}"></div>
+          <div class="field"><label for="p-origine">Da dove lo conosci</label>
+            <input id="p-origine" type="text" value="${esc(p ? p.origine : "")}" placeholder="Palestra, lavoro, amico di…"></div>
+        </div>
+        <div class="field"><label for="p-note">Note</label>
+          <textarea id="p-note" placeholder="Cosa fa, cosa gli interessa, cosa ti ha detto">${esc(p ? p.note : "")}</textarea></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-quiet" data-act="close-modal">Annulla</button>
+          <button type="submit" class="btn btn-primary">${isNew ? "Aggiungi" : "Salva"}</button>
+        </div>
+      </form>`, box => {
+      box.querySelector("#f-person").addEventListener("submit", ev => {
+        ev.preventDefault();
+        const name = box.querySelector("#p-name").value.trim();
+        if (!name) return;
+        const vals = {
+          name,
+          contact: box.querySelector("#p-contact").value.trim(),
+          origine: box.querySelector("#p-origine").value.trim(),
+          note: box.querySelector("#p-note").value.trim(),
+        };
+        if (isNew) {
+          const np = {
+            id: uid(), ...vals, reached: 0, outcome: null, nextDate: "", nextNote: "",
+            createdAt: todayISO(), updatedAt: nowISO(),
+            events: [{ id: uid(), type: "lista", date: todayISO(), note: "", plan: "", outcome: "" }],
+          };
+          state.people.push(np);
+          toast(`${name} è in lista`);
+        } else {
+          const per = byId(p.id);
+          Object.assign(per, vals);
+          touch(per);
+          toast("Salvato");
+        }
+        save(); closeModal(); render();
+      });
+    });
+  }
+
+  function modalBulk() {
+    openModal(`<div class="eyebrow">Lista nomi</div>
+      <h2>Aggiungi tanti nomi insieme</h2>
+      <form class="modal-form" id="f-bulk">
+        <div class="field">
+          <label for="b-text">Un nome per riga</label>
+          <textarea id="b-text" style="min-height:180px" placeholder="Marco Rossi
+Giulia Bianchi, 333 1234567, palestra
+Zio Franco"></textarea>
+        </div>
+        <p class="muted" style="font-size:13px">Se vuoi, dopo il nome puoi mettere una virgola e aggiungere
+          il contatto e da dove lo conosci. Tutti entrano come <b>In lista</b>: nessuna decisione, solo nomi.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-quiet" data-act="close-modal">Annulla</button>
+          <button type="submit" class="btn btn-primary">Aggiungi alla lista</button>
+        </div>
+      </form>`, box => {
+      box.querySelector("#f-bulk").addEventListener("submit", ev => {
+        ev.preventDefault();
+        const lines = box.querySelector("#b-text").value.split("\n").map(l => l.trim()).filter(Boolean);
+        let n = 0;
+        for (const line of lines) {
+          const [name, contact, origine] = line.split(",").map(s => (s || "").trim());
+          if (!name) continue;
+          state.people.push({
+            id: uid(), name, contact: contact || "", origine: origine || "", note: "",
+            reached: 0, outcome: null, nextDate: "", nextNote: "", createdAt: todayISO(), updatedAt: nowISO(),
+            events: [{ id: uid(), type: "lista", date: todayISO(), note: "", plan: "", outcome: "" }],
+          });
+          n++;
+        }
+        save(); closeModal();
+        if (view === "cruscotto") view = "nomi";
+        render();
+        toast(n === 1 ? "1 nome aggiunto" : `${n} nomi aggiunti`);
+      });
+    });
+  }
+
+  /* Prima finestra: si scegle il passo. Quella consigliata è la fase successiva a
+     dove si trova la persona, così il pulsante unico non perde l'indicazione che
+     davano i due pulsanti separati. */
+  function modalProgress(p) {
+    const suggested = isOpen(p) ? (p.reached < 4 ? STAGES[p.reached + 1].id : "followup") : null;
+    const order = ["contatto", "invito", "piano", "followup", "esito", "nota"];
+    const already = t => {
+      const ev = p.events.filter(e => e.type === t).sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+      return ev ? `Ultimo: ${dshort(ev.date)}` : "";
+    };
+    openModal(`<div class="eyebrow">${esc(p.name)}</div>
+      <h2>Progressi</h2>
+      <p class="muted" style="margin-top:4px;font-size:13.5px">Cosa hai fatto?</p>
+      <div class="choices">
+        ${order.map(t => {
+          const F = FORMS[t];
+          const last = already(t);
+          return `<button type="button" class="choice" data-choice="${t}" ${t === suggested ? "data-suggested" : ""}>
+            <span class="choice-t">${esc(F.title)}
+              ${t === suggested ? `<span class="chip t-accent"><i class="dot"></i>il prossimo passo</span>` : ""}</span>
+            <span class="choice-d">${esc(F.lead)}${last ? ` · ${esc(last)}` : ""}</span>
+          </button>`;
+        }).join("")}
+      </div>
+      <div class="modal-actions" style="margin-top:14px">
+        <button type="button" class="btn btn-quiet" data-act="close-modal">Annulla</button>
+      </div>`, box => {
+      box.querySelectorAll("[data-choice]").forEach(b =>
+        b.addEventListener("click", () => modalStep(p, b.dataset.choice)));
+    });
+  }
+
+  /* Seconda finestra: il passo scelto, con le sue domande e nient'altro. */
+  function modalStep(p, type) {
+    const F = FORMS[type];
+    const sel = (id, label, opts) => `<div class="field"><label for="${id}">${esc(label)}</label>
+      <select id="${id}"><option value="">—</option>
+      ${opts.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join("")}</select></div>`;
+
+    const middle = [
+      F.how ? sel("s-how", F.how.label, F.how.opts) : "",
+      F.react ? sel("s-react", F.react.label, F.react.opts) : "",
+      F.plan ? `<div class="field"><label for="s-plan">Com'è andato</label><select id="s-plan">
+          ${PLAN_RESULTS.map(r => `<option value="${r.id}">${esc(r.label)}</option>`).join("")}</select></div>` : "",
+      F.outcome ? `<div class="field"><label>Che risposta hai avuto</label><div class="opts" id="s-out">
+          ${OUTCOMES.map((o, i) => `<input type="radio" name="s-out" id="o-${o.id}" value="${o.id}" ${i === 0 ? "checked" : ""}>
+            <label for="o-${o.id}">${esc(o.label)}</label>`).join("")}</div></div>` : "",
+    ].join("");
+
+    openModal(`<button type="button" class="btn btn-sm btn-quiet" data-back style="margin-bottom:10px;padding-left:0">‹ Tutti i passi</button>
+      <div class="eyebrow">${esc(p.name)}</div>
+      <h2>${esc(F.title)}</h2>
+      <p class="muted" style="margin-top:4px;font-size:13.5px">${esc(F.lead)}</p>
+      <form class="modal-form" id="f-step">
+        <div class="field" style="max-width:190px"><label for="s-date">Quando</label>
+          <input id="s-date" type="date" value="${todayISO()}"></div>
+        ${middle}
+        <div class="field"><label for="s-note" id="s-note-l">${esc(F.noteLabel)}</label>
+          <textarea id="s-note"></textarea></div>
+        <div class="next-box">
+          <div class="eyebrow" id="s-next-l">${esc(F.nextLabel)}</div>
+          <div class="field-2">
+            <input id="s-ndate" type="date" value="${esc(p.nextDate)}" aria-label="Data">
+            <input id="s-nnote" type="text" value="${esc(p.nextNote)}" placeholder="Cosa devi fare" aria-label="Cosa devi fare">
+          </div>
+          <p class="muted" id="s-next-h" style="font-size:12.5px">${esc(F.nextHint || "")}</p>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-quiet" data-back>Indietro</button>
+          <button type="submit" class="btn btn-primary">Registra ${esc(F.title.toLowerCase())}</button>
+        </div>
+      </form>`, box => {
+      box.querySelectorAll("[data-back]").forEach(b => b.addEventListener("click", () => modalProgress(p)));
+
+      // La chiusura riscrive le domande che le stanno sotto in base alla risposta.
+      const outBox = box.querySelector("#s-out");
+      if (outBox) {
+        const syncClose = () => {
+          const v = (box.querySelector('input[name="s-out"]:checked') || {}).value;
+          const c = CLOSE_COPY[v] || {};
+          box.querySelector("#s-note-l").textContent = c.note || F.noteLabel;
+          box.querySelector("#s-next-l").textContent = c.next || F.nextLabel;
+          box.querySelector("#s-next-h").textContent = c.hint || "";
+        };
+        outBox.addEventListener("change", syncClose);
+        syncClose();
+      }
+
+      box.querySelector("#f-step").addEventListener("submit", ev => {
+        ev.preventDefault();
+        const g = id => { const el = box.querySelector("#" + id); return el ? el.value : ""; };
+        const e = {
+          id: uid(), type,
+          date: g("s-date") || todayISO(),
+          note: box.querySelector("#s-note").value.trim(),
+          how: g("s-how"),
+          react: g("s-react"),
+          plan: F.plan ? g("s-plan") : "",
+          outcome: F.outcome ? (box.querySelector('input[name="s-out"]:checked') || {}).value || "" : "",
+          reopen: false,
+        };
+        const per = byId(p.id);
+        per.events.push(e);
+        const si = stageIndexOf(type);
+        if (si > 0) per.reached = Math.max(per.reached, si);
+        if (type === "esito") per.outcome = e.outcome;
+        per.nextDate = g("s-ndate");
+        per.nextNote = box.querySelector("#s-nnote").value.trim();
+        touch(per);
+        save(); closeModal(); render();
+        toast(type === "esito" ? `${per.name}: ${outcomeOf(e.outcome).label}` : `${F.title} registrato`);
+      });
+    });
+  }
+
+  function modalConfirm(title, body, label, onYes) {
+    openModal(`<h2>${esc(title)}</h2>
+      <p class="muted" style="margin-top:8px;font-size:13.5px">${esc(body)}</p>
+      <div class="modal-actions" style="margin-top:18px">
+        <button class="btn btn-quiet" data-act="close-modal">Annulla</button>
+        <button class="btn btn-danger" id="c-yes">${esc(label)}</button>
+      </div>`, box => {
+      box.querySelector("#c-yes").addEventListener("click", () => { onYes(); closeModal(); render(); });
+    });
+  }
+
+  /* ══ Toast ════════════════════════════════════════════════════════════ */
+
+  let toastT = null;
+  function toast(msg) {
+    document.querySelectorAll(".toast").forEach(n => n.remove());
+    const n = document.createElement("div");
+    n.className = "toast"; n.setAttribute("role", "status"); n.textContent = msg;
+    document.body.appendChild(n);
+    clearTimeout(toastT);
+    toastT = setTimeout(() => n.remove(), 2600);
+  }
+
+  /* ══ Backup ═══════════════════════════════════════════════════════════ */
+
+  async function backupFile() {
+    const data = JSON.stringify(state, null, 2);
+    const name = `lista-nomi-${todayISO()}.json`;
+    let dl = null;
+    try { dl = window.claude && claude.use ? await claude.use("downloads") : null; } catch (e) { dl = null; }
+    if (dl) {
+      try { await dl.save({ filename: name, data }); markBackup(); render(); toast("Copia salvata"); }
+      catch (err) {
+        if (err && err.code === "declined") return;
+        toast("Non è stato possibile scaricare: copia il testo");
+      }
+      return;
+    }
+    try {
+      const url = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      markBackup(); render(); toast("Copia salvata");
+    } catch (e) { toast("Download non disponibile: copia il testo"); }
+  }
+
+  async function copyJSON() {
+    const el = document.getElementById("json-out");
+    if (!el) return;
+    el.select();
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(el.value);
+      else document.execCommand("copy");
+      markBackup();
+      toast("Copiato");
+    } catch (e) { toast("Seleziona il testo e copialo a mano"); }
+  }
+
+  /* L'unione non toglie niente, quindi si applica e poi si racconta cosa è
+     cambiato: chiedere conferma prima costringerebbe a decidere alla cieca. */
+  function applyIncoming(d, from) {
+    if (!d || !Array.isArray(d.people)) { toast("Non è un backup valido"); return false; }
+    const res = mergeStates(state, normalize(d));
+    state = res.state;
+    /* Aver caricato un archivio da un file dimostra che una copia esiste fuori da
+       questo browser: vale come copia salvata, e il promemoria può tacere. */
+    markBackup();
+    save();
+    render();
+    reportMerge(res, from);
+    return true;
+  }
+
+  function reportMerge(res, from) {
+    const { nuovi, aggiornati, rimossi } = res.stats;
+    const righe = [
+      `${state.people.length} nomi in totale`,
+      nuovi ? (nuovi === 1 ? "1 nome nuovo arrivato" : `${nuovi} nomi nuovi arrivati`) : "",
+      aggiornati ? (aggiornati === 1 ? "1 scheda aggiornata" : `${aggiornati} schede aggiornate`) : "",
+      rimossi ? (rimossi === 1 ? "1 cancellazione rispettata" : `${rimossi} cancellazioni rispettate`) : "",
+    ].filter(Boolean);
+    if (!nuovi && !aggiornati && !rimossi) righe.push("Era già tutto allineato");
+
+    openModal(`<div class="eyebrow">${esc(from || "Unione")}</div>
+      <h2>Archivi uniti</h2>
+      <ul class="sum">${righe.map(r => `<li>${esc(r)}</li>`).join("")}</ul>
+      ${res.dupes.length ? `<div class="banner" style="margin-top:14px"><div>
+        <b>${res.dupes.length === 1 ? "Un nome compare due volte" : "Alcuni nomi compaiono due volte"}:</b>
+        ${esc(res.dupes.join(", "))}. Succede quando la stessa persona è stata scritta a mano su due
+        dispositivi: hanno due schede separate e non le unisco da sola, per non fondere due omonimi.
+        Aprine una, copia quello che ti serve e cancella l'altra.</div></div>` : ""}
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="btn btn-primary" data-act="close-modal">Va bene</button>
+      </div>`);
+  }
+
+  function importPasted() {
+    const el = document.getElementById("json-in");
+    const raw = (el && el.value || "").trim();
+    if (!raw) { toast("Incolla prima il testo del backup"); return; }
+    let d;
+    try { d = JSON.parse(raw); } catch (e) { toast("Il testo non è un backup valido"); return; }
+    if (applyIncoming(d, "Dal testo incollato")) el.value = "";
+  }
+
+  async function importPickedFile(input) {
+    const f = input.files && input.files[0];
+    if (!f) return;
+    try {
+      const d = JSON.parse(await f.text());
+      applyIncoming(d, f.name);
+    } catch (e) { toast("Il file non è un backup valido"); }
+    input.value = "";
+  }
+
+  /* ══ Esempio ══════════════════════════════════════════════════════════ */
+
+  function demoData() {
+    const t = new Date();
+    const D = n => iso(addDays(t, -n));
+    const P = (name, origine, reached, outcome, evs, nextDate, nextNote) => ({
+      id: uid(), name, contact: "", origine, note: "", reached, outcome: outcome || null,
+      nextDate: nextDate || "", nextNote: nextNote || "", createdAt: D(40),
+      events: [{ id: uid(), type: "lista", date: D(40), note: "", plan: "", outcome: "" },
+        ...evs.map(e => ({ id: uid(), plan: "", outcome: "", note: "", ...e }))],
+    });
+    return {
+      v: 1,
+      settings: { nome: "", goals: { ...DEFAULT_GOALS } },
+      people: [
+        P("Marco Rossi", "palestra", 4, "partner", [
+          { type: "contatto", date: D(28), note: "Curioso, mi ha chiesto lui cosa faccio" },
+          { type: "invito", date: D(24) },
+          { type: "piano", date: D(20), plan: "molto", note: "Vuole partire dal consumo personale" },
+          { type: "followup", date: D(14), note: "Ha parlato con la moglie" },
+          { type: "esito", date: D(11), outcome: "partner", note: "Iscritto, primo ordine fatto" },
+        ]),
+        P("Giulia Bianchi", "collega di Ale", 4, "cliente", [
+          { type: "contatto", date: D(26) },
+          { type: "invito", date: D(22), note: "Non le interessa l'attività, solo i prodotti" },
+          { type: "piano", date: D(18), plan: "interessato" },
+          { type: "followup", date: D(9), note: "Ha provato il Nutrilite" },
+          { type: "esito", date: D(6), outcome: "cliente", note: "Ordine mensile" },
+        ]),
+        P("Anna Ferri", "mamma all'asilo", 4, "cliente", [
+          { type: "contatto", date: D(30) },
+          { type: "invito", date: D(25) },
+          { type: "piano", date: D(21), plan: "interessato", note: "Le interessa la linea casa" },
+          { type: "followup", date: D(9), note: "Ha finito il campione" },
+          { type: "esito", date: D(0), outcome: "cliente", note: "Primo ordine oggi" },
+        ]),
+        P("Zio Franco", "famiglia", 3, "non_ora", [
+          { type: "contatto", date: D(19) },
+          { type: "invito", date: D(16) },
+          { type: "piano", date: D(12), plan: "pensarci", note: "Gli piace l'idea ma ha il cantiere aperto" },
+          { type: "esito", date: D(10), outcome: "non_ora", note: "Ricontattare a lavori finiti" },
+        ], iso(addDays(t, 2)), "Chiamare, dovrebbe aver finito"),
+        P("Sara Conti", "corso di inglese", 3, null, [
+          { type: "contatto", date: D(15) },
+          { type: "invito", date: D(11) },
+          { type: "piano", date: D(0), plan: "molto", note: "Ha preso appunti, vuole rivedere i numeri" },
+        ], iso(addDays(t, 1)), "Rivedere i numeri con lei"),
+        P("Davide Milani", "ex compagno di squadra", 2, null, [
+          { type: "contatto", date: D(8) },
+          { type: "invito", date: D(0), note: "Ci vediamo giovedì a casa loro" },
+        ], iso(addDays(t, 3)), "Piano a casa loro"),
+        P("Chiara Fumagalli", "vicina di casa", 1, null, [
+          { type: "contatto", date: D(4), note: "Aperta, dice che ha poco tempo" },
+        ], iso(addDays(t, -2)), "Richiamare per fissare"),
+        P("Elena Sartori", "amica di Giulia", 1, null, [
+          { type: "contatto", date: D(0), note: "Le ho raccontato cosa facciamo, incuriosita" },
+        ], iso(addDays(t, 2)), "Mandarle il video"),
+        P("Paolo Greco", "padel", 1, null, [
+          { type: "contatto", date: D(0), note: "Dopo la partita, molto alla mano" },
+        ], "", ""),
+        P("Luca Perego", "lavoro", 1, "no", [
+          { type: "contatto", date: D(21) },
+          { type: "esito", date: D(20), outcome: "no", note: "Non è il suo mondo, chiuso senza forzare" },
+        ]),
+        P("Martina Riva", "ex università", 0, null, [], "", ""),
+        P("Simone Ferraro", "vicino di ombrellone", 0, null, [], "", ""),
+      ],
+    };
+  }
+
+  /* ══ Rail ═════════════════════════════════════════════════════════════ */
+
+  function renderRail() {
+    const t = todo();
+    const dueN = t.late.length + t.now.length;
+    const items = [
+      { id: "cruscotto", label: "Cruscotto", icon: "◧", tally: dueN ? String(dueN) : "" },
+      { id: "nomi", label: "Nomi", icon: "☰", tally: String(state.people.length) },
+      { id: "piani", label: "Piani", icon: "◈", tally: String(allPlans().length) },
+      { id: "dati", label: "Dati", icon: "⚙", tally: "" },
+    ];
+    const dark = document.documentElement.getAttribute("data-theme") === "dark";
+    document.getElementById("rail").innerHTML = `
+      <div class="brand"><b>Dalla Lista al Sì</b><span class="eyebrow">il tuo registro</span></div>
+      ${items.map(i => `<button class="rail-btn" data-act="nav" data-view="${i.id}"
+        ${view === i.id ? 'aria-current="page"' : ""}>
+        <span aria-hidden="true" style="font-size:13px;width:14px;text-align:center">${i.icon}</span>
+        <span>${i.label}</span>${i.tally ? `<span class="tally">${i.tally}</span>` : ""}</button>`).join("")}
+      <div class="rail-foot">
+        <button class="btn btn-sm btn-quiet" data-act="theme">${dark ? "☀ Chiaro" : "☾ Scuro"}</button>
+        <span class="eyebrow" style="line-height:1.4">I dati restano su questo dispositivo</span>
+      </div>`;
+  }
+
+  /* ══ Render ═══════════════════════════════════════════════════════════ */
+
+  function render() {
+    renderRail();
+    const body = view === "nomi" ? viewNomi() : view === "piani" ? viewPiani() : view === "dati" ? viewDati() : viewCruscotto();
+    /* Resta il solo avviso che segnala un guasto in corso: il browser che rifiuta
+       di salvare. Quello sull'indirizzo temporaneo è stato tolto su richiesta —
+       il percorso previsto è il link, dove non si presenta. */
+    const banner = (!storageOk && view !== "dati")
+      ? `<div class="banner"><div><b>Questo browser non salva i dati.</b>
+         Chiudendo la pagina perdi tutto — vai in <b>Dati</b> e salva una copia, o apri l'app da un file sul tuo
+         computer.</div></div>` : "";
+    document.getElementById("main").innerHTML = `<div class="wrap">${banner}${body}</div>`;
+    renderSheet();
+    if (view === "nomi") {
+      const q = document.getElementById("q");
+      if (q && query) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+    }
+    if (view === "dati") bindDati();
+  }
+
+  function bindDati() {
+    const fi = document.getElementById("file-in");
+    if (fi) fi.addEventListener("change", () => importPickedFile(fi));
+    const nome = document.getElementById("s-nome");
+    if (nome) nome.addEventListener("change", () => { state.settings.nome = nome.value.trim(); save(); renderRail(); });
+    for (const k of Object.keys(DEFAULT_GOALS)) {
+      const el = document.getElementById("g-" + k);
+      if (el) el.addEventListener("change", () => {
+        state.settings.goals[k] = clamp(parseInt(el.value, 10) || 0, 0, 999);
+        el.value = state.settings.goals[k]; save();
+      });
+    }
+  }
+
+  /* ══ Eventi ═══════════════════════════════════════════════════════════ */
+
+  document.addEventListener("click", ev => {
+    const el = ev.target.closest("[data-act]");
+    if (!el) return;
+    const act = el.dataset.act;
+    const p = el.dataset.id ? byId(el.dataset.id) : null;
+
+    switch (act) {
+      case "nav": view = el.dataset.view; query = ""; render(); window.scrollTo(0, 0); break;
+      case "filter": filter = el.dataset.f; render(); break;
+      case "open": if (p) { openId = p.id; renderSheet(); } break;
+      case "close-layer": openId = null; document.getElementById("layer").innerHTML = ""; break;
+      case "close-modal": closeModal(); break;
+      case "add-one": modalPerson(null); break;
+      case "add-bulk": modalBulk(); break;
+      case "edit": if (p) modalPerson(p); break;
+      case "progress": if (p) modalProgress(p); break;
+      case "reopen":
+        if (p) {
+          p.outcome = null;
+          p.events.push({ id: uid(), type: "nota", date: todayISO(), note: "Percorso riaperto", plan: "", outcome: "", reopen: true });
+          touch(p); save(); render(); toast("Percorso riaperto");
+        }
+        break;
+      case "save-next": {
+        if (!p) break;
+        p.nextDate = document.getElementById("np-date").value || "";
+        p.nextNote = document.getElementById("np-note").value.trim();
+        touch(p); save(); render(); toast("Prossimo passo salvato"); break;
+      }
+      case "clear-next": if (p) { p.nextDate = ""; p.nextNote = ""; touch(p); save(); render(); } break;
+      case "del-event":
+        if (p) { p.events = p.events.filter(e => e.id !== el.dataset.eid); recompute(p); touch(p); save(); render(); }
+        break;
+      case "del-person":
+        if (p) modalConfirm(`Eliminare ${p.name}?`, "Sparisce la persona e tutta la sua cronologia. Non si torna indietro.",
+          "Elimina", () => {
+            state.people = state.people.filter(x => x.id !== p.id);
+            state.deleted.push({ id: p.id, at: nowISO() });
+            openId = null; save(); toast("Eliminato");
+          });
+        break;
+      case "demo":
+        modalConfirm("Caricare i dati di esempio?", "Sostituisce quello che c'è ora con dodici nomi inventati, utili per capire come funziona.",
+          "Carica esempio", () => { state = normalize(demoData()); view = "cruscotto"; save(); toast("Esempio caricato"); });
+        break;
+      case "reset":
+        modalConfirm("Cancellare tutto?", "Tutti i nomi e tutta la cronologia. Salva prima una copia se non sei sicuro.",
+          "Cancella tutto", () => { state = emptyState(); openId = null; save(); toast("Tutto cancellato"); });
+        break;
+      case "backup-file": backupFile(); break;
+      case "copy-json": copyJSON(); break;
+      case "import": importPasted(); break;
+      case "pick-import": document.getElementById("file-in").click(); break;
+      case "snooze-backup":
+        state.settings.snoozeBackup = nowISO(); saveLocal(); render();
+        toast("Te lo richiedo fra tre giorni"); break;
+      case "theme": {
+        const root = document.documentElement;
+        const cur = root.getAttribute("data-theme");
+        const sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const next = cur ? (cur === "dark" ? "light" : "dark") : (sysDark ? "light" : "dark");
+        root.setAttribute("data-theme", next);
+        try { localStorage.setItem(KEY + ".theme", next); } catch (e) {}
+        renderRail();
+        if (view === "dati") render();
+        break;
+      }
+    }
+  });
+
+  document.addEventListener("input", ev => {
+    if (ev.target.id === "q") {
+      query = ev.target.value;
+      const card = document.querySelector("main .card");
+      const list = (() => { const saved = view; view = "nomi"; const h = viewNomi(); view = saved; return h; })();
+      const tmp = document.createElement("div"); tmp.innerHTML = list;
+      const fresh = tmp.querySelector(".card");
+      if (card && fresh) card.replaceWith(fresh);
+      const chips = tmp.querySelector(".fchips");
+      const cur = document.querySelector("main .fchips");
+      if (chips && cur) cur.replaceWith(chips);
+    }
+  });
+
+  document.addEventListener("keydown", ev => {
+    if (ev.key === "Escape") {
+      if (document.querySelector(".modal-box")) closeModal();
+      else if (openId) { openId = null; document.getElementById("layer").innerHTML = ""; }
+    }
+    if (ev.key === "Enter" || ev.key === " ") {
+      const r = ev.target.closest && ev.target.closest('.row[data-act="open"]');
+      if (r) { ev.preventDefault(); openId = r.dataset.id; renderSheet(); }
+    }
+  });
+
+  /* ══ Avvio ════════════════════════════════════════════════════════════ */
+
+  try {
+    const th = localStorage.getItem(KEY + ".theme");
+    if (th === "dark" || th === "light") document.documentElement.setAttribute("data-theme", th);
+  } catch (e) {}
+
+  load();
+  render();
+
+  /* Chiede al browser di trattare questi dati come persistenti. Serve contro la
+     sparizione involontaria: senza, il browser può buttare i dati dei siti quando
+     il dispositivo è a corto di spazio, o dopo mesi di inutilizzo. Contro la
+     cancellazione manuale non protegge — niente lo fa — e per questo resta il
+     promemoria della copia. Il browser concede o nega da sé, senza chiedere. */
+  (async () => {
+    try {
+      if (!navigator.storage || !navigator.storage.persist) return;
+      persistent = await navigator.storage.persisted();
+      if (!persistent) persistent = await navigator.storage.persist();
+      if (view === "dati") render();
+    } catch (e) { /* funzione assente: si continua senza */ }
+  })();
+
+})();
+</script>
