@@ -1,0 +1,67 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le nostre app</title>
+<style>
+  :root {
+    --ground: #EDF0EC; --surface: #FFFFFF; --ink: #131A16; --ink-2: #4C5852; --ink-3: #66726B;
+    --rule: #DBE1DA; --accent: #1D6A52; --accent-wash: #E2EDE6;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0E1310; --surface: #161D19; --ink: #E6EBE6; --ink-2: #A3AEA7; --ink-3: #8A968F;
+      --rule: #29332D; --accent: #63BF9B; --accent-wash: #1B2E26;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 34px 20px 60px; background: var(--ground); color: var(--ink);
+    font-family: var(--sans); font-size: 15px; line-height: 1.55; -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
+  .eyebrow { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
+  p { margin: 0; color: var(--ink-2); }
+  .apps { display: flex; flex-direction: column; gap: 12px; }
+  a.app {
+    display: flex; flex-direction: column; gap: 3px; padding: 17px 18px;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 9px;
+    text-decoration: none; color: inherit;
+  }
+  a.app:hover { border-color: var(--accent); background: var(--accent-wash); }
+  a.app b { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+  a.app span { font-size: 13.5px; color: var(--ink-3); }
+  .nota { border-top: 1px solid var(--rule); padding-top: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; }
+  .nota b { color: var(--ink); }
+</style>
+
+<div class="wrap">
+  <div>
+    <div class="eyebrow">CumLaude21</div>
+    <h1>Le nostre app</h1>
+    <p style="margin-top:6px">Strumenti per il lavoro di tutti i giorni, nell'ordine in cui servono.
+      Si aprono dal telefono, non chiedono registrazione, e i dati di ognuno restano sul suo telefono.</p>
+  </div>
+
+  <div class="apps">
+    <a class="app" href="lista/">
+      <b>Dalla Lista al Sì →</b>
+      <span>Dalla lista nomi alla chiusura: contatto, invito, piano, follow-up.</span>
+    </a>
+    <a class="app" href="clienti/">
+      <b>Clienti e Riordini →</b>
+      <span>Chi compra, cosa usa, quando sta finendo. E cosa scrivergli.</span>
+    </a>
+  </div>
+
+  <div class="nota">
+    <p><b>Aggiungila alla schermata Home.</b> Apri l'app, tocca il menu del browser e scegli
+      «Aggiungi alla schermata Home»: da lì in poi si apre come qualsiasi altra app.</p>
+    <p><b>I tuoi dati sono tuoi.</b> Restano nel browser del tuo telefono: nessuno li vede, nemmeno noi.
+      Per questo dentro l'app c'è «Salva la copia» — usala di tanto in tanto, è l'unico modo per non
+      perderli se cambi telefono.</p>
+  </div>
+</div>

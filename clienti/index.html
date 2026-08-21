@@ -1,0 +1,2652 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clienti e Riordini</title>
+<style>
+  /* ── Tokens: light is the base set ─────────────────────────────────── */
+  :root {
+    --ground: #EDF0EC;
+    --surface: #FFFFFF;
+    --surface-2: #F6F8F5;
+    --ink: #131A16;
+    --ink-2: #4C5852;
+    --ink-3: #66726B;
+    --rule: #DBE1DA;
+    --rule-soft: #E8ECE6;
+    --accent: #1D6A52;
+    --accent-ink: #FFFFFF;
+    --accent-wash: #E2EDE6;
+    --good: #0F7A45;
+    --warn: #8A6410;
+    --crit: #9E2B25;
+    --off: #66726B;
+    --focus: #1D6A52;
+    --shadow: 0 1px 2px rgba(19, 26, 22, .05), 0 8px 24px rgba(19, 26, 22, .07);
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --r: 8px;
+    --gap: 16px;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0E1310;
+      --surface: #161D19;
+      --surface-2: #1D2621;
+      --ink: #E6EBE6;
+      --ink-2: #A3AEA7;
+      --ink-3: #8A968F;
+      --rule: #29332D;
+      --rule-soft: #222B26;
+      --accent: #63BF9B;
+      --accent-ink: #0E1310;
+      --accent-wash: #1B2E26;
+      --good: #4FB477;
+      --warn: #C79A3E;
+      --crit: #D9756B;
+      --off: #8A968F;
+      --focus: #63BF9B;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .45);
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0E1310;
+    --surface: #161D19;
+    --surface-2: #1D2621;
+    --ink: #E6EBE6;
+    --ink-2: #A3AEA7;
+    --ink-3: #8A968F;
+    --rule: #29332D;
+    --rule-soft: #222B26;
+    --accent: #63BF9B;
+    --accent-ink: #0E1310;
+    --accent-wash: #1B2E26;
+    --good: #4FB477;
+    --warn: #C79A3E;
+    --crit: #D9756B;
+    --off: #8A968F;
+    --focus: #63BF9B;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .45);
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] { color-scheme: light; }
+
+  /* ── Base ──────────────────────────────────────────────────────────── */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+  }
+  h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -.015em; text-wrap: balance; }
+  h1 { font-size: 25px; }
+  h2 { font-size: 17px; }
+  h3 { font-size: 15px; }
+  p { margin: 0; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+
+  /* I campi si vestono da soli: appoggiarsi a un contenitore lascerebbe quelli
+     fuori da esso con l'aspetto di default del browser — fondo bianco e sopra il
+     testo chiaro del tema scuro, cioè illeggibili. */
+  input[type="text"], input[type="search"], input[type="date"], input[type="number"],
+  input:not([type]), select, textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  input[type="date"] { -webkit-appearance: textfield; appearance: auto; }
+  select { -webkit-appearance: menulist; appearance: auto; }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  ::placeholder { color: var(--ink-3); opacity: 1; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--ink-3);
+  }
+
+  /* ── Shell ─────────────────────────────────────────────────────────── */
+  .app { display: flex; min-height: 100vh; }
+
+  .rail {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 208px;
+    flex: none;
+    padding: 22px 14px;
+    border-right: 1px solid var(--rule);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .brand { padding: 0 8px 18px; display: flex; flex-direction: column; gap: 2px; }
+  .brand b { font-size: 15px; font-weight: 650; letter-spacing: -.02em; }
+  .rail-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ink-2);
+    text-align: left;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .rail-btn:hover { background: var(--surface-2); color: var(--ink); }
+  .rail-btn[aria-current="page"] { background: var(--accent-wash); color: var(--accent); font-weight: 600; }
+  .rail-btn .tally { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .rail-btn .tally.hot { color: var(--crit); font-weight: 600; }
+  .rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 0 4px; }
+
+  main { flex: 1; min-width: 0; padding: 26px 28px 48px; }
+  .wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .page-head .lede { color: var(--ink-2); font-size: 14px; margin-top: 3px; }
+
+  /* ── Cards ─────────────────────────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--r);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .card > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: var(--gap); align-items: start; }
+
+  /* ── Buttons ───────────────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 8px 13px;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  a.btn { text-decoration: none; }
+  .btn:hover { border-color: var(--ink-3); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .btn-primary:hover { filter: brightness(1.08); border-color: var(--accent); }
+  .btn-sm { padding: 5px 10px; font-size: 12.5px; }
+  .btn-quiet { border-color: transparent; background: transparent; color: var(--ink-2); }
+  .btn-quiet:hover { background: var(--surface-2); border-color: transparent; color: var(--ink); }
+  .btn-danger { color: var(--crit); border-color: var(--rule); }
+  .btn-danger:hover { border-color: var(--crit); }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ── KPI tiles ─────────────────────────────────────────────────────── */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap); }
+  .kpi { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r); padding: 15px; display: flex; flex-direction: column; gap: 9px; }
+  .kpi-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .kpi-val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 30px; line-height: 1; font-weight: 550; letter-spacing: -.03em; }
+  .kpi-val.warn { color: var(--warn); }
+  .kpi-val.crit { color: var(--crit); }
+  .kpi-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--ink-3); }
+
+  /* ── Bars ──────────────────────────────────────────────────────────── */
+  .track { height: 8px; background: var(--rule-soft); border-radius: 4px; overflow: hidden; }
+  .track > i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+  .track.thin { height: 5px; border-radius: 3px; }
+  .track.thin > i { border-radius: 3px; }
+  .track > i.late { background: var(--crit); }
+  .track > i.now { background: var(--warn); }
+
+  /* ── Chips ─────────────────────────────────────────────────────────── */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+  .chip .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--ink-3); flex: none; }
+  .chip.t-accent { color: var(--accent); border-color: var(--accent); background: var(--accent-wash); }
+  .chip.t-accent .dot { background: var(--accent); }
+  .chip.t-good { color: var(--good); border-color: var(--good); background: transparent; }
+  .chip.t-good .dot { background: var(--good); }
+  .chip.t-warn { color: var(--warn); border-color: var(--warn); background: transparent; }
+  .chip.t-warn .dot { background: var(--warn); }
+  .chip.t-crit { color: var(--crit); border-color: var(--crit); background: transparent; }
+  .chip.t-crit .dot { background: var(--crit); }
+  .chip.t-off { color: var(--off); }
+
+  /* ── Righe ─────────────────────────────────────────────────────────── */
+  .rows { display: flex; flex-direction: column; }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 4px;
+    border-top: 1px solid var(--rule-soft);
+  }
+  .row.tap { cursor: pointer; }
+  .rows > .row:first-child { border-top: 0; }
+  .row.tap:hover { background: var(--surface-2); }
+  .row-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .row-name { font-weight: 550; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-sub { font-size: 12.5px; color: var(--ink-3); }
+  .row-side { display: flex; align-items: center; gap: 8px; flex: none; }
+  .due { font-family: var(--mono); font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+  .due.late { color: var(--crit); font-weight: 600; }
+  .due.now { color: var(--warn); font-weight: 600; }
+
+  /* ── Filtri / ricerca ──────────────────────────────────────────────── */
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .search { flex: 1; min-width: 180px; display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; }
+  .search input { border: 0; padding: 0; background: transparent; width: 100%; outline: none; }
+  .search input:focus { border: 0; }
+  .fchips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .fchip {
+    padding: 5px 10px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface);
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--ink-2); cursor: pointer;
+  }
+  .fchip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+  /* ── Scaffale: cosa usa un cliente ─────────────────────────────────── */
+  .shelf { display: flex; flex-direction: column; }
+  .sh {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; border-top: 1px solid var(--rule-soft);
+  }
+  .shelf > .sh:first-child { border-top: 0; }
+  .sh-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .sh-name { font-weight: 500; }
+  .sh-meta { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .sh.off .sh-name, .sh.off .sh-meta { color: var(--ink-3); text-decoration: line-through; }
+  .sh-side { display: flex; align-items: center; gap: 6px; flex: none; }
+  .bullets { display: flex; flex-direction: column; gap: 3px; margin: 0; padding-left: 17px; font-size: 13px; color: var(--ink-2); }
+
+  /* ── Sheet (scheda cliente) ────────────────────────────────────────── */
+  .scrim { position: fixed; inset: 0; background: rgba(10, 16, 13, .42); z-index: 40; }
+  .sheet {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 41;
+    width: min(460px, 100%);
+    background: var(--surface);
+    border-left: 1px solid var(--rule);
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column;
+  }
+  .sheet-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--rule); display: flex; flex-direction: column; gap: 10px; }
+  .sheet-body { padding: 18px 20px 28px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+  .sheet-x { position: absolute; top: 14px; right: 14px; }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 5px 12px; font-size: 13.5px; }
+  .kv dt { color: var(--ink-3); font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding-top: 2px; }
+  .kv dd { margin: 0; }
+
+  .next-box { background: var(--surface-2); border: 1px solid var(--rule); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 9px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field > label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+  .field textarea { min-height: 68px; resize: vertical; font-size: 14px; }
+  .field-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field .hint { font-size: 12px; color: var(--ink-3); }
+
+  /* ── Finestre ──────────────────────────────────────────────────────── */
+  .modal-scrim { z-index: 45; }
+  .modal-box {
+    position: fixed; z-index: 46; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(520px, calc(100% - 24px));
+    max-height: calc(100vh - 40px); overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 10px;
+    box-shadow: var(--shadow); padding: 20px;
+  }
+  .modal-box h2 { margin-bottom: 2px; }
+  .modal-form { display: flex; flex-direction: column; gap: 13px; margin-top: 14px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+
+  /* Righe dell'ordine: prodotto e quantità, con il cestino a destra. */
+  .oline { display: grid; grid-template-columns: 1fr 74px 40px; gap: 8px; align-items: center; }
+  .oline .btn { width: 100%; }
+
+  /* Scelta secca fra poche risposte: pastiglie, non un menù a tendina. */
+  .opts { display: flex; flex-wrap: wrap; gap: 7px; }
+  .opts input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .opts label {
+    padding: 7px 13px; border: 1px solid var(--rule); border-radius: 999px;
+    background: var(--surface); cursor: pointer; font-size: 13.5px;
+  }
+  .opts label:hover { border-color: var(--ink-3); }
+  .opts input:checked + label { border-color: var(--accent); background: var(--accent-wash); color: var(--accent); font-weight: 600; }
+  .opts input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ── Varie ─────────────────────────────────────────────────────────── */
+  .empty { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; padding: 8px 0; }
+  .empty p { color: var(--ink-2); max-width: 52ch; }
+  .banner {
+    display: flex; gap: 10px; align-items: flex-start;
+    border: 1px solid var(--warn); border-radius: var(--r);
+    background: var(--surface); padding: 12px 14px; font-size: 13.5px; color: var(--ink-2);
+  }
+  .banner b { color: var(--ink); }
+  .toast {
+    position: fixed; z-index: 60; left: 50%; bottom: 26px; transform: translateX(-50%);
+    background: var(--ink); color: var(--ground); padding: 9px 16px; border-radius: 999px;
+    font-size: 13.5px; box-shadow: var(--shadow); max-width: calc(100% - 32px); text-align: center;
+  }
+  .grp-label { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  .grp-label::after { content: ""; flex: 1; height: 1px; background: var(--rule-soft); }
+  /* Un suggerimento, non un allarme: prende i colori dell'accento come le altre
+     cose consigliate dell'app, non quelli dell'avviso. */
+  .nudge {
+    border: 1px solid var(--accent); background: var(--accent-wash);
+    border-radius: var(--r); padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .nudge-t { font-weight: 600; font-size: 14.5px; }
+  .nudge-d { font-size: 13px; color: var(--ink-2); max-width: 62ch; }
+  .spark { display: flex; align-items: flex-end; gap: 3px; height: 42px; }
+  .spark i { flex: 1; background: var(--accent-wash); border-radius: 2px 2px 0 0; min-height: 2px; display: block; }
+  .spark i.on { background: var(--accent); }
+  .spark-x { display: flex; gap: 3px; font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
+  .spark-x span { flex: 1; text-align: center; }
+
+  .sum { margin: 12px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+  .fold { border-top: 1px solid var(--rule-soft); padding-top: 12px; }
+  .fold > summary { cursor: pointer; font-size: 13.5px; color: var(--ink-2); width: fit-content; }
+  .fold > summary:hover { color: var(--ink); }
+  .fold-body { display: flex; flex-direction: column; gap: 11px; padding-top: 12px; }
+  .backup-json { width: 100%; min-height: 110px; font-family: var(--mono); font-size: 11px; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface-2); resize: vertical; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .btn, .row, .rail-btn { transition: background-color .12s ease, border-color .12s ease, color .12s ease; }
+  }
+
+  /* ── Stretto ───────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .app { flex-direction: column; }
+    .rail {
+      position: fixed; bottom: 0; left: 0; right: 0; top: auto;
+      width: auto; height: auto; flex-direction: row; gap: 2px;
+      padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+      border-right: 0; border-top: 1px solid var(--rule);
+      z-index: 30;
+    }
+    .brand, .rail-foot { display: none; }
+    .rail-btn { flex: 1; flex-direction: column; gap: 3px; justify-content: center; font-size: 11px; padding: 6px 2px; }
+    .rail-btn .tally { display: none; }
+    main { padding: 20px 16px 92px; }
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .cols { grid-template-columns: 1fr; }
+    h1 { font-size: 22px; }
+    .sheet { width: 100%; border-left: 0; }
+  }
+  /* Su uno schermo di telefono nome e stato non stanno sulla stessa riga: il nome
+     si strozza e la pastiglia finisce fuori schermo. Vanno a capo. */
+  @media (max-width: 560px) {
+    .row { flex-wrap: wrap; gap: 6px 10px; }
+    .row-main { flex: 1 1 100%; }
+    .row-side { width: 100%; justify-content: flex-start; flex-wrap: wrap; row-gap: 6px; }
+    .sh { flex-wrap: wrap; gap: 8px; }
+    .sh-main { flex: 1 1 100%; }
+    .sh-side { width: 100%; justify-content: flex-start; }
+    .card > header { flex-direction: column; align-items: flex-start; gap: 3px; }
+
+    /* Un dito non è un puntatore: sotto i 44px si sbaglia bersaglio, e qui si
+       sbaglia su cose come «Elimina». Tutto ciò che si tocca cresce. */
+    .btn { min-height: 44px; padding: 10px 16px; }
+    .btn-sm { min-height: 40px; padding: 8px 14px; font-size: 13.5px; }
+    .fchip { min-height: 40px; padding: 9px 14px; display: inline-flex; align-items: center; }
+    .opts label { min-height: 44px; padding: 11px 16px; display: inline-flex; align-items: center; }
+    .row .btn-sm, .sh .btn-sm { min-width: 44px; justify-content: center; }
+    .fold > summary { min-height: 40px; display: flex; align-items: center; }
+    .sheet-body, .sheet-head { padding-left: 16px; padding-right: 16px; }
+
+    /* Le finestre diventano fogli ancorati in basso: dove arriva il pollice, e
+       dove la tastiera non le spinge fuori schermo. */
+    .modal-box {
+      top: auto; bottom: 0; left: 0; right: 0;
+      transform: none; width: auto;
+      max-height: 88vh;
+      border-radius: 14px 14px 0 0;
+      border-bottom: 0;
+      padding: 18px 16px calc(20px + env(safe-area-inset-bottom));
+    }
+    .modal-actions { flex-direction: column-reverse; align-items: stretch; gap: 10px; }
+    .modal-actions .btn { width: 100%; }
+  }
+
+  @media (max-width: 440px) {
+    .field-2 { grid-template-columns: 1fr; }
+    .oline { grid-template-columns: 1fr 64px 44px; }
+  }
+</style>
+
+<div class="app">
+  <nav class="rail" id="rail" aria-label="Sezioni"></nav>
+  <main id="main"></main>
+</div>
+<div id="layer"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ══ Modello ══════════════════════════════════════════════════════════
+
+     Tre elenchi. Il **catalogo** dice quanto dura un prodotto. I **clienti**
+     tengono i loro **ordini**, che sono fatti accaduti e non si modificano: da
+     lì si ricava tutto il resto — cosa usa uno, quando gli sta finendo, se
+     ricompra o si è fermato. Nessuno stato calcolato viene salvato, così due
+     archivi uniti danno sempre lo stesso risultato.                        */
+
+  const KEY = "clienti-e-riordini.v1";
+  const DEFAULTS = { preavviso: 7, fermoDopo: 45, durataNuovo: 30, dopoAcquisto: 8, compleanno: 7 };
+  /* Quanto resta valida la domanda «come ti sei trovato». Passato questo tempo la
+     verifica scade e sparisce da sé: chiedere a qualcuno come si è trovato con
+     una cosa comprata sette mesi fa non è attenzione, è una figura goffa. Non si
+     scrive niente nell'archivio — il fatto che sia scaduta si vede dalle date. */
+  const FINESTRA_VERIFICA = 30;
+
+  /* Le chiusure sono l'unica etichetta messa a mano: il resto si deduce dagli
+     ordini, e dedurre è sempre meglio che chiedere. */
+  const CLOSED = [
+    { id: "partner", label: "Diventato partner", tone: "accent" },
+    { id: "perso",   label: "Non compra più",    tone: "off" },
+  ];
+
+  const emptyState = () => ({
+    v: 1,
+    clients: [],
+    products: [],
+    deleted: [],
+    settings: {
+      nome: "",
+      preavviso: DEFAULTS.preavviso,
+      fermoDopo: DEFAULTS.fermoDopo,
+      dopoAcquisto: DEFAULTS.dopoAcquisto,
+      compleanno: DEFAULTS.compleanno,
+      lastBackup: "",
+      snoozeBackup: "",
+    },
+  });
+
+  let state = emptyState();
+  let view = "oggi";
+  let filter = "tutti";
+  let query = "";
+  let openId = null;
+  let storageOk = true;
+  let persistent = null;
+  let toastT = null;
+
+  /* ══ Utilità ══════════════════════════════════════════════════════════ */
+
+  const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  /* Una sola fonte dell'ora, così i timestamp scritti e i confronti fra date
+     leggono sempre lo stesso orologio. */
+  const nowISO = () => new Date(Date.now()).toISOString();
+  const touch = c => { if (c) c.updatedAt = nowISO(); };
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const daysSince = stamp => stamp ? Math.floor((Date.now() - new Date(stamp).getTime()) / 86400000) : null;
+
+  function todayISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  const parseISO = s => { const [y, m, d] = String(s).split("-").map(Number); return new Date(y, (m || 1) - 1, d || 1); };
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const daysBetween = (a, b) => Math.round((parseISO(b) - parseISO(a)) / 86400000);
+  const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
+  const fmtDate = s => { if (!s) return ""; const d = parseISO(s); return `${d.getDate()} ${MESI[d.getMonth()]}`; };
+  const fmtDateY = s => { if (!s) return ""; const d = parseISO(s); return `${d.getDate()} ${MESI[d.getMonth()]} ${d.getFullYear()}`; };
+  const plur = (n, uno, molti) => `${n} ${n === 1 ? uno : molti}`;
+
+  /* Dentro l'anteprima dell'artifact la pagina vive in una cornice: i link si
+     aprono in un browser interno che non passa la mano alle app installate, e
+     gli indirizzi che non sono http (`tel:`) vengono bloccati in partenza. Dal
+     link pubblicato la pagina è padrona di sé e tutto funziona. Saperlo permette
+     di avvisare invece di far sbattere la gente contro un muro. */
+  const dentroCornice = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+
+  const byId = id => state.clients.find(c => c.id === id) || null;
+  const prodById = id => state.products.find(p => p.id === id) || null;
+  const prodName = id => { const p = prodById(id); return p ? p.name : "prodotto eliminato"; };
+
+  /* ══ Persistenza ══════════════════════════════════════════════════════ */
+
+  function load() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); }
+    catch (e) { storageOk = false; return; }
+    if (!raw) return;
+    try {
+      const d = JSON.parse(raw);
+      if (d && Array.isArray(d.clients)) state = normalize(d);
+    } catch (e) { /* dato illeggibile: si riparte vuoti, la copia resta l'unica via */ }
+  }
+
+  function save() {
+    if (!storageOk) return;
+    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch (e) { storageOk = false; render(); }
+  }
+
+  function normalize(d) {
+    const s = d.settings || {};
+    /* Le pietre tombali tengono memoria di ciò che è stato cancellato: senza di
+       loro l'unione con l'archivio dell'altro dispositivo lo farebbe tornare in
+       vita. Si potano dopo 180 giorni. */
+    const cutoff = new Date(Date.now() - 180 * 86400000).toISOString();
+    const products = (Array.isArray(d.products) ? d.products : []).map(p => ({
+      id: p.id || uid(),
+      name: String(p.name || "").trim() || "Senza nome",
+      days: clamp(parseInt(p.days, 10) || DEFAULTS.durataNuovo, 1, 3650),
+      check: !!p.check,
+      note: p.note || "",
+      updatedAt: p.updatedAt || nowISO(),
+    }));
+    const known = new Set(products.map(p => p.id));
+    return {
+      v: 1,
+      deleted: (Array.isArray(d.deleted) ? d.deleted : [])
+        .filter(x => x && x.id && (x.at || "") > cutoff)
+        .map(x => ({ id: x.id, at: x.at })),
+      products,
+      clients: (Array.isArray(d.clients) ? d.clients : []).map(c => ({
+        updatedAt: c.updatedAt || nowISO(),
+        id: c.id || uid(),
+        name: String(c.name || "").trim() || "Senza nome",
+        contact: c.contact || "",
+        origine: c.origine || "",
+        note: c.note || "",
+        closed: CLOSED.some(x => x.id === c.closed) ? c.closed : "",
+        nextDate: c.nextDate || "",
+        nextNote: c.nextNote || "",
+        /* Due nature per lo stesso promemoria. «rimanda» è una decisione sul
+           prodotto — ne ha ancora, non chiamarmi prima — e mette in pausa le
+           segnalazioni. «nota» è un appuntamento che ti sei preso per altro (la
+           proposta di compleanno) e non deve zittire un riordino già scaduto:
+           mandare gli auguri non fa sparire il flacone finito. */
+        nextKind: c.nextKind === "nota" ? "nota" : "rimanda",
+        fromLista: c.fromLista || "",
+        createdAt: c.createdAt || todayISO(),
+        /* Il compleanno si tiene come giorno e mese, «MM-GG»: quasi nessuno sa
+           l'anno di nascita dei propri clienti, e chiederlo per forza vorrebbe
+           dire lasciare il campo vuoto. */
+        birthday: /^\d{2}-\d{2}$/.test(c.birthday || "") ? c.birthday : "",
+        /* L'anno in cui gli auguri sono già stati fatti: senza, il promemoria
+           resterebbe acceso fino a mezzanotte del giorno dopo. */
+        augurato: /^\d{4}$/.test(String(c.augurato || "")) ? String(c.augurato) : "",
+        /* Prodotti che non si seguono più: uno che ha provato la crema una volta
+           e non la rivuole non deve restare in eterno fra i riordini. */
+        dropped: (Array.isArray(c.dropped) ? c.dropped : [])
+          .filter(x => x && x.productId)
+          .map(x => ({ productId: x.productId, at: x.at || nowISO() })),
+        orders: (Array.isArray(c.orders) ? c.orders : []).map(o => ({
+          id: o.id || uid(),
+          date: o.date || todayISO(),
+          note: o.note || "",
+          importo: Number(o.importo) > 0 ? Number(o.importo) : 0,
+          /* La verifica dopo l'acquisto: vuoto = ancora da fare, una data = fatta
+             quel giorno, «no» = questo ordine non la richiede. Sta sull'ordine e
+             non sul cliente perché è di quell'acquisto che si chiede conto. */
+          checkin: o.checkin === "no" ? "no" : (o.checkin || ""),
+          lines: (Array.isArray(o.lines) ? o.lines : [])
+            .filter(l => l && l.productId && known.has(l.productId))
+            .map(l => ({ productId: l.productId, qty: clamp(parseInt(l.qty, 10) || 1, 1, 99) })),
+        })).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)),
+      })),
+      settings: {
+        nome: s.nome || "",
+        preavviso: clamp(parseInt(s.preavviso, 10) || DEFAULTS.preavviso, 0, 90),
+        fermoDopo: clamp(parseInt(s.fermoDopo, 10) || DEFAULTS.fermoDopo, 7, 365),
+        dopoAcquisto: clamp(parseInt(s.dopoAcquisto, 10) || DEFAULTS.dopoAcquisto, 1, 90),
+        compleanno: clamp(parseInt(s.compleanno, 10) || DEFAULTS.compleanno, 0, 60),
+        lastBackup: s.lastBackup || "",
+        snoozeBackup: s.snoozeBackup || "",
+      },
+    };
+  }
+
+  /* ══ Unione di due archivi ════════════════════════════════════════════
+
+     Sostituire distrugge: se importi il telefono sul Mac perdi il lavoro fatto
+     sul Mac. Qui i due archivi si sommano. Gli ordini hanno un identificativo
+     proprio, quindi si uniscono senza conflitto; sui dati della scheda (nome,
+     note, prossimo contatto) vince chi è stato modificato più tardi. Unire due
+     volte lo stesso archivio non cambia niente.                            */
+
+  function mergeStates(local, incoming) {
+    const tombs = new Map();
+    for (const t of [...(local.deleted || []), ...(incoming.deleted || [])]) {
+      if (!tombs.has(t.id) || t.at > tombs.get(t.id)) tombs.set(t.id, t.at);
+    }
+    const stats = { nuovi: 0, aggiornati: 0, rimossi: 0, prodotti: 0 };
+
+    /* Catalogo: stesso identificativo si fonde per data, stesso nome scritto a
+       mano su due dispositivi si fonde per nome — due prodotti omonimi non
+       esistono, mentre due persone omonime sì. */
+    const prods = new Map();
+    for (const p of local.products) prods.set(p.id, p);
+    for (const p of incoming.products) {
+      const tomb = tombs.get(p.id);
+      if (tomb && tomb > (p.updatedAt || "")) continue;
+      const same = prods.get(p.id) || [...prods.values()].find(x => x.name.trim().toLowerCase() === p.name.trim().toLowerCase());
+      if (!same) { prods.set(p.id, p); stats.prodotti++; }
+      else if ((p.updatedAt || "") > (same.updatedAt || "")) prods.set(same.id, { ...p, id: same.id });
+    }
+    const products = [...prods.values()].filter(p => {
+      const tomb = tombs.get(p.id);
+      return !(tomb && tomb > (p.updatedAt || ""));
+    });
+    /* Se l'archivio in arrivo chiamava lo stesso prodotto con un altro
+       identificativo, le righe dei suoi ordini vanno rimappate sul nostro. */
+    const remap = new Map();
+    for (const p of incoming.products) {
+      const mine = products.find(x => x.id === p.id) ||
+        products.find(x => x.name.trim().toLowerCase() === p.name.trim().toLowerCase());
+      if (mine && mine.id !== p.id) remap.set(p.id, mine.id);
+    }
+    const fixLines = c => ({
+      ...c,
+      orders: c.orders.map(o => ({ ...o, lines: o.lines.map(l => ({ ...l, productId: remap.get(l.productId) || l.productId })) })),
+      dropped: c.dropped.map(x => ({ ...x, productId: remap.get(x.productId) || x.productId })),
+    });
+
+    const pairs = new Map();
+    for (const c of local.clients) pairs.set(c.id, { a: c });
+    for (const c of incoming.clients) pairs.set(c.id, { ...(pairs.get(c.id) || {}), b: fixLines(c) });
+
+    const clients = [];
+    for (const [id, { a, b }] of pairs) {
+      const winner = !a ? b : !b ? a : ((b.updatedAt || "") > (a.updatedAt || "") ? b : a);
+      const tomb = tombs.get(id);
+      if (tomb && tomb > (winner.updatedAt || "")) { stats.rimossi++; continue; }
+      if (!a || !b) { clients.push(winner); if (!a) stats.nuovi++; continue; }
+
+      const loser = winner === b ? a : b;
+      const ords = new Map();
+      for (const o of [...loser.orders, ...winner.orders]) ords.set(o.id, o);
+      const drop = new Map();
+      for (const x of [...loser.dropped, ...winner.dropped]) {
+        if (!drop.has(x.productId) || x.at > drop.get(x.productId)) drop.set(x.productId, x.at);
+      }
+      const merged = {
+        ...winner,
+        orders: [...ords.values()].sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0)),
+        dropped: [...drop].map(([productId, at]) => ({ productId, at })),
+      };
+      clients.push(merged);
+      if (winner === b || merged.orders.length !== a.orders.length) stats.aggiornati++;
+    }
+
+    /* Lo stesso cliente inserito a mano su due dispositivi ha due
+       identificativi diversi: unirlo d'ufficio rischierebbe di fondere due
+       omonimi, per cui lo segnalo e lascio decidere. */
+    const seen = new Set(), dupes = [];
+    for (const c of clients) {
+      const k = c.name.trim().toLowerCase();
+      if (seen.has(k)) { if (!dupes.includes(c.name)) dupes.push(c.name); } else seen.add(k);
+    }
+
+    return {
+      state: { v: 1, clients, products, deleted: [...tombs].map(([id, at]) => ({ id, at })), settings: local.settings },
+      stats, dupes,
+    };
+  }
+
+  /* Il browser è una memoria buona per l'uso quotidiano ma non è un backup: chi
+     svuota i dati di navigazione perde tutto, e non c'è niente da cui
+     recuperarlo. Il promemoria sposta questa disciplina dalla buona volontà
+     dell'utente all'app. */
+  function backupNudge() {
+    if (!state.clients.length) return null;
+    const snooze = daysSince(state.settings.snoozeBackup);
+    if (snooze !== null && snooze < 3) return null;
+    const age = daysSince(state.settings.lastBackup);
+    if (age === null) return state.clients.length >= 3 ? { mai: true } : null;
+    return age >= 14 ? { giorni: age } : null;
+  }
+
+  function markBackup() {
+    state.settings.lastBackup = nowISO();
+    state.settings.snoozeBackup = "";
+    save();
+  }
+
+  /* ══ Conti ════════════════════════════════════════════════════════════
+
+     Quando finisce una confezione: dalla data dell'ultimo ordine, più la durata
+     del prodotto moltiplicata per quante ne ha prese. Due flaconi durano il
+     doppio di uno — senza questo, chi si rifornisce per tre mesi verrebbe
+     chiamato ogni mese.                                                    */
+
+  function shelf(c) {
+    const last = new Map();
+    for (const o of c.orders) {
+      for (const l of o.lines) {
+        const prev = last.get(l.productId);
+        if (!prev || o.date >= prev.date) last.set(l.productId, { date: o.date, qty: l.qty });
+      }
+    }
+    const off = new Set(c.dropped.map(x => x.productId));
+    const today = todayISO();
+    return [...last].map(([productId, v]) => {
+      const p = prodById(productId);
+      const days = p ? p.days : DEFAULTS.durataNuovo;
+      const dura = days * v.qty;
+      const due = iso(addDays(parseISO(v.date), dura));
+      return {
+        productId, name: prodName(productId), qty: v.qty, days, dura,
+        lastDate: v.date, due, dropped: off.has(productId),
+        daysTo: daysBetween(today, due),
+        volte: c.orders.filter(o => o.lines.some(l => l.productId === productId)).length,
+      };
+    }).sort((a, b) => (a.dropped !== b.dropped ? (a.dropped ? 1 : -1) : a.due < b.due ? -1 : a.due > b.due ? 1 : 0));
+  }
+
+  /* Lo stato di un cliente in una parola sola. L'ordine dei casi è il suo
+     significato: una chiusura vince su tutto, un promemoria spostato in avanti
+     mette in pausa la segnalazione — se hai deciso tu di risentirlo fra due
+     settimane, l'app non ti mette fretta prima. */
+  function clientState(c) {
+    const today = todayISO();
+    const sh = shelf(c).filter(x => !x.dropped);
+    /* Due scadenze diverse per due domande diverse. La **prima** dice se c'è
+       qualcosa da chiedergli adesso. L'**ultima** dice se è ancora un cliente:
+       finché una sola delle cose che ha preso è nella sua finestra, non è fermo —
+       senza questa distinzione chi compra scorte per tre mesi risultava fermo per
+       colpa di un dentifricio comprato una volta e mai più. */
+    const due = sh.length ? sh[0].due : "";
+    const ultima = sh.length ? sh.reduce((m, x) => (x.due > m ? x.due : m), sh[0].due) : "";
+    const daysTo = due ? daysBetween(today, due) : null;
+    const daysToUltima = ultima ? daysBetween(today, ultima) : null;
+    const rinviato = c.nextDate && c.nextDate > today && c.nextKind !== "nota";
+
+    if (c.closed) {
+      const k = CLOSED.find(x => x.id === c.closed);
+      return { key: "chiuso", label: k ? k.label : "Chiuso", tone: "off", due, daysTo, sh };
+    }
+    if (!c.orders.length) return { key: "mai", label: "Mai ordinato", tone: "warn", due: "", daysTo: null, sh };
+    if (!sh.length) return { key: "senza", label: "Nessun prodotto seguito", tone: "off", due: "", daysTo: null, sh };
+    if (rinviato) return { key: "rinviato", label: "Rimandato al " + fmtDate(c.nextDate), tone: "off", due, daysTo, sh };
+    if (daysToUltima < -state.settings.fermoDopo) return { key: "fermo", label: "Fermo", tone: "crit", due, daysTo, sh };
+    if (daysTo < 0) return { key: "ritardo", label: "Doveva riordinare", tone: "crit", due, daysTo, sh };
+    if (daysTo <= state.settings.preavviso) return { key: "ora", label: "Sta finendo", tone: "warn", due, daysTo, sh };
+    return { key: "ok", label: "A posto", tone: "good", due, daysTo, sh };
+  }
+
+  /* «Ha provato» e «ricompra» dicono la cosa più importante di un cliente: se il
+     primo ordine è diventato un'abitudine. Si contano gli ordini, non si chiede
+     niente a nessuno. */
+  function abitudine(c) {
+    const n = c.orders.length;
+    if (!n) return null;
+    if (n === 1) return { key: "provato", label: "Ha provato", tone: "off" };
+    return { key: "ricompra", label: "Ricompra", tone: "accent" };
+  }
+
+  /* Dopo che uno compra, la telefonata che conta è quella che non chiede niente:
+     «come ti sei trovato». Vale per gli ordini che portano a quella persona
+     qualcosa che non aveva mai preso — al secondo flacone dello stesso
+     integratore non si chiede più come si è trovato, lo sa già e suonerebbe
+     finto. Un ordine verificato resta verificato: la data sta sull'ordine. */
+  function verifichePendenti(c) {
+    if (c.closed) return [];
+    const today = todayISO();
+    const visti = new Set();
+    const out = [];
+    for (const o of c.orders) {
+      const nuovi = o.lines.filter(l => !visti.has(l.productId)).map(l => l.productId);
+      o.lines.forEach(l => visti.add(l.productId));
+      if (!nuovi.length || o.checkin) continue;
+      const due = iso(addDays(parseISO(o.date), state.settings.dopoAcquisto));
+      const daysTo = daysBetween(today, due);
+      if (daysTo < -FINESTRA_VERIFICA) continue;
+      out.push({ order: o, nuovi, due, daysTo });
+    }
+    return out;
+  }
+
+  const daVerificare = c => verifichePendenti(c).filter(x => x.daysTo <= 0)[0] || null;
+
+  /* Giorno e mese, senza anno. Il 29 febbraio negli anni comuni cade il 1° marzo:
+     è la resa del calendario, non un difetto da correggere qui. */
+  function compleanno(c) {
+    if (!c.birthday || c.closed) return null;
+    const [mm, gg] = c.birthday.split("-").map(Number);
+    const oggi = todayISO();
+    const anno = new Date().getFullYear();
+    let quando = iso(new Date(anno, mm - 1, gg));
+    let annoFesta = anno;
+    if (quando < oggi) { annoFesta = anno + 1; quando = iso(new Date(annoFesta, mm - 1, gg)); }
+    return {
+      md: c.birthday, data: quando, anno: annoFesta,
+      daysTo: daysBetween(oggi, quando),
+      etichetta: `${gg} ${MESI[mm - 1]}`,
+      fatto: String(c.augurato || "") === String(annoFesta),
+    };
+  }
+
+  function relDue(daysTo) {
+    if (daysTo === null || daysTo === undefined) return "";
+    if (daysTo < -1) return `${-daysTo} giorni fa`;
+    if (daysTo === -1) return "ieri";
+    if (daysTo === 0) return "oggi";
+    if (daysTo === 1) return "domani";
+    if (daysTo <= 30) return `fra ${daysTo} giorni`;
+    const m = Math.round(daysTo / 30);
+    return `fra ${plur(m, "mese", "mesi")}`;
+  }
+
+  /* Le liste del giorno. Sulle scadenze dei prodotti un cliente compare in una
+     sola, la più urgente; verifiche e compleanni corrono a parte, perché sono
+     occasioni diverse e perderle per colpa di un riordino sarebbe un peccato. */
+  function todo() {
+    const today = todayISO();
+    const out = { verifiche: [], compleanni: [], ritardo: [], ora: [], fermi: [], promemoria: [], mai: [] };
+    for (const c of state.clients) {
+      if (c.closed) continue;
+      const st = clientState(c);
+
+      const v = daVerificare(c);
+      if (v) out.verifiche.push({ c, st, v });
+
+      const b = compleanno(c);
+      if (b && !b.fatto && b.daysTo <= state.settings.compleanno) out.compleanni.push({ c, st, b });
+
+      /* Il promemoria scritto a mano scade oggi: è una cosa che hai deciso tu e
+         viene prima di qualunque conto sulle scadenze. */
+      if (c.nextDate && c.nextDate <= today) { out.promemoria.push({ c, st }); continue; }
+      if (st.key === "ritardo") out.ritardo.push({ c, st });
+      else if (st.key === "ora") out.ora.push({ c, st });
+      else if (st.key === "fermo") out.fermi.push({ c, st });
+      else if (st.key === "mai") out.mai.push({ c, st });
+    }
+    const byDue = (x, y) => (x.st.due < y.st.due ? -1 : x.st.due > y.st.due ? 1 : 0);
+    out.ritardo.sort(byDue); out.ora.sort(byDue); out.fermi.sort(byDue);
+    out.verifiche.sort((x, y) => (x.v.due < y.v.due ? -1 : 1));
+    out.compleanni.sort((x, y) => x.b.daysTo - y.b.daysTo);
+    out.promemoria.sort((x, y) => (x.c.nextDate < y.c.nextDate ? -1 : 1));
+    out.mai.sort((x, y) => (x.c.createdAt < y.c.createdAt ? -1 : 1));
+    return out;
+  }
+
+  const monthKey = s => String(s).slice(0, 7);
+
+  function ordersIn(fromISO, toISO) {
+    const out = [];
+    for (const c of state.clients) for (const o of c.orders) {
+      if (o.date >= fromISO && o.date <= toISO) out.push({ c, o });
+    }
+    return out;
+  }
+
+  function monthlySeries(n) {
+    const now = new Date();
+    const keys = [];
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      keys.push({ k: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: MESI[d.getMonth()] });
+    }
+    const counts = new Map(keys.map(x => [x.k, 0]));
+    for (const c of state.clients) for (const o of c.orders) {
+      const k = monthKey(o.date);
+      if (counts.has(k)) counts.set(k, counts.get(k) + 1);
+    }
+    return keys.map(x => ({ ...x, n: counts.get(x.k) }));
+  }
+
+  /* La durata dichiarata è una stima; i riordini di chi lo usa davvero sono un
+     fatto. Mediana degli intervalli fra un ordine e il successivo dello stesso
+     prodotto, divisa per le confezioni prese la prima volta. */
+  function osservata(productId) {
+    const gaps = [];
+    for (const c of state.clients) {
+      const dates = c.orders
+        .map(o => ({ date: o.date, qty: (o.lines.find(l => l.productId === productId) || {}).qty }))
+        .filter(x => x.qty);
+      for (let i = 1; i < dates.length; i++) {
+        const g = daysBetween(dates[i - 1].date, dates[i].date) / dates[i - 1].qty;
+        if (g >= 3 && g <= 730) gaps.push(g);
+      }
+    }
+    if (gaps.length < 2) return null;
+    gaps.sort((a, b) => a - b);
+    const mid = Math.floor(gaps.length / 2);
+    const med = gaps.length % 2 ? gaps[mid] : (gaps[mid - 1] + gaps[mid]) / 2;
+    return { days: Math.round(med), n: gaps.length };
+  }
+
+  function usoProdotto(productId) {
+    return state.clients.filter(c => c.orders.some(o => o.lines.some(l => l.productId === productId))).length;
+  }
+
+  /* ══ Pezzi ════════════════════════════════════════════════════════════ */
+
+  const chip = (label, tone) => `<span class="chip t-${tone || "off"}"><i class="dot"></i>${esc(label)}</span>`;
+
+  function dueTag(st) {
+    if (!st.due) return "";
+    const cls = st.daysTo < 0 ? "late" : st.daysTo <= state.settings.preavviso ? "now" : "";
+    const verbo = st.daysTo < 0 ? "finito" : "finisce";
+    return `<span class="due ${cls}">${verbo} ${esc(relDue(st.daysTo))}</span>`;
+  }
+
+  /* `magro` toglie pastiglie e scadenza: nelle righe di una verifica o di un
+     compleanno lo stato del prodotto è rumore — quello che conta lo dice
+     l'intestazione del gruppo, e la riga deve restare leggibile su un telefono. */
+  function clientRow(c, st, extra, sottotitolo, magro) {
+    const ab = abitudine(c);
+    const primo = st.sh.filter(x => !x.dropped)[0];
+    const sub = sottotitolo ? esc(sottotitolo) : primo
+      ? `${esc(primo.name)}${primo.qty > 1 ? ` ×${primo.qty}` : ""} · ultimo ordine ${esc(fmtDate(primo.lastDate))}`
+      : c.orders.length ? "nessun prodotto seguito" : "in elenco, mai un ordine";
+    return `<div class="row tap" data-act="open" data-id="${c.id}" tabindex="0" role="button">
+      <div class="row-main">
+        <div class="row-name">${esc(c.name)}</div>
+        <div class="row-sub">${sub}</div>
+      </div>
+      <div class="row-side">
+        ${magro ? "" : chip(st.label, st.tone)}
+        ${!magro && ab && st.key !== "chiuso" ? chip(ab.label, ab.tone) : ""}
+        ${magro ? "" : dueTag(st)}
+        ${extra || ""}
+      </div>
+    </div>`;
+  }
+
+  const btnRiordino = c => `<button class="btn btn-sm btn-primary" data-act="order" data-id="${c.id}">Ha riordinato</button>`;
+  const btnRimanda = c => `<button class="btn btn-sm" data-act="snooze" data-id="${c.id}">Rimanda</button>`;
+  const btnMsg = (c, tipo, label, primario) => `<button class="btn btn-sm ${primario ? "btn-primary" : ""}"
+    data-act="msg" data-tipo="${tipo}" data-id="${c.id}">${esc(label)}</button>`;
+
+  function kpiTile(val, title, foot, tone) {
+    return `<div class="kpi">
+      <div class="kpi-top"><span class="eyebrow">${esc(title)}</span></div>
+      <div class="kpi-val ${tone || ""}">${esc(String(val))}</div>
+      <div class="kpi-foot"><span>${foot || ""}</span></div>
+    </div>`;
+  }
+
+  function sparkline(series) {
+    const max = Math.max(1, ...series.map(x => x.n));
+    return `<div>
+      <div class="spark">${series.map((x, i) => `<i class="${i === series.length - 1 ? "on" : ""}"
+        style="height:${Math.round((x.n / max) * 100)}%" title="${x.label}: ${x.n}"></i>`).join("")}</div>
+      <div class="spark-x">${series.map(x => `<span>${x.label}</span>`).join("")}</div>
+    </div>`;
+  }
+
+  /* ══ Oggi ═════════════════════════════════════════════════════════════ */
+
+  function viewOggi() {
+    if (!state.clients.length) return viewVuoto();
+
+    const t = todo();
+    const daChiamare = t.promemoria.length + t.ritardo.length + t.ora.length
+      + t.verifiche.length + t.compleanni.length;
+    const conOrdini = state.clients.filter(c => c.orders.length);
+    const ricompra = conOrdini.filter(c => c.orders.length >= 2).length;
+    const attivi = state.clients.filter(c => !c.closed && c.orders.length && clientState(c).key !== "fermo").length;
+    const mese = todayISO().slice(0, 7);
+    const ordiniMese = ordersIn(mese + "-01", mese + "-31");
+    const incasso = ordiniMese.reduce((s, x) => s + (x.o.importo || 0), 0);
+    const nudge = backupNudge();
+
+    return `
+      <div class="page-head">
+        <div>
+          <h1>Oggi</h1>
+          <p class="lede">${daChiamare
+            ? `${plur(daChiamare, "cliente", "clienti")} da sentire.`
+            : "Nessuno da sentire oggi. I conti tornano."}</p>
+        </div>
+        <div class="btn-row">
+          <button class="btn" data-act="add-client">+ Cliente</button>
+          <button class="btn" data-act="add-order">+ Ordine</button>
+        </div>
+      </div>
+
+      <div class="kpis">
+        ${kpiTile(daChiamare, "Da sentire", daChiamare
+          ? [t.verifiche.length ? plur(t.verifiche.length, "verifica", "verifiche") : "",
+             t.compleanni.length ? plur(t.compleanni.length, "compleanno", "compleanni") : "",
+             (t.ritardo.length + t.ora.length + t.promemoria.length) ? plur(t.ritardo.length + t.ora.length + t.promemoria.length, "riordino", "riordini") : ""]
+            .filter(Boolean).join(", ")
+          : "tutto in ordine",
+          t.ritardo.length ? "crit" : daChiamare ? "warn" : "")}
+        ${kpiTile(attivi, "Clienti attivi", `su ${state.clients.length} in elenco`)}
+        ${kpiTile(conOrdini.length ? Math.round((ricompra / conOrdini.length) * 100) + "%" : "—", "Ricomprano",
+          conOrdini.length ? `${ricompra} su ${conOrdini.length} ha riordinato` : "nessun ordine ancora")}
+        ${kpiTile(ordiniMese.length, "Ordini questo mese", incasso ? `${incasso.toFixed(0)} € registrati` : "&nbsp;")}
+      </div>
+
+      ${nudge ? `<div class="nudge">
+        <div class="nudge-t">Salva una copia</div>
+        <div class="nudge-d">${nudge.mai
+          ? "I dati stanno solo in questo browser. Se svuoti la cronologia o cambi telefono, sparisce tutto: scarica il file e mettilo al sicuro."
+          : `L'ultima copia è di ${plur(nudge.giorni, "giorno", "giorni")} fa.`}</div>
+        <div class="btn-row">
+          <button class="btn btn-primary btn-sm" data-act="backup-file">Salva la copia</button>
+          <button class="btn btn-sm btn-quiet" data-act="snooze-backup">Più tardi</button>
+        </div></div>` : ""}
+
+      ${cardTodo(t)}
+
+      <div class="cols">
+        ${cardFermi(t) || cardAbitudini()}
+        ${cardAndamento()}
+      </div>`;
+  }
+
+  function cardTodo(t) {
+    const grp = (label, items, azioni, promemoria) => items.length ? `
+      <div class="grp-label"><span class="eyebrow">${esc(label)}</span></div>
+      <div class="rows">${items.map(({ c, st }) => clientRow(c, st,
+        azioni ? btnMsg(c, promemoria && c.nextKind === "nota" ? "proposta" : "riordino", "Messaggio")
+          + btnRiordino(c) + btnRimanda(c) : "",
+        promemoria && c.nextNote ? "ti eri scritto: " + c.nextNote : "")).join("")}</div>` : "";
+
+    /* Le verifiche stanno in cima a tutto: sono l'unica cosa in questa pagina che
+       non chiede niente al cliente, e sono quelle che si perdono per prime. */
+    const verifiche = t.verifiche.length ? `
+      <div class="grp-label"><span class="eyebrow">Come si è trovato</span></div>
+      <div class="rows">${t.verifiche.map(({ c, st, v }) => clientRow(c, st,
+        btnMsg(c, "checkin", "Messaggio", true)
+        + `<button class="btn btn-sm" data-act="checkin-done" data-id="${c.id}" data-oid="${v.order.id}">Fatto</button>`
+        + `<button class="btn btn-sm btn-quiet" data-act="checkin-skip" data-id="${c.id}" data-oid="${v.order.id}">Non serve</button>`,
+        `${v.nuovi.map(prodName).join(", ")} · preso ${relDue(daysBetween(todayISO(), v.order.date))}`, true
+      )).join("")}</div>` : "";
+
+    const compleanni = t.compleanni.length ? `
+      <div class="grp-label"><span class="eyebrow">Compleanni</span></div>
+      <div class="rows">${t.compleanni.map(({ c, st, b }) => clientRow(c, st,
+        btnMsg(c, "auguri", "Auguri", b.daysTo === 0)
+        + `<button class="btn btn-sm btn-quiet" data-act="auguri-done" data-id="${c.id}">Fatti</button>`,
+        `compie gli anni ${b.daysTo === 0 ? "oggi" : relDue(b.daysTo)} · ${b.etichetta}`, true
+      )).join("")}</div>` : "";
+
+    const vuoto = !t.promemoria.length && !t.ritardo.length && !t.ora.length && !t.mai.length
+      && !t.verifiche.length && !t.compleanni.length;
+    return `<div class="card">
+      <header><h2>Da fare</h2><span class="eyebrow">chi va sentito</span></header>
+      ${vuoto ? `<div class="empty"><p>Niente in scadenza. Quando a un cliente sta finendo qualcosa,
+        o è ora di chiedergli come si è trovato, compare qui da solo — non devi ricordartelo tu.</p></div>` : ""}
+      ${verifiche}
+      ${compleanni}
+      ${grp("Promemoria di oggi", t.promemoria, true, true)}
+      ${grp("Doveva già riordinare", t.ritardo, true)}
+      ${grp("Sta finendo", t.ora, true)}
+      ${grp("Mai ordinato", t.mai, false)}
+    </div>`;
+  }
+
+  /* Quando non c'è nessuno fermo la colonna resterebbe vuota: al suo posto la
+     cosa che conta di più dopo le scadenze, cioè quanti hanno ricomprato. */
+  function cardAbitudini() {
+    const conOrdini = state.clients.filter(c => c.orders.length && !c.closed);
+    const uno = conOrdini.filter(c => c.orders.length === 1);
+    const piu = conOrdini.filter(c => c.orders.length >= 2);
+    if (!conOrdini.length) return "";
+    const quota = Math.round((piu.length / conOrdini.length) * 100);
+    return `<div class="card">
+      <header><h2>Hanno ricomprato</h2><span class="eyebrow">${quota}%</span></header>
+      <div class="track"><i style="width:${quota}%"></i></div>
+      <p class="row-sub">${plur(piu.length, "cliente è tornato", "clienti sono tornati")} a ordinare.
+        ${uno.length ? `${plur(uno.length, "si è fermato", "si sono fermati")} al primo assaggio: sono
+        quelli da capire — se il prodotto non era giusto, o se nessuno li ha più chiamati.` : ""}</p>
+      ${uno.length ? `<div class="rows">${uno.slice(0, 5).map(c => clientRow(c, clientState(c), "")).join("")}</div>` : ""}
+    </div>`;
+  }
+
+  function cardAndamento() {
+    const series = monthlySeries(6);
+    const tot = series.reduce((s, x) => s + x.n, 0);
+    return `<div class="card">
+      <header><h2>Riordini</h2><span class="eyebrow">ultimi 6 mesi</span></header>
+      ${tot ? sparkline(series) : `<p class="row-sub">Ancora nessun ordine registrato.</p>`}
+    </div>`;
+  }
+
+  function cardFermi(t) {
+    if (!t.fermi.length) return "";
+    return `<div class="card">
+      <header><h2>Si sono fermati</h2><span class="eyebrow">tutto finito da oltre ${state.settings.fermoDopo} giorni</span></header>
+      <p class="row-sub">Hanno finito il prodotto da un pezzo e non hanno più ordinato. Una telefonata
+        senza secondi fini è quasi sempre quello che serve.</p>
+      <div class="rows">${t.fermi.slice(0, 8).map(({ c, st }) => clientRow(c, st, btnRiordino(c))).join("")}</div>
+    </div>`;
+  }
+
+  function viewVuoto() {
+    const vicina = listaVicina();
+    return `
+      <div class="page-head"><div>
+        <h1>Clienti e Riordini</h1>
+        <p class="lede">Sai quando a un cliente sta finendo quello che usa, com'è andata col primo
+          acquisto e quando compie gli anni. E cosa scrivergli.</p>
+      </div></div>
+      ${vicina && vicina.nuovi ? `<div class="nudge">
+        <div class="nudge-t">I tuoi clienti sono già su questo telefono</div>
+        <div class="nudge-d">Nella tua lista nomi ${vicina.nuovi === 1
+          ? "c'è una persona che hai chiuso come cliente"
+          : `ci sono ${vicina.nuovi} persone che hai chiuso come clienti`}. Le porto qui con nome, numero e
+          note: non devi riscrivere niente, e la lista nomi resta come è.</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" data-act="import-lista">Portali qui</button>
+        </div></div>` : ""}
+
+      <div class="card">
+        <header><h2>Si parte da qui</h2></header>
+        <ol class="bullets" style="font-size:14px">
+          <li><b>Aggiungi un cliente</b> — nome e numero bastano. Se sai il compleanno mettilo: ti avviso
+            qualche giorno prima.</li>
+          <li><b>Registra cosa ha preso</b> e quando: da lì l'app calcola quando finisce.</li>
+          <li>Nel <b>catalogo</b> ogni prodotto ha una durata (un integratore da 30 giorni, un detersivo
+            concentrato tre mesi). La imposti una volta e vale per tutti.</li>
+          <li>Dopo qualche giorno ti chiede di <b>sentire come si è trovato</b>, e il messaggio da mandare
+            te lo trovi già scritto — col suo nome e il prodotto dentro.</li>
+        </ol>
+        <div class="btn-row">
+          <button class="btn ${vicina && vicina.nuovi ? "" : "btn-primary"}" data-act="add-client">Aggiungi il primo cliente</button>
+          <button class="btn" data-act="nav" data-view="dati">Ho già una copia da caricare</button>
+        </div>
+        <details class="fold"><summary>Provala con dei dati inventati</summary>
+          <div class="fold-body">
+            <p class="row-sub">Sei clienti e qualche prodotto, per capire come si muove prima di
+              metterci i tuoi. Si cancellano quando vuoi.</p>
+            <div class="btn-row"><button class="btn btn-sm" data-act="demo">Carica l'esempio</button></div>
+          </div>
+        </details>
+      </div>`;
+  }
+
+  /* ══ Clienti ══════════════════════════════════════════════════════════ */
+
+  const FILTRI = [
+    { id: "tutti",    label: "Tutti" },
+    { id: "chiamare", label: "Da sentire" },
+    { id: "provato",  label: "Ha provato" },
+    { id: "ricompra", label: "Ricompra" },
+    { id: "fermo",    label: "Fermi" },
+    { id: "mai",      label: "Mai ordinato" },
+    { id: "chiuso",   label: "Chiusi" },
+  ];
+
+  function viewClienti() {
+    const q = query.trim().toLowerCase();
+    let list = state.clients.map(c => ({ c, st: clientState(c), ab: abitudine(c) }));
+
+    list = list.filter(({ c, st, ab }) => {
+      if (q && !(c.name.toLowerCase().includes(q) || c.contact.toLowerCase().includes(q)
+        || c.note.toLowerCase().includes(q) || st.sh.some(x => x.name.toLowerCase().includes(q)))) return false;
+      switch (filter) {
+        case "chiamare": return st.key === "ritardo" || st.key === "ora" || (c.nextDate && c.nextDate <= todayISO() && !c.closed);
+        case "provato": return ab && ab.key === "provato" && !c.closed;
+        case "ricompra": return ab && ab.key === "ricompra" && !c.closed;
+        case "fermo": return st.key === "fermo";
+        case "mai": return st.key === "mai";
+        case "chiuso": return st.key === "chiuso";
+        default: return true;
+      }
+    });
+
+    /* Chi ha una scadenza passata sta in cima: l'elenco serve a lavorare, non a
+       fare l'inventario. I chiusi scendono in fondo. */
+    const rank = st => st.key === "chiuso" ? 5 : st.key === "ritardo" ? 0 : st.key === "fermo" ? 1
+      : st.key === "ora" ? 2 : st.key === "mai" ? 3 : 4;
+    list.sort((a, b) => rank(a.st) - rank(b.st)
+      || (a.st.due && b.st.due ? (a.st.due < b.st.due ? -1 : a.st.due > b.st.due ? 1 : 0) : 0)
+      || a.c.name.localeCompare(b.c.name, "it"));
+
+    const counts = f => state.clients.filter(c => {
+      const st = clientState(c), ab = abitudine(c);
+      if (f === "tutti") return true;
+      if (f === "chiamare") return st.key === "ritardo" || st.key === "ora" || (c.nextDate && c.nextDate <= todayISO() && !c.closed);
+      if (f === "provato") return ab && ab.key === "provato" && !c.closed;
+      if (f === "ricompra") return ab && ab.key === "ricompra" && !c.closed;
+      return st.key === f;
+    }).length;
+
+    return `
+      <div class="page-head">
+        <div><h1>Clienti</h1><p class="lede">${plur(state.clients.length, "persona", "persone")} in elenco.</p></div>
+        <div class="btn-row"><button class="btn btn-primary" data-act="add-client">+ Cliente</button></div>
+      </div>
+      <div class="toolbar">
+        <div class="search">
+          <span class="eyebrow" aria-hidden="true">Cerca</span>
+          <input id="q" type="search" value="${esc(query)}" placeholder="nome, numero, prodotto"
+            autocomplete="off" aria-label="Cerca fra i clienti">
+        </div>
+      </div>
+      <div class="fchips">${FILTRI.map(f => `<button class="fchip" data-act="filter" data-f="${f.id}"
+        aria-pressed="${filter === f.id}">${esc(f.label)} ${counts(f.id)}</button>`).join("")}</div>
+      <div class="card">
+        ${list.length ? `<div class="rows">${list.map(({ c, st }) =>
+          clientRow(c, st, st.key === "ritardo" || st.key === "ora" || st.key === "fermo" ? btnRiordino(c) : "")).join("")}</div>`
+        : `<div class="empty"><p>Nessun cliente con questi filtri.</p></div>`}
+      </div>`;
+  }
+
+  /* ══ Catalogo ═════════════════════════════════════════════════════════ */
+
+  function viewProdotti() {
+    const list = [...state.products].sort((a, b) => a.name.localeCompare(b.name, "it"));
+    const daControllare = list.filter(p => p.check).length;
+    return `
+      <div class="page-head">
+        <div><h1>Catalogo</h1><p class="lede">Quanto dura ogni prodotto. È il numero da cui nasce tutto il resto.</p></div>
+        <div class="btn-row"><button class="btn btn-primary" data-act="add-product">+ Prodotto</button></div>
+      </div>
+      ${daControllare ? `<div class="banner"><div><b>${plur(daControllare, "prodotto", "prodotti")} con la durata
+        da controllare.</b> Sono nati da un ordine e hanno preso ${DEFAULTS.durataNuovo} giorni per
+        difetto: correggila, o le scadenze mentiranno.</div></div>` : ""}
+      <div class="card">
+        ${list.length ? `<div class="shelf">${list.map(p => {
+          const oss = osservata(p.id);
+          const uso = usoProdotto(p.id);
+          /* Proporre un cambio con due soli intervalli sarebbe rumore: un cliente
+             che si rifornisce in anticipo basterebbe a spostare la durata di
+             tutti. Il numero misurato si mostra sempre, il pulsante solo quando
+             c'è abbastanza storia. */
+          const scostato = oss && oss.n >= 3 && Math.abs(oss.days - p.days) >= Math.max(4, p.days * 0.15);
+          return `<div class="sh">
+            <div class="sh-main">
+              <div class="sh-name">${esc(p.name)} ${p.check ? chip("durata da controllare", "warn") : ""}</div>
+              <div class="sh-meta">${p.days} giorni · ${uso ? plur(uso, "cliente", "clienti") : "nessun cliente"}${
+                oss ? ` · dai riordini risulta ~${oss.days} gg` : ""}</div>
+              ${p.note ? `<div class="row-sub">${esc(p.note)}</div>` : ""}
+            </div>
+            <div class="sh-side">
+              ${scostato ? `<button class="btn btn-sm" data-act="use-observed" data-pid="${p.id}"
+                data-days="${oss.days}">Usa ${oss.days} gg</button>` : ""}
+              <button class="btn btn-sm" data-act="edit-product" data-pid="${p.id}">Modifica</button>
+            </div>
+          </div>`;
+        }).join("")}</div>` : `<div class="empty">
+          <p>Il catalogo è vuoto. Puoi aggiungere i prodotti qui, oppure scriverli mentre registri un
+            ordine: quelli nuovi entrano da soli e poi ne sistemi la durata.</p>
+          <button class="btn btn-primary" data-act="add-product">Aggiungi un prodotto</button>
+        </div>`}
+      </div>
+      <div class="card">
+        <header><h2>Sulla durata</h2></header>
+        <p class="row-sub" style="max-width:64ch">Metti i giorni che una confezione dura <b>a una
+          persona</b>, come li vedi tu sui clienti: è meglio una stima onesta che un numero preso dalla
+          scatola. Appena un cliente riordina due volte lo stesso prodotto, l'app misura l'intervallo
+          vero e te lo propone.</p>
+      </div>`;
+  }
+
+  /* ══ Dati ═════════════════════════════════════════════════════════════ */
+
+  function viewDati() {
+    const dark = document.documentElement.getAttribute("data-theme") === "dark";
+    const vicina = listaVicina();
+    const age = daysSince(state.settings.lastBackup);
+    const ordini = state.clients.reduce((s, c) => s + c.orders.length, 0);
+    return `
+      <div class="page-head"><div><h1>Dati</h1>
+        <p class="lede">Tutto sta in questo browser. La copia è l'unico modo per portarlo altrove.</p></div></div>
+
+      ${!storageOk ? `<div class="banner"><div><b>Questo browser non salva i dati.</b> Succede in
+        navigazione privata o quando la memoria del sito è bloccata. Finché è così, chiudendo la pagina
+        perdi quello che scrivi.</div></div>` : ""}
+
+      <div class="cols">
+        <div class="card">
+          <header><h2>Copia dei dati</h2><span class="eyebrow">${age === null ? "mai salvata" : age === 0 ? "salvata oggi" : `${plur(age, "giorno", "giorni")} fa`}</span></header>
+          <p class="row-sub">Un file con ${plur(state.clients.length, "cliente", "clienti")},
+            ${plur(state.products.length, "prodotto", "prodotti")} e ${plur(ordini, "ordine", "ordini")}.</p>
+          <div class="btn-row">
+            <button class="btn btn-primary" data-act="backup-file">Salva il file</button>
+            <button class="btn" data-act="pick-import">Carica un file</button>
+          </div>
+          <input type="file" id="file-in" accept=".json,application/json" style="display:none">
+          <p class="row-sub">Caricare <b>unisce</b>, non sostituisce: quello che c'è resta, quello che
+            arriva si somma. Puoi caricare due volte lo stesso file senza combinare guai.</p>
+          <details class="fold"><summary>Copia e incolla il testo</summary>
+            <div class="fold-body">
+              <div class="field"><label for="json-out">Da qui esce</label>
+                <textarea class="backup-json" id="json-out" readonly>${esc(JSON.stringify(state))}</textarea>
+                <div class="btn-row"><button class="btn btn-sm" data-act="copy-json">Copia</button></div></div>
+              <div class="field"><label for="json-in">Qui si incolla</label>
+                <textarea class="backup-json" id="json-in" placeholder="incolla qui il testo di un'altra copia"></textarea>
+                <div class="btn-row"><button class="btn btn-sm" data-act="import">Unisci</button></div></div>
+            </div></details>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:var(--gap)">
+          <div class="card">
+            <header><h2>Come ti avviso</h2></header>
+            <div class="field-2">
+              <div class="field"><label for="s-preavviso">Preavviso</label>
+                <input id="s-preavviso" type="number" min="0" max="90" value="${state.settings.preavviso}">
+                <span class="hint">giorni prima che finisca</span></div>
+              <div class="field"><label for="s-fermo">Fermo dopo</label>
+                <input id="s-fermo" type="number" min="7" max="365" value="${state.settings.fermoDopo}">
+                <span class="hint">giorni di silenzio</span></div>
+            </div>
+            <div class="field-2">
+              <div class="field"><label for="s-dopo">Come si è trovato</label>
+                <input id="s-dopo" type="number" min="1" max="90" value="${state.settings.dopoAcquisto}">
+                <span class="hint">giorni dopo un prodotto nuovo</span></div>
+              <div class="field"><label for="s-compl">Compleanni</label>
+                <input id="s-compl" type="number" min="0" max="60" value="${state.settings.compleanno}">
+                <span class="hint">giorni di preavviso</span></div>
+            </div>
+            <div class="field"><label for="s-nome">Il tuo nome</label>
+              <input id="s-nome" type="text" value="${esc(state.settings.nome)}" placeholder="facoltativo"></div>
+            <div class="btn-row"><button class="btn btn-sm btn-quiet" data-act="theme">${dark ? "☀ Tema chiaro" : "☾ Tema scuro"}</button></div>
+          </div>
+
+          <div class="card">
+            <header><h2>Da «Dalla Lista al Sì»</h2></header>
+            ${vicina ? (vicina.nuovi ? `
+              <p class="row-sub">La tua lista nomi è su questo dispositivo, con
+                <b>${plur(vicina.tutti, "persona chiusa come cliente", "persone chiuse come cliente")}</b>:
+                ${vicina.nuovi === vicina.tutti
+                  ? (vicina.tutti === 1 ? "non è ancora in questo elenco" : "nessuna è ancora in questo elenco")
+                  : `${vicina.nuovi === 1 ? "una non è" : vicina.nuovi + " non sono"} ancora in questo elenco`}.</p>
+              <div class="btn-row">
+                <button class="btn btn-primary" data-act="import-lista">Portali qui</button>
+              </div>` : `
+              <p class="row-sub">La tua lista nomi è su questo dispositivo, e ${vicina.tutti === 1
+                ? "il cliente che ci hai chiuso è già qui"
+                : `i ${vicina.tutti} clienti che ci hai chiuso sono già qui`}. Quando ne chiudi un altro,
+                torna e portalo dentro con un tocco.</p>
+              <div class="btn-row">
+                <button class="btn" data-act="import-lista">Ricontrolla</button>
+              </div>`) : `
+              <p class="row-sub">Carica qui il file di quell'app: prende le persone chiuse come
+                <b>cliente</b> e le porta in questo elenco, con numero e note. Chi c'è già non viene
+                duplicato.</p>
+              <div class="btn-row"><button class="btn" data-act="pick-import">Carica quel file</button></div>`}
+          </div>
+
+          <div class="card">
+            <header><h2>Ripartire</h2></header>
+            <div class="btn-row">
+              <button class="btn btn-sm" data-act="demo">Dati di esempio</button>
+              <button class="btn btn-sm btn-danger" data-act="reset">Cancella tutto</button>
+            </div>
+            <p class="row-sub">${persistent === true
+              ? "Il browser ha promesso di non buttare questi dati per fare spazio."
+              : "Il browser può liberare spazio buttando i dati dei siti: la copia salvata resta l'unica garanzia."}</p>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  /* ══ Scheda del cliente ═══════════════════════════════════════════════ */
+
+  /* Il numero scritto a mano non è un indirizzo telefonico: qui diventa
+     cliccabile. Un numero italiano senza prefisso lo prende, perché è il caso
+     normale di chi scrive «333…» in rubrica. `num` sono le sole cifre col
+     prefisso internazionale: le vogliono così sia WhatsApp sia Telegram. */
+  function telLink(raw) {
+    const s = String(raw || "").replace(/[^\d+]/g, "");
+    if (s.length < 6) return null;
+    const intl = s.startsWith("+") ? s.slice(1) : s.startsWith("00") ? s.slice(2)
+      : (/^3\d{8,9}$/.test(s) ? "39" + s : s);
+    return { tel: "+" + intl, num: intl };
+  }
+
+  function renderSheet() {
+    const layer = document.getElementById("layer");
+    if (!openId) { layer.innerHTML = ""; return; }
+    const c = byId(openId);
+    if (!c) { openId = null; layer.innerHTML = ""; return; }
+
+    const st = clientState(c);
+    const ab = abitudine(c);
+    const link = telLink(c.contact);
+    const pend = verifichePendenti(c);
+    const bday = compleanno(c);
+    /* Qui serve lo scaffale intero, non quello che serve alle segnalazioni: nella
+       scheda anche i prodotti messi da parte devono restare visibili e barrati,
+       altrimenti «non lo segue più» diventa una cancellazione senza ritorno. */
+    const sh = shelf(c);
+
+    const shelfHTML = sh.length ? `<div class="shelf">${sh.map(x => {
+      const cls = x.dropped ? "sh off" : "sh";
+      const quando = x.dropped ? "non lo segui più"
+        : `${x.dura} gg dal ${fmtDate(x.lastDate)} · ${x.daysTo < 0 ? "finito" : "finisce"} ${relDue(x.daysTo)}`;
+      return `<div class="${cls}">
+        <div class="sh-main">
+          <div class="sh-name">${esc(x.name)}${x.qty > 1 ? ` <span class="sh-meta">×${x.qty}</span>` : ""}</div>
+          <div class="sh-meta">${esc(quando)}${x.volte > 1 ? ` · preso ${x.volte} volte` : ""}</div>
+        </div>
+        <div class="sh-side">
+          ${x.dropped
+            ? `<button class="btn btn-sm" data-act="undrop" data-id="${c.id}" data-pid="${x.productId}">Riprendi</button>`
+            : `<button class="btn btn-sm btn-primary" data-act="reorder-one" data-id="${c.id}" data-pid="${x.productId}">Riordinato</button>
+               <button class="btn btn-sm btn-quiet" data-act="drop" data-id="${c.id}" data-pid="${x.productId}"
+                 title="Non lo segue più" aria-label="Non segue più ${esc(x.name)}">✕</button>`}
+        </div>
+      </div>`;
+    }).join("")}</div>` : `<p class="row-sub">Nessun prodotto ancora. Registra il primo ordine e le
+      scadenze cominciano a camminare.</p>`;
+
+    const storia = [...c.orders].reverse();
+
+    layer.innerHTML = `
+      <div class="scrim" data-act="close-layer"></div>
+      <aside class="sheet" role="dialog" aria-label="Scheda di ${esc(c.name)}">
+        <div class="sheet-head">
+          <button class="btn btn-sm btn-quiet sheet-x" data-act="close-layer" aria-label="Chiudi">✕</button>
+          <div style="padding-right:34px"><h2>${esc(c.name)}</h2></div>
+          <div class="btn-row">
+            ${chip(st.label, st.tone)}
+            ${ab && st.key !== "chiuso" ? chip(ab.label, ab.tone) : ""}
+            ${chip(plur(c.orders.length, "ordine", "ordini"), "off")}
+          </div>
+          ${link ? `<div class="btn-row">
+            ${dentroCornice ? "" : `<a class="btn btn-sm" href="tel:${esc(link.tel)}">Chiama</a>`}
+            <a class="btn btn-sm" href="https://wa.me/${esc(link.num)}" target="_blank" rel="noopener">WhatsApp</a>
+            ${dentroCornice ? "" : `<a class="btn btn-sm" href="https://t.me/+${esc(link.num)}"
+              target="_blank" rel="noopener">Telegram</a>`}
+            <button class="btn btn-sm btn-quiet" data-act="copy-num" data-id="${c.id}">Copia numero</button>
+          </div>
+          ${dentroCornice ? `<p class="row-sub" style="font-size:12px">Un pulsante che non può funzionare è
+            peggio che non averlo: qui «Chiama» e Telegram non riuscirebbero ad aprire le app del telefono,
+            quindi non li trovi. Usa «Copia numero». Dal link del sito ci sono, e funzionano.</p>` : ""}` : ""}
+        </div>
+        <div class="sheet-body">
+          <div class="btn-row">
+            <button class="btn btn-primary" data-act="order" data-id="${c.id}">Nuovo ordine</button>
+            ${st.key === "ritardo" || st.key === "ora" || st.key === "fermo"
+              ? `<button class="btn" data-act="msg" data-tipo="riordino" data-id="${c.id}">Messaggio</button>` : ""}
+            <button class="btn" data-act="edit-client" data-id="${c.id}">Modifica</button>
+          </div>
+
+          <dl class="kv">
+            ${c.contact ? `<dt>Contatto</dt><dd>${esc(c.contact)}</dd>` : ""}
+            ${c.origine ? `<dt>Come</dt><dd>${esc(c.origine)}</dd>` : ""}
+            ${bday ? `<dt>Compleanno</dt><dd>${esc(bday.etichetta)} · ${bday.fatto
+              ? "auguri fatti" : bday.daysTo === 0 ? "è oggi" : relDue(bday.daysTo)}</dd>` : ""}
+            <dt>In elenco da</dt><dd>${esc(fmtDateY(c.createdAt))}</dd>
+            ${c.orders.length ? `<dt>Ultimo ordine</dt><dd>${esc(fmtDateY(c.orders[c.orders.length - 1].date))}</dd>` : ""}
+            ${c.note ? `<dt>Note</dt><dd>${esc(c.note)}</dd>` : ""}
+          </dl>
+
+          ${pend.length ? pend.slice(0, 2).map(v => `<div class="next-box">
+            <div class="eyebrow">Come si è trovato</div>
+            <p style="font-size:13.5px">Ha preso <b>${esc(v.nuovi.map(prodName).join(" e "))}</b>
+              il ${esc(fmtDate(v.order.date))}${v.daysTo <= 0
+                ? `. Puoi chiederglielo ${v.daysTo === 0 ? "da oggi" : "da " + plur(-v.daysTo, "giorno", "giorni")}.`
+                : `. Glielo chiedi ${esc(relDue(v.daysTo))}.`}</p>
+            <div class="btn-row">
+              <button class="btn btn-sm btn-primary" data-act="msg" data-tipo="checkin" data-id="${c.id}">Messaggio</button>
+              <button class="btn btn-sm" data-act="checkin-done" data-id="${c.id}" data-oid="${v.order.id}">Fatto</button>
+              <button class="btn btn-sm btn-quiet" data-act="checkin-skip" data-id="${c.id}" data-oid="${v.order.id}">Non serve</button>
+            </div></div>`).join("") : ""}
+
+          ${bday && !bday.fatto && bday.daysTo <= state.settings.compleanno ? `<div class="next-box">
+            <div class="eyebrow">Compleanno</div>
+            <p style="font-size:13.5px">${bday.daysTo === 0 ? "È oggi." : `Fra ${plur(bday.daysTo, "giorno", "giorni")}, il ${esc(bday.etichetta)}.`}
+              Gli auguri prima, l'eventuale proposta qualche giorno dopo.</p>
+            <div class="btn-row">
+              <button class="btn btn-sm btn-primary" data-act="msg" data-tipo="auguri" data-id="${c.id}">Auguri e proposta</button>
+              <button class="btn btn-sm btn-quiet" data-act="auguri-done" data-id="${c.id}">Già fatti</button>
+            </div></div>` : ""}
+
+          <div>
+            <div class="grp-label"><span class="eyebrow">Cosa usa</span></div>
+            ${shelfHTML}
+          </div>
+
+          <div class="next-box">
+            <div class="eyebrow">Promemoria</div>
+            <div class="field-2">
+              <div class="field"><label for="np-date">Quando</label>
+                <input id="np-date" type="date" value="${esc(c.nextDate)}"></div>
+              <div class="field"><label for="np-note">Cosa</label>
+                <input id="np-note" type="text" value="${esc(c.nextNote)}" placeholder="es. chiedere della crema"></div>
+            </div>
+            <p class="hint" style="font-size:12px;color:var(--ink-3)">Una data futura mette in pausa le
+              segnalazioni: se hai deciso tu quando risentirlo, l'app non ti mette fretta prima.</p>
+            <div class="btn-row">
+              <button class="btn btn-sm btn-primary" data-act="save-next" data-id="${c.id}">Salva</button>
+              ${c.nextDate || c.nextNote ? `<button class="btn btn-sm btn-quiet" data-act="clear-next" data-id="${c.id}">Togli</button>` : ""}
+            </div>
+          </div>
+
+          <div>
+            <div class="grp-label"><span class="eyebrow">Ordini</span></div>
+            ${storia.length ? `<div class="rows">${storia.map(o => `<div class="row">
+              <div class="row-main">
+                <div class="row-name" style="font-weight:500">${o.lines.length
+                  ? esc(o.lines.map(l => prodName(l.productId) + (l.qty > 1 ? ` ×${l.qty}` : "")).join(", "))
+                  : "ordine senza prodotti"}</div>
+                <div class="row-sub">${esc(fmtDateY(o.date))}${o.importo ? ` · ${o.importo.toFixed(2).replace(".", ",")} €` : ""}${o.note ? ` · ${esc(o.note)}` : ""}</div>
+              </div>
+              <div class="row-side">
+                <button class="btn btn-sm btn-quiet" data-act="del-order" data-id="${c.id}" data-oid="${o.id}"
+                  aria-label="Elimina questo ordine">✕</button>
+              </div></div>`).join("")}</div>`
+            : `<p class="row-sub">Nessun ordine registrato.</p>`}
+          </div>
+
+          <details class="fold"><summary>Altro</summary>
+            <div class="fold-body">
+              ${c.closed
+                ? `<div class="btn-row"><button class="btn btn-sm" data-act="reopen" data-id="${c.id}">Riapri il cliente</button></div>
+                   <p class="row-sub">Chiuso come «${esc((CLOSED.find(x => x.id === c.closed) || {}).label || "")}»: resta
+                     nell'elenco ma non compare più fra chi va sentito.</p>`
+                : `<div class="btn-row"><button class="btn btn-sm" data-act="close-client" data-id="${c.id}">Chiudi il cliente</button></div>
+                   <p class="row-sub">Per chi è diventato partner e ordina da sé, o per chi non compra più.</p>`}
+              <div class="btn-row"><button class="btn btn-sm btn-danger" data-act="del-client" data-id="${c.id}">Elimina</button></div>
+            </div></details>
+        </div>
+      </aside>`;
+  }
+
+  /* ══ Finestre ═════════════════════════════════════════════════════════ */
+
+  function openModal(html, onMount) {
+    const layer = document.getElementById("modal-layer") || (() => {
+      const d = document.createElement("div"); d.id = "modal-layer"; document.body.appendChild(d); return d;
+    })();
+    layer.innerHTML = `<div class="scrim modal-scrim" data-act="close-modal"></div>
+      <div class="modal-box" role="dialog" aria-modal="true">${html}</div>`;
+    const box = layer.querySelector(".modal-box");
+    if (onMount) onMount(box);
+    const first = box.querySelector("input:not([type=hidden]), select, textarea");
+    if (first && window.matchMedia("(min-width: 561px)").matches) first.focus();
+  }
+
+  function closeModal() {
+    const layer = document.getElementById("modal-layer");
+    if (layer) layer.innerHTML = "";
+  }
+
+  function toast(msg) {
+    document.querySelectorAll(".toast").forEach(n => n.remove());
+    const n = document.createElement("div");
+    n.className = "toast"; n.setAttribute("role", "status"); n.textContent = msg;
+    document.body.appendChild(n);
+    clearTimeout(toastT);
+    toastT = setTimeout(() => n.remove(), 2600);
+  }
+
+  function modalConfirm(title, body, label, onYes) {
+    openModal(`<h2>${esc(title)}</h2><p class="row-sub" style="margin-top:6px">${esc(body)}</p>
+      <div class="modal-actions" style="margin-top:18px">
+        <button class="btn" data-act="close-modal">Annulla</button>
+        <button class="btn btn-danger" id="yes">${esc(label)}</button>
+      </div>`, box => {
+      box.querySelector("#yes").addEventListener("click", () => { closeModal(); onYes(); render(); });
+    });
+  }
+
+  function modalClient(c) {
+    const nuovo = !c;
+    const bd = c && c.birthday ? { mm: Number(c.birthday.slice(0, 2)), gg: Number(c.birthday.slice(3, 5)) } : null;
+    openModal(`<div class="eyebrow">${nuovo ? "Nuovo cliente" : "Modifica"}</div>
+      <h2>${nuovo ? "Chi è" : esc(c.name)}</h2>
+      <form class="modal-form" id="f-client">
+        <div class="field"><label for="c-name">Nome</label>
+          <input id="c-name" type="text" required value="${esc(c ? c.name : "")}" placeholder="nome e cognome"></div>
+        <div class="field"><label for="c-contact">Telefono o email</label>
+          <input id="c-contact" type="text" value="${esc(c ? c.contact : "")}" placeholder="333 1234567">
+          <span class="hint">Se metti il numero, dalla scheda lo chiami con un tocco.</span></div>
+        <div class="field"><label for="c-origine">Come l'hai conosciuto</label>
+          <input id="c-origine" type="text" value="${esc(c ? c.origine : "")}" placeholder="palestra, collega di Ale…"></div>
+        <div class="field"><label>Compleanno</label>
+          <div class="field-2">
+            <select id="c-bg" aria-label="Giorno">
+              <option value="">giorno</option>
+              ${Array.from({ length: 31 }, (_, i) => `<option value="${i + 1}"
+                ${bd && bd.gg === i + 1 ? "selected" : ""}>${i + 1}</option>`).join("")}
+            </select>
+            <select id="c-bm" aria-label="Mese">
+              <option value="">mese</option>
+              ${MESI.map((m, i) => `<option value="${i + 1}" ${bd && bd.mm === i + 1 ? "selected" : ""}>${m}</option>`).join("")}
+            </select>
+          </div>
+          <span class="hint">Senza anno: serve solo il giorno. Ti avviso qualche giorno prima.</span></div>
+        <div class="field"><label for="c-note">Note</label>
+          <textarea id="c-note" placeholder="cosa gli serve, allergie, abitudini…">${esc(c ? c.note : "")}</textarea></div>
+        <div class="modal-actions">
+          <button type="button" class="btn" data-act="close-modal">Annulla</button>
+          <button type="submit" class="btn btn-primary">${nuovo ? "Aggiungi" : "Salva"}</button>
+        </div>
+      </form>`, box => {
+      box.querySelector("#f-client").addEventListener("submit", ev => {
+        ev.preventDefault();
+        const name = box.querySelector("#c-name").value.trim();
+        if (!name) return;
+        const gg = parseInt(box.querySelector("#c-bg").value, 10);
+        const mm = parseInt(box.querySelector("#c-bm").value, 10);
+        const dati = {
+          name,
+          contact: box.querySelector("#c-contact").value.trim(),
+          origine: box.querySelector("#c-origine").value.trim(),
+          note: box.querySelector("#c-note").value.trim(),
+          birthday: gg && mm ? `${String(mm).padStart(2, "0")}-${String(gg).padStart(2, "0")}` : "",
+        };
+        if (nuovo) {
+          const nc = {
+            id: uid(), ...dati, closed: "", nextDate: "", nextNote: "", fromLista: "", augurato: "",
+            createdAt: todayISO(), updatedAt: nowISO(), dropped: [], orders: [],
+          };
+          state.clients.push(nc);
+          openId = nc.id;
+        } else Object.assign(c, dati), touch(c);
+        save(); closeModal(); render();
+        toast(nuovo ? "Cliente aggiunto — ora registra cosa ha preso" : "Salvato");
+        if (nuovo) modalOrder(byId(openId));
+      });
+    });
+  }
+
+  /* La finestra dell'ordine è il gesto che si ripete di più: dev'essere corta.
+     Per questo arriva già compilata con quello che il cliente usa — riordinare
+     «come l'ultima volta» è un tocco — e i prodotti che non esistono ancora si
+     scrivono qui, senza passare dal catalogo. */
+  function modalOrder(c, prefill) {
+    if (!c) return;
+    const sh = shelf(c).filter(x => !x.dropped);
+    let draft = (prefill && prefill.length ? prefill : sh.filter(x => x.daysTo <= state.settings.preavviso).map(x => x.productId))
+      .map(pid => ({ productId: pid, qty: (sh.find(x => x.productId === pid) || {}).qty || 1, nome: "" }));
+    if (!draft.length) draft = [{ productId: sh.length ? sh[0].productId : (state.products[0] ? state.products[0].id : "__new"), qty: 1, nome: "" }];
+
+    const opzioni = sel => state.products
+      .slice().sort((a, b) => a.name.localeCompare(b.name, "it"))
+      .map(p => `<option value="${p.id}" ${sel === p.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")
+      + `<option value="__new" ${sel === "__new" ? "selected" : ""}>+ nuovo prodotto…</option>`;
+
+    openModal(`<div class="eyebrow">${esc(c.name)}</div>
+      <h2>Ordine</h2>
+      <form class="modal-form" id="f-order">
+        <div class="field"><label>Prodotti</label><div id="ol" style="display:flex;flex-direction:column;gap:8px"></div>
+          <div><button type="button" class="btn btn-sm" id="ol-add">+ Aggiungi riga</button></div></div>
+        <div class="field-2">
+          <div class="field"><label for="o-date">Quando</label>
+            <input id="o-date" type="date" value="${todayISO()}" required></div>
+          <div class="field"><label for="o-importo">Importo (facoltativo)</label>
+            <input id="o-importo" type="number" min="0" step="0.01" placeholder="€"></div>
+        </div>
+        <div class="field"><label for="o-note">Note</label>
+          <input id="o-note" type="text" placeholder="consegnato a mano, ordine fatto da lui…"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn" data-act="close-modal">Annulla</button>
+          <button type="submit" class="btn btn-primary">Registra l'ordine</button>
+        </div>
+      </form>`, box => {
+      const ol = box.querySelector("#ol");
+
+      /* Si legge dal contenitore della riga, non dalla griglia: il campo del nome
+         del prodotto nuovo sta fuori dalla griglia — cercarlo lì dentro lo
+         lasciava sempre vuoto, e l'ordine non si registrava. */
+      const leggi = () => {
+        [...ol.querySelectorAll(".oitem")].forEach((item, i) => {
+          if (!draft[i]) return;
+          draft[i].productId = item.querySelector("[data-role=p]").value;
+          draft[i].qty = clamp(parseInt(item.querySelector("[data-role=q]").value, 10) || 1, 1, 99);
+          const n = item.querySelector("[data-role=n]");
+          if (n) draft[i].nome = n.value;
+        });
+      };
+
+      const dipingi = () => {
+        ol.innerHTML = draft.map((l, i) => `<div class="oitem">
+          <div class="oline" data-i="${i}">
+            <select data-role="p" aria-label="Prodotto">${opzioni(l.productId)}</select>
+            <input data-role="q" type="number" min="1" max="99" value="${l.qty}" aria-label="Quantità">
+            <button type="button" class="btn btn-sm btn-quiet" data-role="x" aria-label="Togli la riga">✕</button>
+          </div>
+          ${l.productId === "__new" ? `<input data-role="n" type="text" value="${esc(l.nome)}"
+            placeholder="nome del prodotto nuovo" style="margin-top:8px">` : ""}
+        </div>`).join("");
+      };
+
+      dipingi();
+      ol.addEventListener("change", ev => {
+        if (ev.target.dataset.role === "p") { leggi(); dipingi(); }
+      });
+      ol.addEventListener("click", ev => {
+        const x = ev.target.closest("[data-role=x]");
+        if (!x) return;
+        const i = Number(x.closest(".oline").dataset.i);
+        leggi(); draft.splice(i, 1);
+        if (!draft.length) draft = [{ productId: "__new", qty: 1, nome: "" }];
+        dipingi();
+      });
+      box.querySelector("#ol-add").addEventListener("click", () => {
+        leggi(); draft.push({ productId: state.products[0] ? state.products[0].id : "__new", qty: 1, nome: "" }); dipingi();
+      });
+
+      box.querySelector("#f-order").addEventListener("submit", ev => {
+        ev.preventDefault();
+        leggi();
+        const lines = [];
+        let creati = 0;
+        for (const l of draft) {
+          let pid = l.productId;
+          if (pid === "__new") {
+            const nome = (l.nome || "").trim();
+            if (!nome) continue;
+            const esiste = state.products.find(p => p.name.trim().toLowerCase() === nome.toLowerCase());
+            if (esiste) pid = esiste.id;
+            else {
+              /* Nato di corsa dentro un ordine: prende una durata di ripiego e un
+                 segno che chiede di controllarla, perché da quel numero dipendono
+                 tutte le scadenze di questo prodotto. */
+              const np = { id: uid(), name: nome, days: DEFAULTS.durataNuovo, check: true, note: "", updatedAt: nowISO() };
+              state.products.push(np); pid = np.id; creati++;
+            }
+          }
+          const gia = lines.find(x => x.productId === pid);
+          if (gia) gia.qty = clamp(gia.qty + l.qty, 1, 99);
+          else lines.push({ productId: pid, qty: l.qty });
+        }
+        if (!lines.length) { toast("Scegli almeno un prodotto"); return; }
+
+        pushOrder(c, lines, {
+          date: box.querySelector("#o-date").value || todayISO(),
+          importo: box.querySelector("#o-importo").value,
+          note: box.querySelector("#o-note").value.trim(),
+        });
+        closeModal(); render();
+        toast(creati ? `Ordine registrato — controlla la durata ${creati === 1 ? "del prodotto nuovo" : "dei prodotti nuovi"}` : "Ordine registrato");
+      });
+    });
+  }
+
+  function modalProduct(p) {
+    const nuovo = !p;
+    const oss = p ? osservata(p.id) : null;
+    const uso = p ? usoProdotto(p.id) : 0;
+    const pills = [30, 60, 90, 180, 365];
+    openModal(`<div class="eyebrow">${nuovo ? "Nuovo prodotto" : "Catalogo"}</div>
+      <h2>${nuovo ? "Che prodotto è" : esc(p.name)}</h2>
+      <form class="modal-form" id="f-prod">
+        <div class="field"><label for="p-name">Nome</label>
+          <input id="p-name" type="text" required value="${esc(p ? p.name : "")}" placeholder="es. Nutrilite Doppio X"></div>
+        <div class="field"><label for="p-days">Quanto dura una confezione</label>
+          <input id="p-days" type="number" min="1" max="3650" required value="${p ? p.days : DEFAULTS.durataNuovo}">
+          <div class="opts" style="margin-top:4px">${pills.map(n =>
+            `<label data-days="${n}" style="cursor:pointer">${n} gg</label>`).join("")}</div>
+          <span class="hint">Giorni che dura a una persona. ${oss
+            ? `Dai riordini dei tuoi clienti risultano <b>${oss.days} giorni</b> (${plur(oss.n, "riordino", "riordini")}).`
+            : "Con due riordini dello stesso prodotto l'app comincia a misurarla da sola."}</span></div>
+        <div class="field"><label for="p-note">Note</label>
+          <input id="p-note" type="text" value="${esc(p ? p.note : "")}" placeholder="formato, dosaggio…"></div>
+        <div class="modal-actions">
+          ${!nuovo ? `<button type="button" class="btn btn-danger" id="del">Elimina</button>` : ""}
+          <button type="button" class="btn" data-act="close-modal">Annulla</button>
+          <button type="submit" class="btn btn-primary">${nuovo ? "Aggiungi" : "Salva"}</button>
+        </div>
+      </form>`, box => {
+      box.querySelectorAll(".opts label[data-days]").forEach(el => {
+        el.addEventListener("click", () => { box.querySelector("#p-days").value = el.dataset.days; });
+      });
+      const del = box.querySelector("#del");
+      if (del) del.addEventListener("click", () => {
+        if (uso) { toast(`Lo usano ${plur(uso, "cliente", "clienti")}: rinominalo invece di eliminarlo`); return; }
+        closeModal();
+        modalConfirm(`Eliminare ${p.name}?`, "Sparisce dal catalogo. Nessun cliente lo sta usando.", "Elimina", () => {
+          state.products = state.products.filter(x => x.id !== p.id);
+          state.deleted.push({ id: p.id, at: nowISO() });
+          save(); toast("Prodotto eliminato");
+        });
+      });
+      box.querySelector("#f-prod").addEventListener("submit", ev => {
+        ev.preventDefault();
+        const name = box.querySelector("#p-name").value.trim();
+        const days = clamp(parseInt(box.querySelector("#p-days").value, 10) || DEFAULTS.durataNuovo, 1, 3650);
+        const note = box.querySelector("#p-note").value.trim();
+        if (!name) return;
+        if (nuovo) state.products.push({ id: uid(), name, days, note, check: false, updatedAt: nowISO() });
+        else Object.assign(p, { name, days, note, check: false, updatedAt: nowISO() });
+        save(); closeModal(); render(); toast(nuovo ? "Prodotto aggiunto" : "Salvato");
+      });
+    });
+  }
+
+  /* ══ Messaggi ══════════════════════════════════════════════════════════
+
+     Qui l'app esce per un momento dal suo mestiere di calendario. Non è una
+     raccolta di messaggi — quella è roba di SofIA — ma le tre righe che servono
+     nell'istante esatto in cui questa pagina ti dice di scrivere: arrivano già
+     col nome e col prodotto dentro, si correggono, si copiano, e da qui parte
+     WhatsApp. Restano modificabili perché la voce è tua.                     */
+
+  const primoNome = c => String(c.name || "").trim().split(/\s+/)[0] || c.name;
+
+  /* Copiare da dentro la cornice della piattaforma non è scontato: l'API moderna
+     degli appunti chiede un permesso che l'artifact non ha e rifiuta senza fare
+     rumore — per questo l'avviso diceva «copiato» quando negli appunti non c'era
+     niente. Il vecchio `execCommand`, dentro un tocco dell'utente, passa dove
+     l'altra non passa: si prova prima quello. E se non passa nessuna delle due,
+     si dice come stanno le cose invece di annunciare una copia che non esiste. */
+  /* Si copia sempre da una casella temporanea fuori vista, mai dal campo che si
+     sta guardando: selezionare quello gli darebbe il fuoco e su un telefono
+     farebbe salire la tastiera a ogni «Copia». La casella è di sola lettura, che
+     la tastiera non la chiama, e sparisce subito. */
+  async function copiaStringa(testo) {
+    const t = document.createElement("textarea");
+    t.value = testo;
+    t.readOnly = true;
+    t.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0";
+    document.body.appendChild(t);
+    try {
+      t.focus();
+      t.setSelectionRange(0, testo.length);
+      if (document.execCommand && document.execCommand("copy")) return true;
+    } catch (e) { /* si prova l'altra strada */ }
+    finally { t.remove(); }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(testo);
+        return true;
+      }
+    } catch (e) { /* appunti negati */ }
+    return false;
+  }
+
+  /* Ultima via quando entrambe le strade sono chiuse: il testo resta selezionato
+     e glielo si dice, invece di annunciare una copia che non è avvenuta. */
+  function selezionaPerMano(el) {
+    if (!el) return;
+    try { el.focus(); el.setSelectionRange(0, el.value.length); } catch (e) {}
+  }
+
+  function testiMessaggio(c, tipo) {
+    const n = primoNome(c);
+    const sh = shelf(c).filter(x => !x.dropped);
+
+    if (tipo === "checkin") {
+      const v = verifichePendenti(c)[0];
+      const prod = v ? v.nuovi.map(prodName).join(" e ") : "quello che hai preso";
+      const gg = v ? daysBetween(v.order.date, todayISO()) : state.settings.dopoAcquisto;
+      return {
+        titolo: "Come ti sei trovato",
+        guida: `Sono passati ${plur(gg, "giorno", "giorni")} dall'ordine: il prodotto ha avuto il tempo di
+          farsi giudicare, e se qualcosa non va sei ancora in tempo a sistemarlo. Questo messaggio non
+          chiede niente — ed è per questo che funziona: è il punto in cui uno che ha provato diventa uno
+          che ricompra.`,
+        azione: "Fatto, gliel'ho chiesto",
+        varianti: [
+          { label: "Aperto", testo: `Ciao ${n}, sono passati ${gg} giorni da quando hai preso ${prod}: come ti stai trovando?\n\nSe c'è qualcosa che non ti torna dimmelo pure — mi interessa più sapere com'è andata che venderti altro.` },
+          { label: "Pratico", testo: `Ciao ${n}, ti scrivo per sapere come va con ${prod}. Riesci a usarlo tutti i giorni? Se hai dubbi su quanto prenderne o su quando, chiedimi: sono due minuti.` },
+          { label: "Corto", testo: `Ciao ${n}, tutto bene con ${prod}?` },
+        ],
+      };
+    }
+
+    if (tipo === "proposta") {
+      const suggerito = sh.length ? sh[0].name : "quello che usa di solito";
+      return {
+        titolo: "Il pensiero di compleanno",
+        guida: `Gli auguri glieli hai già fatti: questa è la proposta, che arriva dopo e per questo non
+          sembra il conto del ristorante. Le parentesi quadre vanno riempite, e prometti solo quello che
+          puoi mantenere davvero — uno sconto inventato si paga più caro del regalo.`,
+        azione: "Fatto, gliel'ho mandata",
+        varianti: [
+          { label: "Il regalo", testo: `Ciao ${n}, ti devo ancora il regalo di compleanno. Ho pensato a [scrivi cosa: un campione, un prodotto in omaggio, lo sconto che puoi fare]: se ti va te lo porto con il prossimo ordine.` },
+          { label: "Sul prodotto", testo: `Ciao ${n}, per il tuo compleanno volevo farti un pensiero: su ${suggerito} posso lasciarti [scrivi cosa] fino a [data]. Dimmi se ti interessa e te lo metto da parte.` },
+        ],
+      };
+    }
+
+    if (tipo === "auguri") {
+      const b = compleanno(c);
+      const suggerito = sh.length ? sh[0].name : "quello che usa di solito";
+      return {
+        titolo: "Auguri",
+        guida: `Gli auguri restano auguri. Se ci attacchi un'offerta diventano il pretesto per vendere, e si
+          sente subito. La proposta, se vuoi farla, va qualche giorno dopo: qui sotto c'è il testo, e l'app
+          te la ricorda.`,
+        azione: "Auguri fatti",
+        varianti: [
+          { label: "Semplice", testo: `Buon compleanno ${n}! Ti auguro una giornata come la vuoi tu.` },
+          { label: "Caldo", testo: `Tanti auguri ${n}! Spero che oggi ti facciano festeggiare come si deve. Un abbraccio.` },
+        ],
+        dopo: {
+          titolo: "La proposta, qualche giorno dopo",
+          avviso: `Le parentesi quadre vanno riempite, e prometti solo quello che puoi mantenere davvero:
+            uno sconto inventato si paga più caro del regalo.`,
+          varianti: [
+            { label: "Il regalo", testo: `Ciao ${n}, ti devo ancora il regalo di compleanno. Ho pensato a [scrivi cosa: un campione, un prodotto in omaggio, lo sconto che puoi fare]: se ti va te lo porto con il prossimo ordine.` },
+            { label: "Sul prodotto", testo: `Ciao ${n}, per il tuo compleanno volevo farti un pensiero: su ${suggerito} posso lasciarti [scrivi cosa] fino a [data]. Dimmi se ti interessa e te lo metto da parte.` },
+          ],
+          promemoria: b ? 3 : 3,
+        },
+      };
+    }
+
+    const x = sh[0];
+    const prod = x ? x.name : "quello che prendi di solito";
+    const quanti = x && x.qty > 1 ? ` Te ne riporto ${x.qty} come l'altra volta?` : "";
+    return {
+      titolo: "Sta finendo",
+      guida: x
+        ? `Secondo i conti ${prod} è finito ${relDue(x.daysTo)}. Chiedere non è insistere: se dice che ne ha
+           ancora, usa «Rimanda» e la data si sposta senza perdere niente.`
+        : `Chiedere non è insistere: se dice che ne ha ancora, usa «Rimanda» e la data si sposta.`,
+      azione: "",
+      varianti: [
+        { label: "Diretto", testo: `Ciao ${n}, se non ho sbagliato i conti ${prod} ti sta finendo in questi giorni. Te ne serve ancora?${quanti}` },
+        { label: "Con l'ordine", testo: `Ciao ${n}, sto per fare un ordine: ti aggiungo ${prod}? Dovrebbe essere più o meno il momento in cui finisce.` },
+        { label: "Dopo un silenzio", testo: `Ciao ${n}, mi sono accorto che non ci sentiamo da un po'. Come stai?\n\nIl ${prod} l'hai finito o hai deciso di lasciarlo? Dimmelo tranquillamente, non me la prendo — mi serve solo per non farti telefonate a vuoto.` },
+      ],
+    };
+  }
+
+  /* Un blocco = pastiglie per scegliere il tono, il testo modificabile, copia e
+     WhatsApp. Ne servono due nella stessa finestra (auguri e proposta), quindi
+     è una funzione sola usata due volte. */
+  function bloccoMessaggio(id, varianti, link, etichetta) {
+    return `<div class="field" style="margin-top:14px">
+      <label for="${id}-t">${esc(etichetta || "Il messaggio")}</label>
+      <div class="opts" style="margin-bottom:2px">${varianti.map((v, i) =>
+        `<input type="radio" name="${id}-v" id="${id}-v${i}" value="${i}" ${i === 0 ? "checked" : ""}>
+         <label for="${id}-v${i}">${esc(v.label)}</label>`).join("")}</div>
+      <textarea id="${id}-t" style="min-height:152px">${esc(varianti[0].testo)}</textarea>
+      <div class="btn-row" style="margin-top:2px">
+        <button type="button" class="btn btn-sm ${link ? "" : "btn-primary"}" data-copy="${id}">Copia</button>
+        ${link ? `<a class="btn btn-sm btn-primary" id="${id}-wa" target="_blank" rel="noopener"
+          href="https://wa.me/${esc(link.num)}">Apri WhatsApp</a>
+        ${dentroCornice ? "" : `<a class="btn btn-sm" id="${id}-tg" target="_blank" rel="noopener"
+          href="https://t.me/share/url?url=&text=">Telegram</a>`}` : ""}
+      </div>
+    </div>`;
+  }
+
+  function collegaBlocco(box, id, varianti, link) {
+    const ta = box.querySelector("#" + id + "-t");
+    const wa = box.querySelector("#" + id + "-wa");
+    const tg = box.querySelector("#" + id + "-tg");
+    /* WhatsApp apre la chat della persona col messaggio già dentro. Telegram non
+       ha un modo di fare le due cose insieme: nessun parametro scrive in una chat
+       precisa. Quindi qui si sceglie il testo — si apre la sua finestra «invia a»
+       col messaggio già scritto, e la persona la scegli lì. Dipendere dagli
+       appunti non funzionava: dentro l'artifact la copia viene negata. */
+    const aggiorna = () => {
+      const t = encodeURIComponent(ta.value);
+      if (wa) wa.href = `https://wa.me/${link.num}?text=${t}`;
+      if (tg) tg.href = `https://t.me/share/url?url=&text=${t}`;
+    };
+    aggiorna();
+    ta.addEventListener("input", aggiorna);
+    box.querySelectorAll(`input[name="${id}-v"]`).forEach(r => r.addEventListener("change", () => {
+      ta.value = varianti[Number(r.value)].testo;
+      aggiorna();
+    }));
+    const copia = box.querySelector(`[data-copy="${id}"]`);
+    copia.addEventListener("click", async () => {
+      if (await copiaStringa(ta.value)) { toast("Messaggio copiato"); return; }
+      selezionaPerMano(ta);
+      toast("Appunti bloccati: il testo è selezionato, copialo a mano");
+    });
+  }
+
+  function modalMessaggio(c, tipo) {
+    const m = testiMessaggio(c, tipo);
+    const link = telLink(c.contact);
+    const b = compleanno(c);
+    openModal(`<div class="eyebrow">${esc(c.name)}</div>
+      <h2>${esc(m.titolo)}</h2>
+      <p class="row-sub" style="margin-top:6px">${m.guida}</p>
+      ${bloccoMessaggio("msg", m.varianti, link)}
+      ${!link ? `<p class="row-sub">Senza numero in scheda non si apre né WhatsApp né Telegram: copia il
+        testo, o aggiungi il numero con «Modifica».</p>`
+        : dentroCornice ? `<p class="row-sub" style="font-size:12px">Per Telegram qui non c'è il pulsante:
+          da questa anteprima porterebbe alla sua pagina web che chiede l'accesso. Tocca <b>Copia</b> e
+          passa a Telegram a mano — gli appunti funzionano. Dal link del sito il pulsante c'è e apre
+          l'app.</p>` : ""}
+      ${m.dopo ? `<details class="fold" style="margin-top:16px"><summary>${esc(m.dopo.titolo)}</summary>
+        <div class="fold-body">
+          <p class="row-sub">${m.dopo.avviso}</p>
+          ${bloccoMessaggio("dopo", m.dopo.varianti, link, "La proposta")}
+          <label style="display:flex;gap:8px;align-items:flex-start;font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="msg-prom" checked style="width:auto;margin-top:3px">
+            <span>Ricordami fra ${m.dopo.promemoria} giorni di mandargliela</span>
+          </label>
+        </div></details>` : ""}
+      <div class="modal-actions" style="margin-top:16px">
+        <button type="button" class="btn" data-act="close-modal">Chiudi</button>
+        ${m.azione ? `<button type="button" class="btn" id="msg-done">${esc(m.azione)}</button>` : ""}
+      </div>`, box => {
+      collegaBlocco(box, "msg", m.varianti, link || { wa: "" });
+      if (m.dopo) collegaBlocco(box, "dopo", m.dopo.varianti, link || { wa: "" });
+      const done = box.querySelector("#msg-done");
+      if (!done) return;
+      done.addEventListener("click", () => {
+        if (tipo === "proposta") {
+          c.nextDate = ""; c.nextNote = ""; c.nextKind = "rimanda";
+          touch(c); save(); closeModal(); render(); toast("Segnato: gliel'hai mandata");
+          return;
+        }
+        if (tipo === "checkin") {
+          const v = verifichePendenti(c)[0];
+          if (v) v.order.checkin = todayISO();
+          touch(c); save(); closeModal(); render(); toast("Segnato: gliel'hai chiesto");
+          return;
+        }
+        if (tipo === "auguri") {
+          if (b) c.augurato = String(b.anno);
+          const prom = box.querySelector("#msg-prom");
+          const giorni = m.dopo ? m.dopo.promemoria : 3;
+          let messo = false;
+          if (prom && prom.checked) {
+            /* Non sovrascrivo un promemoria già tuo: quello che ti eri scritto vale
+               più di quello che ti propongo io. */
+            if (c.nextDate && c.nextDate > todayISO()) messo = false;
+            else {
+              c.nextDate = iso(addDays(new Date(), giorni));
+              c.nextNote = "il pensiero di compleanno";
+              c.nextKind = "nota";
+              messo = true;
+            }
+          }
+          touch(c); save(); closeModal(); render();
+          toast(messo ? `Auguri segnati — te lo ricordo il ${fmtDate(c.nextDate)}`
+            : "Auguri segnati" + (prom && prom.checked ? " — avevi già un promemoria, l'ho lasciato" : ""));
+        }
+      });
+    });
+  }
+
+  function modalSnooze(c) {
+    const opts = [[3, "3 giorni"], [7, "una settimana"], [14, "due settimane"], [30, "un mese"]];
+    openModal(`<div class="eyebrow">${esc(c.name)}</div>
+      <h2>Quando lo risenti</h2>
+      <p class="row-sub" style="margin-top:6px">Fino a quel giorno non lo trovi più fra chi va sentito.</p>
+      <div class="opts" style="margin-top:14px">${opts.map(([n, l], i) =>
+        `<input type="radio" name="sn" id="sn${i}" value="${n}" ${i === 1 ? "checked" : ""}>
+         <label for="sn${i}">${l}</label>`).join("")}</div>
+      <div class="modal-form">
+        <div class="field"><label for="sn-note">Perché</label>
+          <input id="sn-note" type="text" value="${esc(c.nextNote)}" placeholder="ne ha ancora, in vacanza…"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn" data-act="close-modal">Annulla</button>
+          <button type="button" class="btn btn-primary" id="ok">Rimanda</button>
+        </div>
+      </div>`, box => {
+      box.querySelector("#ok").addEventListener("click", () => {
+        const n = Number((box.querySelector("input[name=sn]:checked") || {}).value || 7);
+        c.nextDate = iso(addDays(new Date(), n));
+        c.nextNote = box.querySelector("#sn-note").value.trim();
+        c.nextKind = "rimanda";
+        touch(c); save(); closeModal(); render();
+        toast("Rimandato al " + fmtDate(c.nextDate));
+      });
+    });
+  }
+
+  function modalClose(c) {
+    openModal(`<div class="eyebrow">${esc(c.name)}</div>
+      <h2>Chiudere il cliente</h2>
+      <p class="row-sub" style="margin-top:6px">Resta nell'elenco con la sua storia, ma non compare più
+        fra chi va sentito.</p>
+      <div class="opts" style="margin-top:14px">${CLOSED.map((x, i) =>
+        `<input type="radio" name="cl" id="cl${i}" value="${x.id}" ${i === 0 ? "checked" : ""}>
+         <label for="cl${i}">${esc(x.label)}</label>`).join("")}</div>
+      <div class="modal-actions" style="margin-top:18px">
+        <button type="button" class="btn" data-act="close-modal">Annulla</button>
+        <button type="button" class="btn btn-primary" id="ok">Chiudi</button>
+      </div>`, box => {
+      box.querySelector("#ok").addEventListener("click", () => {
+        c.closed = (box.querySelector("input[name=cl]:checked") || {}).value || "perso";
+        c.nextDate = ""; c.nextNote = "";
+        touch(c); save(); closeModal(); render(); toast("Cliente chiuso");
+      });
+    });
+  }
+
+  function modalPickClient() {
+    const list = [...state.clients].filter(c => !c.closed).sort((a, b) => a.name.localeCompare(b.name, "it"));
+    if (!list.length) { toast("Aggiungi prima un cliente"); return; }
+    openModal(`<h2>Per chi è l'ordine</h2>
+      <form class="modal-form" id="f-pick">
+        <div class="field"><label for="pk">Cliente</label>
+          <select id="pk">${list.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></div>
+        <div class="modal-actions">
+          <button type="button" class="btn" data-act="close-modal">Annulla</button>
+          <button type="submit" class="btn btn-primary">Avanti</button>
+        </div>
+      </form>`, box => {
+      box.querySelector("#f-pick").addEventListener("submit", ev => {
+        ev.preventDefault();
+        const c = byId(box.querySelector("#pk").value);
+        closeModal();
+        if (c) { openId = c.id; modalOrder(c); }
+      });
+    });
+  }
+
+  /* Registrare un ordine non è solo aggiungere una riga: risponde al promemoria
+     che c'era, riapre chi era stato dato per perso e rimette fra i seguiti un
+     prodotto che era stato messo da parte. Un punto solo, perché queste tre cose
+     valgono sia dalla finestra dell'ordine sia dal tocco singolo sulla scheda. */
+  function pushOrder(c, lines, opts) {
+    const o = {
+      id: uid(),
+      date: (opts && opts.date) || todayISO(),
+      importo: Math.max(0, Number(opts && opts.importo) || 0),
+      note: (opts && opts.note) || "",
+      checkin: "",
+      lines,
+    };
+    c.orders.push(o);
+    c.orders.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    if (c.nextDate && c.nextDate <= o.date) { c.nextDate = ""; c.nextNote = ""; }
+    if (c.closed === "perso") c.closed = "";
+    /* Chi ricompra ha già risposto alla domanda «come ti sei trovato»: la verifica
+       su quel vecchio ordine non serve più. Quella dell'ordine appena registrato
+       resta in piedi — la si esclude per identificativo. */
+    for (const v of verifichePendenti(c)) {
+      if (v.order.id !== o.id && v.nuovi.some(pid => lines.some(l => l.productId === pid))) v.order.checkin = "no";
+    }
+    c.dropped = c.dropped.filter(x => !lines.some(l => l.productId === x.productId));
+    touch(c); save();
+    return o;
+  }
+
+  /* ══ Copie ════════════════════════════════════════════════════════════ */
+
+  /* Due strade, e servono entrambe. Aperta dal link, la pagina non può scaricare
+     da sé: il salvataggio passa dalla piattaforma, che chiede il permesso al
+     volo. Aperta come file dal computer quella strada non esiste e si scarica
+     alla vecchia maniera. Quando siamo nel link e la piattaforma non concede il
+     salvataggio, il vecchio metodo non funziona affatto: lì si dice di copiare il
+     testo, invece di far finta di aver salvato. */
+  async function backupFile() {
+    const data = JSON.stringify(state, null, 2);
+    const name = `clienti-riordini-${todayISO()}.json`;
+    const ospitata = !!(window.claude && claude.use);
+    let dl = null;
+    try { dl = ospitata ? await claude.use("downloads") : null; } catch (e) { dl = null; }
+    if (dl) {
+      try { await dl.save({ filename: name, data }); markBackup(); render(); toast("Copia salvata"); }
+      catch (err) {
+        const code = err && err.code;
+        if (code === "declined") return;
+        if (code === "rate_limited") { toast("Aspetta un attimo e riprova"); return; }
+        if (code === "too_large") { toast("Archivio troppo grande: copia il testo"); return; }
+        toast("Non è stato possibile salvare: copia il testo");
+      }
+      return;
+    }
+    if (ospitata) { toast("Qui il download non è disponibile: copia il testo"); return; }
+    try {
+      const url = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      markBackup(); render(); toast("Copia salvata");
+    } catch (e) { toast("Download non disponibile: copia il testo"); }
+  }
+
+  async function copyJSON() {
+    const el = document.getElementById("json-out");
+    if (!el) return;
+    if (await copiaStringa(el.value)) { markBackup(); toast("Copiato"); return; }
+    selezionaPerMano(el);
+    toast("Appunti bloccati: il testo è selezionato, copialo a mano");
+  }
+
+  /* L'unione non toglie niente, quindi si applica e poi si racconta cosa è
+     cambiato: chiedere conferma prima costringerebbe a decidere alla cieca. */
+  function applyIncoming(d, from) {
+    if (!d || typeof d !== "object") { toast("Non è un file valido"); return false; }
+    /* Il file dell'altra app ha «people» al posto di «clients»: si riconosce da
+       sé e prende un'altra strada, invece di dire che non è valido. */
+    if (!Array.isArray(d.clients) && Array.isArray(d.people)) return importFromLista(d, from);
+    if (!Array.isArray(d.clients)) { toast("Non è una copia di questa app"); return false; }
+    const res = mergeStates(state, normalize(d));
+    state = res.state;
+    /* Aver caricato un archivio da un file dimostra che una copia esiste fuori da
+       questo browser: vale come copia salvata, e il promemoria può tacere. */
+    markBackup();
+    save(); render();
+    const { nuovi, aggiornati, rimossi, prodotti } = res.stats;
+    const righe = [
+      `${plur(state.clients.length, "cliente", "clienti")} in totale`,
+      nuovi ? `${plur(nuovi, "cliente nuovo arrivato", "clienti nuovi arrivati")}` : "",
+      aggiornati ? `${plur(aggiornati, "scheda aggiornata", "schede aggiornate")}` : "",
+      prodotti ? `${plur(prodotti, "prodotto nuovo nel catalogo", "prodotti nuovi nel catalogo")}` : "",
+      rimossi ? `${plur(rimossi, "cancellazione rispettata", "cancellazioni rispettate")}` : "",
+    ].filter(Boolean);
+    if (!nuovi && !aggiornati && !rimossi && !prodotti) righe.push("Era già tutto allineato");
+    openModal(`<div class="eyebrow">${esc(from || "Unione")}</div>
+      <h2>Archivi uniti</h2>
+      <ul class="sum">${righe.map(r => `<li>${esc(r)}</li>`).join("")}</ul>
+      ${res.dupes.length ? `<div class="banner" style="margin-top:14px"><div>
+        <b>${res.dupes.length === 1 ? "Un nome compare due volte" : "Alcuni nomi compaiono due volte"}:</b>
+        ${esc(res.dupes.join(", "))}. Succede quando la stessa persona è stata scritta a mano su due
+        dispositivi: hanno due schede separate e non le unisco da sola, per non fondere due omonimi.
+        Aprine una, riporta quello che serve e cancella l'altra.</div></div>` : ""}
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="btn btn-primary" data-act="close-modal">Va bene</button>
+      </div>`);
+    return true;
+  }
+
+  /* Quando le due app stanno sullo stesso indirizzo, la lista nomi è a portata di
+     mano: si legge il suo archivio dal browser e i clienti arrivano con un tocco,
+     senza esportare e ricaricare un file. Dove non c'è — il link dell'artifact,
+     un altro dominio, un telefono dove la lista non è mai stata aperta — questa
+     funzione torna niente e il blocco non compare: nessun errore da spiegare. */
+  const CHIAVE_LISTA = "dalla-lista-al-si.v1";
+
+  function listaVicina() {
+    let raw = null;
+    try { raw = localStorage.getItem(CHIAVE_LISTA); } catch (e) { return null; }
+    if (!raw) return null;
+    let d = null;
+    try { d = JSON.parse(raw); } catch (e) { return null; }
+    if (!d || !Array.isArray(d.people)) return null;
+    const src = d.people.filter(p => p && p.outcome === "cliente" && String(p.name || "").trim());
+    if (!src.length) return null;
+    const nuovi = src.filter(p => !state.clients.some(c =>
+      (p.id && c.fromLista === p.id) || c.name.trim().toLowerCase() === String(p.name).trim().toLowerCase()));
+    return { d, tutti: src.length, nuovi: nuovi.length };
+  }
+
+  /* Ponte con «Dalla Lista al Sì»: da lì arrivano le persone chiuse come
+     cliente. Non tocco nient'altro — le liste nomi restano affare di quell'app. */
+  function importFromLista(d, from) {
+    const src = d.people.filter(p => p && p.outcome === "cliente");
+    let nuovi = 0, gia = 0;
+    for (const p of src) {
+      const nome = String(p.name || "").trim();
+      if (!nome) continue;
+      const esiste = state.clients.find(c =>
+        (p.id && c.fromLista === p.id) || c.name.trim().toLowerCase() === nome.toLowerCase());
+      if (esiste) { gia++; continue; }
+      const chiusura = (Array.isArray(p.events) ? p.events : []).filter(e => e.type === "esito").pop();
+      state.clients.push({
+        id: uid(), name: nome,
+        contact: p.contact || "",
+        origine: p.origine || "",
+        note: [p.note, chiusura && chiusura.note].filter(Boolean).join(" · "),
+        closed: "", nextDate: p.nextDate || "", nextNote: p.nextNote || "",
+        birthday: "", augurato: "", fromLista: p.id || "",
+        createdAt: (chiusura && chiusura.date) || p.createdAt || todayISO(),
+        updatedAt: nowISO(), dropped: [], orders: [],
+      });
+      nuovi++;
+    }
+    save(); render();
+    openModal(`<div class="eyebrow">${esc(from || "Dalla Lista al Sì")}</div>
+      <h2>${nuovi ? "Clienti importati" : "Niente da importare"}</h2>
+      <ul class="sum">
+        <li>${plur(src.length, "persona chiusa come cliente", "persone chiuse come cliente")} in quel file</li>
+        ${nuovi ? `<li>${plur(nuovi, "portata qui", "portate qui")}</li>` : ""}
+        ${gia ? `<li>${plur(gia, "era già in elenco", "erano già in elenco")}</li>` : ""}
+      </ul>
+      ${nuovi ? `<p class="row-sub" style="margin-top:10px">Ora sono senza ordini: registra cosa hanno
+        preso e le scadenze partono.</p>` : ""}
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="btn btn-primary" data-act="close-modal">Va bene</button>
+      </div>`);
+    return true;
+  }
+
+  function importPasted() {
+    const el = document.getElementById("json-in");
+    const raw = (el && el.value || "").trim();
+    if (!raw) { toast("Incolla prima il testo della copia"); return; }
+    let d;
+    try { d = JSON.parse(raw); } catch (e) { toast("Il testo non è una copia valida"); return; }
+    if (applyIncoming(d, "Dal testo incollato")) el.value = "";
+  }
+
+  async function importPickedFile(input) {
+    const f = input.files && input.files[0];
+    if (!f) return;
+    try {
+      const d = JSON.parse(await f.text());
+      applyIncoming(d, f.name);
+    } catch (e) { toast("Il file non è una copia valida"); }
+    input.value = "";
+  }
+
+  /* ══ Esempio ══════════════════════════════════════════════════════════
+
+     Nomi e prodotti inventati, con durate verosimili: serve a vedere come si
+     muove l'app, non a dire quanto dura un prodotto vero.                  */
+
+  function demoData() {
+    const D = n => iso(addDays(new Date(), -n));
+    /* Compleanni relativi a oggi, così l'esempio mostra sempre qualcosa in
+       arrivo qualunque giorno lo si carichi. */
+    const B = n => { const d = addDays(new Date(), n); return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+    const P = (name, days) => ({ id: uid(), name, days, note: "", check: false, updatedAt: nowISO() });
+    const multi = P("Integratore multivitaminico", 30);
+    const det = P("Detersivo concentrato", 90);
+    const dent = P("Dentifricio", 60);
+    const crema = P("Crema viso notte", 45);
+    const barre = P("Barrette proteiche", 20);
+
+    const C = (name, contact, note, orders, extra) => ({
+      id: uid(), name, contact, origine: "", note, closed: "", nextDate: "", nextNote: "",
+      fromLista: "", createdAt: D(150), updatedAt: nowISO(), dropped: [],
+      orders: orders.map(o => ({ id: uid(), date: o[0], importo: o[2] || 0, note: o[3] || "", lines: o[1] })),
+      ...(extra || {}),
+    });
+    const L = (p, q) => [{ productId: p.id, qty: q || 1 }];
+
+    return {
+      v: 1,
+      settings: { nome: "", preavviso: DEFAULTS.preavviso, fermoDopo: DEFAULTS.fermoDopo },
+      products: [multi, det, dent, crema, barre],
+      clients: [
+        C("Anna Ferri", "333 1122334", "Prende le vitamine da un anno, puntuale.", [
+          [D(100), L(multi), 42], [D(70), L(multi), 42], [D(40), L(multi), 42, "consegnato in palestra"],
+        ], { birthday: B(0) }),
+        C("Dario Pini", "351 2223334", "Primo ordine, gli ho spiegato come prenderlo.", [
+          [D(9), L(multi), 42, "primo ordine"],
+        ], { birthday: B(120) }),
+        C("Luca Sarti", "347 9988776", "Casa grande, compra scorte.", [
+          [D(120), [{ productId: det.id, qty: 2 }, { productId: dent.id, qty: 1 }], 68],
+          [D(20), [{ productId: det.id, qty: 2 }], 55],
+        ], { birthday: B(200) }),
+        C("Marta Bo", "", "Le ho lasciato provare la crema, non l'ho più risentita.", [
+          [D(70), L(crema), 39],
+        ]),
+        C("Giorgio Neri", "339 4455667", "", [
+          [D(85), [{ productId: barre.id, qty: 2 }], 30], [D(60), [{ productId: barre.id, qty: 2 }], 30],
+          [D(25), [{ productId: barre.id, qty: 2 }], 30],
+        ]),
+        C("Elena Vitali", "348 1231231", "Comprava il dentifricio, poi silenzio.", [
+          [D(200), L(dent), 12],
+        ]),
+        C("Sara Conti", "320 7654321", "Interessata alle vitamine, deve ancora provarle.", [], { birthday: B(4) }),
+        C("Paolo Riva", "", "È partito con l'attività, ordina da sé.", [
+          [D(140), L(multi), 42], [D(110), L(multi), 42],
+        ], { closed: "partner" }),
+      ],
+    };
+  }
+
+  /* ══ Impalcatura ══════════════════════════════════════════════════════ */
+
+  function renderRail() {
+    const t = todo();
+    const dueN = t.promemoria.length + t.ritardo.length + t.ora.length
+      + t.verifiche.length + t.compleanni.length;
+    const items = [
+      { id: "oggi", label: "Oggi", icon: "◧", tally: dueN ? String(dueN) : "", hot: !!t.ritardo.length },
+      { id: "clienti", label: "Clienti", icon: "☰", tally: String(state.clients.length) },
+      { id: "prodotti", label: "Catalogo", icon: "◈", tally: String(state.products.length) },
+      { id: "dati", label: "Dati", icon: "⚙", tally: "" },
+    ];
+    const dark = document.documentElement.getAttribute("data-theme") === "dark";
+    document.getElementById("rail").innerHTML = `
+      <div class="brand"><b>Clienti e Riordini</b><span class="eyebrow">${esc(state.settings.nome || "chi compra, e quando richiamarlo")}</span></div>
+      ${items.map(i => `<button class="rail-btn" data-act="nav" data-view="${i.id}"
+        ${view === i.id ? 'aria-current="page"' : ""}>
+        <span aria-hidden="true" style="font-size:13px;width:14px;text-align:center">${i.icon}</span>
+        <span>${i.label}</span>${i.tally ? `<span class="tally ${i.hot ? "hot" : ""}">${i.tally}</span>` : ""}</button>`).join("")}
+      <div class="rail-foot">
+        <button class="btn btn-sm btn-quiet" data-act="theme">${dark ? "☀ Chiaro" : "☾ Scuro"}</button>
+        <span class="eyebrow" style="line-height:1.4">I dati restano su questo dispositivo</span>
+      </div>`;
+  }
+
+  function render() {
+    renderRail();
+    const body = view === "clienti" ? viewClienti() : view === "prodotti" ? viewProdotti()
+      : view === "dati" ? viewDati() : viewOggi();
+    const banner = (!storageOk && view !== "dati")
+      ? `<div class="banner"><div><b>Questo browser non salva i dati.</b>
+         Chiudendo la pagina perdi tutto — vai in <b>Dati</b> e salva una copia.</div></div>` : "";
+    document.getElementById("main").innerHTML = `<div class="wrap">${banner}${body}</div>`;
+    renderSheet();
+    if (view === "dati") bindDati();
+  }
+
+  function bindDati() {
+    const fi = document.getElementById("file-in");
+    if (fi) fi.addEventListener("change", () => importPickedFile(fi));
+    const nome = document.getElementById("s-nome");
+    if (nome) nome.addEventListener("change", () => { state.settings.nome = nome.value.trim(); save(); renderRail(); });
+    const pre = document.getElementById("s-preavviso");
+    if (pre) pre.addEventListener("change", () => {
+      state.settings.preavviso = clamp(parseInt(pre.value, 10) || 0, 0, 90);
+      pre.value = state.settings.preavviso; save(); renderRail();
+    });
+    const fer = document.getElementById("s-fermo");
+    if (fer) fer.addEventListener("change", () => {
+      state.settings.fermoDopo = clamp(parseInt(fer.value, 10) || DEFAULTS.fermoDopo, 7, 365);
+      fer.value = state.settings.fermoDopo; save(); renderRail();
+    });
+    const dop = document.getElementById("s-dopo");
+    if (dop) dop.addEventListener("change", () => {
+      state.settings.dopoAcquisto = clamp(parseInt(dop.value, 10) || DEFAULTS.dopoAcquisto, 1, 90);
+      dop.value = state.settings.dopoAcquisto; save(); renderRail();
+    });
+    const cmp = document.getElementById("s-compl");
+    if (cmp) cmp.addEventListener("change", () => {
+      state.settings.compleanno = clamp(parseInt(cmp.value, 10) || 0, 0, 60);
+      cmp.value = state.settings.compleanno; save(); renderRail();
+    });
+  }
+
+  /* ══ Eventi ═══════════════════════════════════════════════════════════ */
+
+  document.addEventListener("click", ev => {
+    const el = ev.target.closest("[data-act]");
+    if (!el) return;
+    const act = el.dataset.act;
+    const c = el.dataset.id ? byId(el.dataset.id) : null;
+    const p = el.dataset.pid ? prodById(el.dataset.pid) : null;
+
+    switch (act) {
+      case "nav": view = el.dataset.view; query = ""; filter = "tutti"; render(); window.scrollTo(0, 0); break;
+      case "filter": filter = el.dataset.f; render(); break;
+      case "open": if (c) { openId = c.id; renderSheet(); } break;
+      case "close-layer": openId = null; document.getElementById("layer").innerHTML = ""; break;
+      case "close-modal": closeModal(); break;
+
+      case "add-client": modalClient(null); break;
+      case "edit-client": if (c) modalClient(c); break;
+      case "add-order": modalPickClient(); break;
+      case "order": if (c) { openId = c.id; modalOrder(c); } break;
+      case "snooze": if (c) modalSnooze(c); break;
+      case "msg": if (c) modalMessaggio(c, el.dataset.tipo); break;
+      case "copy-num": {
+        if (!c) break;
+        const l = telLink(c.contact);
+        if (!l) break;
+        (async () => {
+          toast(await copiaStringa(l.tel) ? "Numero copiato: " + l.tel : "Il numero è " + l.tel);
+        })();
+        break;
+      }
+      case "checkin-done":
+      case "checkin-skip":
+        if (c) {
+          const o = c.orders.find(x => x.id === el.dataset.oid);
+          if (o) o.checkin = act === "checkin-skip" ? "no" : todayISO();
+          touch(c); save(); render();
+          toast(act === "checkin-skip" ? "Non te lo chiedo più per questo ordine" : "Segnato: gliel'hai chiesto");
+        }
+        break;
+      case "auguri-done":
+        if (c) {
+          const b = compleanno(c);
+          if (b) c.augurato = String(b.anno);
+          touch(c); save(); render(); toast("Auguri segnati");
+        }
+        break;
+
+      case "reorder-one": {
+        if (!c || !p) break;
+        const x = shelf(c).find(y => y.productId === p.id);
+        pushOrder(c, [{ productId: p.id, qty: x ? x.qty : 1 }], {});
+        render(); toast(`${p.name}: riordinato oggi`);
+        break;
+      }
+      case "drop":
+        if (c && p) {
+          c.dropped.push({ productId: p.id, at: nowISO() });
+          touch(c); save(); render(); toast(`${p.name} non lo segui più`);
+        }
+        break;
+      case "undrop":
+        if (c && p) {
+          c.dropped = c.dropped.filter(x => x.productId !== p.id);
+          touch(c); save(); render(); toast(`${p.name} torna fra i seguiti`);
+        }
+        break;
+
+      case "save-next": {
+        if (!c) break;
+        c.nextDate = document.getElementById("np-date").value || "";
+        c.nextNote = document.getElementById("np-note").value.trim();
+        c.nextKind = "rimanda";
+        touch(c); save(); render(); toast("Promemoria salvato"); break;
+      }
+      case "clear-next": if (c) { c.nextDate = ""; c.nextNote = ""; c.nextKind = "rimanda"; touch(c); save(); render(); } break;
+      case "del-order":
+        if (c) {
+          c.orders = c.orders.filter(o => o.id !== el.dataset.oid);
+          touch(c); save(); render(); toast("Ordine eliminato");
+        }
+        break;
+      case "close-client": if (c) modalClose(c); break;
+      case "reopen":
+        if (c) { c.closed = ""; touch(c); save(); render(); toast("Cliente riaperto"); }
+        break;
+      case "del-client":
+        if (c) modalConfirm(`Eliminare ${c.name}?`, "Spariscono la scheda e tutti i suoi ordini. Non si torna indietro.",
+          "Elimina", () => {
+            state.clients = state.clients.filter(x => x.id !== c.id);
+            state.deleted.push({ id: c.id, at: nowISO() });
+            openId = null; save(); toast("Eliminato");
+          });
+        break;
+
+      case "add-product": modalProduct(null); break;
+      case "edit-product": if (p) modalProduct(p); break;
+      case "use-observed":
+        if (p) {
+          p.days = clamp(parseInt(el.dataset.days, 10) || p.days, 1, 3650);
+          p.check = false; p.updatedAt = nowISO();
+          save(); render(); toast(`${p.name}: ${p.days} giorni`);
+        }
+        break;
+
+      case "backup-file": backupFile(); break;
+      case "copy-json": copyJSON(); break;
+      case "import": importPasted(); break;
+      case "pick-import": document.getElementById("file-in").click(); break;
+      case "import-lista": {
+        const l = listaVicina();
+        if (!l) { toast("Non trovo la lista nomi su questo dispositivo"); break; }
+        if (!l.nuovi) { toast("Sono già tutti qui"); break; }
+        importFromLista(l.d, "Dalla lista nomi su questo telefono");
+        break;
+      }
+      case "snooze-backup":
+        state.settings.snoozeBackup = nowISO(); save(); render();
+        toast("Te lo richiedo fra tre giorni"); break;
+      case "demo":
+        modalConfirm("Caricare i dati di esempio?", "Sostituisce quello che c'è ora con otto clienti inventati.",
+          "Carica esempio", () => { state = normalize(demoData()); view = "oggi"; openId = null; save(); toast("Esempio caricato"); });
+        break;
+      case "reset":
+        modalConfirm("Cancellare tutto?", "Clienti, ordini e catalogo. Salva prima una copia se non sei sicuro.",
+          "Cancella tutto", () => { state = emptyState(); openId = null; save(); toast("Tutto cancellato"); });
+        break;
+      case "theme": {
+        const root = document.documentElement;
+        const cur = root.getAttribute("data-theme");
+        const sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const next = cur ? (cur === "dark" ? "light" : "dark") : (sysDark ? "light" : "dark");
+        root.setAttribute("data-theme", next);
+        try { localStorage.setItem(KEY + ".theme", next); } catch (e) {}
+        renderRail();
+        if (view === "dati") render();
+        break;
+      }
+    }
+  });
+
+  document.addEventListener("input", ev => {
+    if (ev.target.id !== "q") return;
+    query = ev.target.value;
+    const pos = ev.target.selectionStart;
+    render();
+    const q = document.getElementById("q");
+    if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch (e) {} }
+  });
+
+  document.addEventListener("keydown", ev => {
+    if (ev.key === "Escape") {
+      if (document.querySelector(".modal-box")) closeModal();
+      else if (openId) { openId = null; document.getElementById("layer").innerHTML = ""; }
+    }
+    if (ev.key === "Enter" || ev.key === " ") {
+      const r = ev.target.closest && ev.target.closest('.row[data-act="open"]');
+      if (r) { ev.preventDefault(); openId = r.dataset.id; renderSheet(); }
+    }
+  });
+
+  /* ══ Avvio ════════════════════════════════════════════════════════════ */
+
+  try {
+    const th = localStorage.getItem(KEY + ".theme");
+    if (th === "dark" || th === "light") document.documentElement.setAttribute("data-theme", th);
+  } catch (e) {}
+
+  load();
+  render();
+
+  /* Chiede al browser di trattare questi dati come persistenti: senza, può
+     buttare i dati dei siti quando il dispositivo è a corto di spazio. Contro la
+     cancellazione manuale non protegge — niente lo fa — e per questo resta il
+     promemoria della copia. */
+  (async () => {
+    try {
+      if (!navigator.storage || !navigator.storage.persist) return;
+      persistent = await navigator.storage.persisted();
+      if (!persistent) persistent = await navigator.storage.persist();
+      if (view === "dati") render();
+    } catch (e) { /* funzione assente: si continua senza */ }
+  })();
+
+})();
+</script>
