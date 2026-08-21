@@ -976,6 +976,23 @@
      di avvisare invece di far sbattere la gente contro un muro. */
   const dentroCornice = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
 
+  /* La rubrica si può chiedere al telefono, ma solo a certe condizioni: Chrome su
+     Android (su iPhone questa funzione non esiste), pagina in https, e fuori da
+     una cornice — dentro l'anteprima dell'artifact il sistema la nega. Per
+     questo il pulsante compare sul sito e non nell'anteprima: meglio non
+     mostrarlo che mostrarlo morto.
+
+     Il permesso non è «leggi la rubrica»: si apre il selettore del telefono,
+     l'utente tocca un contatto, e all'app arriva solo quello. Il resto della
+     rubrica non passa mai da qui.
+
+     Su iPhone questa strada non esiste — Apple non l'ha implementata, e lì tutti
+     i browser girano sul motore di Safari, quindi nemmeno Chrome ce l'ha. Per
+     loro resta la tastiera: i campi dichiarano `autocomplete="name"` e
+     `autocomplete="tel"`, e il suggerimento del contatto lo propone il sistema
+     sopra la tastiera. Meno diretto, ma è quanto si può avere. */
+  const rubricaOk = !dentroCornice && "contacts" in navigator && "ContactsManager" in window;
+
   const byId = id => state.clients.find(c => c.id === id) || null;
   const prodById = id => state.products.find(p => p.id === id) || null;
   const prodName = id => { const p = prodById(id); return p ? p.name : "prodotto eliminato"; };
@@ -2071,10 +2088,15 @@
       <h2>${nuovo ? "Chi è" : esc(c.name)}</h2>
       <form class="modal-form" id="f-client">
         <div class="field"><label for="c-name">Nome</label>
-          <input id="c-name" type="text" required value="${esc(c ? c.name : "")}" placeholder="nome e cognome"></div>
+          <input id="c-name" type="text" required value="${esc(c ? c.name : "")}" placeholder="nome e cognome"
+            autocomplete="name" autocapitalize="words"></div>
         <div class="field"><label for="c-contact">Telefono o email</label>
-          <input id="c-contact" type="text" value="${esc(c ? c.contact : "")}" placeholder="333 1234567">
-          <span class="hint">Se metti il numero, dalla scheda lo chiami con un tocco.</span></div>
+          <input id="c-contact" type="text" value="${esc(c ? c.contact : "")}" placeholder="333 1234567"
+            autocomplete="tel" inputmode="tel">
+          ${rubricaOk ? `<div class="btn-row" style="margin-top:2px">
+            <button type="button" class="btn btn-sm" id="c-rubrica">Prendi dalla rubrica</button></div>` : ""}
+          <span class="hint">Se metti il numero, dalla scheda lo chiami con un tocco${rubricaOk
+            ? ". Dalla rubrica scegli tu il contatto: all'app arriva solo quello" : ""}.</span></div>
         <div class="field"><label for="c-origine">Come l'hai conosciuto</label>
           <input id="c-origine" type="text" value="${esc(c ? c.origine : "")}" placeholder="palestra, collega di Ale…"></div>
         <div class="field"><label>Compleanno</label>
@@ -2097,6 +2119,28 @@
           <button type="submit" class="btn btn-primary">${nuovo ? "Aggiungi" : "Salva"}</button>
         </div>
       </form>`, box => {
+      const rub = box.querySelector("#c-rubrica");
+      if (rub) rub.addEventListener("click", async () => {
+        try {
+          /* Non tutti i telefoni offrono le stesse informazioni: si chiede solo
+             quello che questo telefono dice di saper dare, altrimenti la
+             richiesta viene rifiutata in blocco. */
+          const disponibili = await navigator.contacts.getProperties();
+          const voglio = ["name", "tel"].filter(x => disponibili.includes(x));
+          if (!voglio.length) { toast("Questo telefono non condivide nome e numero"); return; }
+          const scelti = await navigator.contacts.select(voglio, { multiple: false });
+          if (!scelti || !scelti.length) return;
+          const k = scelti[0];
+          const nome = (k.name && k.name[0]) || "";
+          const tel = (k.tel && k.tel[0]) || "";
+          if (nome) box.querySelector("#c-name").value = nome;
+          if (tel) box.querySelector("#c-contact").value = tel;
+          toast(tel ? "Preso dalla rubrica" : "Quel contatto non ha un numero");
+        } catch (e) {
+          toast("La rubrica non si è aperta: scrivi il numero a mano");
+        }
+      });
+
       box.querySelector("#f-client").addEventListener("submit", ev => {
         ev.preventDefault();
         const name = box.querySelector("#c-name").value.trim();
