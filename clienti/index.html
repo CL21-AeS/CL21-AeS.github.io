@@ -530,6 +530,7 @@
   const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
   const daysBetween = (a, b) => Math.round((parseISO(b) - parseISO(a)) / 86400000);
   const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
+  const fmtLong = new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long" });
   const fmtDate = s => { if (!s) return ""; const d = parseISO(s); return `${d.getDate()} ${MESI[d.getMonth()]}`; };
   const fmtDateY = s => { if (!s) return ""; const d = parseISO(s); return `${d.getDate()} ${MESI[d.getMonth()]} ${d.getFullYear()}`; };
   const plur = (n, uno, molti) => `${n} ${n === 1 ? uno : molti}`;
@@ -1026,14 +1027,15 @@
     const ordiniMese = ordersIn(mese + "-01", mese + "-31");
     const incasso = ordiniMese.reduce((s, x) => s + (x.o.importo || 0), 0);
     const nudge = backupNudge();
+    const nome = state.settings.nome.trim();
 
     return `
       <div class="page-head">
         <div>
-          <h1>Oggi</h1>
-          <p class="lede">${daChiamare
-            ? `${plur(daChiamare, "cliente", "clienti")} da sentire.`
-            : "Nessuno da sentire oggi. I conti tornano."}</p>
+          <h1>${nome ? `Ciao ${esc(nome.split(" ")[0])}` : "Oggi"}</h1>
+          <p class="lede">${esc(fmtLong.format(new Date()))} · ${daChiamare
+            ? `${plur(daChiamare, "cliente", "clienti")} da sentire`
+            : "nessuno da sentire, i conti tornano"}</p>
         </div>
         <div class="btn-row">
           <button class="btn" data-act="add-client">+ Cliente</button>
@@ -1371,7 +1373,8 @@
                 <span class="hint">giorni di preavviso</span></div>
             </div>
             <div class="field"><label for="s-nome">Il tuo nome</label>
-              <input id="s-nome" type="text" value="${esc(state.settings.nome)}" placeholder="facoltativo"></div>
+              <input id="s-nome" type="text" value="${esc(state.settings.nome)}" placeholder="facoltativo">
+              <span class="hint">Compare nel saluto in cima a «Oggi».</span></div>
             <div class="btn-row"><button class="btn btn-sm btn-quiet" data-act="theme">${dark ? "☀ Tema chiaro" : "☾ Tema scuro"}</button></div>
           </div>
 
@@ -1986,7 +1989,7 @@
         ${link ? `<a class="btn btn-sm btn-primary" id="${id}-wa" target="_blank" rel="noopener"
           href="https://wa.me/${esc(link.num)}">Apri WhatsApp</a>
         ${dentroCornice ? "" : `<a class="btn btn-sm" id="${id}-tg" target="_blank" rel="noopener"
-          href="https://t.me/share/url?url=&text=">Telegram</a>`}` : ""}
+          href="https://t.me/+${esc(link.num)}">Copia e apri Telegram</a>`}` : ""}
       </div>
     </div>`;
   }
@@ -1996,15 +1999,19 @@
     const wa = box.querySelector("#" + id + "-wa");
     const tg = box.querySelector("#" + id + "-tg");
     /* WhatsApp apre la chat della persona col messaggio già dentro. Telegram non
-       ha un modo di fare le due cose insieme: nessun parametro scrive in una chat
-       precisa. Quindi qui si sceglie il testo — si apre la sua finestra «invia a»
-       col messaggio già scritto, e la persona la scegli lì. Dipendere dagli
-       appunti non funzionava: dentro l'artifact la copia viene negata. */
+       sa fare le due cose insieme, e delle sue due mezze strade una sola funziona
+       davvero sul telefono: `t.me/+numero` apre la chat giusta — provato dalla
+       scheda del cliente — mentre `t.me/share/url?text=` non passa la mano all'app
+       e resta lì. Quindi il testo lo portano gli appunti, che ora sono affidabili:
+       un tocco copia e apre la conversazione, e resta da incollare. */
     const aggiorna = () => {
-      const t = encodeURIComponent(ta.value);
-      if (wa) wa.href = `https://wa.me/${link.num}?text=${t}`;
-      if (tg) tg.href = `https://t.me/share/url?url=&text=${t}`;
+      if (wa) wa.href = `https://wa.me/${link.num}?text=${encodeURIComponent(ta.value)}`;
     };
+    if (tg) tg.addEventListener("click", async () => {
+      toast(await copiaStringa(ta.value)
+        ? "Testo copiato: in Telegram tieni premuto e incolla"
+        : "Appunti bloccati: copia il testo a mano prima di scrivergli");
+    });
     aggiorna();
     ta.addEventListener("input", aggiorna);
     box.querySelectorAll(`input[name="${id}-v"]`).forEach(r => r.addEventListener("change", () => {
@@ -2441,7 +2448,10 @@
     const fi = document.getElementById("file-in");
     if (fi) fi.addEventListener("change", () => importPickedFile(fi));
     const nome = document.getElementById("s-nome");
-    if (nome) nome.addEventListener("change", () => { state.settings.nome = nome.value.trim(); save(); renderRail(); });
+    if (nome) nome.addEventListener("change", () => {
+      state.settings.nome = nome.value.trim(); save(); renderRail();
+      toast(state.settings.nome ? `Ciao ${state.settings.nome.split(" ")[0]}` : "Nome tolto");
+    });
     const pre = document.getElementById("s-preavviso");
     if (pre) pre.addEventListener("change", () => {
       state.settings.preavviso = clamp(parseInt(pre.value, 10) || 0, 0, 90);
