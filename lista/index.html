@@ -198,6 +198,8 @@
     cursor: pointer;
     white-space: nowrap;
   }
+  /* Un pulsante che è un collegamento non deve sembrare un collegamento. */
+  a.btn { text-decoration: none; }
   .btn:hover { border-color: var(--ink-3); }
   .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
   .btn-primary:hover { filter: brightness(1.08); border-color: var(--accent); }
@@ -1300,6 +1302,87 @@
 
   /* ══ Scheda persona ═══════════════════════════════════════════════════ */
 
+  /* ══ Passare il prossimo passo al calendario ═══════════════════════════
+
+     Una notifica vera l'app non può darla: per svegliarti fra cinque giorni
+     servirebbe un server che sappia cosa dirti, e i nomi stanno solo su questo
+     telefono. Il modo che funziona su Android e su iPhone è consegnare la data al
+     calendario, che di notifiche se ne intende.
+
+     Due strade: il collegamento a Google Calendar (un tocco, l'evento arriva già
+     scritto) e il file `.ics` per qualunque altro calendario. Il secondo non
+     compare dentro la cornice dell'artifact, dove i file non si possono salvare.
+     Lo stesso impianto è nell'app «Clienti e Riordini».                      */
+
+  const dentroCornice = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+  const FUSO = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; } })();
+  const soloCifre = d => String(d).replace(/-/g, "");
+  /* Una sveglia nel passato non suona: un passo già scaduto va a domani, la prima
+     mattina in cui puoi ancora farci qualcosa. Se scade oggi resta oggi. */
+  const nonPassata = d => d < todayISO() ? iso(addDays(new Date(), 1)) : d;
+
+  function eventoPasso(p) {
+    if (!p.nextDate) return null;
+    const fase = STAGES[clamp(p.reached, 0, STAGES.length - 1)];
+    return {
+      data: nonPassata(p.nextDate),
+      titolo: `${p.name}${p.nextNote ? ": " + p.nextNote : " — prossimo passo"}`,
+      nota: fase ? `A che punto siete: ${fase.label.toLowerCase()}.` : "",
+    };
+  }
+
+  const dettaglioEvento = (p, e) => [e.nota, p.contact ? "Contatto: " + p.contact : "",
+    "Da «Dalla Lista al Sì» — " + location.href].filter(Boolean).join("\n");
+
+  function linkGoogleCal(p, e) {
+    const d = soloCifre(e.data);
+    const q = new URLSearchParams({ action: "TEMPLATE", text: e.titolo,
+      dates: `${d}T090000/${d}T091500`, details: dettaglioEvento(p, e) });
+    if (FUSO) q.set("ctz", FUSO);
+    return "https://calendar.google.com/calendar/render?" + q.toString();
+  }
+
+  /* Le righe di un file .ics vanno piegate e le virgole protette: un calendario
+     esigente rifiuta il file intero per una riga troppo lunga. */
+  const icsRiga = (chiave, valore) => {
+    const riga = chiave + ":" + String(valore).replace(/\\/g, "\\\\").replace(/([,;])/g, "\\$1").replace(/\n/g, "\\n");
+    const pezzi = [];
+    for (let i = 0; i < riga.length; i += 72) pezzi.push((i ? " " : "") + riga.slice(i, i + 72));
+    return pezzi.join("\r\n");
+  };
+
+  function icsTesto(p, e) {
+    const d = soloCifre(e.data);
+    const stampa = nowISO().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+    return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//CumLaude21//Dalla Lista al Si//IT",
+      "CALSCALE:GREGORIAN", "BEGIN:VEVENT",
+      icsRiga("UID", `${p.id}-${e.data}@dalla-lista-al-si`),
+      `DTSTAMP:${stampa}`, `DTSTART:${d}T090000`, `DTEND:${d}T091500`,
+      icsRiga("SUMMARY", e.titolo), icsRiga("DESCRIPTION", dettaglioEvento(p, e)),
+      "BEGIN:VALARM", "ACTION:DISPLAY", icsRiga("DESCRIPTION", e.titolo),
+      "TRIGGER:-PT15M", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  }
+
+  function scaricaIcs(p) {
+    const e = eventoPasso(p);
+    if (!e) return;
+    const nome = `prossimo-passo-${e.data}.ics`;
+    try {
+      const url = URL.createObjectURL(new Blob([icsTesto(p, e)], { type: "text/calendar;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast("File del calendario scaricato: aprilo per aggiungerlo");
+    } catch (err) { toast("Non riesco a creare il file"); }
+  }
+
+  function bottoniCalendario(p) {
+    const e = eventoPasso(p);
+    if (!e) return "";
+    return `<a class="btn btn-sm" href="${esc(linkGoogleCal(p, e))}" target="_blank" rel="noopener">In calendario</a>
+      ${dentroCornice ? "" : `<button class="btn btn-sm btn-quiet" data-act="ics" data-id="${p.id}">file .ics</button>`}`;
+  }
+
   function renderSheet() {
     const layer = document.getElementById("layer");
     if (!openId) { if (!document.querySelector(".modal-box")) layer.innerHTML = ""; return; }
@@ -1361,6 +1444,7 @@
             <div class="btn-row">
               <button class="btn btn-sm" data-act="save-next" data-id="${p.id}">Salva</button>
               ${p.nextDate ? `<button class="btn btn-sm btn-quiet" data-act="clear-next" data-id="${p.id}">Togli</button>` : ""}
+              ${p.nextDate ? bottoniCalendario(p) : ""}
             </div>
           </div>
 
@@ -1915,6 +1999,7 @@ Zio Franco"></textarea>
         modalConfirm("Cancellare tutto?", "Tutti i nomi e tutta la cronologia. Salva prima una copia se non sei sicuro.",
           "Cancella tutto", () => { state = emptyState(); openId = null; save(); toast("Tutto cancellato"); });
         break;
+      case "ics": if (p) scaricaIcs(p); break;
       case "backup-file": backupFile(); break;
       case "copy-json": copyJSON(); break;
       case "import": importPasted(); break;
