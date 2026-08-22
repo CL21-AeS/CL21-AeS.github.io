@@ -1879,6 +1879,113 @@
       </div>`;
   }
 
+  /* ══ Passare una scadenza al calendario ═══════════════════════════════
+
+     Una notifica vera l'app non può darla: per svegliarti fra cinque giorni
+     servirebbe un server che sappia cosa dirti, e i dati stanno solo qui. Il modo
+     che funziona su Android e su iPhone è consegnare la scadenza al calendario
+     del telefono, che di notifiche se ne intende.
+
+     Due strade: il collegamento a Google Calendar (un tocco, l'evento arriva già
+     scritto) e il file `.ics`, che va bene per qualunque altro calendario. Il
+     secondo non compare nell'anteprima dell'artifact, dove i file non si possono
+     salvare.                                                                */
+
+  const FUSO = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; } })();
+  const soloCifre = iso => String(iso).replace(/-/g, "");
+
+  /* Che evento nasce da ciascuna delle tre scadenze. Le due «da fare» diventano
+     un appuntamento alle nove del mattino; il compleanno è di giornata intera e
+     si ripete ogni anno, che è quello che un compleanno fa. */
+  /* Una sveglia nel passato non suona: se la scadenza è già scaduta l'evento si
+     sposta a domani, che è la prima mattina in cui puoi ancora farci qualcosa.
+     Se scade oggi resta oggi, così lo vedi nell'agenda di giornata. */
+  const nonPassata = d => d < todayISO() ? iso(addDays(new Date(), 1)) : d;
+
+  function eventoPer(c, tipo) {
+    const n = c.name;
+    if (tipo === "checkin") {
+      const v = verifichePendenti(c)[0];
+      if (!v) return null;
+      return { data: nonPassata(v.due), titolo: `Sentire ${n}: come si è trovato con ${v.nuovi.map(prodName).join(" e ")}`,
+        nota: "Chiedere com'è andata, senza vendere niente." };
+    }
+    if (tipo === "prom") {
+      if (!c.nextDate) return null;
+      return { data: nonPassata(c.nextDate), titolo: `${n}${c.nextNote ? ": " + c.nextNote : " — risentirlo"}`, nota: "" };
+    }
+    if (tipo === "bday") {
+      const b = compleanno(c);
+      if (!b) return null;
+      return { data: b.data, titolo: `Compleanno di ${n}`, nota: "Gli auguri oggi; l'eventuale proposta qualche giorno dopo.",
+        intera: true, ogniAnno: true };
+    }
+    return null;
+  }
+
+  const dettaglioEvento = (c, e) => [e.nota, c.contact ? "Telefono: " + c.contact : "",
+    "Da «Clienti e Riordini» — " + location.href].filter(Boolean).join("\n");
+
+  function linkGoogleCal(c, e) {
+    const d = soloCifre(e.data);
+    const quando = e.intera
+      ? `${d}/${soloCifre(iso(addDays(parseISO(e.data), 1)))}`
+      : `${d}T090000/${d}T091500`;
+    const q = new URLSearchParams({ action: "TEMPLATE", text: e.titolo, dates: quando,
+      details: dettaglioEvento(c, e) });
+    if (!e.intera && FUSO) q.set("ctz", FUSO);
+    if (e.ogniAnno) q.set("recur", "RRULE:FREQ=YEARLY");
+    return "https://calendar.google.com/calendar/render?" + q.toString();
+  }
+
+  /* Le righe di un file .ics vanno spezzate a 75 ottetti e le virgole protette:
+     un calendario esigente rifiuta il file intero per una riga troppo lunga. */
+  const icsRiga = (chiave, valore) => {
+    const riga = chiave + ":" + String(valore).replace(/\\/g, "\\\\").replace(/([,;])/g, "\\$1").replace(/\n/g, "\\n");
+    const pezzi = [];
+    for (let i = 0; i < riga.length; i += 72) pezzi.push((i ? " " : "") + riga.slice(i, i + 72));
+    return pezzi.join("\r\n");
+  };
+
+  function icsTesto(c, e) {
+    const d = soloCifre(e.data);
+    const stampa = nowISO().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+    const quando = e.intera
+      ? [`DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${soloCifre(iso(addDays(parseISO(e.data), 1)))}`]
+      : [`DTSTART:${d}T090000`, `DTEND:${d}T091500`];
+    return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//CumLaude21//Clienti e Riordini//IT",
+      "CALSCALE:GREGORIAN", "BEGIN:VEVENT",
+      icsRiga("UID", `${c.id}-${e.data}-${e.titolo.slice(0, 12)}@clienti-riordini`),
+      `DTSTAMP:${stampa}`, ...quando,
+      icsRiga("SUMMARY", e.titolo), icsRiga("DESCRIPTION", dettaglioEvento(c, e)),
+      ...(e.ogniAnno ? ["RRULE:FREQ=YEARLY"] : []),
+      "BEGIN:VALARM", "ACTION:DISPLAY", icsRiga("DESCRIPTION", e.titolo),
+      e.intera ? "TRIGGER:PT9H" : "TRIGGER:-PT15M", "END:VALARM",
+      "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  }
+
+  async function scaricaIcs(c, tipo) {
+    const e = eventoPer(c, tipo);
+    if (!e) return;
+    const nome = `promemoria-${chiave(c.name).replace(/ /g, "-")}-${e.data}.ics`;
+    try {
+      const url = URL.createObjectURL(new Blob([icsTesto(c, e)], { type: "text/calendar;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast("File del calendario scaricato: aprilo per aggiungerlo");
+    } catch (err) { toast("Non riesco a creare il file"); }
+  }
+
+  /* I due comandi che portano una scadenza nel calendario. */
+  function bottoniCalendario(c, tipo) {
+    const e = eventoPer(c, tipo);
+    if (!e) return "";
+    return `<a class="btn btn-sm" href="${esc(linkGoogleCal(c, e))}" target="_blank" rel="noopener">In calendario</a>
+      ${dentroCornice ? "" : `<button class="btn btn-sm btn-quiet" data-act="ics" data-id="${c.id}"
+        data-tipo="${tipo}">file .ics</button>`}`;
+  }
+
   /* ══ Scheda del cliente ═══════════════════════════════════════════════ */
 
   /* Il numero scritto a mano non è un indirizzo telefonico: qui diventa
@@ -1981,6 +2088,7 @@
               <button class="btn btn-sm btn-primary" data-act="msg" data-tipo="checkin" data-id="${c.id}">Messaggio</button>
               <button class="btn btn-sm" data-act="checkin-done" data-id="${c.id}" data-oid="${v.order.id}">Fatto</button>
               <button class="btn btn-sm btn-quiet" data-act="checkin-skip" data-id="${c.id}" data-oid="${v.order.id}">Non serve</button>
+              ${bottoniCalendario(c, "checkin")}
             </div></div>`).join("") : ""}
 
           ${bday && !bday.fatto && bday.daysTo <= state.settings.compleanno ? `<div class="next-box">
@@ -1990,6 +2098,7 @@
             <div class="btn-row">
               <button class="btn btn-sm btn-primary" data-act="msg" data-tipo="auguri" data-id="${c.id}">Auguri e proposta</button>
               <button class="btn btn-sm btn-quiet" data-act="auguri-done" data-id="${c.id}">Già fatti</button>
+              ${bottoniCalendario(c, "bday")}
             </div></div>` : ""}
 
           <div>
@@ -2010,6 +2119,7 @@
             <div class="btn-row">
               <button class="btn btn-sm btn-primary" data-act="save-next" data-id="${c.id}">Salva</button>
               ${c.nextDate || c.nextNote ? `<button class="btn btn-sm btn-quiet" data-act="clear-next" data-id="${c.id}">Togli</button>` : ""}
+              ${c.nextDate ? bottoniCalendario(c, "prom") : ""}
             </div>
           </div>
 
@@ -3122,6 +3232,7 @@
       case "order": if (c) { openId = c.id; modalOrder(c); } break;
       case "snooze": if (c) modalSnooze(c); break;
       case "msg": if (c) modalMessaggio(c, el.dataset.tipo); break;
+      case "ics": if (c) scaricaIcs(c, el.dataset.tipo); break;
       case "copy-num": {
         if (!c) break;
         const l = telLink(c.contact);
