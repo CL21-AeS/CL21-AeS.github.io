@@ -344,6 +344,14 @@
   .pick { display: block; width: 100%; text-align: left; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; }
   .pick.vuoto { color: var(--ink-3); }
+
+  /* Il prezzo sta su una riga sua: infilarlo nella griglia insieme a nome e
+     quantità lo avrebbe strozzato su un telefono. */
+  .oprezzo { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .oprezzo label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--ink-3); }
+  .oprezzo input { width: 96px; }
+  .oprezzo .nota { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
   .picker { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
   .pick-list { display: flex; flex-direction: column; gap: 2px; max-height: 236px; overflow-y: auto;
     border: 1px solid var(--rule); border-radius: 6px; padding: 5px; background: var(--surface-2); }
@@ -509,8 +517,9 @@
   /* ══ Il catalogo Amway ═════════════════════════════════════════════════
 
      I 370 prodotti presi dai fogli del progetto (`IT_Fogli Excel_e_listino`,
-     listino di aprile 2026): codice, nome, formato, categoria. Servono a non
-     far scrivere a mano «Nutrilite™ - Omega-3 Triple Strength» a nessuno.
+     listino di aprile 2026): codice, nome, formato, categoria e **prezzo di
+     listino al cliente**. Servono a non far scrivere a mano «Nutrilite™ -
+     Omega-3 Triple Strength» né il suo prezzo a nessuno.
 
      **Le durate non ci sono, ed è voluto.** Quanto dura una confezione dipende
      da chi la usa, non dalla scatola: inventarla qui vorrebbe dire far mentire
@@ -518,381 +527,383 @@
      catalogo personale con una durata di ripiego e il segno «da controllare» —
      la si sistema una volta, e dopo tre riordini l'app la misura da sé.
 
-     Nemmeno i prezzi ci sono: cambiano, e sono il mestiere di un'altra app. */
+     Il prezzo di listino invece invecchia, e per quello c'è
+     `genera_catalogo.py`. Ma il prezzo **scritto su un ordine** non si tocca mai:
+     è quanto è stato venduto quel giorno, e resta anche se il listino cambia. */
 
   const CAT_LABEL = { N: "Nutrizione", C: "Casa", B: "Bellezza", P: "Cura della persona" };
 
   const CATALOGO = [
-    ["127466", "Artistry Ever Perfect™ - Cipria in Polvere Fissante - Highlight", "16 g", "B"],
-    ["127832", "Artistry Ever Perfect™ - Fondotinta Compatto in Polvere Ricarica - 101 Shell", "", "B"],
-    ["127449", "Artistry Ever Perfect™ - Fondotinta Lunga Tenuta SPF 25 PA+++ (Shell)", "30 ml", "B"],
-    ["127844", "Artistry Ever Perfect™ - Portafondotinta Compatto", "", "B"],
-    ["341133", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 101 Shell", "", "B"],
-    ["341134", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 102 Cashmere", "", "B"],
-    ["341135", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 103 Ivory", "", "B"],
-    ["341136", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 201 Beige", "", "B"],
-    ["341137", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 202 Bamboo", "", "B"],
-    ["341138", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 203 Honey", "", "B"],
-    ["341139", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 301 Biscotti", "", "B"],
-    ["341140", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 302 Almond", "", "B"],
-    ["341141", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 401 Mocha", "", "B"],
-    ["341142", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 402 Nutmeg", "", "B"],
-    ["127467", "Artistry Ever Perfect™ Cipria in Polvere Fissante - Light to Medium", "16 g", "B"],
-    ["127468", "Artistry Ever Perfect™ Cipria in Polvere Fissante - Medium to Deep", "16 g", "B"],
-    ["127839", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Almond", "", "B"],
-    ["127836", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Bamboo", "", "B"],
-    ["127835", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Beige", "", "B"],
-    ["127838", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Biscotti", "", "B"],
-    ["127833", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Cashmere", "", "B"],
-    ["127837", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Honey", "", "B"],
-    ["127834", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Ivory", "", "B"],
-    ["127841", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Mocha", "", "B"],
-    ["127842", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Nutmeg", "", "B"],
-    ["127450", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 102 Cashmere", "30 ml", "B"],
-    ["127451", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 103 Ivory", "30 ml", "B"],
-    ["127452", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 104 Fawn", "30 ml", "B"],
-    ["127453", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 201 Beige", "30 ml", "B"],
-    ["127454", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 202 Bamboo", "30 ml", "B"],
-    ["127455", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 203 Honey", "30 ml", "B"],
-    ["127456", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 204 Oat", "30 ml", "B"],
-    ["127457", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 301 Biscotti", "30 ml", "B"],
-    ["127458", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 302 Almond", "30 ml", "B"],
-    ["127459", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 303 Chestnut", "30 ml", "B"],
-    ["127460", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 304 Amber", "30 ml", "B"],
-    ["127461", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 305 Cocoa", "30 ml", "B"],
-    ["127462", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 401 Mocha", "30 ml", "B"],
-    ["127463", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 402 Nutmeg", "30 ml", "B"],
-    ["127464", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 403 Java", "30 ml", "B"],
-    ["127465", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 404 Espresso", "30 ml", "B"],
-    ["126718", "Artistry Future Glow™ - Fondotinta Siero SPF 35 PA++ (Shell)", "30 ml / 35 g", "B"],
-    ["127825", "Artistry Future Glow™ - Siero Correttore - Fair", "", "B"],
-    ["126719", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 102 Cashmere", "30 ml / 35 g", "B"],
-    ["126720", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 103 Ivory", "30 ml / 35 g", "B"],
-    ["126721", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 104 Fawn", "30 ml / 35 g", "B"],
-    ["126722", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 201 Beige", "30 ml / 35 g", "B"],
-    ["126723", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 202 Bamboo", "30 ml / 35 g", "B"],
-    ["126724", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 203 Honey", "30 ml / 35 g", "B"],
-    ["126725", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 204 Oat", "30 ml / 35 g", "B"],
-    ["126726", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 301 Biscotti", "30 ml / 35 g", "B"],
-    ["126727", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 302 Almond", "30 ml / 35 g", "B"],
-    ["126728", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 303 Chestnut", "30 ml / 35 g", "B"],
-    ["126729", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 304 Amber", "30 ml / 35 g", "B"],
-    ["126731", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 401 Mocha", "30 ml / 35 g", "B"],
-    ["126732", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 402 Nutmeg", "30 ml / 35 g", "B"],
-    ["126734", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 404 Espresso", "30 ml / 35 g", "B"],
-    ["127830", "Artistry Future Glow™ Siero Correttore - Deep", "", "B"],
-    ["127826", "Artistry Future Glow™ Siero Correttore - Light", "", "B"],
-    ["127827", "Artistry Future Glow™ Siero Correttore - Light Medium", "", "B"],
-    ["127828", "Artistry Future Glow™ Siero Correttore - Medium", "", "B"],
-    ["127829", "Artistry Future Glow™ Siero Correttore - Medium Deep", "", "B"],
-    ["124674", "Artistry Go Vibrant™ - Balsamo Labbra Trasparente", "3 g", "B"],
-    ["127473", "Artistry Go Vibrant™ - Fard in Crema e Polvere - Pink Spring Fling", "9 g", "B"],
-    ["126740", "Artistry Go Vibrant™ - Mascara Rinforzante Lunghezza & Definizione", "8,5 ml", "B"],
-    ["127845", "Artistry Go Vibrant™ - Mascara Volume 3-in-1", "", "B"],
-    ["126745", "Artistry Go Vibrant™ - Matita & Gel Sopracciglia Perfette - True Black", "Matita 0,18 g - Gel 2,5 g", "B"],
-    ["126741", "Artistry Go Vibrant™ - Matita Eyeliner Alta Definizione - Natural Brown", "0,1 g", "B"],
-    ["126736", "Artistry Go Vibrant™ - Quartetto Ombretti - Golden Harvest", "8.8 g", "B"],
-    ["124155", "Artistry Go Vibrant™ - Rossetto Matte - Lunch Date Pink", "", "B"],
-    ["124144", "Artistry Go Vibrant™ - Rossetto Satinato - Saturday Peach", "", "B"],
-    ["127474", "Artistry Go Vibrant™ Fard in Crema e Polvere - Mauvy Night", "9 g", "B"],
-    ["126747", "Artistry Go Vibrant™ Matita & Gel Sopracciglia Perfette - Dark Brown", "Matita 0,18 g - Gel 2,5 g", "B"],
-    ["126746", "Artistry Go Vibrant™ Matita & Gel Sopracciglia Perfette - Taupe", "Matita 0,18 g - Gel 2,5 g", "B"],
-    ["126744", "Artistry Go Vibrant™ Matita Eyeliner Alta Definizione - Natural Black", "0,1 g", "B"],
-    ["126738", "Artistry Go Vibrant™ Quartetto Ombretti - Berry Garden", "8.8 g", "B"],
-    ["126737", "Artistry Go Vibrant™ Quartetto Ombretti - Peach Basket", "8.8 g", "B"],
-    ["124161", "Artistry Go Vibrant™ Rossetto Matte - Blush Crush", "", "B"],
-    ["124159", "Artistry Go Vibrant™ Rossetto Matte - Firecracker Red", "", "B"],
-    ["124162", "Artistry Go Vibrant™ Rossetto Matte - Lazy Day Latte", "", "B"],
-    ["124163", "Artistry Go Vibrant™ Rossetto Matte - Love Note Nude", "", "B"],
-    ["124156", "Artistry Go Vibrant™ Rossetto Matte - Photobomb Fuchsia", "", "B"],
-    ["124157", "Artistry Go Vibrant™ Rossetto Matte - Recharge Rose", "", "B"],
-    ["124158", "Artistry Go Vibrant™ Rossetto Matte - Road Trip Ted", "", "B"],
-    ["124147", "Artistry Go Vibrant™ Rossetto Satinato - Berry Special Evening", "", "B"],
-    ["124153", "Artistry Go Vibrant™ Rossetto Satinato - Crush on Coral", "", "B"],
-    ["124154", "Artistry Go Vibrant™ Rossetto Satinato - Go-Go Cocoa", "", "B"],
-    ["124146", "Artistry Go Vibrant™ Rossetto Satinato - Mauvelous Morning", "", "B"],
-    ["124149", "Artistry Go Vibrant™ Rossetto Satinato - Secret Crush Scarlet", "", "B"],
-    ["124152", "Artistry Go Vibrant™ Rossetto Satinato - Spice Meets Nice", "", "B"],
-    ["124150", "Artistry Go Vibrant™ Rossetto Satinato - Take Charge Red", "", "B"],
-    ["124151", "Artistry Go Vibrant™ Rossetto Satinato - Text Me Terracotta", "", "B"],
-    ["124145", "Artistry Go Vibrant™ Rossetto Satinato - Weekend Rose", "", "B"],
-    ["127173", "Artistry Labs™ - Pezzi di Ricambio per il Dispositivo Aquabrasion", "", "B"],
-    ["128178", "Artistry Labs™ - Siero Ritexturizzante", "Flacone da 30 ml", "B"],
-    ["126219", "Artistry Labs™ - Sistema Illuminante", "Siero illuminante - 30 ml/1 FL OZ | Correttore Anti-Macchie - 15 ml/0,5 FL OZ", "B"],
-    ["126807", "Artistry Labs™ - Sistema Ritexturizzante", "", "B"],
-    ["125547", "Artistry Labs™ - Sistema Ritexturizzante – Ricarica", "1 x Peeling 15 ml; 1 x Siero 30 ml", "B"],
-    ["127573", "Artistry LongXevity™ - Crema Contorno Occhi", "15 g", "B"],
-    ["127577", "Artistry LongXevity™ - Crema Contorno Occhi - Ricarica", "15 g", "B"],
-    ["127572", "Artistry LongXevity™ - Crema Morbida Idratante", "50 g", "B"],
-    ["127576", "Artistry LongXevity™ - Crema Morbida Idratante - Ricarica", "50 g", "B"],
-    ["127571", "Artistry LongXevity™ - Crema Ricca Nutriente", "50 g", "B"],
-    ["127575", "Artistry LongXevity™ - Crema Ricca Nutriente - Ricarica", "50 g", "B"],
-    ["127600", "Artistry LongXevity™ - Essenza Tonificante", "125 ml", "B"],
-    ["122339", "Artistry Signature Select™ - Maschera Esfoliante", "100 g", "B"],
-    ["122343", "Artistry Signature Select™ - Maschera Idratante", "100 g", "B"],
-    ["122340", "Artistry Signature Select™ - Maschera Illuminante", "100 g", "B"],
-    ["122342", "Artistry Signature Select™ - Maschera Purificante", "100 g", "B"],
-    ["122341", "Artistry Signature Select™ - Maschera Rassodante", "125 g", "B"],
-    ["123789", "Artistry Skin Nutrition™ - Beauty On-The-Go Firming Travel Kit", "Travel Kit", "B"],
-    ["123804", "Artistry Skin Nutrition™ - Beauty On-The-Go Hydrating Travel Kit", "Travel Kit", "B"],
-    ["123790", "Artistry Skin Nutrition™ - Beauty On-The-Go Renewing Travel Kit", "Travel Kit", "B"],
-    ["321906", "Artistry Skin Nutrition™ - Beauty Sleep Solution", "", "B"],
-    ["123784", "Artistry Skin Nutrition™ - Crema Contorno Occhi Riattivante", "15 g", "B"],
-    ["123786", "Artistry Skin Nutrition™ - Crema Effetto Ultra Lifting", "50 g", "B"],
-    ["123787", "Artistry Skin Nutrition™ - Crema Giorno Riattivante SPF 30", "50 g", "B"],
-    ["123785", "Artistry Skin Nutrition™ - Crema Riattivante", "50 g", "B"],
-    ["123779", "Artistry Skin Nutrition™ - Crema Struccante Viso e Occhi", "118 g", "B"],
-    ["123796", "Artistry Skin Nutrition™ - Crema-Gel Contorno Occhi", "15 g", "B"],
-    ["123798", "Artistry Skin Nutrition™ - Crema-Gel Viso", "50 g", "B"],
-    ["123781", "Artistry Skin Nutrition™ - Detergente in Schiuma", "125 g", "B"],
-    ["128047", "Artistry Skin Nutrition™ - Gocce Omega", "20 ml", "B"],
-    ["123857", "Artistry Skin Nutrition™ - Lozione Giorno Riattivante SPF 30", "50 g", "B"],
-    ["123800", "Artistry Skin Nutrition™ - Lozione Giorno SPF 30", "50 g", "B"],
-    ["123791", "Artistry Skin Nutrition™ - Lozione Micellare Viso e Occhi", "200 ml", "B"],
-    ["128276", "Artistry Skin Nutrition™ - Maschera Gel Illuminante Vitamina C+", "5 maschere (30 g ciascuna)", "B"],
-    ["127108", "Artistry Skin Nutrition™ - Maschera Notte", "80 ml + Massaggiatore a forma di T", "B"],
-    ["124822", "Artistry Skin Nutrition™ - Protezione UV Multi-Difesa SPF 50+", "50 g", "B"],
-    ["319398", "Artistry Skin Nutrition™ - Set Healthy Beauty Firming Routine", "", "B"],
-    ["319392", "Artistry Skin Nutrition™ - Set Healthy Beauty Hydrating Routine", "", "B"],
-    ["319385", "Artistry Skin Nutrition™ - Set Healthy Beauty Renewing Routine", "", "B"],
-    ["319402", "Artistry Skin Nutrition™ - Set Moisturisation Power Firming", "", "B"],
-    ["319401", "Artistry Skin Nutrition™ - Set Moisturisation Power Hydrating", "", "B"],
-    ["319400", "Artistry Skin Nutrition™ - Set Moisturisation Power Renewing", "", "B"],
-    ["127019", "Artistry Skin Nutrition™ - Siero Antietà", "Flacone da 30 ml", "B"],
-    ["127020", "Artistry Skin Nutrition™ - Siero Correttore", "Flacone da 30 ml", "B"],
-    ["125517", "Artistry Skin Nutrition™ - Siero Vitamina C+HA3 Acido Ialuronico", "12 ml", "B"],
-    ["123783", "Artistry Skin Nutrition™ - Tonico Emolliente", "200 ml", "B"],
-    ["123795", "Artistry Skin Nutrition™ - Tonico Levigante", "200 ml", "B"],
-    ["125325", "Artistry Studio™ - Acqua per il Viso Rinfrescante + Protettiva", "Flacone: 100 ml, erogatore con micronebulizzatore", "B"],
-    ["125966", "Artistry Studio™ - Crema Idratante + Antiossidante", "Tubetto: 50 ml", "B"],
-    ["124812", "Artistry Studio™ - Detergente + Esfoliante", "Tubo: 125 ml", "B"],
-    ["124818", "Artistry Studio™ - Patch Occhi Anti-Gonfiore + Illuminante", "30 set di maschere per contorno occhi (60 pezzi) in vasetto", "B"],
-    ["124811", "Artistry Studio™ - Salviette Micellari Struccanti + Detergenti", "Confezione plastificata con etichetta richiudibile. 30 salviettine", "B"],
-    ["316099", "Artistry Studio™ - Set Jump-Start Your Morning", "", "B"],
-    ["316101", "Artistry Studio™ - Set Ready For Bed in 3 Minutes", "", "B"],
-    ["303185", "Artistry Studio™ - Siero in Gel Illuminante + Idratante", "Flacone: 20 ml, erogatore airless", "B"],
-    ["125964", "Artistry Studio™ - Siero Occhi Illuminante + Rinfrescante", "Tubetto con roller: 15 ml", "B"],
-    ["124813", "Artistry Studio™ - Tonico Anti-Imperfezioni + Purificante Pori", "Flacone: 200 ml con riduttore", "B"],
-    ["125327", "Artistry Studio™ - Trattamento Anti-Imperfezioni + Gel Purificante", "Tubetto: 30 ml, punta oftalmica", "B"],
-    ["127720", "Artistry™ - Derma-Architect™", "", "B"],
-    ["127784", "Artistry™ - Derma-Architect™ Gel Rivitalizzante", "", "B"],
-    ["125901", "g&h™ - Crema Protezione Solare SPF 50+ PA++++ Protect", "Tubetto da 100 ml con tappo a vite e confezione in cartone", "B"],
-    ["110480", "Amway Home™ - Ammorbidente per Tessuti Giardino Fiorito SA8™", "1 Litro", "C"],
-    ["110488", "Amway Home™ - Detergente Liquido Concentrato Dish Drops™", "1 Litro", "C"],
-    ["0001", "Amway Home™ - Detergente Multiuso L.O.C.™", "1 Litro", "C"],
-    ["117080", "Amway Home™ - Detergente per i Vetri L.O.C.™", "500 ml", "C"],
-    ["117078", "Amway Home™ - Detergente per il Bagno L.O.C.™", "500 ml", "C"],
-    ["117079", "Amway Home™ - Detergente per la Cucina L.O.C.™", "500 ml", "C"],
-    ["120536", "Amway Home™ - Detersivo Liquido Concentrato con effetto ammorbidente SA8™ Baby", "1 L", "C"],
-    ["124456", "Amway Home™ - Detersivo Liquido Concentrato per Capi Colorati e Scuri SA8™ Color", "1 Litro", "C"],
-    ["110479", "Amway Home™ - Detersivo Liquido Concentrato SA8™ Delicato", "1 Litro", "C"],
-    ["110478", "Amway Home™ - Detersivo Liquido Concentrato SA8™ Liquido", "4 Litri", "C"],
-    ["5101", "Amway Home™ - Dosa Detersivo", "1 Pezzo", "C"],
-    ["1560", "Amway Home™ - Erogatore a Immersione SA8™", "1 Pezzo", "C"],
-    ["103972", "Amway Home™ - Erogatore ad Immersione", "1 Pezzo (per Flacone da 1 litro)", "C"],
-    ["110485", "Amway Home™ - Fazzolettini Imbevuti per Pulizie L.O.C.™", "Confezione 4 x 24 Pezzi", "C"],
-    ["110487", "Amway Home™ - Flacone Dispensatore", "500 ml", "C"],
-    ["110490", "Amway Home™ - Pagliette in Acciaio Inox Dish Drops™ Scrub Buds™", "4 Confezioni", "C"],
-    ["0014", "Amway Home™ - Pulitore per il Forno", "500 ml", "C"],
-    ["109849", "Amway Home™ - SA8™ Premium Detersivo in Polvere per Bucato Concentrato", "3 kg", "C"],
-    ["124485", "Amway Home™ - Smacchiante Candeggiante per Tutti i Tessuti SA8™", "1 kg", "C"],
-    ["110483", "Amway Home™ - Spruzzatore a Pistola", "500 ml", "C"],
-    ["109867", "Amway Home™ - Tavolette per Lavastoviglie Dish Drops™", "60 Tavolette", "C"],
-    ["120545", "Atmosphere Sky™ - Cavo di Alimentazione Rimovibile", "1 Peace", "C"],
-    ["120541", "Atmosphere Sky™ - Filtro a Carbone per", "1 Unità", "C"],
-    ["120540", "Atmosphere Sky™ - Filtro HEPA per", "1 Unità", "C"],
-    ["122961", "Atmosphere Sky™ - Paracolpi", "", "C"],
-    ["120542", "Atmosphere Sky™ - Prefiltro", "", "C"],
-    ["122344", "Atmosphere Sky™ - Ruote per Mobilità", "", "C"],
-    ["120539", "Atmosphere Sky™ - Sistema per il Trattamento dell'Aria", "1 Unità con Filtri pre-installati", "C"],
-    ["0420", "eSpring™ - Adattatore di Alimentazione (110-240V) per", "1 Pezzo", "C"],
-    ["1109", "eSpring™ - Alimentatore", "1 pezzo", "C"],
-    ["0426", "eSpring™ - Anello per la Staffa del Filtro", "1 Pezzo", "C"],
-    ["329780", "eSpring™ - Borraccia", "500 ml", "C"],
-    ["127065", "eSpring™ - Deviatore per Rubinetto", "", "C"],
-    ["100186", "eSpring™ - Filtro di Ricambio Sistema per il Trattamento dell'Acqua con Tecnologia UV", "1 Pezzo", "C"],
-    ["122943", "eSpring™ - Filtro e Prefiltro di Ricambio", "1 pezzo", "C"],
-    ["102996", "eSpring™ - Kit per Montaggio a Parete", "1 Kit", "C"],
-    ["125627", "eSpring™ - Kit per Rubinetto Ausiliario", "1 kit", "C"],
-    ["128115", "eSpring™ - Modello Mini da dimostrazione", "18,15 cm (L) x 7,65 cm (P) x 13,35 cm (A)", "C"],
-    ["127063", "eSpring™ - Prefiltro di Ricambio", "1 kit", "C"],
-    ["127064", "eSpring™ - Set di Tubi di Ricambio", "1 kit", "C"],
-    ["122940", "eSpring™ - Sistema per il Trattamento dell'Acqua con Deviatore per Rubinetto esistente", "1 unità", "C"],
-    ["122941", "eSpring™ - Sistema per il Trattamento dell'Acqua con Rubinetto Ausiliario", "1 unità", "C"],
-    ["0706", "eSpring™ - Staffa per Filtro", "1 Pezzo", "C"],
-    ["127068", "eSpring™ - Staffa per il Montaggio a Parete", "1 kit", "C"],
-    ["400142", "iCook™ - Coperchi per Ciotole in 3 misure", "1 Set (3 Grandezze)", "C"],
-    ["401962", "iCook™ - Coperchio di Ricambio (per Padella Antiaderente da 24 cm)", "", "C"],
-    ["401956", "iCook™ - Coperchio di Ricambio (per Padella Antiaderente da 28 cm)", "", "C"],
-    ["401955", "iCook™ - Manico Laterale di Ricambio con Vite (per Padella Antiaderente da 28 cm)", "", "C"],
-    ["401954", "iCook™ - Manico Lungo di Ricambio con Vite (per Padella Antiaderente da 28 cm e 24 cm)", "", "C"],
-    ["400135", "iCook™ - Manico per Pentole da 1, 2 e 3 Litri - Padella da 1,5 Litri", "1 Pezzo", "C"],
-    ["400136", "iCook™ - Manico per Pentole da 2, 3, 4 Litri - Scolapasta e Cupola da 4 Litri", "1 Pezzo", "C"],
-    ["400520", "iCook™ - Manico Wok", "1 Set", "C"],
-    ["124694", "iCook™ - Padella Antiaderente con Coperchio (24 cm)", "24 cm di diametro", "C"],
-    ["124695", "iCook™ - Padella Antiaderente con Coperchio (28 cm)", "28 cm di diametro", "C"],
-    ["400137", "iCook™ - Pomello e Sottopomello per Coperchi in Acciaio", "1 Pezzo", "C"],
-    ["400141", "iCook™ - Pomello e Sottopomello per Coperchi in Vetro", "1 Pezzo", "C"],
-    ["101082", "iCook™ - Set 2 Casseruole con Coperchio (4 pezzi)", "", "C"],
-    ["101084", "iCook™ - Set 2 Padelle con Coperchio e Coperchio Bombato (5 pezzi)", "", "C"],
-    ["102709", "iCook™ - Set 5 Coltelli", "5 Pezzi", "C"],
-    ["101088", "iCook™ - Set Casseruola da 1 Litro con Coperchio (2 pezzi)", "", "C"],
-    ["101085", "iCook™ - Set Casseruola da 4 Litri con Coperchio e Accessori (4 pezzi)", "", "C"],
-    ["101098", "iCook™ - Set Prestige", "", "C"],
-    ["105084", "iCook™ - Wok", "4 Pezzi (30 cm di diametro - 7 Strati)", "C"],
-    ["200662", "Amway™ - Aceto Balsamico di Modena Amway™", "500 ml", "N"],
-    ["100209", "Amway™ - Caffè Espresso Amway™", "4 x 250 g", "N"],
-    ["100257", "Amway™ - Caffè Istantaneo Amway™", "4 x 100 g", "N"],
-    ["3963", "Amway™ - Olio Extra Vergine di Oliva Amway™", "2 x 750 ml", "N"],
-    ["101162", "Amway™ - Tè Darjeeling Amway™", "200 g (100 Bustine)", "N"],
-    ["121057", "bodykey by Nutrilite™ - Barretta Sostitutiva del Pasto ai Frutti Tropicali", "14 Barrette per Confezione", "N"],
-    ["121056", "bodykey by Nutrilite™ - Barretta Sostitutiva del Pasto al Cioccolato Fondente", "14 Barrette per Confezione", "N"],
-    ["116660", "bodykey by Nutrilite™ - Frappé - Gusto Cioccolato", "371 g", "N"],
-    ["116661", "bodykey by Nutrilite™ - Frappé - Gusto Vaniglia", "329 g", "N"],
-    ["301617", "bodykey by Nutrilite™ - Shaker", "1 Pezzo", "N"],
-    ["116670", "bodykey by Nutrilite™ - Tisana", "45 g", "N"],
-    ["109705", "Nutrilite™ - Aglio", "120 Compresse", "N"],
-    ["110415", "Nutrilite™ - All Plant Protein", "450 g", "N"],
-    ["119792", "Nutrilite™ - Appetite Controller", "Ogni confezione contiene 30 stick da 2,5 g (75 g)", "N"],
-    ["120571", "Nutrilite™ - Balance Within™ Probiotics", "30 Stick x 1,5 g / 45 g", "N"],
-    ["126150", "Nutrilite™ - Be Focused", "60 caramelle gommose (da 2) / 120 g", "N"],
-    ["128148", "Nutrilite™ - Beauty Powder Drink", "Fornitura per 30 giorni, 30 stick", "N"],
-    ["128149", "Nutrilite™ - Beauty Supplement", "60 compresse, fornitura per 30 giorni", "N"],
-    ["308613", "Nutrilite™ - Beauty You Glow", "60 caramelle gommose per flacone.", "N"],
-    ["100305", "Nutrilite™ - Biotina C Plus", "90 Compresse", "N"],
-    ["125625", "Nutrilite™ - Blocco Lame del Frullatore Elettrico ad Alta Velocità", "n/a", "N"],
-    ["110606", "Nutrilite™ - Cal Mag D Plus", "173 g (180 Compresse)", "N"],
-    ["5847", "Nutrilite™ - Cal Mag Masticabile", "162 g (80 Tavolette)", "N"],
-    ["308612", "Nutrilite™ - Can’t Stop, Won’t Stop™", "15 stick per confezione.", "N"],
-    ["101831", "Nutrilite™ - Cardo Mariano", "46 g (60 Compresse)", "N"],
-    ["100280", "Nutrilite™ - CLA 500", "180 Capsule", "N"],
-    ["0191", "Nutrilite™ - Coenzima Q10", "60 Capsule", "N"],
-    ["100296", "Nutrilite™ - Concentrato di Frutta e Verdura", "31 g (60 Compresse)", "N"],
-    ["125167", "Nutrilite™ - Daily", "1 flacone da 90 compresse (1 al giorno)", "N"],
-    ["125166", "Nutrilite™ - Daily", "1 flacone da 45 compresse (1 al giorno)", "N"],
-    ["121576", "Nutrilite™ - Double X™", "Fornitura per 31 giorni - Confezione da 3 scompartimenti (186 Compresse)", "N"],
-    ["5986", "Nutrilite™ - Echinacea Forte", "120 Compresse", "N"],
-    ["343020", "Nutrilite™ - Energy Program Set Ricarica – Caffè", "", "N"],
-    ["343021", "Nutrilite™ - Energy Program Set Ricarica – Cioccolato", "", "N"],
-    ["100295", "Nutrilite™ - Ferro e Acido Folico", "72 g (120 Compresse)", "N"],
-    ["102736", "Nutrilite™ - Fibre Powder", "30 Stick x 6 g (180 g)", "N"],
-    ["8005", "Nutrilite™ - Ginkgo Biloba con DHA", "100 Capsule", "N"],
-    ["100108", "Nutrilite™ - Glucosamina con Boswellia", "150 capsule", "N"],
-    ["123046", "Nutrilite™ - Immunity Support* Plus Kids", "30 stick da 1 g (30 g)", "N"],
-    ["126149", "Nutrilite™ - Immuno", "60 caramelle gommose per flacone", "N"],
-    ["4042", "Nutrilite™ - Lecitina E", "102 g (110 Compresse)", "N"],
-    ["126148", "Nutrilite™ - Less Stress, More Yes", "Confezione da 30 stick.", "N"],
-    ["127620", "Nutrilite™ - Metabolism* plus", "", "N"],
-    ["326812", "Nutrilite™ - Morning Nutrition", "", "N"],
-    ["128617", "Nutrilite™ - Morning Nutrition Ricarica", "", "N"],
-    ["109538", "Nutrilite™ - Multi Carotene Naturale", "55 g (90 Capsule)", "N"],
-    ["100930", "Nutrilite™ - Multivitaminico Masticabile", "120 Tavolette", "N"],
-    ["343022", "Nutrilite™ - Nutrilite™ Energy Program Set Ricarica Cocco", "", "N"],
-    ["122447", "Nutrilite™ - Omega-3 Kids", "45 g (30 Compresse Molli Masticabili: 2 Blister da 15 compresse)", "N"],
-    ["126132", "Nutrilite™ - Omega-3 Triple Strength", "30 capsule molli", "N"],
-    ["111661", "Nutrilite™ - Portacompresse", "1 Pezzo", "N"],
-    ["128152", "Nutrilite™ - Powder Drink OxiBeauty™", "Fornitura per 30 giorni, 30 stick", "N"],
-    ["8004", "Nutrilite™ - Prostafit", "73 g (100 Capsule)", "N"],
-    ["125624", "Nutrilite™ - Recipiente in Vetro per Frullatore Elettrico ad Alta Velocità", "n/a", "N"],
-    ["292409", "Nutrilite™ - Ricarica Double X™", "", "N"],
-    ["114447", "Nutrilite™ - Set Beauty (Beauty Supplement e Beauty Powder Drink)", "", "N"],
-    ["326037", "Nutrilite™ - Set Best Age", "", "N"],
-    ["126624", "Nutrilite™ - Set Daily", "", "N"],
-    ["342944", "Nutrilite™ - Set Energy Program", "1 Nutrilite™ Omega-3 Triple Strength, 1 XS™ High Protein Energy Bar – Caffè, 1 XS™ High Protein Energy Shake – Cappuccino, 1 XS™ Amino Advantage + Anguria, 1 Energy Program Shaker, 1 Materiale Informativo", "N"],
-    ["326043", "Nutrilite™ - Set Foundational Trio Daily", "", "N"],
-    ["326041", "Nutrilite™ - Set Foundational Trio Double X", "", "N"],
-    ["326042", "Nutrilite™ - Set In Charge", "", "N"],
-    ["308133", "Nutrilite™ - Set Kids Immunity Support", "", "N"],
-    ["294852", "Nutrilite™ - Set Mom To Be", "", "N"],
-    ["114448", "Nutrilite™ - Set OxiBeauty™ (OxiBeauty Supplement e OxiBeauty Powder Drink)", "", "N"],
-    ["127059", "Nutrilite™ - Set Programma Depurante", "", "N"],
-    ["317514", "Nutrilite™ - Set Ricarica Programma Depurante (senza scatola)", "", "N"],
-    ["314051", "Nutrilite™ - Set Seasonal Immunity Support", "", "N"],
-    ["315562", "Nutrilite™ - Set Year-Round Vitamin Immunity", "", "N"],
-    ["308614", "Nutrilite™ - Sleep Easy", "30 caramelle gommose per confezione", "N"],
-    ["128151", "Nutrilite™ - Supplement OxiBeauty™", "60 compresse, fornitura per 30 giorni", "N"],
-    ["124321", "Nutrilite™ - Vision Plus", "60 Capsule Molli", "N"],
-    ["110178", "Nutrilite™ - Vitamina B Plus", "32 g (60 Compresse)", "N"],
-    ["109741", "Nutrilite™ - Vitamina C Plus", "42 g (60 Compresse)", "N"],
-    ["109743", "Nutrilite™ - Vitamina C Plus (Formato Famiglia)", "125 g (180 Compresse)", "N"],
-    ["119797", "Nutrilite™ - Vitamina D", "90 Compresse", "N"],
-    ["128057", "Nutrilite™ - Women’s 40+ Support*", "30 compresse", "N"],
-    ["126811", "Nutrilite™ - Zinc + Selenium", "30 stick per confezione – 10 mg di zinco (100 % VNR), 52 mcg di selenio (95% VNR) per stick", "N"],
-    ["326055", "Nutrilite™ Energy Program", "1 set", "N"],
-    ["322032", "Nutrilite™ Energy Program Nutrition", "1 set", "N"],
-    ["326049", "Nutrilite™ Energy Program Supplementation", "1 set", "N"],
-    ["126754", "XS™ - Amino Advantage+", "Confezione da 219 g", "N"],
-    ["128619", "XS™ - Creatine+", "264 g di polvere, 60 porzioni, 4,4 g a porzione", "N"],
-    ["121604", "XS™ - Electrolyte Drink - Gusto Arancia e Lime", "375 g (15 Stick x 25 g)", "N"],
-    ["298813", "XS™ - Ginger Passion Fruit Flavour Power Drink +", "12 x 250 ml", "N"],
-    ["127730", "XS™ - High Protein Energy Bar Cioccolato Fondente", "14 barrette da 50 g ciascuna / 700 g", "N"],
-    ["127731", "XS™ - High Protein Energy Bar Cocco", "14 barrette da 50 g ciascuna / 700 g", "N"],
-    ["341520", "XS™ - High Protein Energy Bar – Caffè", "14 barrette da 50 g ciascuna / 700 g", "N"],
-    ["321579", "XS™ - High Protein Energy Shake Cioccolato Fondente", "14 bustine da 67,1 g ciascuna / 939 g", "N"],
-    ["342052", "XS™ - High Protein Energy Shake – Cappuccino", "bustina (68,2 g); 14 bustine/confezione", "N"],
-    ["121606", "XS™ - Hydrolyzed Whey Protein Powder - Gusto Cioccolato", "700 g (17,5 Porzioni x 40 g)", "N"],
-    ["298812", "XS™ - Lemon Peach Flavour Power Water +", "12 x 250 ml", "N"],
-    ["121062", "XS™ - Magnesio in Stick Electric Lemon Flavour", "30 Stick x 1.5 g (45 g)", "N"],
-    ["122109", "XS™ - Orange Kumquat Flavour Power Drink", "12 x 250 ml", "N"],
-    ["119802", "XS™ - Pink Grapefruit Flavour Power Drink", "12 x 250 ml", "N"],
-    ["121602", "XS™ - Pre-Workout Drink - Lemon Lime Flavour", "450 g (15 Stick x 30 g)", "N"],
-    ["121609", "XS™ - Protein Bar - Gusto Caramello-Vaniglia", "720 g (12 Barrette x 60 g)", "N"],
-    ["121608", "XS™ - Protein Bar - Gusto Cioccolato", "720 g (12 Barrette x 60 g)", "N"],
-    ["101593", "XS™ - Rhodiola Plus", "60 Compresse", "N"],
-    ["118766", "XS™ - Wild Berry Flavour Power Drink", "12 x 250 ml", "N"],
-    ["126308", "g&h™ - Bagnoschiuma e Shampoo per Bambini Baby", "400 ml", "P"],
-    ["125901", "g&h™ - Crema Protezione Solare SPF 50+ PA++++ Protect", "Tubetto da 100 ml con tappo a vite e confezione in cartone", "P"],
-    ["126309", "g&h™ - Lozione per Bambini Baby", "400 ml", "P"],
-    ["125890", "g&h™ - Nourish Bagnoschiuma GOODNESS & HEALTH™", "400 ml", "P"],
-    ["125914", "g&h™ - Nourish Bagnoschiuma GOODNESS & HEALTH™", "1000 ml", "P"],
-    ["125900", "g&h™ - Nourish Balsamo per le Labbra GOODNESS & HEALTH™", "4 g", "P"],
-    ["125899", "g&h™ - Nourish Crema per i Piedi GOODNESS & HEALTH™", "100 ml", "P"],
-    ["125902", "g&h™ - Nourish Crema per le Mani GOODNESS & HEALTH™", "75 ml", "P"],
-    ["125891", "g&h™ - Nourish Lozione per il Corpo GOODNESS & HEALTH™", "400 ml", "P"],
-    ["125913", "g&h™ - Nourish Saponetta GOODNESS & HEALTH™", "250 g", "P"],
-    ["125896", "g&h™ - Protect Deodorante Antitraspirante Roll-on GOODNESS & HEALTH™", "100 ml", "P"],
-    ["125898", "g&h™ - Protect Deodorante Spray Antitraspirante GOODNESS & HEALTH™", "200 ml", "P"],
-    ["126855", "g&h™ - Protect Detergente per le Mani GOODNESS & HEALTH™", "400 ml", "P"],
-    ["125894", "g&h™ - Protect Sapone per le Mani GOODNESS & HEALTH™", "250 ml", "P"],
-    ["125897", "g&h™ - Protect Saponetta GOODNESS & HEALTH™", "6 x 150 g", "P"],
-    ["125892", "g&h™ - Refresh Bagnoschiuma Esfoliante GOODNESS & HEALTH™", "400 ml", "P"],
-    ["125915", "g&h™ - Refresh Bagnoschiuma Esfoliante GOODNESS & HEALTH™", "1000 ml", "P"],
-    ["125893", "g&h™ - Refresh Latte per il Corpo GOODNESS & HEALTH™", "400 ml", "P"],
-    ["124108", "Glister™ - Collutorio Multi-Azione (concentrato)", "Flacone in PET da 72 ml", "P"],
-    ["124106", "Glister™ - Dentifricio Multi-Azione", "Formato standard: tubetto da 200 g / 151 ml con tappo flip-top", "P"],
-    ["124107", "Glister™ - Dentifricio Multi-Azione - Formato da Viaggio", "Formato da Viaggio: tubetto da 50 g / 37 ml con tappo a vite", "P"],
-    ["120519", "Glister™ - Dentifricio per Bambini", "65 ml", "P"],
-    ["124112", "Glister™ - Filo Interdentale Multi-Azione", "2 contenitori di filo interdentale, da 50 m ciascuno", "P"],
-    ["317878", "Glister™ - Set Family", "", "P"],
-    ["127705", "Glister™ - Spazzolino da Denti Elettrico Multi-Azione", "", "P"],
-    ["124110", "Glister™ - Spazzolino da Denti Multi-Azione (con setole medie)", "4 spazzolini da denti per confezione (di colori diversi).", "P"],
-    ["124109", "Glister™ - Spazzolino da Denti Multi-Azione (con setole morbide)", "4 spazzolini da denti per confezione (di colori diversi).", "P"],
-    ["124111", "Glister™ - Spray Rinfrescante alla Menta", "Contenitore da 14 ml con erogatore spray", "P"],
-    ["127706", "Glister™ - Testine di Ricambio dello Spazzolino da Denti Elettrico Multi-Azione", "3 testine di ricambio", "P"],
-    ["120522", "Glister™ Kids Spazzolini da Denti per Bambini", "set da 4", "P"],
-    ["126459", "Satinique™ - Balsamo Anticaduta per Capelli e Cuoio Capelluto (280 ml)", "280 ml", "P"],
-    ["126636", "Satinique™ - Balsamo Anticaduta per Capelli e Cuoio Capelluto (750 ml)", "750 ml", "P"],
-    ["126451", "Satinique™ - Balsamo Idratante (280 ml)", "280 ml", "P"],
-    ["126634", "Satinique™ - Balsamo Idratante (750 ml)", "750 ml", "P"],
-    ["126462", "Satinique™ - Balsamo Purificante per Capelli e Cuoio Capelluto (280 ml)", "280 ml", "P"],
-    ["126454", "Satinique™ - Balsamo Riparazione Intensa (280 ml)", "280 ml", "P"],
-    ["126635", "Satinique™ - Balsamo Riparazione Intensa (750 ml)", "750 ml", "P"],
-    ["126468", "Satinique™ - Lozione per Capelli Riparazione Intensa (100 ml)", "100 ml", "P"],
-    ["126457", "Satinique™ - Shampoo Anticaduta per Capelli e Cuoio Capelluto (280 ml)", "280 ml", "P"],
-    ["126458", "Satinique™ - Shampoo Anticaduta per Capelli e Cuoio Capelluto (750 ml)", "750 ml", "P"],
-    ["126463", "Satinique™ - Shampoo Antiforfora Cute e Capelli", "280 ml", "P"],
-    ["126464", "Satinique™ - Shampoo Antiforfora Cute e Capelli (750 ml)", "750 ml", "P"],
-    ["126455", "Satinique™ - Shampoo e Balsamo 2 in 1 (280 ml)", "280 ml", "P"],
-    ["126456", "Satinique™ - Shampoo e Balsamo 2 in 1 (750 ml)", "750 ml", "P"],
-    ["126449", "Satinique™ - Shampoo Idratante (280 ml)", "280 ml", "P"],
-    ["126450", "Satinique™ - Shampoo Idratante (750 ml)", "750 ml", "P"],
-    ["126460", "Satinique™ - Shampoo Purificante per Capelli e Cuoio Capelluto (280 ml)", "280 ml", "P"],
-    ["126461", "Satinique™ - Shampoo Purificante per Capelli e Cuoio Capelluto (750 ml)", "750 ml", "P"],
-    ["126452", "Satinique™ - Shampoo Riparazione Intensa (280 ml)", "280 ml", "P"],
-    ["126453", "Satinique™ - Shampoo Riparazione Intensa (750 ml)", "750 ml", "P"],
-    ["126467", "Satinique™ - Siero-Olio Riparatore per Capelli (100 ml)", "100 ml", "P"],
-    ["126466", "Satinique™ - Tonico Anticaduta per il Cuoio Capelluto", "120ml", "P"],
-    ["126465", "Satinique™ - Trattamento per Capelli Riparazione Intensa (250 ml)", "250 ml", "P"]
+    ["127466", "Artistry Ever Perfect™ - Cipria in Polvere Fissante - Highlight", "16 g", "B", 49.36],
+    ["127832", "Artistry Ever Perfect™ - Fondotinta Compatto in Polvere Ricarica - 101 Shell", "", "B", 35.65],
+    ["127449", "Artistry Ever Perfect™ - Fondotinta Lunga Tenuta SPF 25 PA+++ (Shell)", "30 ml", "B", 52.19],
+    ["127844", "Artistry Ever Perfect™ - Portafondotinta Compatto", "", "B", 28.57],
+    ["341133", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 101 Shell", "", "B", 64.22],
+    ["341134", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 102 Cashmere", "", "B", 64.22],
+    ["341135", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 103 Ivory", "", "B", 64.22],
+    ["341136", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 201 Beige", "", "B", 64.22],
+    ["341137", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 202 Bamboo", "", "B", 64.22],
+    ["341138", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 203 Honey", "", "B", 64.22],
+    ["341139", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 301 Biscotti", "", "B", 64.22],
+    ["341140", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 302 Almond", "", "B", 64.22],
+    ["341141", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 401 Mocha", "", "B", 64.22],
+    ["341142", "Artistry Ever Perfect™ - Set Fondotinta Compatto in Polvere – 402 Nutmeg", "", "B", 64.22],
+    ["127467", "Artistry Ever Perfect™ Cipria in Polvere Fissante - Light to Medium", "16 g", "B", 49.36],
+    ["127468", "Artistry Ever Perfect™ Cipria in Polvere Fissante - Medium to Deep", "16 g", "B", 49.36],
+    ["127839", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Almond", "", "B", 35.65],
+    ["127836", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Bamboo", "", "B", 35.65],
+    ["127835", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Beige", "", "B", 35.65],
+    ["127838", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Biscotti", "", "B", 35.65],
+    ["127833", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Cashmere", "", "B", 35.65],
+    ["127837", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Honey", "", "B", 35.65],
+    ["127834", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Ivory", "", "B", 35.65],
+    ["127841", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Mocha", "", "B", 35.65],
+    ["127842", "Artistry Ever Perfect™ Fondotinta Compatto in Polvere - Ricarica - Nutmeg", "", "B", 35.65],
+    ["127450", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 102 Cashmere", "30 ml", "B", 52.19],
+    ["127451", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 103 Ivory", "30 ml", "B", 52.19],
+    ["127452", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 104 Fawn", "30 ml", "B", 52.19],
+    ["127453", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 201 Beige", "30 ml", "B", 52.19],
+    ["127454", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 202 Bamboo", "30 ml", "B", 52.19],
+    ["127455", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 203 Honey", "30 ml", "B", 52.19],
+    ["127456", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 204 Oat", "30 ml", "B", 52.19],
+    ["127457", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 301 Biscotti", "30 ml", "B", 52.19],
+    ["127458", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 302 Almond", "30 ml", "B", 52.19],
+    ["127459", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 303 Chestnut", "30 ml", "B", 52.19],
+    ["127460", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 304 Amber", "30 ml", "B", 52.19],
+    ["127461", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 305 Cocoa", "30 ml", "B", 52.19],
+    ["127462", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 401 Mocha", "30 ml", "B", 52.19],
+    ["127463", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 402 Nutmeg", "30 ml", "B", 52.19],
+    ["127464", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 403 Java", "30 ml", "B", 52.19],
+    ["127465", "Artistry Ever Perfect™ Fondotinta Lunga Tenuta SPF 25 PA+++ - 404 Espresso", "30 ml", "B", 52.19],
+    ["126718", "Artistry Future Glow™ - Fondotinta Siero SPF 35 PA++ (Shell)", "30 ml / 35 g", "B", 59.67],
+    ["127825", "Artistry Future Glow™ - Siero Correttore - Fair", "", "B", 35.92],
+    ["126719", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 102 Cashmere", "30 ml / 35 g", "B", 59.67],
+    ["126720", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 103 Ivory", "30 ml / 35 g", "B", 59.67],
+    ["126721", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 104 Fawn", "30 ml / 35 g", "B", 59.67],
+    ["126722", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 201 Beige", "30 ml / 35 g", "B", 59.67],
+    ["126723", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 202 Bamboo", "30 ml / 35 g", "B", 59.67],
+    ["126724", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 203 Honey", "30 ml / 35 g", "B", 59.67],
+    ["126725", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 204 Oat", "30 ml / 35 g", "B", 59.67],
+    ["126726", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 301 Biscotti", "30 ml / 35 g", "B", 59.67],
+    ["126727", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 302 Almond", "30 ml / 35 g", "B", 59.67],
+    ["126728", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 303 Chestnut", "30 ml / 35 g", "B", 59.67],
+    ["126729", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 304 Amber", "30 ml / 35 g", "B", 59.67],
+    ["126731", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 401 Mocha", "30 ml / 35 g", "B", 59.67],
+    ["126732", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 402 Nutmeg", "30 ml / 35 g", "B", 59.67],
+    ["126734", "Artistry Future Glow™ Fondotinta Siero SPF 35 PA++ - 404 Espresso", "30 ml / 35 g", "B", 59.67],
+    ["127830", "Artistry Future Glow™ Siero Correttore - Deep", "", "B", 35.92],
+    ["127826", "Artistry Future Glow™ Siero Correttore - Light", "", "B", 35.92],
+    ["127827", "Artistry Future Glow™ Siero Correttore - Light Medium", "", "B", 35.92],
+    ["127828", "Artistry Future Glow™ Siero Correttore - Medium", "", "B", 35.92],
+    ["127829", "Artistry Future Glow™ Siero Correttore - Medium Deep", "", "B", 35.92],
+    ["124674", "Artistry Go Vibrant™ - Balsamo Labbra Trasparente", "3 g", "B", 25.6],
+    ["127473", "Artistry Go Vibrant™ - Fard in Crema e Polvere - Pink Spring Fling", "9 g", "B", 44.07],
+    ["126740", "Artistry Go Vibrant™ - Mascara Rinforzante Lunghezza & Definizione", "8,5 ml", "B", 29.41],
+    ["127845", "Artistry Go Vibrant™ - Mascara Volume 3-in-1", "", "B", 35.92],
+    ["126745", "Artistry Go Vibrant™ - Matita & Gel Sopracciglia Perfette - True Black", "Matita 0,18 g - Gel 2,5 g", "B", 30.16],
+    ["126741", "Artistry Go Vibrant™ - Matita Eyeliner Alta Definizione - Natural Brown", "0,1 g", "B", 25.63],
+    ["126736", "Artistry Go Vibrant™ - Quartetto Ombretti - Golden Harvest", "8.8 g", "B", 61.55],
+    ["124155", "Artistry Go Vibrant™ - Rossetto Matte - Lunch Date Pink", "", "B", 25.6],
+    ["124144", "Artistry Go Vibrant™ - Rossetto Satinato - Saturday Peach", "", "B", 25.6],
+    ["127474", "Artistry Go Vibrant™ Fard in Crema e Polvere - Mauvy Night", "9 g", "B", 44.07],
+    ["126747", "Artistry Go Vibrant™ Matita & Gel Sopracciglia Perfette - Dark Brown", "Matita 0,18 g - Gel 2,5 g", "B", 30.16],
+    ["126746", "Artistry Go Vibrant™ Matita & Gel Sopracciglia Perfette - Taupe", "Matita 0,18 g - Gel 2,5 g", "B", 30.16],
+    ["126744", "Artistry Go Vibrant™ Matita Eyeliner Alta Definizione - Natural Black", "0,1 g", "B", 25.63],
+    ["126738", "Artistry Go Vibrant™ Quartetto Ombretti - Berry Garden", "8.8 g", "B", 61.55],
+    ["126737", "Artistry Go Vibrant™ Quartetto Ombretti - Peach Basket", "8.8 g", "B", 61.55],
+    ["124161", "Artistry Go Vibrant™ Rossetto Matte - Blush Crush", "", "B", 25.6],
+    ["124159", "Artistry Go Vibrant™ Rossetto Matte - Firecracker Red", "", "B", 25.6],
+    ["124162", "Artistry Go Vibrant™ Rossetto Matte - Lazy Day Latte", "", "B", 25.6],
+    ["124163", "Artistry Go Vibrant™ Rossetto Matte - Love Note Nude", "", "B", 25.6],
+    ["124156", "Artistry Go Vibrant™ Rossetto Matte - Photobomb Fuchsia", "", "B", 25.6],
+    ["124157", "Artistry Go Vibrant™ Rossetto Matte - Recharge Rose", "", "B", 25.6],
+    ["124158", "Artistry Go Vibrant™ Rossetto Matte - Road Trip Ted", "", "B", 25.6],
+    ["124147", "Artistry Go Vibrant™ Rossetto Satinato - Berry Special Evening", "", "B", 25.6],
+    ["124153", "Artistry Go Vibrant™ Rossetto Satinato - Crush on Coral", "", "B", 25.6],
+    ["124154", "Artistry Go Vibrant™ Rossetto Satinato - Go-Go Cocoa", "", "B", 25.6],
+    ["124146", "Artistry Go Vibrant™ Rossetto Satinato - Mauvelous Morning", "", "B", 25.6],
+    ["124149", "Artistry Go Vibrant™ Rossetto Satinato - Secret Crush Scarlet", "", "B", 25.6],
+    ["124152", "Artistry Go Vibrant™ Rossetto Satinato - Spice Meets Nice", "", "B", 25.6],
+    ["124150", "Artistry Go Vibrant™ Rossetto Satinato - Take Charge Red", "", "B", 25.6],
+    ["124151", "Artistry Go Vibrant™ Rossetto Satinato - Text Me Terracotta", "", "B", 25.6],
+    ["124145", "Artistry Go Vibrant™ Rossetto Satinato - Weekend Rose", "", "B", 25.6],
+    ["127173", "Artistry Labs™ - Pezzi di Ricambio per il Dispositivo Aquabrasion", "", "B", 16.49],
+    ["128178", "Artistry Labs™ - Siero Ritexturizzante", "Flacone da 30 ml", "B", 115.7],
+    ["126219", "Artistry Labs™ - Sistema Illuminante", "Siero illuminante - 30 ml/1 FL OZ | Correttore Anti-Macchie - 15 ml/0,5 FL OZ", "B", 259.13],
+    ["126807", "Artistry Labs™ - Sistema Ritexturizzante", "", "B", 444.88],
+    ["125547", "Artistry Labs™ - Sistema Ritexturizzante – Ricarica", "1 x Peeling 15 ml; 1 x Siero 30 ml", "B", 264.67],
+    ["127573", "Artistry LongXevity™ - Crema Contorno Occhi", "15 g", "B", 203.08],
+    ["127577", "Artistry LongXevity™ - Crema Contorno Occhi - Ricarica", "15 g", "B", 173.22],
+    ["127572", "Artistry LongXevity™ - Crema Morbida Idratante", "50 g", "B", 402.16],
+    ["127576", "Artistry LongXevity™ - Crema Morbida Idratante - Ricarica", "50 g", "B", 352.41],
+    ["127571", "Artistry LongXevity™ - Crema Ricca Nutriente", "50 g", "B", 415.13],
+    ["127575", "Artistry LongXevity™ - Crema Ricca Nutriente - Ricarica", "50 g", "B", 352.41],
+    ["127600", "Artistry LongXevity™ - Essenza Tonificante", "125 ml", "B", 132.74],
+    ["122339", "Artistry Signature Select™ - Maschera Esfoliante", "100 g", "B", 37.62],
+    ["122343", "Artistry Signature Select™ - Maschera Idratante", "100 g", "B", 44.63],
+    ["122340", "Artistry Signature Select™ - Maschera Illuminante", "100 g", "B", 47.36],
+    ["122342", "Artistry Signature Select™ - Maschera Purificante", "100 g", "B", 44.63],
+    ["122341", "Artistry Signature Select™ - Maschera Rassodante", "125 g", "B", 47.36],
+    ["123789", "Artistry Skin Nutrition™ - Beauty On-The-Go Firming Travel Kit", "Travel Kit", "B", 61.87],
+    ["123804", "Artistry Skin Nutrition™ - Beauty On-The-Go Hydrating Travel Kit", "Travel Kit", "B", 61.87],
+    ["123790", "Artistry Skin Nutrition™ - Beauty On-The-Go Renewing Travel Kit", "Travel Kit", "B", 61.87],
+    ["321906", "Artistry Skin Nutrition™ - Beauty Sleep Solution", "", "B", 168.55],
+    ["123784", "Artistry Skin Nutrition™ - Crema Contorno Occhi Riattivante", "15 g", "B", 52.69],
+    ["123786", "Artistry Skin Nutrition™ - Crema Effetto Ultra Lifting", "50 g", "B", 88.69],
+    ["123787", "Artistry Skin Nutrition™ - Crema Giorno Riattivante SPF 30", "50 g", "B", 80.62],
+    ["123785", "Artistry Skin Nutrition™ - Crema Riattivante", "50 g", "B", 80.62],
+    ["123779", "Artistry Skin Nutrition™ - Crema Struccante Viso e Occhi", "118 g", "B", 28.45],
+    ["123796", "Artistry Skin Nutrition™ - Crema-Gel Contorno Occhi", "15 g", "B", 38.86],
+    ["123798", "Artistry Skin Nutrition™ - Crema-Gel Viso", "50 g", "B", 42.02],
+    ["123781", "Artistry Skin Nutrition™ - Detergente in Schiuma", "125 g", "B", 32.93],
+    ["128047", "Artistry Skin Nutrition™ - Gocce Omega", "20 ml", "B", 58.04],
+    ["123857", "Artistry Skin Nutrition™ - Lozione Giorno Riattivante SPF 30", "50 g", "B", 80.62],
+    ["123800", "Artistry Skin Nutrition™ - Lozione Giorno SPF 30", "50 g", "B", 42.02],
+    ["123791", "Artistry Skin Nutrition™ - Lozione Micellare Viso e Occhi", "200 ml", "B", 28.45],
+    ["128276", "Artistry Skin Nutrition™ - Maschera Gel Illuminante Vitamina C+", "5 maschere (30 g ciascuna)", "B", 48.01],
+    ["127108", "Artistry Skin Nutrition™ - Maschera Notte", "80 ml + Massaggiatore a forma di T", "B", 88.69],
+    ["124822", "Artistry Skin Nutrition™ - Protezione UV Multi-Difesa SPF 50+", "50 g", "B", 58.32],
+    ["319398", "Artistry Skin Nutrition™ - Set Healthy Beauty Firming Routine", "", "B", 209.52],
+    ["319392", "Artistry Skin Nutrition™ - Set Healthy Beauty Hydrating Routine", "", "B", 148.39],
+    ["319385", "Artistry Skin Nutrition™ - Set Healthy Beauty Renewing Routine", "", "B", 201.85],
+    ["319402", "Artistry Skin Nutrition™ - Set Moisturisation Power Firming", "", "B", 210.91],
+    ["319401", "Artistry Skin Nutrition™ - Set Moisturisation Power Hydrating", "", "B", 116.73],
+    ["319400", "Artistry Skin Nutrition™ - Set Moisturisation Power Renewing", "", "B", 203.24],
+    ["127019", "Artistry Skin Nutrition™ - Siero Antietà", "Flacone da 30 ml", "B", 89.35],
+    ["127020", "Artistry Skin Nutrition™ - Siero Correttore", "Flacone da 30 ml", "B", 105.77],
+    ["125517", "Artistry Skin Nutrition™ - Siero Vitamina C+HA3 Acido Ialuronico", "12 ml", "B", 59.41],
+    ["123783", "Artistry Skin Nutrition™ - Tonico Emolliente", "200 ml", "B", 39.52],
+    ["123795", "Artistry Skin Nutrition™ - Tonico Levigante", "200 ml", "B", 24.35],
+    ["125325", "Artistry Studio™ - Acqua per il Viso Rinfrescante + Protettiva", "Flacone: 100 ml, erogatore con micronebulizzatore", "B", 26.96],
+    ["125966", "Artistry Studio™ - Crema Idratante + Antiossidante", "Tubetto: 50 ml", "B", 30.74],
+    ["124812", "Artistry Studio™ - Detergente + Esfoliante", "Tubo: 125 ml", "B", 23.52],
+    ["124818", "Artistry Studio™ - Patch Occhi Anti-Gonfiore + Illuminante", "30 set di maschere per contorno occhi (60 pezzi) in vasetto", "B", 35.14],
+    ["124811", "Artistry Studio™ - Salviette Micellari Struccanti + Detergenti", "Confezione plastificata con etichetta richiudibile. 30 salviettine", "B", 13.13],
+    ["316099", "Artistry Studio™ - Set Jump-Start Your Morning", "", "B", 74.29],
+    ["316101", "Artistry Studio™ - Set Ready For Bed in 3 Minutes", "", "B", 66.34],
+    ["303185", "Artistry Studio™ - Siero in Gel Illuminante + Idratante", "Flacone: 20 ml, erogatore airless", "B", 30.06],
+    ["125964", "Artistry Studio™ - Siero Occhi Illuminante + Rinfrescante", "Tubetto con roller: 15 ml", "B", 26.93],
+    ["124813", "Artistry Studio™ - Tonico Anti-Imperfezioni + Purificante Pori", "Flacone: 200 ml con riduttore", "B", 24.6],
+    ["125327", "Artistry Studio™ - Trattamento Anti-Imperfezioni + Gel Purificante", "Tubetto: 30 ml, punta oftalmica", "B", 25.97],
+    ["127720", "Artistry™ - Derma-Architect™", "", "B", 753.53],
+    ["127784", "Artistry™ - Derma-Architect™ Gel Rivitalizzante", "", "B", 27.58],
+    ["125901", "g&h™ - Crema Protezione Solare SPF 50+ PA++++ Protect", "Tubetto da 100 ml con tappo a vite e confezione in cartone", "B", 28.71],
+    ["110480", "Amway Home™ - Ammorbidente per Tessuti Giardino Fiorito SA8™", "1 Litro", "C", 14.12],
+    ["110488", "Amway Home™ - Detergente Liquido Concentrato Dish Drops™", "1 Litro", "C", 12.16],
+    ["0001", "Amway Home™ - Detergente Multiuso L.O.C.™", "1 Litro", "C", 12.43],
+    ["117080", "Amway Home™ - Detergente per i Vetri L.O.C.™", "500 ml", "C", 5.93],
+    ["117078", "Amway Home™ - Detergente per il Bagno L.O.C.™", "500 ml", "C", 8.49],
+    ["117079", "Amway Home™ - Detergente per la Cucina L.O.C.™", "500 ml", "C", 8.49],
+    ["120536", "Amway Home™ - Detersivo Liquido Concentrato con effetto ammorbidente SA8™ Baby", "1 L", "C", 29.6],
+    ["124456", "Amway Home™ - Detersivo Liquido Concentrato per Capi Colorati e Scuri SA8™ Color", "1 Litro", "C", 28.67],
+    ["110479", "Amway Home™ - Detersivo Liquido Concentrato SA8™ Delicato", "1 Litro", "C", 19.85],
+    ["110478", "Amway Home™ - Detersivo Liquido Concentrato SA8™ Liquido", "4 Litri", "C", 95.97],
+    ["5101", "Amway Home™ - Dosa Detersivo", "1 Pezzo", "C", 1.29],
+    ["1560", "Amway Home™ - Erogatore a Immersione SA8™", "1 Pezzo", "C", 6.83],
+    ["103972", "Amway Home™ - Erogatore ad Immersione", "1 Pezzo (per Flacone da 1 litro)", "C", 2.76],
+    ["110485", "Amway Home™ - Fazzolettini Imbevuti per Pulizie L.O.C.™", "Confezione 4 x 24 Pezzi", "C", 27.13],
+    ["110487", "Amway Home™ - Flacone Dispensatore", "500 ml", "C", 2.18],
+    ["110490", "Amway Home™ - Pagliette in Acciaio Inox Dish Drops™ Scrub Buds™", "4 Confezioni", "C", 11.93],
+    ["0014", "Amway Home™ - Pulitore per il Forno", "500 ml", "C", 12.13],
+    ["109849", "Amway Home™ - SA8™ Premium Detersivo in Polvere per Bucato Concentrato", "3 kg", "C", 57.93],
+    ["124485", "Amway Home™ - Smacchiante Candeggiante per Tutti i Tessuti SA8™", "1 kg", "C", 21.73],
+    ["110483", "Amway Home™ - Spruzzatore a Pistola", "500 ml", "C", 3.49],
+    ["109867", "Amway Home™ - Tavolette per Lavastoviglie Dish Drops™", "60 Tavolette", "C", 27.96],
+    ["120545", "Atmosphere Sky™ - Cavo di Alimentazione Rimovibile", "1 Peace", "C", 35.0],
+    ["120541", "Atmosphere Sky™ - Filtro a Carbone per", "1 Unità", "C", 211.69],
+    ["120540", "Atmosphere Sky™ - Filtro HEPA per", "1 Unità", "C", 308.46],
+    ["122961", "Atmosphere Sky™ - Paracolpi", "", "C", 2.56],
+    ["120542", "Atmosphere Sky™ - Prefiltro", "", "C", 28.9],
+    ["122344", "Atmosphere Sky™ - Ruote per Mobilità", "", "C", 15.23],
+    ["120539", "Atmosphere Sky™ - Sistema per il Trattamento dell'Aria", "1 Unità con Filtri pre-installati", "C", 2019.86],
+    ["0420", "eSpring™ - Adattatore di Alimentazione (110-240V) per", "1 Pezzo", "C", 64.56],
+    ["1109", "eSpring™ - Alimentatore", "1 pezzo", "C", 53.81],
+    ["0426", "eSpring™ - Anello per la Staffa del Filtro", "1 Pezzo", "C", 8.17],
+    ["329780", "eSpring™ - Borraccia", "500 ml", "C", 53.81],
+    ["127065", "eSpring™ - Deviatore per Rubinetto", "", "C", 130.66],
+    ["100186", "eSpring™ - Filtro di Ricambio Sistema per il Trattamento dell'Acqua con Tecnologia UV", "1 Pezzo", "C", 292.97],
+    ["122943", "eSpring™ - Filtro e Prefiltro di Ricambio", "1 pezzo", "C", 289.23],
+    ["102996", "eSpring™ - Kit per Montaggio a Parete", "1 Kit", "C", 53.92],
+    ["125627", "eSpring™ - Kit per Rubinetto Ausiliario", "1 kit", "C", 188.34],
+    ["128115", "eSpring™ - Modello Mini da dimostrazione", "18,15 cm (L) x 7,65 cm (P) x 13,35 cm (A)", "C", 62.05],
+    ["127063", "eSpring™ - Prefiltro di Ricambio", "1 kit", "C", 24.22],
+    ["127064", "eSpring™ - Set di Tubi di Ricambio", "1 kit", "C", 28.26],
+    ["122940", "eSpring™ - Sistema per il Trattamento dell'Acqua con Deviatore per Rubinetto esistente", "1 unità", "C", 1547.09],
+    ["122941", "eSpring™ - Sistema per il Trattamento dell'Acqua con Rubinetto Ausiliario", "1 unità", "C", 1547.09],
+    ["0706", "eSpring™ - Staffa per Filtro", "1 Pezzo", "C", 56.95],
+    ["127068", "eSpring™ - Staffa per il Montaggio a Parete", "1 kit", "C", 53.81],
+    ["400142", "iCook™ - Coperchi per Ciotole in 3 misure", "1 Set (3 Grandezze)", "C", 9.25],
+    ["401962", "iCook™ - Coperchio di Ricambio (per Padella Antiaderente da 24 cm)", "", "C", 38.3],
+    ["401956", "iCook™ - Coperchio di Ricambio (per Padella Antiaderente da 28 cm)", "", "C", 43.53],
+    ["401955", "iCook™ - Manico Laterale di Ricambio con Vite (per Padella Antiaderente da 28 cm)", "", "C", 13.82],
+    ["401954", "iCook™ - Manico Lungo di Ricambio con Vite (per Padella Antiaderente da 28 cm e 24 cm)", "", "C", 13.93],
+    ["400135", "iCook™ - Manico per Pentole da 1, 2 e 3 Litri - Padella da 1,5 Litri", "1 Pezzo", "C", 9.25],
+    ["400136", "iCook™ - Manico per Pentole da 2, 3, 4 Litri - Scolapasta e Cupola da 4 Litri", "1 Pezzo", "C", 9.25],
+    ["400520", "iCook™ - Manico Wok", "1 Set", "C", 8.48],
+    ["124694", "iCook™ - Padella Antiaderente con Coperchio (24 cm)", "24 cm di diametro", "C", 199.17],
+    ["124695", "iCook™ - Padella Antiaderente con Coperchio (28 cm)", "28 cm di diametro", "C", 252.89],
+    ["400137", "iCook™ - Pomello e Sottopomello per Coperchi in Acciaio", "1 Pezzo", "C", 9.25],
+    ["400141", "iCook™ - Pomello e Sottopomello per Coperchi in Vetro", "1 Pezzo", "C", 12.96],
+    ["101082", "iCook™ - Set 2 Casseruole con Coperchio (4 pezzi)", "", "C", 414.62],
+    ["101084", "iCook™ - Set 2 Padelle con Coperchio e Coperchio Bombato (5 pezzi)", "", "C", 444.25],
+    ["102709", "iCook™ - Set 5 Coltelli", "5 Pezzi", "C", 493.01],
+    ["101088", "iCook™ - Set Casseruola da 1 Litro con Coperchio (2 pezzi)", "", "C", 155.48],
+    ["101085", "iCook™ - Set Casseruola da 4 Litri con Coperchio e Accessori (4 pezzi)", "", "C", 340.59],
+    ["101098", "iCook™ - Set Prestige", "", "C", 1966.46],
+    ["105084", "iCook™ - Wok", "4 Pezzi (30 cm di diametro - 7 Strati)", "C", 574.9],
+    ["200662", "Amway™ - Aceto Balsamico di Modena Amway™", "500 ml", "N", 22.33],
+    ["100209", "Amway™ - Caffè Espresso Amway™", "4 x 250 g", "N", 40.63],
+    ["100257", "Amway™ - Caffè Istantaneo Amway™", "4 x 100 g", "N", 40.54],
+    ["3963", "Amway™ - Olio Extra Vergine di Oliva Amway™", "2 x 750 ml", "N", 39.23],
+    ["101162", "Amway™ - Tè Darjeeling Amway™", "200 g (100 Bustine)", "N", 22.89],
+    ["121057", "bodykey by Nutrilite™ - Barretta Sostitutiva del Pasto ai Frutti Tropicali", "14 Barrette per Confezione", "N", 61.63],
+    ["121056", "bodykey by Nutrilite™ - Barretta Sostitutiva del Pasto al Cioccolato Fondente", "14 Barrette per Confezione", "N", 61.63],
+    ["116660", "bodykey by Nutrilite™ - Frappé - Gusto Cioccolato", "371 g", "N", 55.52],
+    ["116661", "bodykey by Nutrilite™ - Frappé - Gusto Vaniglia", "329 g", "N", 55.52],
+    ["301617", "bodykey by Nutrilite™ - Shaker", "1 Pezzo", "N", 13.57],
+    ["116670", "bodykey by Nutrilite™ - Tisana", "45 g", "N", 10.6],
+    ["109705", "Nutrilite™ - Aglio", "120 Compresse", "N", 28.14],
+    ["110415", "Nutrilite™ - All Plant Protein", "450 g", "N", 48.6],
+    ["119792", "Nutrilite™ - Appetite Controller", "Ogni confezione contiene 30 stick da 2,5 g (75 g)", "N", 46.32],
+    ["120571", "Nutrilite™ - Balance Within™ Probiotics", "30 Stick x 1,5 g / 45 g", "N", 49.71],
+    ["126150", "Nutrilite™ - Be Focused", "60 caramelle gommose (da 2) / 120 g", "N", 29.7],
+    ["128148", "Nutrilite™ - Beauty Powder Drink", "Fornitura per 30 giorni, 30 stick", "N", 45.83],
+    ["128149", "Nutrilite™ - Beauty Supplement", "60 compresse, fornitura per 30 giorni", "N", 82.76],
+    ["308613", "Nutrilite™ - Beauty You Glow", "60 caramelle gommose per flacone.", "N", 33.37],
+    ["100305", "Nutrilite™ - Biotina C Plus", "90 Compresse", "N", 25.86],
+    ["125625", "Nutrilite™ - Blocco Lame del Frullatore Elettrico ad Alta Velocità", "n/a", "N", 36.76],
+    ["110606", "Nutrilite™ - Cal Mag D Plus", "173 g (180 Compresse)", "N", 29.69],
+    ["5847", "Nutrilite™ - Cal Mag Masticabile", "162 g (80 Tavolette)", "N", 17.89],
+    ["308612", "Nutrilite™ - Can’t Stop, Won’t Stop™", "15 stick per confezione.", "N", 16.83],
+    ["101831", "Nutrilite™ - Cardo Mariano", "46 g (60 Compresse)", "N", 52.25],
+    ["100280", "Nutrilite™ - CLA 500", "180 Capsule", "N", 86.28],
+    ["0191", "Nutrilite™ - Coenzima Q10", "60 Capsule", "N", 55.2],
+    ["100296", "Nutrilite™ - Concentrato di Frutta e Verdura", "31 g (60 Compresse)", "N", 41.71],
+    ["125167", "Nutrilite™ - Daily", "1 flacone da 90 compresse (1 al giorno)", "N", 42.15],
+    ["125166", "Nutrilite™ - Daily", "1 flacone da 45 compresse (1 al giorno)", "N", 22.18],
+    ["121576", "Nutrilite™ - Double X™", "Fornitura per 31 giorni - Confezione da 3 scompartimenti (186 Compresse)", "N", 87.66],
+    ["5986", "Nutrilite™ - Echinacea Forte", "120 Compresse", "N", 55.29],
+    ["343020", "Nutrilite™ - Energy Program Set Ricarica – Caffè", "", "N", 215.5],
+    ["343021", "Nutrilite™ - Energy Program Set Ricarica – Cioccolato", "", "N", 209.02],
+    ["100295", "Nutrilite™ - Ferro e Acido Folico", "72 g (120 Compresse)", "N", 17.74],
+    ["102736", "Nutrilite™ - Fibre Powder", "30 Stick x 6 g (180 g)", "N", 44.86],
+    ["8005", "Nutrilite™ - Ginkgo Biloba con DHA", "100 Capsule", "N", 74.31],
+    ["100108", "Nutrilite™ - Glucosamina con Boswellia", "150 capsule", "N", 29.91],
+    ["123046", "Nutrilite™ - Immunity Support* Plus Kids", "30 stick da 1 g (30 g)", "N", 47.47],
+    ["126149", "Nutrilite™ - Immuno", "60 caramelle gommose per flacone", "N", 26.53],
+    ["4042", "Nutrilite™ - Lecitina E", "102 g (110 Compresse)", "N", 34.27],
+    ["126148", "Nutrilite™ - Less Stress, More Yes", "Confezione da 30 stick.", "N", 29.7],
+    ["127620", "Nutrilite™ - Metabolism* plus", "", "N", 41.62],
+    ["326812", "Nutrilite™ - Morning Nutrition", "", "N", 181.11],
+    ["128617", "Nutrilite™ - Morning Nutrition Ricarica", "", "N", 173.83],
+    ["109538", "Nutrilite™ - Multi Carotene Naturale", "55 g (90 Capsule)", "N", 38.19],
+    ["100930", "Nutrilite™ - Multivitaminico Masticabile", "120 Tavolette", "N", 35.31],
+    ["343022", "Nutrilite™ - Nutrilite™ Energy Program Set Ricarica Cocco", "", "N", 209.02],
+    ["122447", "Nutrilite™ - Omega-3 Kids", "45 g (30 Compresse Molli Masticabili: 2 Blister da 15 compresse)", "N", 28.27],
+    ["126132", "Nutrilite™ - Omega-3 Triple Strength", "30 capsule molli", "N", 31.79],
+    ["111661", "Nutrilite™ - Portacompresse", "1 Pezzo", "N", 7.66],
+    ["128152", "Nutrilite™ - Powder Drink OxiBeauty™", "Fornitura per 30 giorni, 30 stick", "N", 47.61],
+    ["8004", "Nutrilite™ - Prostafit", "73 g (100 Capsule)", "N", 74.87],
+    ["125624", "Nutrilite™ - Recipiente in Vetro per Frullatore Elettrico ad Alta Velocità", "n/a", "N", 50.53],
+    ["292409", "Nutrilite™ - Ricarica Double X™", "", "N", 160.75],
+    ["114447", "Nutrilite™ - Set Beauty (Beauty Supplement e Beauty Powder Drink)", "", "N", 128.59],
+    ["326037", "Nutrilite™ - Set Best Age", "", "N", 128.81],
+    ["126624", "Nutrilite™ - Set Daily", "", "N", 84.29],
+    ["342944", "Nutrilite™ - Set Energy Program", "1 Nutrilite™ Omega-3 Triple Strength, 1 XS™ High Protein Energy Bar – Caffè, 1 XS™ High Protein Energy Shake – Cappuccino, 1 XS™ Amino Advantage + Anguria, 1 Energy Program Shaker, 1 Materiale Informativo", "N", 240.28],
+    ["326043", "Nutrilite™ - Set Foundational Trio Daily", "", "N", 116.41],
+    ["326041", "Nutrilite™ - Set Foundational Trio Double X", "", "N", 159.64],
+    ["326042", "Nutrilite™ - Set In Charge", "", "N", 75.78],
+    ["308133", "Nutrilite™ - Set Kids Immunity Support", "", "N", 71.95],
+    ["294852", "Nutrilite™ - Set Mom To Be", "", "N", 73.26],
+    ["114448", "Nutrilite™ - Set OxiBeauty™ (OxiBeauty Supplement e OxiBeauty Powder Drink)", "", "N", 133.56],
+    ["127059", "Nutrilite™ - Set Programma Depurante", "", "N", 195.42],
+    ["317514", "Nutrilite™ - Set Ricarica Programma Depurante (senza scatola)", "", "N", 175.89],
+    ["314051", "Nutrilite™ - Set Seasonal Immunity Support", "", "N", 92.28],
+    ["315562", "Nutrilite™ - Set Year-Round Vitamin Immunity", "", "N", 156.77],
+    ["308614", "Nutrilite™ - Sleep Easy", "30 caramelle gommose per confezione", "N", 21.23],
+    ["128151", "Nutrilite™ - Supplement OxiBeauty™", "60 compresse, fornitura per 30 giorni", "N", 85.94],
+    ["124321", "Nutrilite™ - Vision Plus", "60 Capsule Molli", "N", 42.37],
+    ["110178", "Nutrilite™ - Vitamina B Plus", "32 g (60 Compresse)", "N", 21.84],
+    ["109741", "Nutrilite™ - Vitamina C Plus", "42 g (60 Compresse)", "N", 26.15],
+    ["109743", "Nutrilite™ - Vitamina C Plus (Formato Famiglia)", "125 g (180 Compresse)", "N", 63.75],
+    ["119797", "Nutrilite™ - Vitamina D", "90 Compresse", "N", 22.88],
+    ["128057", "Nutrilite™ - Women’s 40+ Support*", "30 compresse", "N", 52.15],
+    ["126811", "Nutrilite™ - Zinc + Selenium", "30 stick per confezione – 10 mg di zinco (100 % VNR), 52 mcg di selenio (95% VNR) per stick", "N", 24.07],
+    ["326055", "Nutrilite™ Energy Program", "1 set", "N", 341.7],
+    ["322032", "Nutrilite™ Energy Program Nutrition", "1 set", "N", 172.53],
+    ["326049", "Nutrilite™ Energy Program Supplementation", "1 set", "N", 169.16],
+    ["126754", "XS™ - Amino Advantage+", "Confezione da 219 g", "N", 56.65],
+    ["128619", "XS™ - Creatine+", "264 g di polvere, 60 porzioni, 4,4 g a porzione", "N", 62.1],
+    ["121604", "XS™ - Electrolyte Drink - Gusto Arancia e Lime", "375 g (15 Stick x 25 g)", "N", 26.26],
+    ["298813", "XS™ - Ginger Passion Fruit Flavour Power Drink +", "12 x 250 ml", "N", 37.16],
+    ["127730", "XS™ - High Protein Energy Bar Cioccolato Fondente", "14 barrette da 50 g ciascuna / 700 g", "N", 53.26],
+    ["127731", "XS™ - High Protein Energy Bar Cocco", "14 barrette da 50 g ciascuna / 700 g", "N", 53.26],
+    ["341520", "XS™ - High Protein Energy Bar – Caffè", "14 barrette da 50 g ciascuna / 700 g", "N", 53.26],
+    ["321579", "XS™ - High Protein Energy Shake Cioccolato Fondente", "14 bustine da 67,1 g ciascuna / 939 g", "N", 67.31],
+    ["342052", "XS™ - High Protein Energy Shake – Cappuccino", "bustina (68,2 g); 14 bustine/confezione", "N", 73.79],
+    ["121606", "XS™ - Hydrolyzed Whey Protein Powder - Gusto Cioccolato", "700 g (17,5 Porzioni x 40 g)", "N", 76.8],
+    ["298812", "XS™ - Lemon Peach Flavour Power Water +", "12 x 250 ml", "N", 37.16],
+    ["121062", "XS™ - Magnesio in Stick Electric Lemon Flavour", "30 Stick x 1.5 g (45 g)", "N", 14.48],
+    ["122109", "XS™ - Orange Kumquat Flavour Power Drink", "12 x 250 ml", "N", 32.16],
+    ["119802", "XS™ - Pink Grapefruit Flavour Power Drink", "12 x 250 ml", "N", 32.16],
+    ["121602", "XS™ - Pre-Workout Drink - Lemon Lime Flavour", "450 g (15 Stick x 30 g)", "N", 43.1],
+    ["121609", "XS™ - Protein Bar - Gusto Caramello-Vaniglia", "720 g (12 Barrette x 60 g)", "N", 46.77],
+    ["121608", "XS™ - Protein Bar - Gusto Cioccolato", "720 g (12 Barrette x 60 g)", "N", 46.77],
+    ["101593", "XS™ - Rhodiola Plus", "60 Compresse", "N", 37.69],
+    ["118766", "XS™ - Wild Berry Flavour Power Drink", "12 x 250 ml", "N", 32.16],
+    ["126308", "g&h™ - Bagnoschiuma e Shampoo per Bambini Baby", "400 ml", "P", 17.69],
+    ["125901", "g&h™ - Crema Protezione Solare SPF 50+ PA++++ Protect", "Tubetto da 100 ml con tappo a vite e confezione in cartone", "P", 28.71],
+    ["126309", "g&h™ - Lozione per Bambini Baby", "400 ml", "P", 23.11],
+    ["125890", "g&h™ - Nourish Bagnoschiuma GOODNESS & HEALTH™", "400 ml", "P", 13.27],
+    ["125914", "g&h™ - Nourish Bagnoschiuma GOODNESS & HEALTH™", "1000 ml", "P", 28.78],
+    ["125900", "g&h™ - Nourish Balsamo per le Labbra GOODNESS & HEALTH™", "4 g", "P", 12.91],
+    ["125899", "g&h™ - Nourish Crema per i Piedi GOODNESS & HEALTH™", "100 ml", "P", 15.07],
+    ["125902", "g&h™ - Nourish Crema per le Mani GOODNESS & HEALTH™", "75 ml", "P", 16.31],
+    ["125891", "g&h™ - Nourish Lozione per il Corpo GOODNESS & HEALTH™", "400 ml", "P", 20.06],
+    ["125913", "g&h™ - Nourish Saponetta GOODNESS & HEALTH™", "250 g", "P", 14.64],
+    ["125896", "g&h™ - Protect Deodorante Antitraspirante Roll-on GOODNESS & HEALTH™", "100 ml", "P", 11.83],
+    ["125898", "g&h™ - Protect Deodorante Spray Antitraspirante GOODNESS & HEALTH™", "200 ml", "P", 13.86],
+    ["126855", "g&h™ - Protect Detergente per le Mani GOODNESS & HEALTH™", "400 ml", "P", 19.54],
+    ["125894", "g&h™ - Protect Sapone per le Mani GOODNESS & HEALTH™", "250 ml", "P", 9.94],
+    ["125897", "g&h™ - Protect Saponetta GOODNESS & HEALTH™", "6 x 150 g", "P", 27.84],
+    ["125892", "g&h™ - Refresh Bagnoschiuma Esfoliante GOODNESS & HEALTH™", "400 ml", "P", 13.27],
+    ["125915", "g&h™ - Refresh Bagnoschiuma Esfoliante GOODNESS & HEALTH™", "1000 ml", "P", 28.78],
+    ["125893", "g&h™ - Refresh Latte per il Corpo GOODNESS & HEALTH™", "400 ml", "P", 20.06],
+    ["124108", "Glister™ - Collutorio Multi-Azione (concentrato)", "Flacone in PET da 72 ml", "P", 17.13],
+    ["124106", "Glister™ - Dentifricio Multi-Azione", "Formato standard: tubetto da 200 g / 151 ml con tappo flip-top", "P", 10.22],
+    ["124107", "Glister™ - Dentifricio Multi-Azione - Formato da Viaggio", "Formato da Viaggio: tubetto da 50 g / 37 ml con tappo a vite", "P", 3.46],
+    ["120519", "Glister™ - Dentifricio per Bambini", "65 ml", "P", 5.29],
+    ["124112", "Glister™ - Filo Interdentale Multi-Azione", "2 contenitori di filo interdentale, da 50 m ciascuno", "P", 16.63],
+    ["317878", "Glister™ - Set Family", "", "P", 58.04],
+    ["127705", "Glister™ - Spazzolino da Denti Elettrico Multi-Azione", "", "P", 225.02],
+    ["124110", "Glister™ - Spazzolino da Denti Multi-Azione (con setole medie)", "4 spazzolini da denti per confezione (di colori diversi).", "P", 14.91],
+    ["124109", "Glister™ - Spazzolino da Denti Multi-Azione (con setole morbide)", "4 spazzolini da denti per confezione (di colori diversi).", "P", 14.91],
+    ["124111", "Glister™ - Spray Rinfrescante alla Menta", "Contenitore da 14 ml con erogatore spray", "P", 7.91],
+    ["127706", "Glister™ - Testine di Ricambio dello Spazzolino da Denti Elettrico Multi-Azione", "3 testine di ricambio", "P", 33.4],
+    ["120522", "Glister™ Kids Spazzolini da Denti per Bambini", "set da 4", "P", 13.22],
+    ["126459", "Satinique™ - Balsamo Anticaduta per Capelli e Cuoio Capelluto (280 ml)", "280 ml", "P", 20.06],
+    ["126636", "Satinique™ - Balsamo Anticaduta per Capelli e Cuoio Capelluto (750 ml)", "750 ml", "P", 45.62],
+    ["126451", "Satinique™ - Balsamo Idratante (280 ml)", "280 ml", "P", 18.01],
+    ["126634", "Satinique™ - Balsamo Idratante (750 ml)", "750 ml", "P", 40.78],
+    ["126462", "Satinique™ - Balsamo Purificante per Capelli e Cuoio Capelluto (280 ml)", "280 ml", "P", 20.06],
+    ["126454", "Satinique™ - Balsamo Riparazione Intensa (280 ml)", "280 ml", "P", 20.06],
+    ["126635", "Satinique™ - Balsamo Riparazione Intensa (750 ml)", "750 ml", "P", 45.62],
+    ["126468", "Satinique™ - Lozione per Capelli Riparazione Intensa (100 ml)", "100 ml", "P", 23.5],
+    ["126457", "Satinique™ - Shampoo Anticaduta per Capelli e Cuoio Capelluto (280 ml)", "280 ml", "P", 18.53],
+    ["126458", "Satinique™ - Shampoo Anticaduta per Capelli e Cuoio Capelluto (750 ml)", "750 ml", "P", 42.16],
+    ["126463", "Satinique™ - Shampoo Antiforfora Cute e Capelli", "280 ml", "P", 18.53],
+    ["126464", "Satinique™ - Shampoo Antiforfora Cute e Capelli (750 ml)", "750 ml", "P", 42.16],
+    ["126455", "Satinique™ - Shampoo e Balsamo 2 in 1 (280 ml)", "280 ml", "P", 18.01],
+    ["126456", "Satinique™ - Shampoo e Balsamo 2 in 1 (750 ml)", "750 ml", "P", 40.78],
+    ["126449", "Satinique™ - Shampoo Idratante (280 ml)", "280 ml", "P", 16.67],
+    ["126450", "Satinique™ - Shampoo Idratante (750 ml)", "750 ml", "P", 37.89],
+    ["126460", "Satinique™ - Shampoo Purificante per Capelli e Cuoio Capelluto (280 ml)", "280 ml", "P", 18.53],
+    ["126461", "Satinique™ - Shampoo Purificante per Capelli e Cuoio Capelluto (750 ml)", "750 ml", "P", 42.16],
+    ["126452", "Satinique™ - Shampoo Riparazione Intensa (280 ml)", "280 ml", "P", 18.53],
+    ["126453", "Satinique™ - Shampoo Riparazione Intensa (750 ml)", "750 ml", "P", 42.16],
+    ["126467", "Satinique™ - Siero-Olio Riparatore per Capelli (100 ml)", "100 ml", "P", 27.38],
+    ["126466", "Satinique™ - Tonico Anticaduta per il Cuoio Capelluto", "120ml", "P", 65.34],
+    ["126465", "Satinique™ - Trattamento per Capelli Riparazione Intensa (250 ml)", "250 ml", "P", 34.56]
   ];
 
   /* Chiave di ricerca senza accenti, simboli e maiuscole: chi cerca «omega 3»
@@ -900,7 +911,7 @@
   const chiave = s => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, " ").trim();
 
-  const CATALOGO_K = CATALOGO.map(x => ({ code: x[0], name: x[1], fmt: x[2], cat: x[3],
+  const CATALOGO_K = CATALOGO.map(x => ({ code: x[0], name: x[1], fmt: x[2], cat: x[3], prezzo: x[4] || 0,
     k: chiave(x[1] + " " + x[2] + " " + x[0]) }));
 
   /* Prima i prodotti che quella persona ha già in casa sua, poi il catalogo
@@ -930,6 +941,8 @@
       fermoDopo: DEFAULTS.fermoDopo,
       dopoAcquisto: DEFAULTS.dopoAcquisto,
       compleanno: DEFAULTS.compleanno,
+      consegne: false,
+      consegneDa: "",
       lastBackup: "",
       snoozeBackup: "",
     },
@@ -937,6 +950,7 @@
 
   let state = emptyState();
   let view = "oggi";
+  let mese = "";
   let filter = "tutti";
   let query = "";
   let openId = null;
@@ -1032,6 +1046,8 @@
          riconoscere lo stesso prodotto quando due archivi si uniscono. */
       code: String(p.code || "").trim(),
       formato: String(p.formato || "").trim(),
+      /* Il prezzo a cui *tu* lo vendi. Nasce dal listino, ma può essere il tuo. */
+      prezzo: Number(p.prezzo) > 0 ? Math.round(Number(p.prezzo) * 100) / 100 : 0,
       updatedAt: p.updatedAt || nowISO(),
     }));
     const known = new Set(products.map(p => p.id));
@@ -1080,9 +1096,16 @@
              quel giorno, «no» = questo ordine non la richiede. Sta sull'ordine e
              non sul cliente perché è di quell'acquisto che si chiede conto. */
           checkin: o.checkin === "no" ? "no" : (o.checkin || ""),
+          /* Consegna e incasso: due date, non due stati con molti valori. Vuoto =
+             ancora da fare. Contano solo se «Consegne e incassi» è accesa. */
+          consegnato: o.consegnato || "",
+          pagato: o.pagato || "",
           lines: (Array.isArray(o.lines) ? o.lines : [])
             .filter(l => l && l.productId && known.has(l.productId))
-            .map(l => ({ productId: l.productId, qty: clamp(parseInt(l.qty, 10) || 1, 1, 99) })),
+            /* Il prezzo unitario di quel giorno. Non si aggiorna mai da solo: se il
+               listino cambia, quello che hai venduto ieri resta quello che era. */
+            .map(l => ({ productId: l.productId, qty: clamp(parseInt(l.qty, 10) || 1, 1, 99),
+              prezzo: Number(l.prezzo) > 0 ? Math.round(Number(l.prezzo) * 100) / 100 : 0 })),
         })).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)),
       })),
       settings: {
@@ -1091,6 +1114,10 @@
         fermoDopo: clamp(parseInt(s.fermoDopo, 10) || DEFAULTS.fermoDopo, 7, 365),
         dopoAcquisto: clamp(parseInt(s.dopoAcquisto, 10) || DEFAULTS.dopoAcquisto, 1, 90),
         compleanno: clamp(parseInt(s.compleanno, 10) || DEFAULTS.compleanno, 0, 60),
+        consegne: !!s.consegne,
+        /* Da quando si tiene il conto: accendendo l'interruttore, gli ordini
+           vecchi non diventano tutti «da consegnare». La storia resta storia. */
+        consegneDa: s.consegneDa || "",
         lastBackup: s.lastBackup || "",
         snoozeBackup: s.snoozeBackup || "",
       },
@@ -1218,7 +1245,7 @@
     for (const o of c.orders) {
       for (const l of o.lines) {
         const prev = last.get(l.productId);
-        if (!prev || o.date >= prev.date) last.set(l.productId, { date: o.date, qty: l.qty });
+        if (!prev || o.date >= prev.date) last.set(l.productId, { date: o.date, qty: l.qty, prezzo: l.prezzo || 0 });
       }
     }
     const off = new Set(c.dropped.map(x => x.productId));
@@ -1229,7 +1256,7 @@
       const dura = days * v.qty;
       const due = iso(addDays(parseISO(v.date), dura));
       return {
-        productId, name: prodName(productId), qty: v.qty, days, dura,
+        productId, name: prodName(productId), qty: v.qty, days, dura, prezzo: v.prezzo,
         lastDate: v.date, due, dropped: off.has(productId),
         daysTo: daysBetween(today, due),
         volte: c.orders.filter(o => o.lines.some(l => l.productId === productId)).length,
@@ -1364,6 +1391,59 @@
     return out;
   }
 
+  /* Cosa resta in sospeso. Un ordine senza importo non ha niente da incassare;
+     un ordine più vecchio dell'interruttore non conta, altrimenti accendendolo si
+     riempirebbe tutto di arretrati inventati. */
+  function sospesi() {
+    const out = { consegna: [], incasso: [], dovuto: 0 };
+    if (!state.settings.consegne) return out;
+    const da = state.settings.consegneDa;
+    for (const c of state.clients) for (const o of c.orders) {
+      if (da && o.date < da) continue;
+      if (!o.consegnato) out.consegna.push({ c, o });
+      if (!o.pagato && o.importo > 0) { out.incasso.push({ c, o }); out.dovuto += o.importo; }
+    }
+    const perData = (x, y) => (x.o.date < y.o.date ? -1 : x.o.date > y.o.date ? 1 : 0);
+    out.consegna.sort(perData); out.incasso.sort(perData);
+    return out;
+  }
+
+  const soldi = n => (Math.round(n * 100) / 100).toFixed(2).replace(".", ",") + " €";
+
+  /* Il listino sta nel catalogo e si ritrova dal codice: non lo copio sul
+     prodotto, così quando il listino si aggiorna il confronto resta vero. */
+  const listinoDi = p => {
+    if (!p || !p.code) return 0;
+    const x = CATALOGO_K.find(y => y.code === p.code);
+    return x ? x.prezzo : 0;
+  };
+
+  /* A quanto gliel'hai venduto l'ultima volta. È la cosa che serve ricordare:
+     se hai fatto uno sconto a una persona, al riordino ti ritrovi quel prezzo e
+     non ti tocca ricordartelo a memoria. */
+  function ultimoPrezzo(c, pid) {
+    for (let i = c.orders.length - 1; i >= 0; i--) {
+      const l = c.orders[i].lines.find(x => x.productId === pid && x.prezzo > 0);
+      if (l) return l.prezzo;
+    }
+    return 0;
+  }
+
+  /* Ordine di precedenza: quello che ha pagato lui, poi il tuo prezzo, poi il
+     listino. Il primo che esiste vince. */
+  function prezzoSuggerito(c, pid) {
+    const u = c ? ultimoPrezzo(c, pid) : 0;
+    if (u) return u;
+    const p = prodById(pid);
+    return (p && p.prezzo) || listinoDi(p) || 0;
+  }
+
+  /* Quanto vale un ordine: l'importo scritto se c'è, altrimenti la somma delle
+     righe. Gli ordini registrati prima dei prezzi hanno solo l'importo. */
+  function totaleOrdine(o) {
+    if (o.importo > 0) return o.importo;
+    return o.lines.reduce((t, l) => t + (l.prezzo || 0) * l.qty, 0);
+  }
   const monthKey = s => String(s).slice(0, 7);
 
   function ordersIn(fromISO, toISO) {
@@ -1412,6 +1492,119 @@
 
   function usoProdotto(productId) {
     return state.clients.filter(c => c.orders.some(o => o.lines.some(l => l.productId === productId))).length;
+  }
+
+  /* ══ Riepilogo del mese ═══════════════════════════════════════════════
+
+     A fine mese serve un numero solo, e sotto la sua scomposizione: quanto hai
+     venduto, a chi, e che cosa. Tutto si ricava dagli ordini già registrati —
+     nessun dato in più da inserire.
+
+     Un avvertimento onesto sui conti: le righe senza prezzo (ordini vecchi, o
+     prodotti registrati di fretta) non possono entrare nel venduto per prodotto.
+     Il riquadro lo dice invece di far quadrare i conti per finta.            */
+
+  const fmtMese = new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric" });
+  const nomeMese = k => {
+    const [y, m] = String(k).split("-").map(Number);
+    const t = fmtMese.format(new Date(y, (m || 1) - 1, 1));
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  };
+  const meseScorso = k => {
+    const [y, m] = String(k).split("-").map(Number);
+    const d = new Date(y, (m || 1) - 2, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+
+  function mesiConOrdini() {
+    const set = new Set();
+    for (const c of state.clients) for (const o of c.orders) set.add(monthKey(o.date));
+    set.add(monthKey(todayISO()));
+    return [...set].sort().reverse();
+  }
+
+  function contiDelMese(k) {
+    const ord = ordersIn(k + "-01", k + "-31");
+    const venduto = ord.reduce((t, x) => t + totaleOrdine(x.o), 0);
+    const clienti = new Set(ord.map(x => x.c.id));
+    const prodotti = new Map();
+    let senzaPrezzo = 0;
+    for (const { o } of ord) for (const l of o.lines) {
+      const v = prodotti.get(l.productId) || { qty: 0, euro: 0 };
+      v.qty += l.qty;
+      v.euro += (l.prezzo || 0) * l.qty;
+      if (!l.prezzo) senzaPrezzo++;
+      prodotti.set(l.productId, v);
+    }
+    const clientiMap = new Map();
+    for (const { c, o } of ord) {
+      const v = clientiMap.get(c.id) || { nome: c.name, n: 0, euro: 0 };
+      v.n++; v.euro += totaleOrdine(o);
+      clientiMap.set(c.id, v);
+    }
+    const pagato = ord.filter(x => x.o.pagato).reduce((t, x) => t + totaleOrdine(x.o), 0);
+    return {
+      ord, venduto, clienti: clienti.size, senzaPrezzo, pagato,
+      prodotti: [...prodotti].map(([pid, v]) => ({ nome: prodName(pid), ...v }))
+        .sort((a, b) => b.euro - a.euro || b.qty - a.qty),
+      clientiTop: [...clientiMap.values()].sort((a, b) => b.euro - a.euro),
+    };
+  }
+
+  function viewRiepilogo() {
+    const mesi = mesiConOrdini();
+    const k = mesi.includes(mese) ? mese : mesi[0];
+    const r = contiDelMese(k);
+    const prima = contiDelMese(meseScorso(k));
+    const delta = prima.venduto ? Math.round(((r.venduto - prima.venduto) / prima.venduto) * 100) : null;
+
+    return `
+      <div class="page-head">
+        <div><h1>Riepilogo</h1><p class="lede">Quanto è stato venduto, e a chi.</p></div>
+        <div class="field" style="min-width:190px">
+          <label for="r-mese">Mese</label>
+          <select id="r-mese">${mesi.map(x => `<option value="${x}" ${x === k ? "selected" : ""}>${esc(nomeMese(x))}</option>`).join("")}</select>
+        </div>
+      </div>
+
+      <div class="kpis">
+        ${kpiTile(r.venduto ? soldi(r.venduto) : "—", "Venduto", delta === null
+          ? (prima.venduto ? "" : "primo mese con ordini")
+          : `${delta >= 0 ? "+" : ""}${delta}% su ${esc(nomeMese(meseScorso(k)).toLowerCase())}`)}
+        ${kpiTile(r.ord.length, "Ordini", r.ord.length ? `${plur(r.clienti, "cliente", "clienti")} serviti` : "&nbsp;")}
+        ${kpiTile(r.ord.length ? soldi(r.venduto / r.ord.length) : "—", "Media per ordine", "&nbsp;")}
+        ${state.settings.consegne
+          ? kpiTile(soldi(r.venduto - r.pagato), "Da incassare", r.venduto ? `su ${esc(soldi(r.venduto))} venduti` : "&nbsp;",
+              r.venduto - r.pagato > 0 ? "warn" : "")
+          : kpiTile(r.prodotti.reduce((t, x) => t + x.qty, 0), "Pezzi usciti", "&nbsp;")}
+      </div>
+
+      ${r.senzaPrezzo ? `<div class="banner"><div><b>${plur(r.senzaPrezzo, "riga d'ordine senza prezzo",
+        "righe d'ordine senza prezzo")}.</b> Nel venduto per prodotto non compaiono: apri la scheda del
+        cliente e scrivi il prezzo, o lasciale così — il totale del mese resta giusto, perché usa l'importo
+        dell'ordine.</div></div>` : ""}
+
+      ${!r.ord.length ? `<div class="card"><div class="empty">
+        <p>In ${esc(nomeMese(k).toLowerCase())} non ci sono ordini registrati. Registrali dalla scheda del
+          cliente e questa pagina si riempie da sé.</p></div></div>` : `
+      <div class="cols">
+        <div class="card">
+          <header><h2>Prodotti</h2><span class="eyebrow">più venduti</span></header>
+          <div class="shelf">${r.prodotti.slice(0, 10).map(x => `<div class="sh">
+            <div class="sh-main"><div class="sh-name">${esc(x.nome)}</div>
+              <div class="sh-meta">${plur(x.qty, "pezzo", "pezzi")}</div></div>
+            <div class="sh-side"><span class="num">${x.euro ? esc(soldi(x.euro)) : "—"}</span></div>
+          </div>`).join("")}</div>
+        </div>
+        <div class="card">
+          <header><h2>Clienti</h2><span class="eyebrow">chi ha comprato</span></header>
+          <div class="shelf">${r.clientiTop.slice(0, 10).map(x => `<div class="sh">
+            <div class="sh-main"><div class="sh-name">${esc(x.nome)}</div>
+              <div class="sh-meta">${plur(x.n, "ordine", "ordini")}</div></div>
+            <div class="sh-side"><span class="num">${esc(soldi(x.euro))}</span></div>
+          </div>`).join("")}</div>
+        </div>
+      </div>`}`;
   }
 
   /* ══ Pezzi ════════════════════════════════════════════════════════════ */
@@ -1527,6 +1720,8 @@
 
       ${cardTodo(t)}
 
+      ${cardConsegne()}
+
       <div class="cols">
         ${cardFermi(t) || cardAbitudini()}
         ${cardAndamento()}
@@ -1590,6 +1785,31 @@
         ${uno.length ? `${plur(uno.length, "si è fermato", "si sono fermati")} al primo assaggio: sono
         quelli da capire — se il prodotto non era giusto, o se nessuno li ha più chiamati.` : ""}</p>
       ${uno.length ? `<div class="rows">${uno.slice(0, 5).map(c => clientRow(c, clientState(c), "")).join("")}</div>` : ""}
+    </div>`;
+  }
+
+  /* Compare solo se c'è qualcosa in sospeso: chi consegna e incassa sul posto non
+     lo vede mai, anche con l'interruttore acceso. */
+  function cardConsegne() {
+    const sp = sospesi();
+    if (!sp.consegna.length && !sp.incasso.length) return "";
+    const riga = ({ c, o }, tipo) => `<div class="row">
+      <div class="row-main">
+        <div class="row-name">${esc(c.name)}</div>
+        <div class="row-sub">${esc(o.lines.map(l => prodName(l.productId) + (l.qty > 1 ? ` ×${l.qty}` : "")).join(", "))}
+          · ${esc(fmtDate(o.date))}${o.importo ? " · " + soldi(o.importo) : ""}</div>
+      </div>
+      <div class="row-side">
+        <button class="btn btn-sm btn-primary" data-act="${tipo === "consegna" ? "set-consegnato" : "set-pagato"}"
+          data-id="${c.id}" data-oid="${o.id}">${tipo === "consegna" ? "Consegnato" : "Incassato"}</button>
+      </div></div>`;
+    return `<div class="card">
+      <header><h2>Consegne e incassi</h2>${sp.dovuto
+        ? `<span class="eyebrow">ti devono ${esc(soldi(sp.dovuto))}</span>` : ""}</header>
+      ${sp.consegna.length ? `<div class="grp-label"><span class="eyebrow">Da consegnare</span></div>
+        <div class="rows">${sp.consegna.map(x => riga(x, "consegna")).join("")}</div>` : ""}
+      ${sp.incasso.length ? `<div class="grp-label"><span class="eyebrow">Da incassare</span></div>
+        <div class="rows">${sp.incasso.map(x => riga(x, "incasso")).join("")}</div>` : ""}
     </div>`;
   }
 
@@ -1754,6 +1974,13 @@
               <div class="sh-meta">${p.days} giorni · ${uso ? plur(uso, "cliente", "clienti") : "nessun cliente"}${
                 oss ? ` · dai riordini risulta ~${oss.days} gg` : ""}</div>
               ${p.formato || p.code ? `<div class="sh-meta">${esc([p.formato, p.code ? "cod. " + p.code : ""].filter(Boolean).join(" · "))}</div>` : ""}
+              ${(() => {
+                const lis = listinoDi(p);
+                if (!p.prezzo && !lis) return "";
+                const suo = p.prezzo || lis;
+                return `<div class="sh-meta">${esc(soldi(suo))}${lis && Math.abs(suo - lis) > 0.004
+                  ? ` · listino ${esc(soldi(lis))}` : lis ? " · di listino" : " · prezzo tuo"}</div>`;
+              })()}
               ${p.note ? `<div class="row-sub">${esc(p.note)}</div>` : ""}
             </div>
             <div class="sh-side">
@@ -1835,6 +2062,18 @@
                 <input id="s-compl" type="number" min="0" max="60" value="${state.settings.compleanno}">
                 <span class="hint">giorni di preavviso</span></div>
             </div>
+            <div class="field">
+              <label>Consegne e incassi</label>
+              <label style="display:flex;gap:8px;align-items:flex-start;font-size:13.5px;cursor:pointer">
+                <input type="checkbox" id="s-consegne" ${state.settings.consegne ? "checked" : ""}
+                  style="width:auto;margin-top:3px">
+                <span>Tengo scorta e consegno io${state.settings.consegne && state.settings.consegneDa
+                  ? ` — il conto parte dal ${esc(fmtDate(state.settings.consegneDa))}` : ""}</span></label>
+              <span class="hint">Acceso, ogni ordine ha due caselle — consegnato e pagato — e in «Oggi»
+                trovi cosa resta in sospeso con il totale che ti devono. Gli ordini di prima non
+                vengono toccati.</span>
+            </div>
+
             <div class="field"><label for="s-nome">Il tuo nome</label>
               <input id="s-nome" type="text" value="${esc(state.settings.nome)}" placeholder="facoltativo">
               <span class="hint">Compare nel saluto in cima a «Oggi».</span></div>
@@ -2130,9 +2369,14 @@
                 <div class="row-name" style="font-weight:500">${o.lines.length
                   ? esc(o.lines.map(l => prodName(l.productId) + (l.qty > 1 ? ` ×${l.qty}` : "")).join(", "))
                   : "ordine senza prodotti"}</div>
-                <div class="row-sub">${esc(fmtDateY(o.date))}${o.importo ? ` · ${o.importo.toFixed(2).replace(".", ",")} €` : ""}${o.note ? ` · ${esc(o.note)}` : ""}</div>
+                <div class="row-sub">${esc(fmtDateY(o.date))}${o.importo ? ` · ${esc(soldi(o.importo))}` : ""}${o.note ? ` · ${esc(o.note)}` : ""}</div>
               </div>
               <div class="row-side">
+                ${state.settings.consegne ? `
+                  <button class="btn btn-sm ${o.consegnato ? "btn-quiet" : ""}" data-act="set-consegnato"
+                    data-id="${c.id}" data-oid="${o.id}">${o.consegnato ? "consegnato " + fmtDate(o.consegnato) : "Consegnato?"}</button>
+                  ${o.importo ? `<button class="btn btn-sm ${o.pagato ? "btn-quiet" : ""}" data-act="set-pagato"
+                    data-id="${c.id}" data-oid="${o.id}">${o.pagato ? "pagato " + fmtDate(o.pagato) : "Pagato?"}</button>` : ""}` : ""}
                 <button class="btn btn-sm btn-quiet" data-act="del-order" data-id="${c.id}" data-oid="${o.id}"
                   aria-label="Elimina questo ordine">✕</button>
               </div></div>`).join("")}</div>`
@@ -2291,12 +2535,12 @@
     if (r.miei.length) {
       h += `<div class="pick-capo">I tuoi prodotti</div>` + r.miei.map(p => `<button type="button"
         class="pick-item" data-pick-mio="${p.id}"><b>${esc(p.name)}</b>
-        <span>${p.days} giorni${p.formato ? " · " + esc(p.formato) : ""}${p.code ? " · " + esc(p.code) : ""}</span></button>`).join("");
+        <span>${p.days} giorni${p.prezzo || listinoDi(p) ? " · " + esc(soldi(p.prezzo || listinoDi(p))) : ""}${p.formato ? " · " + esc(p.formato) : ""}${p.code ? " · " + esc(p.code) : ""}</span></button>`).join("");
     }
     if (r.amway.length) {
       h += `<div class="pick-capo">Catalogo Amway</div>` + r.amway.map(x => `<button type="button"
         class="pick-item" data-pick-amway="${x.code}"><b>${esc(x.name)}</b>
-        <span>${esc(CAT_LABEL[x.cat] || "")}${x.fmt ? " · " + esc(x.fmt) : ""} · ${esc(x.code)}</span></button>`).join("");
+        <span>${x.prezzo ? esc(soldi(x.prezzo)) + " · " : ""}${esc(CAT_LABEL[x.cat] || "")}${x.fmt ? " · " + esc(x.fmt) : ""} · ${esc(x.code)}</span></button>`).join("");
       if (r.tutto) h += `<div class="pick-vuoto">…e altri. Aggiungi una parola per restringere.</div>`;
     }
     if (!h) {
@@ -2331,11 +2575,20 @@
         <div class="field-2">
           <div class="field"><label for="o-date">Quando</label>
             <input id="o-date" type="date" value="${todayISO()}" required></div>
-          <div class="field"><label for="o-importo">Importo (facoltativo)</label>
-            <input id="o-importo" type="number" min="0" step="0.01" placeholder="€"></div>
+          <div class="field"><label for="o-importo">Totale</label>
+            <input id="o-importo" type="number" min="0" step="0.01" placeholder="€" inputmode="decimal">
+            <span class="hint">Si somma dai prezzi. Cambialo se serve.</span></div>
         </div>
         <div class="field"><label for="o-note">Note</label>
           <input id="o-note" type="text" placeholder="consegnato a mano, ordine fatto da lui…"></div>
+        ${state.settings.consegne ? `<div class="field">
+          <label>Consegna e incasso</label>
+          <label style="display:flex;gap:8px;align-items:center;font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="o-cons" style="width:auto"> <span>già consegnato</span></label>
+          <label style="display:flex;gap:8px;align-items:center;font-size:13.5px;cursor:pointer">
+            <input type="checkbox" id="o-pag" style="width:auto"> <span>già pagato</span></label>
+          <span class="hint">Quello che lasci non spuntato lo trovi in «Oggi», fra le cose in sospeso.</span>
+        </div>` : ""}
         <div class="modal-actions">
           <button type="button" class="btn" data-act="close-modal">Annulla</button>
           <button type="submit" class="btn btn-primary">Registra l'ordine</button>
@@ -2353,7 +2606,30 @@
           if (n) draft[i].nome = n.value;
           const q = item.querySelector("[data-role=cerca]");
           if (q) draft[i].q = q.value;
+          const pz = item.querySelector("[data-role=pz]");
+          if (pz) draft[i].pz = pz.value;
         });
+      };
+
+      /* Ogni riga arriva col prezzo già scritto: quello dell'ultima volta a questa
+         persona, se no il tuo, se no il listino. E si ricorda quale sarebbe il
+         listino, per poterci tornare con un tocco. */
+      const prezzaLaRiga = l => {
+        const pid = l.productId || "";
+        l.listino = l.amway ? l.amway.prezzo : listinoDi(prodById(pid));
+        if (l.pz !== undefined && l.pz !== "") return;
+        const sugg = l.amway ? (l.amway.prezzo || 0) : (pid ? prezzoSuggerito(c, pid) : 0);
+        l.pz = sugg ? String(sugg) : "";
+      };
+
+      /* L'importo si compila da sé sommando le righe, e smette di farlo appena lo
+         scrivi a mano: se hai aggiustato il totale, non te lo cambio sotto il naso. */
+      let importoAMano = false;
+      const ricalcola = () => {
+        if (importoAMano) return;
+        const tot = draft.reduce((t, l) => t + (Number(l.pz) || 0) * l.qty, 0);
+        const el = box.querySelector("#o-importo");
+        if (el) el.value = tot > 0 ? (Math.round(tot * 100) / 100).toFixed(2) : "";
       };
 
       /* Nella prima cella della riga sta **una** cosa per volta, mai due. Finché non
@@ -2362,6 +2638,7 @@
          la ricerca e una casella «Scegli il prodotto…»: quella casella non aveva
          niente da mostrare e il suo unico effetto era chiudere la ricerca. */
       const dipingi = () => {
+        draft.forEach(prezzaLaRiga);
         ol.innerHTML = draft.map((l, i) => {
           const nome = etichetta(l);
           const cerca = !l.manuale && (!nome || l.aperto);
@@ -2376,6 +2653,16 @@
               <input data-role="q" type="number" min="1" max="99" value="${l.qty}" aria-label="Quantità">
               <button type="button" class="btn btn-sm btn-quiet" data-role="x" aria-label="Togli la riga">✕</button>
             </div>
+            ${nome && !l.manuale || (l.manuale && (l.nome || "").trim()) ? `<div class="oprezzo">
+              <label for="pz-${i}">Prezzo</label>
+              <input id="pz-${i}" data-role="pz" type="number" min="0" step="0.01" inputmode="decimal"
+                value="${l.pz === undefined ? "" : esc(l.pz)}" placeholder="0,00">
+              <span class="nota">€ l'uno${l.qty > 1 ? ` · ${esc(soldi((Number(l.pz) || 0) * l.qty))} in tutto` : ""}</span>
+              ${l.listino && Math.abs((Number(l.pz) || 0) - l.listino) > 0.004
+                ? `<button type="button" class="btn btn-sm btn-quiet" data-role="listino">
+                    Listino ${esc(soldi(l.listino))}</button>`
+                : l.listino ? `<span class="nota">= listino</span>` : ""}
+            </div>` : ""}
             ${cerca ? `<div class="picker">
               <div><button type="button" class="btn btn-sm" data-role="manuale">
                 Scrivi un nome a mano</button></div>
@@ -2385,6 +2672,7 @@
         }).join("");
         const aperta = ol.querySelector("[data-role=cerca]");
         if (aperta && window.matchMedia("(min-width: 561px)").matches) aperta.focus();
+        ricalcola();
       };
 
       dipingi();
@@ -2392,11 +2680,17 @@
       /* La ricerca aggiorna solo il proprio elenco: ridisegnare tutto a ogni
          lettera farebbe perdere il fuoco e la tastiera si chiuderebbe. */
       ol.addEventListener("input", ev => {
-        if (ev.target.dataset.role !== "cerca") return;
-        const item = ev.target.closest(".oitem");
-        const i = Number(item.dataset.i);
-        draft[i].q = ev.target.value;
-        item.querySelector(".pick-list").innerHTML = listaRisultati(draft[i].q, "ordine");
+        const ruolo = ev.target.dataset.role;
+        if (ruolo === "cerca") {
+          const item = ev.target.closest(".oitem");
+          const i = Number(item.dataset.i);
+          draft[i].q = ev.target.value;
+          item.querySelector(".pick-list").innerHTML = listaRisultati(draft[i].q, "ordine");
+          return;
+        }
+        /* Prezzo e quantità aggiornano solo il totale: ridisegnare la riga mentre
+           si scrive farebbe perdere il fuoco e chiudere la tastiera. */
+        if (ruolo === "pz" || ruolo === "q") { leggi(); ricalcola(); }
       });
 
       ol.addEventListener("click", ev => {
@@ -2429,12 +2723,20 @@
           l.productId = ""; l.manuale = false; l.aperto = false; l.q = "";
           dipingi(); return;
         }
+        if (ev.target.closest("[data-role=listino]")) {
+          leggi();
+          l.pz = l.listino ? String(l.listino) : "";
+          dipingi(); return;
+        }
         if (ev.target.closest("[data-role=manuale]")) {
           leggi();
           l.manuale = true; l.productId = ""; l.amway = null; l.aperto = false; l.nome = l.q || "";
           dipingi(); return;
         }
       });
+
+      const imp = box.querySelector("#o-importo");
+      if (imp) imp.addEventListener("input", () => { importoAMano = true; });
 
       box.querySelector("#ol-add").addEventListener("click", () => {
         leggi();
@@ -2450,8 +2752,9 @@
         let creati = 0;
         /* Un prodotto entra nel catalogo solo adesso, non quando lo si sceglie:
            chi annulla l'ordine non deve lasciare prodotti orfani in giro. */
-        const nasce = (name, code, formato) => {
+        const nasce = (name, code, formato, prezzo) => {
           const np = { id: uid(), name, code: code || "", formato: formato || "",
+            prezzo: Number(prezzo) > 0 ? Math.round(Number(prezzo) * 100) / 100 : 0,
             days: DEFAULTS.durataNuovo, check: true, note: "", updatedAt: nowISO() };
           state.products.push(np); creati++; return np.id;
         };
@@ -2460,25 +2763,29 @@
           if (!pid && l.amway) {
             const e = l.amway;
             const esiste = state.products.find(x => (x.code && x.code === e.code) || chiave(x.name) === chiave(e.name));
-            pid = esiste ? esiste.id : nasce(e.name, e.code, e.fmt);
+            pid = esiste ? esiste.id : nasce(e.name, e.code, e.fmt, e.prezzo);
           }
           if (!pid && l.manuale) {
             const nome = (l.nome || "").trim();
             if (!nome) continue;
             const esiste = state.products.find(x => chiave(x.name) === chiave(nome));
-            pid = esiste ? esiste.id : nasce(nome, "", "");
+            pid = esiste ? esiste.id : nasce(nome, "", "", l.pz);
           }
           if (!pid) continue;
+          const prezzo = Math.max(0, Math.round((Number(l.pz) || 0) * 100) / 100);
           const gia = lines.find(x => x.productId === pid);
-          if (gia) gia.qty = clamp(gia.qty + l.qty, 1, 99);
-          else lines.push({ productId: pid, qty: l.qty });
+          if (gia) { gia.qty = clamp(gia.qty + l.qty, 1, 99); if (prezzo) gia.prezzo = prezzo; }
+          else lines.push({ productId: pid, qty: l.qty, prezzo });
         }
         if (!lines.length) { toast("Scegli almeno un prodotto"); return; }
 
+        const spunta = id => { const el = box.querySelector(id); return el && el.checked; };
         pushOrder(c, lines, {
           date: box.querySelector("#o-date").value || todayISO(),
           importo: box.querySelector("#o-importo").value,
           note: box.querySelector("#o-note").value.trim(),
+          consegnato: spunta("#o-cons"),
+          pagato: spunta("#o-pag"),
         });
         closeModal(); render();
         toast(creati
@@ -2511,6 +2818,14 @@
           <span class="hint">Giorni che dura a una persona. ${oss
             ? `Dai riordini dei tuoi clienti risultano <b>${oss.days} giorni</b> (${plur(oss.n, "riordino", "riordini")}).`
             : "Con due riordini dello stesso prodotto l'app comincia a misurarla da sola."}</span></div>
+        <div class="field"><label for="p-prezzo">Prezzo al cliente</label>
+          <input id="p-prezzo" type="number" min="0" step="0.01" inputmode="decimal"
+            value="${p && p.prezzo ? p.prezzo : (preset && preset.prezzo ? preset.prezzo : "")}" placeholder="€">
+          ${(() => {
+            const lis = p ? listinoDi(p) : (preset ? preset.prezzo : 0);
+            return lis ? `<span class="hint">Listino ${esc(soldi(lis))}. Se vendi a un prezzo tuo, scrivilo
+              qui: è quello che l'app proporrà per i nuovi clienti.</span>` : "";
+          })()}</div>
         <div class="field"><label for="p-note">Note</label>
           <input id="p-note" type="text" value="${esc(p ? p.note : "")}" placeholder="formato, dosaggio…"></div>
         <div class="modal-actions">
@@ -2537,10 +2852,11 @@
         const name = box.querySelector("#p-name").value.trim();
         const days = clamp(parseInt(box.querySelector("#p-days").value, 10) || DEFAULTS.durataNuovo, 1, 3650);
         const note = box.querySelector("#p-note").value.trim();
+        const prezzo = Math.max(0, Math.round((Number(box.querySelector("#p-prezzo").value) || 0) * 100) / 100);
         if (!name) return;
-        if (nuovo) state.products.push({ id: uid(), name, days, note, check: false,
+        if (nuovo) state.products.push({ id: uid(), name, days, note, prezzo, check: false,
           code: code0 || "", formato: fmt0 || "", updatedAt: nowISO() });
-        else Object.assign(p, { name, days, note, check: false, updatedAt: nowISO() });
+        else Object.assign(p, { name, days, note, prezzo, check: false, updatedAt: nowISO() });
         save(); closeModal(); render(); toast(nuovo ? "Prodotto aggiunto" : "Salvato");
       });
     });
@@ -2908,6 +3224,8 @@
       importo: Math.max(0, Number(opts && opts.importo) || 0),
       note: (opts && opts.note) || "",
       checkin: "",
+      consegnato: opts && opts.consegnato ? ((opts && opts.date) || todayISO()) : "",
+      pagato: opts && opts.pagato ? ((opts && opts.date) || todayISO()) : "",
       lines,
     };
     c.orders.push(o);
@@ -3153,6 +3471,7 @@
       { id: "oggi", label: "Oggi", icon: "◧", tally: dueN ? String(dueN) : "", hot: !!t.ritardo.length },
       { id: "clienti", label: "Clienti", icon: "☰", tally: String(state.clients.length) },
       { id: "prodotti", label: "Catalogo", icon: "◈", tally: String(state.products.length) },
+      { id: "riepilogo", label: "Riepilogo", icon: "▤", tally: "" },
       { id: "dati", label: "Dati", icon: "⚙", tally: "" },
     ];
     const dark = document.documentElement.getAttribute("data-theme") === "dark";
@@ -3171,13 +3490,15 @@
   function render() {
     renderRail();
     const body = view === "clienti" ? viewClienti() : view === "prodotti" ? viewProdotti()
-      : view === "dati" ? viewDati() : viewOggi();
+      : view === "riepilogo" ? viewRiepilogo() : view === "dati" ? viewDati() : viewOggi();
     const banner = (!storageOk && view !== "dati")
       ? `<div class="banner"><div><b>Questo browser non salva i dati.</b>
          Chiudendo la pagina perdi tutto — vai in <b>Dati</b> e salva una copia.</div></div>` : "";
     document.getElementById("main").innerHTML = `<div class="wrap">${banner}${body}</div>`;
     renderSheet();
     if (view === "dati") bindDati();
+    const selMese = document.getElementById("r-mese");
+    if (selMese) selMese.addEventListener("change", () => { mese = selMese.value; render(); });
   }
 
   function bindDati() {
@@ -3202,6 +3523,16 @@
     if (dop) dop.addEventListener("change", () => {
       state.settings.dopoAcquisto = clamp(parseInt(dop.value, 10) || DEFAULTS.dopoAcquisto, 1, 90);
       dop.value = state.settings.dopoAcquisto; save(); renderRail();
+    });
+    const cons = document.getElementById("s-consegne");
+    if (cons) cons.addEventListener("change", () => {
+      state.settings.consegne = cons.checked;
+      /* Si segna il giorno in cui si accende, così gli ordini già registrati non
+         diventano tutti arretrati da consegnare. */
+      if (cons.checked && !state.settings.consegneDa) state.settings.consegneDa = todayISO();
+      if (!cons.checked) state.settings.consegneDa = "";
+      save(); render();
+      toast(cons.checked ? "Consegne e incassi attivi" : "Consegne e incassi spenti");
     });
     const cmp = document.getElementById("s-compl");
     if (cmp) cmp.addEventListener("change", () => {
@@ -3287,6 +3618,19 @@
         touch(c); save(); render(); toast("Promemoria salvato"); break;
       }
       case "clear-next": if (c) { c.nextDate = ""; c.nextNote = ""; c.nextKind = "rimanda"; touch(c); save(); render(); } break;
+      case "set-consegnato":
+      case "set-pagato": {
+        if (!c) break;
+        const o = c.orders.find(x => x.id === el.dataset.oid);
+        if (!o) break;
+        const campo = act === "set-consegnato" ? "consegnato" : "pagato";
+        o[campo] = o[campo] ? "" : todayISO();
+        touch(c); save(); render();
+        toast(o[campo]
+          ? (campo === "consegnato" ? "Segnato consegnato" : "Segnato incassato")
+          : (campo === "consegnato" ? "Torna fra le consegne da fare" : "Torna fra gli incassi da fare"));
+        break;
+      }
       case "del-order":
         if (c) {
           c.orders = c.orders.filter(o => o.id !== el.dataset.oid);
