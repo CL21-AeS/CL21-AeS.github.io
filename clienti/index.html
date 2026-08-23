@@ -298,6 +298,14 @@
   .sh-side { display: flex; align-items: center; gap: 6px; flex: none; }
   .bullets { display: flex; flex-direction: column; gap: 3px; margin: 0; padding-left: 17px; font-size: 13px; color: var(--ink-2); }
 
+  /* I prodotti di un ordine, uno per riga. Prima stavano tutti su una riga sola
+     con i puntini di sospensione: dal terzo prodotto in poi non si vedevano, e
+     non c'era modo di aprirli. */
+  .ordine-righe { display: flex; flex-direction: column; gap: 2px; }
+  .ordine-righe > div { font-size: 13.5px; font-weight: 500; }
+  .ordine-righe .q { font-family: var(--mono); font-weight: 400; }
+  .ordine-righe .p { font-family: var(--mono); font-size: 11px; color: var(--ink-3); font-weight: 400; }
+
   /* ── Sheet (scheda cliente) ────────────────────────────────────────── */
   .scrim { position: fixed; inset: 0; background: rgba(10, 16, 13, .42); z-index: 40; }
   .sheet {
@@ -2258,7 +2266,8 @@
     const shelfHTML = sh.length ? `<div class="shelf">${sh.map(x => {
       const cls = x.dropped ? "sh off" : "sh";
       const quando = x.dropped ? "non lo segui più"
-        : `${x.dura} gg dal ${fmtDate(x.lastDate)} · ${x.daysTo < 0 ? "finito" : "finisce"} ${relDue(x.daysTo)}`;
+        : `${x.dura} gg dal ${fmtDate(x.lastDate)} · ${x.daysTo < 0 ? "finito" : "finisce"} ${relDue(x.daysTo)}`
+          + (x.prezzo ? ` · ${soldi(x.prezzo)}` : "");
       return `<div class="${cls}">
         <div class="sh-main">
           <div class="sh-name">${esc(x.name)}${x.qty > 1 ? ` <span class="sh-meta">×${x.qty}</span>` : ""}</div>
@@ -2366,10 +2375,19 @@
             <div class="grp-label"><span class="eyebrow">Ordini</span></div>
             ${storia.length ? `<div class="rows">${storia.map(o => `<div class="row">
               <div class="row-main">
-                <div class="row-name" style="font-weight:500">${o.lines.length
-                  ? esc(o.lines.map(l => prodName(l.productId) + (l.qty > 1 ? ` ×${l.qty}` : "")).join(", "))
-                  : "ordine senza prodotti"}</div>
-                <div class="row-sub">${esc(fmtDateY(o.date))}${o.importo ? ` · ${esc(soldi(o.importo))}` : ""}${o.note ? ` · ${esc(o.note)}` : ""}</div>
+                ${o.lines.length ? `<div class="ordine-righe">${o.lines.map(l => {
+                  const lis = listinoDi(prodById(l.productId));
+                  const scontato = l.prezzo && lis && Math.abs(l.prezzo - lis) > 0.004;
+                  return `<div>${esc(prodName(l.productId))}
+                    ${l.qty > 1 ? `<span class="q">×${l.qty}</span>` : ""}
+                    <span class="p">${l.prezzo
+                      ? esc(soldi(l.prezzo)) + (l.qty > 1 ? " l'uno" : "")
+                        + (scontato ? ` · listino ${esc(soldi(lis))}` : "")
+                        + (l.prezzo && lis && !scontato ? " · di listino" : "")
+                      : "prezzo non registrato"}</span></div>`;
+                }).join("")}</div>`
+                  : `<div class="row-name" style="font-weight:500">ordine senza prodotti</div>`}
+                <div class="row-sub">${esc(fmtDateY(o.date))}${totaleOrdine(o) ? ` · ${esc(soldi(totaleOrdine(o)))}` : ""}${o.note ? ` · ${esc(o.note)}` : ""}</div>
               </div>
               <div class="row-side">
                 ${state.settings.consegne ? `
@@ -3590,13 +3608,11 @@
         }
         break;
 
-      case "reorder-one": {
-        if (!c || !p) break;
-        const x = shelf(c).find(y => y.productId === p.id);
-        pushOrder(c, [{ productId: p.id, qty: x ? x.qty : 1 }], {});
-        render(); toast(`${p.name}: riordinato oggi`);
-        break;
-      }
+      /* Prima registrava di corsa e senza prezzo: comodo finché di soldi non si
+         parlava, sbagliato adesso. Apre la finestra già compilata con quel
+         prodotto, la sua quantità e il prezzo dell'ultima volta — un tocco in più,
+         e in cambio puoi cambiare prezzo, quantità e data. */
+      case "reorder-one": if (c && p) { openId = c.id; modalOrder(c, [p.id]); } break;
       case "drop":
         if (c && p) {
           c.dropped.push({ productId: p.id, at: nowISO() });
