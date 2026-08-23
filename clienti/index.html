@@ -3505,7 +3505,16 @@
       </div>`;
   }
 
+  /* Ridisegnare significa rifare il contenuto da capo, e un contenuto nuovo
+     riparte dall'alto: segnando «consegnato» in fondo alla scheda si finiva
+     rispediti all'inizio. Le due posizioni da tenere sono quella della pagina e
+     quella della scheda, che scorre per conto suo. Chi vuole tornare in cima —
+     il cambio di sezione — lo fa dopo, di proposito. */
   function render() {
+    const yPagina = window.scrollY;
+    const corpo = document.querySelector(".sheet-body");
+    const yScheda = corpo ? corpo.scrollTop : 0;
+
     renderRail();
     const body = view === "clienti" ? viewClienti() : view === "prodotti" ? viewProdotti()
       : view === "riepilogo" ? viewRiepilogo() : view === "dati" ? viewDati() : viewOggi();
@@ -3517,6 +3526,10 @@
     if (view === "dati") bindDati();
     const selMese = document.getElementById("r-mese");
     if (selMese) selMese.addEventListener("change", () => { mese = selMese.value; render(); });
+
+    const corpo2 = document.querySelector(".sheet-body");
+    if (corpo2 && yScheda) corpo2.scrollTop = yScheda;
+    if (yPagina) window.scrollTo(0, yPagina);
   }
 
   function bindDati() {
