@@ -1951,7 +1951,15 @@ Zio Franco"></textarea>
 
   /* ══ Render ═══════════════════════════════════════════════════════════ */
 
+  /* Ridisegnare rifà il contenuto da capo, e un contenuto nuovo riparte dall'alto:
+     registrando qualcosa in fondo a una scheda si finiva rispediti all'inizio. Si
+     tengono le due posizioni: quella della pagina e quella della scheda, che
+     scorre per conto suo. Il cambio di sezione torna in cima dopo, di proposito. */
   function render() {
+    const yPagina = window.scrollY;
+    const corpo = document.querySelector(".sheet-body");
+    const yScheda = corpo ? corpo.scrollTop : 0;
+
     renderRail();
     const body = view === "nomi" ? viewNomi() : view === "piani" ? viewPiani() : view === "dati" ? viewDati() : viewCruscotto();
     /* Resta il solo avviso che segnala un guasto in corso: il browser che rifiuta
@@ -1963,6 +1971,9 @@ Zio Franco"></textarea>
          computer.</div></div>` : "";
     document.getElementById("main").innerHTML = `<div class="wrap">${banner}${body}</div>`;
     renderSheet();
+    const corpo2 = document.querySelector(".sheet-body");
+    if (corpo2 && yScheda) corpo2.scrollTop = yScheda;
+    if (yPagina) window.scrollTo(0, yPagina);
     if (view === "nomi") {
       const q = document.getElementById("q");
       if (q && query) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
