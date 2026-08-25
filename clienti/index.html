@@ -2373,7 +2373,9 @@
 
           <div>
             <div class="grp-label"><span class="eyebrow">Ordini</span></div>
-            ${storia.length ? `<div class="rows">${storia.map(o => `<div class="row">
+            ${storia.length ? `<div class="rows">${storia.map(o => `<div class="row tap"
+              data-act="edit-order" data-id="${c.id}" data-oid="${o.id}" tabindex="0" role="button"
+              aria-label="Modifica l'ordine del ${esc(fmtDateY(o.date))}">
               <div class="row-main">
                 ${o.lines.length ? `<div class="ordine-righe">${o.lines.map(l => {
                   const lis = listinoDi(prodById(l.productId));
@@ -2569,11 +2571,17 @@
     return h;
   }
 
-  function modalOrder(c, prefill) {
+  /* La stessa finestra registra un ordine nuovo e ne corregge uno vecchio: le
+     domande sono le stesse, e un secondo modulo per gli stessi campi sarebbe due
+     posti in cui sbagliare. Con `ordine` si apre in correzione. */
+  function modalOrder(c, prefill, ordine) {
     if (!c) return;
+    const modifica = !!ordine;
     const sh = shelf(c).filter(x => !x.dropped);
-    let draft = (prefill && prefill.length ? prefill : sh.filter(x => x.daysTo <= state.settings.preavviso).map(x => x.productId))
-      .map(pid => ({ productId: pid, qty: (sh.find(x => x.productId === pid) || {}).qty || 1 }));
+    let draft = modifica
+      ? ordine.lines.map(l => ({ productId: l.productId, qty: l.qty, pz: l.prezzo ? String(l.prezzo) : "" }))
+      : (prefill && prefill.length ? prefill : sh.filter(x => x.daysTo <= state.settings.preavviso).map(x => x.productId))
+        .map(pid => ({ productId: pid, qty: (sh.find(x => x.productId === pid) || {}).qty || 1 }));
     /* Nessun prodotto suggerito: la riga parte vuota e aperta sulla ricerca, che
        è il gesto che serve — non un menù da srotolare. */
     if (!draft.length) draft = [{ productId: "", qty: 1, aperto: true }];
@@ -2585,31 +2593,33 @@
       return "";
     };
 
-    openModal(`<div class="eyebrow">${esc(c.name)}</div>
-      <h2>Ordine</h2>
+    openModal(`<div class="eyebrow">${esc(c.name)}${modifica ? " · registrato il " + esc(fmtDate(ordine.date)) : ""}</div>
+      <h2>${modifica ? "Correggi l'ordine" : "Ordine"}</h2>
       <form class="modal-form" id="f-order">
         <div class="field"><label>Prodotti</label><div id="ol" style="display:flex;flex-direction:column;gap:10px"></div>
           <div><button type="button" class="btn btn-sm" id="ol-add">+ Aggiungi riga</button></div></div>
         <div class="field-2">
           <div class="field"><label for="o-date">Quando</label>
-            <input id="o-date" type="date" value="${todayISO()}" required></div>
+            <input id="o-date" type="date" value="${modifica ? esc(ordine.date) : todayISO()}" required></div>
           <div class="field"><label for="o-importo">Totale</label>
-            <input id="o-importo" type="number" min="0" step="0.01" placeholder="€" inputmode="decimal">
+            <input id="o-importo" type="number" min="0" step="0.01" placeholder="€" inputmode="decimal"
+              value="${modifica && ordine.importo ? ordine.importo : ""}">
             <span class="hint">Si somma dai prezzi. Cambialo se serve.</span></div>
         </div>
         <div class="field"><label for="o-note">Note</label>
-          <input id="o-note" type="text" placeholder="consegnato a mano, ordine fatto da lui…"></div>
+          <input id="o-note" type="text" placeholder="consegnato a mano, ordine fatto da lui…"
+            value="${modifica ? esc(ordine.note) : ""}"></div>
         ${state.settings.consegne ? `<div class="field">
           <label>Consegna e incasso</label>
           <label style="display:flex;gap:8px;align-items:center;font-size:13.5px;cursor:pointer">
-            <input type="checkbox" id="o-cons" style="width:auto"> <span>già consegnato</span></label>
+            <input type="checkbox" id="o-cons" style="width:auto" ${modifica && ordine.consegnato ? "checked" : ""}> <span>già consegnato</span></label>
           <label style="display:flex;gap:8px;align-items:center;font-size:13.5px;cursor:pointer">
-            <input type="checkbox" id="o-pag" style="width:auto"> <span>già pagato</span></label>
+            <input type="checkbox" id="o-pag" style="width:auto" ${modifica && ordine.pagato ? "checked" : ""}> <span>già pagato</span></label>
           <span class="hint">Quello che lasci non spuntato lo trovi in «Oggi», fra le cose in sospeso.</span>
         </div>` : ""}
         <div class="modal-actions">
           <button type="button" class="btn" data-act="close-modal">Annulla</button>
-          <button type="submit" class="btn btn-primary">Registra l'ordine</button>
+          <button type="submit" class="btn btn-primary">${modifica ? "Salva le correzioni" : "Registra l'ordine"}</button>
         </div>
       </form>`, box => {
       const ol = box.querySelector("#ol");
@@ -2642,7 +2652,10 @@
 
       /* L'importo si compila da sé sommando le righe, e smette di farlo appena lo
          scrivi a mano: se hai aggiustato il totale, non te lo cambio sotto il naso. */
-      let importoAMano = false;
+      /* Correggendo un ordine: se il totale salvato è la somma delle righe, si
+         continua a calcolarlo; se era stato aggiustato a mano, si lascia stare. */
+      let importoAMano = modifica && ordine.importo > 0
+        && Math.abs(ordine.importo - ordine.lines.reduce((t, l) => t + (l.prezzo || 0) * l.qty, 0)) > 0.004;
       const ricalcola = () => {
         if (importoAMano) return;
         const tot = draft.reduce((t, l) => t + (Number(l.pz) || 0) * l.qty, 0);
@@ -2798,10 +2811,27 @@
         if (!lines.length) { toast("Scegli almeno un prodotto"); return; }
 
         const spunta = id => { const el = box.querySelector(id); return el && el.checked; };
+        const data = box.querySelector("#o-date").value || todayISO();
+        const importo = Math.max(0, Number(box.querySelector("#o-importo").value) || 0);
+        const nota = box.querySelector("#o-note").value.trim();
+
+        if (modifica) {
+          /* Si correggono i campi e basta: niente delle conseguenze di un ordine
+             nuovo — non chiude promemoria, non riapre chi era stato perso, non
+             rimette fra i seguiti un prodotto messo da parte. Correggere un
+             prezzo sbagliato non è ricomprare. Le date di consegna e incasso già
+             segnate restano quelle: solo spuntarle adesso le mette a oggi. */
+          Object.assign(ordine, { date: data, importo, note: nota, lines });
+          ordine.consegnato = spunta("#o-cons") ? (ordine.consegnato || todayISO()) : "";
+          ordine.pagato = spunta("#o-pag") ? (ordine.pagato || todayISO()) : "";
+          c.orders.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+          touch(c); save(); closeModal(); render();
+          toast(creati ? "Ordine corretto — controlla la durata dei prodotti nuovi" : "Ordine corretto");
+          return;
+        }
+
         pushOrder(c, lines, {
-          date: box.querySelector("#o-date").value || todayISO(),
-          importo: box.querySelector("#o-importo").value,
-          note: box.querySelector("#o-note").value.trim(),
+          date: data, importo, note: nota,
           consegnato: spunta("#o-cons"),
           pagato: spunta("#o-pag"),
         });
@@ -3660,6 +3690,12 @@
           : (campo === "consegnato" ? "Torna fra le consegne da fare" : "Torna fra gli incassi da fare"));
         break;
       }
+      case "edit-order": {
+        if (!c) break;
+        const o = c.orders.find(x => x.id === el.dataset.oid);
+        if (o) modalOrder(c, null, o);
+        break;
+      }
       case "del-order":
         if (c) {
           c.orders = c.orders.filter(o => o.id !== el.dataset.oid);
@@ -3741,8 +3777,8 @@
       else if (openId) { openId = null; document.getElementById("layer").innerHTML = ""; }
     }
     if (ev.key === "Enter" || ev.key === " ") {
-      const r = ev.target.closest && ev.target.closest('.row[data-act="open"]');
-      if (r) { ev.preventDefault(); openId = r.dataset.id; renderSheet(); }
+      const r = ev.target.closest && ev.target.closest(".row.tap[data-act]");
+      if (r) { ev.preventDefault(); r.click(); }
     }
   });
 
