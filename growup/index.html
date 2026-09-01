@@ -962,8 +962,11 @@ function vistaDati(){
     <label class="field"><span>Indirizzo dello script</span>
       <input id="syncUrl" type="url" placeholder="https://script.google.com/..." value="${esc(S.sync.url)}"></label>
     <button class="btn wide" data-act="salva-sync">Salva l'indirizzo</button>
-    ${S.sync.url?`<button class="btn primary wide" data-act="sincronizza">Sincronizza adesso</button>
-      <p class="small faint">${S.sync.ultimo?`Ultima volta: ${dataIt(S.sync.ultimo)}`:"Mai sincronizzato"}</p>`:``}
+    ${S.sync.url?`<button class="btn primary wide" data-act="sincronizza" ${sincronizzando?"disabled":""}>${
+        sincronizzando?"Sto sincronizzando…":"Sincronizza adesso"}</button>
+      <p class="small faint">${sincronizzando
+        ? "Il foglio Google impiega qualche secondo. Puoi continuare a usare l'app."
+        : (S.sync.ultimo?`Ultima volta: ${dataIt(S.sync.ultimo)}`:"Mai sincronizzato")}</p>`:``}
   </div>
   <div class="card stack">
     <h2>Ricomincia</h2>
@@ -1238,9 +1241,17 @@ function pacchettoMio(){
 
 /* ---- 10. Sincronizzazione (foglio Google via Apps Script) ---- */
 
-async function sincronizza(){
-  if(!S.sync.url){ toast("Manca l'indirizzo"); return; }
-  toast("Sincronizzo…");
+/* Il foglio Google impiega 6-20 secondi a rispondere: e' il costo di Sheets e non si abbassa.
+   Percio' la sincronizzazione non deve MAI far aspettare nessuno — parte da sola in sottofondo,
+   non si sovrappone a se stessa, e in silenzio non disturba se la rete non c'e'. */
+let sincronizzando = false;
+let syncProgrammata = null;
+
+async function sincronizza(opzioni){
+  const zitto = !!(opzioni && opzioni.silenzioso);
+  if(!S.sync.url){ if(!zitto) toast("Manca l'indirizzo"); return; }
+  if(sincronizzando) return;                 // due giri insieme si pesterebbero i piedi
+  sincronizzando = true; render();
   try{
     const res = await fetch(S.sync.url, {
       method:"POST",
@@ -1250,11 +1261,20 @@ async function sincronizza(){
     const out = await res.json();
     if(out && out.dati) unisci(out.dati);
     S.sync.ultimo = iso(OGGI()); salva();
-    toast("Fatto");
+    if(!zitto) toast("Fatto");
   }catch(e){
-    toast("Non riesco a collegarmi");
+    if(!zitto) toast("Non riesco a collegarmi");
   }
+  sincronizzando = false;
   render();
+}
+
+/* Dopo ogni cosa registrata: manda in sottofondo, senza che l'utente ci pensi.
+   Aspetta qualche secondo cosi' tre spunte di fila diventano una chiamata sola. */
+function programmaSync(){
+  if(!S.sync.url) return;
+  clearTimeout(syncProgrammata);
+  syncProgrammata = setTimeout(()=>sincronizza({silenzioso:true}), 2500);
 }
 
 /* ---- 11. Azioni ---- */
@@ -1373,12 +1393,12 @@ document.addEventListener("click", async ev => {
   if(a==="salva-vp"){
     const v = Number((document.getElementById("vpVal").value||"").trim());
     if(isNaN(v)||v<0) return toast("Numero non valido");
-    aggiungiEvento(id, "vp", v); salva(); chiudiFoglio(); return toast("Segnato");
+    aggiungiEvento(id, "vp", v); salva(); programmaSync(); chiudiFoglio(); return toast("Segnato");
   }
 
-  if(a==="fatto"){ aggiungiEvento(S.me, b.dataset.t); salva(); toast("Bene."); return render(); }
+  if(a==="fatto"){ aggiungiEvento(S.me, b.dataset.t); salva(); programmaSync(); toast("Bene."); return render(); }
 
-  if(a==="conta"){ aggiungiEvento(id, b.dataset.t); salva(); render(); return toast("Segnato"); }
+  if(a==="conta"){ aggiungiEvento(id, b.dataset.t); salva(); programmaSync(); render(); return toast("Segnato"); }
 
   if(a==="salva-nuovo"){
     const nome = (document.getElementById("nvNome").value||"").trim();
@@ -1434,7 +1454,7 @@ document.addEventListener("change", ev => {
     const e = primoEvento(pid, tipo);
     if(c.checked && !e) aggiungiEvento(pid, tipo);
     else if(!c.checked && e) S.cancellati[e.id] = iso(OGGI());
-    salva(); render(); return;
+    salva(); programmaSync(); render(); return;
   }
   const f = ev.target.closest("#fileIn");
   if(f && f.files && f.files[0]){
