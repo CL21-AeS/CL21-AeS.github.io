@@ -198,6 +198,11 @@ const FATTI = [
 
 /* ---- 2. Stato e persistenza ---- */
 
+/* L'indirizzo del foglio e' scritto qui dentro: cosi' ogni installazione sa gia' dove
+   sincronizzarsi, e puo' CHIEDERE al foglio se un capofila esiste gia' prima di lasciarne
+   nascere un secondo. Non e' un segreto: viaggia comunque in ogni link d'invito. */
+const FOGLIO_URL = "https://script.google.com/macros/s/AKfycbz_3sBMgoKh-6MjqiwmMdKP4AvexV_WX0yK2_pmrwFFMvlkSuog-0lv75kiNTzzLHkT/exec";
+
 const CHIAVE = "growup.v1";
 const CHIAVE_VECCHIA = "avanti.v1";   // l'app si chiamava Avanti: si travasa una volta e basta
 const OGGI = () => new Date();
@@ -209,7 +214,8 @@ let foglio = null;        // foglio ancorato in basso
 let chiusi = new Set();   // rami dell'albero collassati
 
 function vuoto(){
-  return { me:null, leader:null, persone:{}, eventi:[], aperture:{}, cancellati:{}, sync:{ url:"", ultimo:null } };
+  return { me:null, leader:null, persone:{}, eventi:[], aperture:{}, cancellati:{},
+           sync:{ url:FOGLIO_URL, ultimo:null } };
 }
 
 function carica(){
@@ -223,6 +229,7 @@ function carica(){
     }
     const s = Object.assign(vuoto(), JSON.parse(raw));
     for(const k in vuoto()) if(s[k]===undefined) s[k]=vuoto()[k];
+    if(!s.sync.url) s.sync.url = FOGLIO_URL;
     return s;
   }catch(e){ return vuoto(); }
 }
@@ -643,17 +650,27 @@ function vistaIngresso(){
       <p class="muted">Una cosa alla volta, e si vede che ti muovi.</p>
     </div>
     <div class="card stack">
-      <h2>Sei stato invitato?</h2>
-      <p class="small">Apri il link che ti ha mandato il tuo sponsor. Se hai solo il codice, incollalo qui.</p>
-      <input id="codeIn" type="text" placeholder="CODICE" autocapitalize="characters">
-      <button class="btn wide" data-act="entra-codice">Entra</button>
+      <h2>Si entra dal link</h2>
+      <p class="small">Il tuo sponsor te ne manda uno: aprilo e sei dentro. Non serve altro,
+      né registrazione né password.</p>
+      <p class="small faint">Non l'hai ricevuto? Chiedilo a chi ti ha parlato di Growup:
+      è l'unico modo per entrare nel suo gruppo.</p>
     </div>
     <div class="card stack">
-      <h2>Apri l'organizzazione</h2>
-      <p class="small">Da fare una volta sola, da chi vede tutto.</p>
+      <h2>Cambiato telefono?</h2>
+      <p class="small">Se eri già dentro, ritrova il tuo percorso con il tuo codice —
+      lo trovi in <b>Dati</b> sul vecchio telefono.</p>
+      <input id="codeIn" type="text" placeholder="CODICE" autocapitalize="characters">
+      <button class="btn wide" data-act="entra-codice">Ritrova il mio percorso</button>
+    </div>
+    ${location.hash==="#apro" ? `
+    <div class="card stack">
+      <span class="tag">Apertura</span>
+      <p class="small">Nessun capofila risulta ancora registrato. Da qui nasce l'organizzazione,
+      una volta sola.</p>
       <label class="field"><span>Il tuo nome</span><input id="leadName" type="text" placeholder="Nome e cognome"></label>
-      <button class="btn primary wide" data-act="crea-leader">Comincia da qui</button>
-    </div>`;
+      <button class="btn primary wide" data-act="crea-leader">Apro io l'organizzazione</button>
+    </div>`:``}`;
 }
 
 /* --- Oggi: la schermata più importante. Una sola azione. --- */
@@ -957,11 +974,14 @@ function vistaDati(){
   </div>
   <div class="card stack">
     <h2>Sincronizzazione</h2>
-    <p class="small">Con l'indirizzo del foglio condiviso i dati viaggiano da soli.
-    Senza, l'app funziona comunque: solo da sola.</p>
-    <label class="field"><span>Indirizzo dello script</span>
-      <input id="syncUrl" type="url" placeholder="https://script.google.com/..." value="${esc(S.sync.url)}"></label>
-    <button class="btn wide" data-act="salva-sync">Salva l'indirizzo</button>
+    <p class="small">${S.sync.url===FOGLIO_URL
+      ? "Già collegata: i tuoi passaggi viaggiano da soli verso chi ti segue."
+      : "Attenzione: stai usando un indirizzo diverso da quello previsto dall'app."}</p>
+    <details><summary class="small faint" style="cursor:pointer;padding:8px 0">Cambia indirizzo</summary>
+      <label class="field"><span>Indirizzo dello script</span>
+        <input id="syncUrl" type="url" placeholder="https://script.google.com/..." value="${esc(S.sync.url)}"></label>
+      <button class="btn wide" data-act="salva-sync" style="margin-top:10px">Salva l'indirizzo</button>
+    </details>
     ${S.sync.url?`<button class="btn primary wide" data-act="sincronizza" ${sincronizzando?"disabled":""}>${
         sincronizzando?"Sto sincronizzando…":"Sincronizza adesso"}</button>
       <p class="small faint">${sincronizzando
@@ -1182,9 +1202,10 @@ function etichettaEvento(e){
    contiene CHI invita e DOVE si sincronizza. Chi lo apre si iscrive da se'
    e risulta agganciato allo sponsor senza che lo sponsor inserisca niente. */
 function linkSponsor(id){
+  /* Niente indirizzo del foglio nel link: l'app lo conosce da sola (FOGLIO_URL).
+     Il link resta corto e non cambia se un domani il foglio cambia. */
   const base = location.origin + location.pathname;
   const q = new URLSearchParams({ sp:id, spn:(S.persone[id]||{}).nome || "" });
-  if(S.sync.url) q.set("u", S.sync.url);
   return base + "#" + q.toString();
 }
 
@@ -1277,6 +1298,20 @@ function programmaSync(){
   syncProgrammata = setTimeout(()=>sincronizza({silenzioso:true}), 2500);
 }
 
+/* Chiede al foglio senza scrivere nulla. Restituisce l'archivio, o null se non si arriva. */
+async function chiediAlFoglio(chi){
+  if(!S.sync.url) return null;
+  try{
+    const res = await fetch(S.sync.url, {
+      method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" },
+      body: JSON.stringify({ azione:"sync", me:chi||null,
+                             dati:{ v:1, persone:{}, eventi:[], aperture:{}, cancellati:{} } })
+    });
+    const out = await res.json();
+    return out && out.dati ? out.dati : null;
+  }catch(e){ return null; }
+}
+
 /* ---- 11. Azioni ---- */
 
 function segnaApertura(){
@@ -1333,6 +1368,17 @@ document.addEventListener("click", async ev => {
   if(a==="crea-leader"){
     const nome = (document.getElementById("leadName").value||"").trim();
     if(!nome) return toast("Scrivi il tuo nome");
+    /* Seconda serratura: anche chi conoscesse questo indirizzo non puo' creare un secondo
+       capofila, perche' prima si chiede al foglio se ce n'e' gia' uno. Un secondo capofila
+       farebbe nascere un'organizzazione parallela che non si unira' mai alla prima. */
+    b.disabled = true; b.textContent = "Controllo…";
+    const gia = await chiediAlFoglio(null);
+    b.disabled = false; b.textContent = "Apro io l'organizzazione";
+    if(gia === null) return alert("Non riesco a controllare il foglio, e senza quel controllo "
+      + "non apro niente: due capofila spaccherebbero l'organizzazione in due.\n\nRiprova fra un momento.");
+    if(gia.leader && gia.persone && gia.persone[gia.leader])
+      return alert("L'organizzazione esiste già: l'ha aperta "
+        + gia.persone[gia.leader].nome + ".\n\nPer entrare serve il link del tuo sponsor.");
     const nid = creaPersona(nome, null, OGGI());
     S.me = nid; S.leader = nid; salva(); segnaApertura(); vista="tutti"; return render();
   }
@@ -1341,7 +1387,14 @@ document.addEventListener("click", async ev => {
     const c = (document.getElementById("codeIn").value||"").trim().toUpperCase();
     if(!c) return toast("Incolla il codice");
     if(S.persone[c]){ S.me=c; salva(); segnaApertura(); return render(); }
-    return toast("Codice sconosciuto: apri il link dello sponsor");
+    b.disabled = true; b.textContent = "Cerco…";
+    const dati = await chiediAlFoglio(c);
+    b.disabled = false; b.textContent = "Ritrova il mio percorso";
+    if(dati === null) return toast("Non riesco a collegarmi, riprova");
+    if(!dati.persone || !dati.persone[c]) return toast("Codice sconosciuto");
+    unisci(dati); S.me = c; salva(); segnaApertura();
+    toast("Bentornato, " + (S.persone[c].nome||"").split(" ")[0]);
+    return render();
   }
 
   if(a==="accetta-sponsor"){
@@ -1429,8 +1482,8 @@ document.addEventListener("click", async ev => {
   }
 
   if(a==="salva-sync"){
-    S.sync.url = (document.getElementById("syncUrl").value||"").trim(); salva();
-    render(); return toast(S.sync.url?"Indirizzo salvato":"Indirizzo rimosso");
+    S.sync.url = (document.getElementById("syncUrl").value||"").trim() || FOGLIO_URL; salva();
+    render(); return toast("Indirizzo salvato");
   }
   if(a==="salva-tel"){
     const t = (document.getElementById("mioTel").value||"").trim();
