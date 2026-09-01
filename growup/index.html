@@ -126,6 +126,7 @@ label.field>span{display:block;font-size:13px;color:var(--ink2);margin-bottom:5p
 .micro .m{width:14px;flex:none;color:var(--ink3);font-weight:700}
 .micro li.ok .m{color:var(--verde)}
 .micro small{display:block;color:var(--ink3)}
+.btn.tolgo{background:transparent;border-color:transparent;color:var(--rosso);font-weight:600}
 .sec{margin-top:22px}
 .sec>.tag{display:block;margin-bottom:6px}
 .empty{text-align:center;color:var(--ink2);padding:28px 8px}
@@ -1176,7 +1177,13 @@ function contenutoFoglio(){
         ${ev.length?ev.map(e=>`<li><span class="mark">·</span><span class="grow">
           ${esc(etichettaEvento(e))}<br><small class="faint">${dataIt(e.at)}${e.by!==p.id?" · segnato dallo sponsor":""}</small>
         </span></li>`).join(""):`<li><span class="mark">–</span><span class="grow small">Niente ancora</span></li>`}
-        </ul></div>`,
+        </ul></div>
+
+      ${mio && p.id!==S.me && p.id!==S.leader ? `
+      <div class="sec" style="margin-top:26px">
+        <button class="btn wide tolgo" data-act="togli-persona" data-id="${p.id}">
+          Togli ${esc(p.nome.split(" ")[0])} dal gruppo</button>
+      </div>`:``}`,
       foot: mio ? `<div class="row">
         <button class="btn grow" data-act="apri-registra" data-id="${p.id}">Registra un fatto</button>
         <button class="btn primary grow" data-act="apri-invito" data-id="${p.id}">Link</button>
@@ -1487,6 +1494,39 @@ document.addEventListener("click", async ev => {
     const tel = (document.getElementById("nvTel").value||"").trim();
     if(tel){ S.persone[nid].tel = tel; S.persone[nid].updatedAt = iso(OGGI()); salva(); }
     return apriFoglio("invito", { id:nid });
+  }
+
+  if(a==="togli-persona"){
+    const p = S.persone[id];
+    if(!p) return;
+    if(id===S.me || id===S.leader) return toast("Questa persona non si può togliere");
+    if(!p.sponsor || !S.persone[p.sponsor])
+      return toast("Non so a chi attaccare le sue persone: sincronizza e riprova");
+
+    /* Chi chiude con Amway sparisce e le sue prime linee salgono al suo sponsor.
+       E' come funziona davvero: il ramo non si perde, si accorcia di un anello. */
+    const sotto = figliDi(id);
+    const su = S.persone[p.sponsor];
+    let avviso = "Togli " + p.nome + " dal gruppo.\n\n";
+    if(sotto.length) avviso += (sotto.length===1
+        ? "La sua persona passa a " : "Le sue " + sotto.length + " persone passano a ")
+      + su.nome + " (" + sotto.map(x=>x.nome).join(", ") + "), con tutta "
+      + (sotto.length===1 ? "la sua storia" : "la loro storia") + ".\n\n";
+    avviso += "Sparisce dall'albero e dai conteggi, su tutti i telefoni. "
+      + "Se sta ancora usando l'app, continuerà a vederla ma quello che segna non arriverà più.\n\n"
+      + "Non si annulla dall'app.";
+    if(!confirm(avviso)) return;
+
+    const ora = iso(OGGI());
+    /* prima si risale il ramo, poi si mette la pietra: invertendo, i figli non si troverebbero piu' */
+    for(const f of sotto){
+      S.persone[f.id] = Object.assign({}, S.persone[f.id], { sponsor: p.sponsor, updatedAt: ora });
+    }
+    S.cancellati[id] = ora;
+    salva(); programmaSync(); chiudiFoglio();
+    return toast(sotto.length
+      ? p.nome.split(" ")[0] + " tolta, " + plur(sotto.length,"persona passata","persone passate") + " a " + su.nome.split(" ")[0]
+      : p.nome.split(" ")[0] + " tolta dal gruppo");
   }
 
   if(a==="copia-link") return copia(linkInvito(S.persone[id]));
