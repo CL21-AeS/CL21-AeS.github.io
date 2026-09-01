@@ -1,0 +1,1456 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Growup</title>
+<style>
+:root{
+  --bg:#f6f7f9; --card:#ffffff; --ink:#14181f; --ink2:#5b6472; --ink3:#8b95a3;
+  --line:#e3e7ec; --accent:#1f6feb; --accent-ink:#ffffff;
+  --verde:#1a9c5b; --giallo:#c98a00; --rosso:#d64545; --stella:#8b5cf6;
+  --r:14px; --pad:16px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1116; --card:#171a21; --ink:#eef1f5; --ink2:#a3adbb; --ink3:#6f7987;
+    --line:#252a33; --accent:#4b8ef7;
+    --verde:#3ec27f; --giallo:#e2a93b; --rosso:#f0736f; --stella:#a78bfa;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1116; --card:#171a21; --ink:#eef1f5; --ink2:#a3adbb; --ink3:#6f7987;
+  --line:#252a33; --accent:#4b8ef7;
+  --verde:#3ec27f; --giallo:#e2a93b; --rosso:#f0736f; --stella:#a78bfa;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%;
+  padding-bottom:calc(72px + env(safe-area-inset-bottom));
+}
+.wrap{max-width:640px;margin:0 auto;padding:var(--pad)}
+h1,h2,h3{margin:0;line-height:1.25}
+h1{font-size:22px;letter-spacing:-.01em}
+h2{font-size:17px}
+h3{font-size:15px}
+p{margin:.5em 0}
+small,.small{font-size:13px;color:var(--ink2)}
+.muted{color:var(--ink2)}
+.faint{color:var(--ink3)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:var(--pad);margin:12px 0}
+.card.tight{padding:12px}
+.row{display:flex;gap:10px;align-items:center}
+.row.wrap{flex-wrap:wrap}
+.spread{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.grow{flex:1;min-width:0}
+.stack>*+*{margin-top:10px}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:46px;padding:0 16px;border-radius:12px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer;
+  text-decoration:none;
+}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.wide{width:100%}
+.btn.small{min-height:38px;padding:0 12px;font-size:14px;font-weight:600}
+.btn.ghost{background:transparent}
+.btn[disabled]{opacity:.45;pointer-events:none}
+a{color:var(--accent)}
+input,select,textarea{
+  font:inherit;color:var(--ink);background:var(--bg);
+  border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%;min-height:46px;
+}
+textarea{min-height:90px;resize:vertical}
+label.field{display:block;margin:12px 0 0}
+label.field>span{display:block;font-size:13px;color:var(--ink2);margin-bottom:5px}
+.bar{height:10px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+  padding:4px 9px;border-radius:99px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
+.pill.v{color:var(--verde);border-color:color-mix(in srgb,var(--verde) 35%,transparent)}
+.pill.g{color:var(--giallo);border-color:color-mix(in srgb,var(--giallo) 35%,transparent)}
+.pill.r{color:var(--rosso);border-color:color-mix(in srgb,var(--rosso) 35%,transparent)}
+.pill.s{color:var(--stella);border-color:color-mix(in srgb,var(--stella) 40%,transparent)}
+.dot{width:9px;height:9px;border-radius:99px;background:var(--ink3);flex:none}
+.dot.v{background:var(--verde)} .dot.g{background:var(--giallo)} .dot.r{background:var(--rosso)}
+.dot.n{background:transparent;box-shadow:inset 0 0 0 2px var(--ink3)}
+.steps{list-style:none;margin:0;padding:0}
+.steps li{display:flex;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+.steps li:first-child{border-top:0}
+.steps .mark{width:22px;flex:none;text-align:center;color:var(--ink3);font-weight:700}
+.steps li.done .mark{color:var(--verde)}
+.steps li.now{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 9%,transparent),transparent);
+  margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:10px}
+.steps li.now .mark{color:var(--accent)}
+.steps li.future .t{color:var(--ink3)}
+.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+  display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:30}
+.tabs button{flex:1;background:none;border:0;color:var(--ink3);font:inherit;font-size:11px;font-weight:600;
+  padding:6px 2px;min-height:56px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.tabs button b{font-size:19px;line-height:1;font-weight:400}
+.tabs button.on{color:var(--accent)}
+.sheet{position:fixed;inset:0;background:rgba(8,10,14,.5);z-index:50;display:flex;align-items:flex-end}
+.sheet-box{background:var(--card);width:100%;max-width:640px;margin:0 auto;border-radius:18px 18px 0 0;
+  max-height:88vh;display:flex;flex-direction:column}
+.sheet-head{padding:14px var(--pad);border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center}
+.sheet-body{padding:var(--pad);overflow:auto;-webkit-overflow-scrolling:touch}
+.sheet-foot{padding:12px var(--pad) calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.x{margin-left:auto;background:none;border:0;color:var(--ink2);font-size:24px;line-height:1;
+  width:44px;height:44px;cursor:pointer}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi div{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px}
+.kpi b{display:block;font-size:20px}
+.kpi span{font-size:11px;color:var(--ink2);display:block;line-height:1.3}
+.person{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line);
+  width:100%;background:none;border-left:0;border-right:0;border-bottom:0;color:inherit;font:inherit;
+  text-align:left;cursor:pointer;min-height:60px}
+.person:first-of-type{border-top:0}
+.person .chev{color:var(--ink3);flex:none}
+.nodo-riga{display:flex;align-items:center;gap:2px}
+.rami{margin-left:9px;padding-left:7px;border-left:1px solid var(--line)}
+.tw{flex:none;width:24px;min-height:44px;background:none;border:0;color:var(--ink3);
+  font-size:13px;cursor:pointer;padding:0}
+.tw.vuoto{pointer-events:none;opacity:.35}
+.nodo-riga .person{border-top:0;padding:9px 0;min-height:52px}
+.sotto{font-size:11px;font-weight:700;color:var(--ink2);background:var(--bg);
+  border:1px solid var(--line);border-radius:99px;padding:2px 7px;white-space:nowrap}
+.tag{font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.06em}
+.warn{background:color-mix(in srgb,var(--giallo) 12%,var(--card));border-color:color-mix(in srgb,var(--giallo) 35%,var(--line))}
+.micro{list-style:none;margin:8px 0 2px;padding:0}
+.micro li{display:flex;gap:8px;padding:3px 0;font-size:14px;color:var(--ink)}
+.micro li.ok{color:var(--ink2)}
+.micro .m{width:14px;flex:none;color:var(--ink3);font-weight:700}
+.micro li.ok .m{color:var(--verde)}
+.micro small{display:block;color:var(--ink3)}
+.sec{margin-top:22px}
+.sec>.tag{display:block;margin-bottom:6px}
+.empty{text-align:center;color:var(--ink2);padding:28px 8px}
+.empty b{display:block;color:var(--ink);margin-bottom:6px}
+.chk{display:flex;gap:12px;align-items:center;padding:13px 0;border-top:1px solid var(--line);min-height:52px}
+.chk:first-child{border-top:0}
+.chk input{width:24px;height:24px;min-height:0;flex:none}
+.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;letter-spacing:.08em;
+  background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:inline-block}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom));
+  background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:12px;font-size:14px;font-weight:600;
+  z-index:80;max-width:88%;text-align:center}
+@media (max-width:560px){ .btn{min-height:48px} .kpi b{font-size:18px} }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<nav class="tabs" id="tabs"></nav>
+
+<script>
+"use strict";
+
+/* ============================================================
+   GROWUP — funnel comportamentale, tre ruoli (nuovo / sponsor / leader)
+   Un file solo. I dati vivono nel browser (localStorage).
+   Le fasi NON sono temporali: la fase è il punto più avanzato raggiunto,
+   il tempo dice soltanto se sei in linea, lento o veloce.
+   ============================================================ */
+
+/* ---- 1. Configurazione: le sei fasi, le finestre, le dichiarazioni ---- */
+
+const FASI = [
+  /* `domanda` e' la lingua del leader (serve a giudicare), `traguardo` e' la lingua
+     di chi il percorso lo sta facendo. Non vanno mai scambiate di schermata. */
+  { n:0, nome:"Ingresso",        domanda:"Ha iniziato davvero?",
+    traguardo:"Fare il primo ordine",             finestra:14,  breve:"Ingresso" },
+  { n:1, nome:"Attivazione",     domanda:"Fa ciò che ha detto di voler fare?",
+    traguardo:"100 VP e il primo cliente",        finestra:14,  breve:"Attivazione" },
+  { n:2, nome:"Duplicazione",    domanda:"Aiuta qualcun altro ad arrivare a 100 VP?",
+    traguardo:"Portare una persona a 100 VP",     finestra:60,  breve:"Duplicazione" },
+  { n:3, nome:"Builder",         domanda:"Prende iniziativa senza essere spinto?",
+    traguardo:"Path to Bronze e Bronze Foundation", finestra:120, breve:"Builder" },
+  { n:4, nome:"Emerging Leader", domanda:"Fa lavorare altre persone?",
+    traguardo:"Dal 15% al 18%",                   finestra:null, breve:"Emerging" },
+  { n:5, nome:"Leader",          domanda:"",
+    traguardo:"21% e oltre",                      finestra:null, breve:"Leader" }
+];
+
+/* Soglie del semaforo e della pipeline. Qui si tarano, in un posto solo. */
+const SOGLIE = {
+  vpAttivazione: 100,
+  verdeGiorni: 7,          // ultimo aggiornamento entro N giorni -> verde
+  gialloGiorni: 14,        // oltre -> rosso
+  freqAperture: 4,         // aperture negli ultimi 14 gg per il segnale "usa il sistema"
+  personeSegnale: 2,       // sponsorizzazioni per il segnale "porta persone"
+  segnaliPerPipeline: 3    // quanti segnali accesi servono per entrare in pipeline
+};
+
+/* I traguardi dichiarabili: fatti, non sensazioni. */
+const FATTI = [
+  { t:"primo_ordine",   label:"Primo ordine fatto",              fase:0 },
+  { t:"primo_cliente",  label:"Primo cliente che compra",         fase:1 },
+  { t:"path_to_bronze", label:"Path to Bronze",                   fase:3 },
+  { t:"foundation",     label:"Bronze Foundation",                fase:3 },
+  { t:"pct15",          label:"Bronze Builder / 15%",             fase:4 },
+  { t:"pct18",          label:"18%",                              fase:5 },
+  { t:"pct21",          label:"21% / Argento",                    fase:5 },
+  { t:"platino",        label:"Platino",                          fase:5 }
+];
+
+/* ---- 2. Stato e persistenza ---- */
+
+const CHIAVE = "growup.v1";
+const CHIAVE_VECCHIA = "avanti.v1";   // l'app si chiamava Avanti: si travasa una volta e basta
+const OGGI = () => new Date();
+
+let S = carica();
+let vista = "oggi";
+let apertoId = null;      // scheda persona aperta
+let foglio = null;        // foglio ancorato in basso
+let chiusi = new Set();   // rami dell'albero collassati
+
+function vuoto(){
+  return { me:null, leader:null, persone:{}, eventi:[], aperture:{}, cancellati:{}, sync:{ url:"", ultimo:null } };
+}
+
+function carica(){
+  try{
+    let raw = localStorage.getItem(CHIAVE);
+    if(!raw){
+      const vecchio = localStorage.getItem(CHIAVE_VECCHIA);
+      if(!vecchio) return vuoto();
+      localStorage.setItem(CHIAVE, vecchio);      // travaso, l'originale resta come rete
+      raw = vecchio;
+    }
+    const s = Object.assign(vuoto(), JSON.parse(raw));
+    for(const k in vuoto()) if(s[k]===undefined) s[k]=vuoto()[k];
+    return s;
+  }catch(e){ return vuoto(); }
+}
+
+let salvaKo = false;
+function salva(){
+  try{ localStorage.setItem(CHIAVE, JSON.stringify(S)); salvaKo=false; }
+  catch(e){ salvaKo = true; }
+}
+
+/* ---- 3. Utilità ---- */
+
+function codice(){
+  const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  try{
+    const b = new Uint8Array(6); crypto.getRandomValues(b);
+    for(const x of b) out += alfabeto[x % alfabeto.length];
+  }catch(e){
+    for(let i=0;i<6;i++) out += alfabeto[Math.floor(Math.random()*alfabeto.length)];
+  }
+  return out;
+}
+function uid(){ return codice()+codice(); }
+function iso(d){ return new Date(d).toISOString(); }
+function giorno(d){ const t = valida(d); return t===null ? "" : new Date(t).toISOString().slice(0,10); }
+function valida(d){ const t = new Date(d).getTime(); return isNaN(t) ? null : t; }
+function giorniTra(a,b){
+  const ta = valida(a), tb = valida(b);
+  if(ta===null || tb===null) return 0;
+  const ms = new Date(giorno(tb)) - new Date(giorno(ta));
+  return Math.round(ms/86400000);
+}
+function dataIt(d){
+  if(!d) return "—";
+  return new Date(d).toLocaleDateString("it-IT",{day:"numeric",month:"short",year:"numeric"});
+}
+/* wa.me vuole solo cifre con prefisso internazionale. Se il numero non ce l'ha,
+   non si indovina: si lascia solo "Chiama", che con qualunque formato funziona. */
+function whatsapp(tel){
+  if(!tel) return null;
+  const t = String(tel).trim();
+  const cifre = t.replace(/[^0-9]/g,"");
+  if(t.startsWith("+")) return cifre;
+  if(cifre.startsWith("00")) return cifre.slice(2);
+  return null;
+}
+function esc(s){
+  return String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function plur(n,uno,molti){ return n===1?`${n} ${uno}`:`${n} ${molti}`; }
+
+let toastT = null;
+function toast(msg){
+  document.querySelectorAll(".toast").forEach(n=>n.remove());
+  const d = document.createElement("div");
+  d.className="toast"; d.textContent = msg; document.body.appendChild(d);
+  clearTimeout(toastT); toastT = setTimeout(()=>d.remove(), 2600);
+}
+
+/* ---- 4. Il modello: eventi come fatti, tutto il resto dedotto ---- */
+
+function aggiungiEvento(personaId, tipo, valore, autore){
+  S.eventi.push({
+    id: uid(), persona: personaId, tipo, valore: valore==null?null:valore,
+    at: iso(OGGI()), by: autore || S.me || personaId
+  });
+}
+function eventiDi(id){ return S.eventi.filter(e => e.persona===id && !S.cancellati[e.id]); }
+function primoEvento(id, tipo){
+  return eventiDi(id).filter(e=>e.tipo===tipo).sort((a,b)=>a.at<b.at?-1:1)[0] || null;
+}
+function ha(id, tipo){ return !!primoEvento(id, tipo); }
+function vpDi(id){
+  const v = eventiDi(id).filter(e=>e.tipo==="vp").sort((a,b)=>a.at<b.at?-1:1);
+  return v.length ? Number(v[v.length-1].valore)||0 : 0;
+}
+function contaEventi(id, tipo){ return eventiDi(id).filter(e=>e.tipo===tipo).length; }
+function figliDi(id){
+  return Object.values(S.persone).filter(p => p.sponsor===id && !S.cancellati[p.id]);
+}
+function discendenti(id, out){
+  out = out || [];
+  for(const f of figliDi(id)){ out.push(f); discendenti(f.id, out); }
+  return out;
+}
+function attivato(id){ return vpDi(id) >= SOGLIE.vpAttivazione && ha(id,"primo_cliente"); }
+function haDuplicato(id){ return figliDi(id).some(f => vpDi(f.id) >= SOGLIE.vpAttivazione); }
+
+/* La fase: il punto più avanzato raggiunto. Un fatto, non una data. */
+function faseDi(id){
+  if(ha(id,"pct18") || ha(id,"pct21") || ha(id,"platino")) return 5;
+  if(ha(id,"foundation") || ha(id,"pct15"))                return 4;
+  /* la duplicazione porta in Fase 3 solo se la persona e' attivata lei stessa:
+     senza questo si diventa "Builder" senza aver fatto il primo ordine */
+  if((haDuplicato(id) && attivato(id)) || ha(id,"path_to_bronze")) return 3;
+  if(attivato(id))                                         return 2;
+  if(ha(id,"primo_ordine"))                                return 1;
+  return 0;
+}
+
+/* Le date di inizio di ogni fase. null = fase non ancora raggiunta.
+   Da qui escono sia il ritmo della fase aperta sia la velocità delle fasi chiuse. */
+function inizioFasi(p){
+  const primo = t => { const x = primoEvento(p.id,t); return x?x.at:null; };
+  const d = [p.creato, null, null, null, null, null];
+  d[1] = primo("primo_ordine");
+  const soglia = eventiDi(p.id).filter(x=>x.tipo==="vp" && Number(x.valore)>=SOGLIE.vpAttivazione)
+                   .sort((a,b)=>a.at<b.at?-1:1)[0];
+  const cli = primo("primo_cliente");
+  if(soglia && cli) d[2] = soglia.at > cli ? soglia.at : cli;
+  const dupl = !attivato(p.id) ? null : figliDi(p.id)
+    .map(f => { const e = eventiDi(f.id).filter(x=>x.tipo==="vp" && Number(x.valore)>=SOGLIE.vpAttivazione)
+                              .sort((a,b)=>a.at<b.at?-1:1)[0]; return e?e.at:null; })
+    .filter(Boolean).sort()[0] || null;
+  const ptb = primo("path_to_bronze");
+  d[3] = (dupl && ptb) ? (dupl < ptb ? dupl : ptb) : (dupl || ptb);
+  d[4] = primo("foundation") || primo("pct15");
+  d[5] = primo("pct18") || primo("pct21") || primo("platino");
+  /* una fase raggiunta implica le precedenti: riempie i buchi guardando indietro */
+  for(let i=1;i<d.length;i++) if(d[i] && !d[i-1]) d[i-1] = d[i];
+  return d;
+}
+function inizioFase(p){ return inizioFasi(p)[faseDi(p.id)] || p.creato; }
+
+/* Il ritmo della fase APERTA: in linea o in ritardo. Mai "veloce":
+   una fase in corso non si può ancora dire chiusa in fretta. */
+function ritmoDi(p){
+  const f = FASI[faseDi(p.id)];
+  if(!f.finestra) return null;
+  const g = giorniTra(inizioFase(p), OGGI());
+  if(g <= f.finestra) return { k:"linea", txt:`in linea (giorno ${g} su ${f.finestra})`, g, finestra:f.finestra };
+  return { k:"lento", txt:`in ritardo di ${g-f.finestra} giorni`, g, finestra:f.finestra };
+}
+
+/* La velocità: solo fasi effettivamente CHIUSE, e chiuse in meno di metà finestra. */
+function fasiVeloci(p){
+  const d = inizioFasi(p), out = [];
+  for(let i=0;i<d.length-1;i++){
+    if(!d[i] || !d[i+1] || !FASI[i].finestra) continue;
+    const g = giorniTra(d[i], d[i+1]);
+    if(g <= FASI[i].finestra*0.5) out.push({ fase:i, giorni:g, finestra:FASI[i].finestra });
+  }
+  return out;
+}
+
+/* Ultimo aggiornamento registrato dalla persona stessa */
+function ultimoTocco(id){
+  const suoi = eventiDi(id).filter(e => e.by===id);
+  const ap = (S.aperture[id]||[]);
+  const date = suoi.map(e=>e.at).concat(ap);
+  if(!date.length) return null;
+  return date.sort()[date.length-1];
+}
+/* Il semaforo misura l'attività REGISTRATA NELL'APP. Mai scritto "fermo". */
+function semaforo(id){
+  const t = ultimoTocco(id);
+  const p = S.persone[id];
+  if(!t){
+    /* invitata di recente e mai entrata: è il dato del funnel, non un fallimento */
+    const g0 = p ? giorniTra(p.creato, OGGI()) : 999;
+    return g0 <= FASI[0].finestra
+      ? { k:"n", g:g0, txt:"non ha ancora aperto l'app" }
+      : { k:"r", g:g0, txt:`invitata ${g0} giorni fa, non ha mai aperto l'app` };
+  }
+  const g = giorniTra(t, OGGI());
+  const txt = g===0 ? "ha aggiornato oggi"
+            : g===1 ? "ha aggiornato ieri"
+            : `non aggiorna da ${g} giorni`;
+  if(g <= SOGLIE.verdeGiorni)  return { k:"v", g, txt };
+  if(g <= SOGLIE.gialloGiorni) return { k:"g", g, txt };
+  return { k:"r", g, txt };
+}
+
+/* I segnali: due si misurano da soli, gli altri sono dichiarati. */
+function segnaliDi(id){
+  const p = S.persone[id]; if(!p) return [];
+  const out = [];
+  const ap = (S.aperture[id]||[]).filter(d => giorniTra(d, OGGI()) <= 14).length;
+  if(ap >= SOGLIE.freqAperture)
+    out.push({ k:"frequenza", misurato:true, txt:`ha aperto l'app ${ap} volte in 14 giorni` });
+
+  const vel = fasiVeloci(p);
+  if(vel.length){
+    const u = vel[vel.length-1];
+    out.push({ k:"velocita", misurato:true,
+      txt:`ha chiuso la Fase ${u.fase} in ${u.giorni} giorni su ${u.finestra}` +
+          (vel.length>1?` (${vel.length} fasi in anticipo)`:"") });
+  }
+
+  const figli = figliDi(id);
+  if(figli.length >= SOGLIE.personeSegnale)
+    out.push({ k:"persone", misurato:false, txt:`ha portato ${plur(figli.length,"persona","persone")}` });
+
+  if(haDuplicato(id)){
+    const chi = figli.filter(f=>vpDi(f.id)>=SOGLIE.vpAttivazione).map(f=>f.nome);
+    out.push({ k:"duplicazione", misurato:false, txt:`${chi.join(", ")} ha superato i 100 VP` });
+  }
+  const tutti = eventiDi(id);
+  const suoi = tutti.filter(e=>e.by===id).length;
+  if(tutti.length >= 4 && suoi/tutti.length >= 0.8)
+    out.push({ k:"iniziativa", misurato:true, txt:"registra da solo quello che fa" });
+
+  const pres = contaEventi(id,"presentazione");
+  if(pres >= 3) out.push({ k:"presentazioni", misurato:false, txt:`${pres} presentazioni segnate` });
+  return out;
+}
+function inPipeline(id){
+  const s = segnaliDi(id);
+  if(s.some(x=>x.k==="duplicazione") && s.length >= 2) return s;
+  return s.length >= SOGLIE.segnaliPerPipeline ? s : null;
+}
+
+/* Ha fatto ciò che ha detto? Confronto dichiarazione / fatti. */
+function promesse(p){
+  const d = p.dichiarato || {};
+  const out = [];
+  if(d.giorni100vp){
+    const scadenza = new Date(new Date(p.creato).getTime() + d.giorni100vp*86400000);
+    const raggiunto = eventiDi(p.id).filter(e=>e.tipo==="vp"&&Number(e.valore)>=100)
+                        .sort((a,b)=>a.at<b.at?-1:1)[0];
+    out.push({
+      txt:`100 VP entro ${d.giorni100vp} giorni`,
+      fatto: !!raggiunto,
+      esito: raggiunto
+        ? (raggiunto.at <= iso(scadenza) ? "mantenuta" : "in ritardo")
+        : (OGGI() <= scadenza ? "in corso" : "scaduta")
+    });
+  }
+  if(d.personeDaSentire){
+    const n = contaEventi(p.id,"conversazione");
+    const scaduta = giorniTra(p.creato, OGGI()) > FASI[1].finestra;
+    out.push({
+      txt:`parlare con ${d.personeDaSentire} persone nelle prime due settimane`,
+      fatto: n >= d.personeDaSentire,
+      esito: n >= d.personeDaSentire ? "mantenuta"
+           : scaduta ? `${n} su ${d.personeDaSentire}, tempo scaduto`
+           : `${n} su ${d.personeDaSentire}`
+    });
+  }
+  return out;
+}
+
+/* Cosa manca per chiudere la fase in cui sei. La domanda della fase serve al leader,
+   a chi ci sta dentro serve l'elenco di quello che gli manca. */
+function mancanti(p){
+  const f = faseDi(p.id), vp = vpDi(p.id), out = [];
+  if(f===0) out.push({ txt:"Il primo ordine", fatto:false });
+  if(f===1){
+    out.push({ txt:`Arrivare a ${SOGLIE.vpAttivazione} VP`, fatto:vp>=SOGLIE.vpAttivazione,
+               nota: vp>=SOGLIE.vpAttivazione?null:`ne mancano ${SOGLIE.vpAttivazione-vp}` });
+    out.push({ txt:"Il primo cliente che compra", fatto:ha(p.id,"primo_cliente") });
+  }
+  if(f===2){
+    const figli = figliDi(p.id);
+    if(!figli.length) out.push({ txt:"Portare la prima persona", fatto:false });
+    else figli.forEach(x=>{
+      const v = vpDi(x.id);
+      out.push({ txt:`${x.nome} a ${SOGLIE.vpAttivazione} VP`, fatto:v>=SOGLIE.vpAttivazione,
+                 nota: v>=SOGLIE.vpAttivazione?null:`è a ${v}` });
+    });
+  }
+  if(f===3){
+    out.push({ txt:"Path to Bronze", fatto:ha(p.id,"path_to_bronze") });
+    out.push({ txt:"Bronze Foundation", fatto:ha(p.id,"foundation") });
+  }
+  if(f===4){
+    out.push({ txt:"Bronze Builder / 15%", fatto:ha(p.id,"pct15") });
+    out.push({ txt:"18%", fatto:ha(p.id,"pct18") });
+  }
+  return out;
+}
+
+/* La strada gia' fatta: le fasi chiuse, quando e in quanti giorni. */
+function strada(p){
+  const d = inizioFasi(p), f = faseDi(p.id), out = [];
+  for(let i=0;i<f;i++){
+    if(!d[i] || !d[i+1]) continue;
+    out.push({ fase:i, nome:FASI[i].nome, quando:d[i+1],
+               giorni:giorniTra(d[i], d[i+1]), finestra:FASI[i].finestra });
+  }
+  return out;
+}
+
+/* La prossima cosa da fare: UNA. */
+function prossimaAzione(p){
+  const f = faseDi(p.id);
+  const vp = vpDi(p.id);
+  if(f===0) return { titolo:"Fai il tuo primo ordine",
+    perche:"È il gesto che trasforma l'iscrizione in un inizio.", azione:"primo_ordine" };
+  if(f===1){
+    if(vp < SOGLIE.vpAttivazione) return {
+      titolo:`Arriva a ${SOGLIE.vpAttivazione} VP`,
+      perche:`Te ne mancano ${SOGLIE.vpAttivazione-vp}.`, azione:"vp" };
+    return { titolo:"Trova il tuo primo cliente",
+      perche:"La prima persona che compra da te è la prova che funziona.", azione:"primo_cliente" };
+  }
+  if(f===2){
+    const figli = figliDi(p.id);
+    if(!figli.length) return { titolo:"Porta la prima persona",
+      perche:"Manda il tuo link: quando entra, la vedi comparire.", azione:"invita" };
+    const indietro = figli.filter(x=>vpDi(x.id)<SOGLIE.vpAttivazione);
+    if(indietro.length) return {
+      titolo:`Aiuta ${indietro[0].nome} ad arrivare a 100 VP`,
+      perche:"È il passaggio che conta più di tutti.", azione:null };
+    return { titolo:"Continua a portare persone", perche:"", azione:"invita" };
+  }
+  if(f===3) return { titolo:"Path to Bronze",
+    perche:"Tre linee che si muovono da sole.", azione:"path_to_bronze" };
+  if(f===4) return ha(p.id,"pct15")
+    ? { titolo:"Verso il 18%", perche:"Adesso il lavoro è far lavorare gli altri.", azione:"pct18" }
+    : { titolo:"Verso il 15%", perche:"Adesso il lavoro è far lavorare gli altri.", azione:"pct15" };
+  return { titolo:"Continua così", perche:"", azione:null };
+}
+
+/* ---- 5. Ruoli ---- */
+function io(){ return S.me ? S.persone[S.me] : null; }
+function sonoLeader(){ return S.me && S.leader===S.me; }
+function hoPersone(){ return S.me ? figliDi(S.me).length>0 : false; }
+
+/* ---- 6. Render ---- */
+
+function render(){
+  const app = document.getElementById("app");
+  const y = window.scrollY;
+  const sb = document.querySelector(".sheet-body");
+  const sy = sb ? sb.scrollTop : 0;
+
+  if(!S.me){ app.innerHTML = vistaIngresso(); }
+  else{
+    switch(vista){
+      case "oggi":     app.innerHTML = vistaOggi(); break;
+      case "percorso": app.innerHTML = vistaPercorso(); break;
+      case "persone":  app.innerHTML = vistaPersone(); break;
+      case "tutti":    app.innerHTML = vistaTutti(); break;
+      case "dati":     app.innerHTML = vistaDati(); break;
+      default:         app.innerHTML = vistaOggi();
+    }
+  }
+  disegnaTabs();
+  disegnaFoglio();
+  window.scrollTo(0,y);
+  const sb2 = document.querySelector(".sheet-body");
+  if(sb2) sb2.scrollTop = sy;
+}
+
+function disegnaTabs(){
+  const t = document.getElementById("tabs");
+  if(!S.me){ t.style.display="none"; return; }
+  t.style.display="flex";
+  const voci = [
+    { k:"oggi", i:"◉", l:"Oggi" },
+    { k:"percorso", i:"↗", l:"Percorso" }
+  ];
+  if(hoPersone()) voci.push({ k:"persone", i:"◍", l:"Persone" });
+  if(sonoLeader()) voci.push({ k:"tutti", i:"▦", l:"Tutti" });
+  voci.push({ k:"dati", i:"≡", l:"Dati" });
+  t.innerHTML = voci.map(v =>
+    `<button class="${vista===v.k?"on":""}" data-tab="${v.k}"><b>${v.i}</b>${esc(v.l)}</button>`
+  ).join("");
+}
+
+/* --- Ingresso: due porte. Il link d'invito o il primo leader. --- */
+function vistaIngresso(){
+  const inv = invitoDaHash();
+
+  /* invito dello sponsor: la persona si iscrive da se' e resta agganciata a lui */
+  if(inv && inv.tipo==="sponsor"){
+    return `
+    <div class="sec" style="margin-top:36px">
+      <h1>Benvenuto 👋</h1>
+      <p class="muted">Quattro righe e parti: sono il tuo metro, non un questionario.</p>
+    </div>
+    <div class="card stack">
+      <label class="field"><span>Come ti chiami</span>
+        <input id="s0" type="text" autocomplete="name" placeholder="Nome e cognome"></label>
+      <label class="field"><span>Quanto vuoi guadagnare al mese, per iniziare</span>
+        <input id="d1" type="number" inputmode="numeric" placeholder="es. 300" value="300"></label>
+      <label class="field"><span>Entro quanti giorni vuoi fare i primi 100 VP</span>
+        <input id="d2" type="number" inputmode="numeric" placeholder="es. 14" value="14"></label>
+      <label class="field"><span>Con quante persone vuoi parlare nelle prime due settimane</span>
+        <input id="d3" type="number" inputmode="numeric" placeholder="es. 10" value="10"></label>
+      <label class="field"><span>Il tuo perché, in una riga (facoltativo)</span>
+        <input id="d4" type="text" placeholder="es. pagare la vacanza di agosto"></label>
+      <label class="field"><span>Il tuo numero (facoltativo)</span>
+        <input id="s1" type="tel" inputmode="tel" autocomplete="tel" placeholder="+39 333 1234567"></label>
+      <button class="btn primary wide" data-act="accetta-sponsor">Comincia</button>
+      <p class="small faint">I tuoi dati restano su questo telefono. Il tuo sponsor vede i tuoi
+      passaggi, non i tuoi contatti. Il numero, se lo lasci, serve a chi ti segue per raggiungerti.</p>
+    </div>`;
+  }
+
+  if(inv){
+    return `
+    <div class="sec" style="margin-top:36px">
+      <h1>Ciao ${esc(inv.n.split(" ")[0])} 👋</h1>
+      <p class="muted">Prima di partire, tre righe: sono il tuo metro, non un questionario.</p>
+    </div>
+    <div class="card stack">
+      <label class="field"><span>Quanto vuoi guadagnare al mese, per iniziare</span>
+        <input id="d1" type="number" inputmode="numeric" placeholder="es. 300" value="300"></label>
+      <label class="field"><span>Entro quanti giorni vuoi fare i primi 100 VP</span>
+        <input id="d2" type="number" inputmode="numeric" placeholder="es. 14" value="14"></label>
+      <label class="field"><span>Con quante persone vuoi parlare nelle prime due settimane</span>
+        <input id="d3" type="number" inputmode="numeric" placeholder="es. 10" value="10"></label>
+      <label class="field"><span>Il tuo perché, in una riga (facoltativo)</span>
+        <input id="d4" type="text" placeholder="es. pagare la vacanza di agosto"></label>
+      <label class="field"><span>Il tuo numero (facoltativo)</span>
+        <input id="s1" type="tel" inputmode="tel" autocomplete="tel" placeholder="+39 333 1234567"></label>
+      <button class="btn primary wide" data-act="accetta-invito">Comincia</button>
+      <p class="small faint">I dati restano su questo telefono. Il tuo sponsor vede
+      i tuoi passaggi, non i tuoi contatti.</p>
+    </div>`;
+  }
+  return `
+    <div class="sec" style="margin-top:44px;text-align:center">
+      <h1>Growup</h1>
+      <p class="muted">Una cosa alla volta, e si vede che ti muovi.</p>
+    </div>
+    <div class="card stack">
+      <h2>Sei stato invitato?</h2>
+      <p class="small">Apri il link che ti ha mandato il tuo sponsor. Se hai solo il codice, incollalo qui.</p>
+      <input id="codeIn" type="text" placeholder="CODICE" autocapitalize="characters">
+      <button class="btn wide" data-act="entra-codice">Entra</button>
+    </div>
+    <div class="card stack">
+      <h2>Apri l'organizzazione</h2>
+      <p class="small">Da fare una volta sola, da chi vede tutto.</p>
+      <label class="field"><span>Il tuo nome</span><input id="leadName" type="text" placeholder="Nome e cognome"></label>
+      <button class="btn primary wide" data-act="crea-leader">Comincia da qui</button>
+    </div>`;
+}
+
+/* --- Oggi: la schermata più importante. Una sola azione. --- */
+function vistaOggi(){
+  const p = io();
+  const f = faseDi(p.id);
+  const fase = FASI[f];
+  const az = prossimaAzione(p);
+  const vp = vpDi(p.id);
+  const g = giorniTra(p.creato, OGGI());
+  const r = ritmoDi(p);
+  const prom = promesse(p);
+  const figli = figliDi(p.id);
+
+  let barra = "";
+  if(f===1){
+    const pct = Math.min(100, Math.round(vp/SOGLIE.vpAttivazione*100));
+    barra = `<div class="bar" style="margin:12px 0 6px"><i style="width:${pct}%"></i></div>
+             <div class="small">${vp} / ${SOGLIE.vpAttivazione} VP</div>`;
+  }
+
+  const daSeguire = figli.map(x=>({x, s:semaforo(x.id)}))
+                         .filter(o=>o.s.k!=="v" || vpDi(o.x.id)<SOGLIE.vpAttivazione);
+
+  return `
+  <div class="spread" style="margin:6px 0 2px">
+    <h1>Ciao ${esc(p.nome.split(" ")[0])} 👋</h1>
+    ${sonoLeader()?`<span class="pill">leader</span>`:``}
+  </div>
+  <p class="small">Giorno ${g} · Fase ${f} · ${esc(fase.nome)}
+    ${r?` · <span class="${r.k==="lento"?"":""}">${esc(r.txt)}</span>`:""}</p>
+
+  <div class="card">
+    <span class="tag">La prossima cosa</span>
+    <h2 style="margin-top:6px">${esc(az.titolo)}</h2>
+    ${az.perche?`<p class="small">${esc(az.perche)}</p>`:``}
+    ${barra}
+    <div class="row wrap" style="margin-top:12px">
+      ${az.azione==="vp"
+        ? `<button class="btn primary grow" data-act="apri-vp">Aggiorna i miei VP</button>`
+        : az.azione==="invita"
+          ? `<button class="btn primary grow" data-act="apri-invita">Invita una persona</button>`
+          : az.azione
+          ? `<button class="btn primary grow" data-act="fatto" data-t="${az.azione}">L'ho fatto</button>`
+          : ``}
+      <button class="btn" data-act="apri-registra">Registra altro</button>
+    </div>
+  </div>
+
+  ${prom.length ? `
+  <div class="card tight">
+    <span class="tag">Quello che hai detto di voler fare</span>
+    <ul class="steps" style="margin-top:8px">
+      ${prom.map(x=>`<li class="${x.fatto?"done":""}">
+        <span class="mark">${x.fatto?"✓":"○"}</span>
+        <span class="grow"><span class="t">${esc(x.txt)}</span>
+        <br><small>${esc(x.esito)}</small></span></li>`).join("")}
+    </ul>
+  </div>`:``}
+
+  ${daSeguire.length ? `
+  <div class="sec">
+    <span class="tag">Chi ha bisogno di te</span>
+    ${daSeguire.map(o=>rigaPersona(o.x)).join("")}
+  </div>`:``}
+
+  ${p.dichiarato && p.dichiarato.perche ? `
+  <div class="card tight">
+    <span class="tag">Il tuo perché</span>
+    <p style="margin:6px 0 0">${esc(p.dichiarato.perche)}</p>
+  </div>`:``}
+
+  ${salvaKo?`<div class="card warn"><b>Questo browser non salva.</b>
+    <p class="small">Se sei in navigazione privata quello che segni sparisce alla chiusura.</p></div>`:``}
+  `;
+}
+
+/* --- Percorso: si vede il futuro, si è guidati sul presente. --- */
+function vistaPercorso(){
+  const p = io();
+  const f = faseDi(p.id);
+  const manca = mancanti(p);
+  const fatta = strada(p);
+  return `
+  <h1>Il mio percorso</h1>
+  <p class="small">La fase non è il calendario: è il punto più avanti a cui sei arrivato.</p>
+  <div class="card">
+    <ul class="steps">
+    ${FASI.map(x=>{
+      const cls = x.n<f ? "done" : x.n===f ? "now" : "future";
+      const mark = x.n<f ? "✓" : x.n===f ? "●" : "○";
+      return `<li class="${cls}">
+        <span class="mark">${mark}</span>
+        <span class="grow">
+          <span class="t"><b>Fase ${x.n} · ${esc(x.nome)}</b></span>
+          ${x.n===f
+            ? `<br><small>Sei qui — per chiudere questa fase:</small>
+               <ul class="micro">${manca.map(m=>`<li class="${m.fatto?"ok":""}">
+                 <span class="m">${m.fatto?"✓":"○"}</span>
+                 <span>${esc(m.txt)}${m.nota?`<small>${esc(m.nota)}</small>`:``}</span></li>`).join("")}</ul>`
+            : `<br><small class="faint">${esc(x.traguardo)}</small>`}
+        </span></li>`;
+    }).join("")}
+    </ul>
+  </div>
+  <div class="card tight">
+    <span class="tag">Fatti registrati</span>
+    <ul class="steps" style="margin-top:8px">
+      ${FATTI.filter(x => x.fase <= f+1 || primoEvento(p.id,x.t)).map(x=>{
+        const e = primoEvento(p.id,x.t);
+        return `<li class="${e?"done":"future"}"><span class="mark">${e?"✓":"○"}</span>
+          <span class="grow"><span class="t">${esc(x.label)}</span>
+          ${e?`<br><small>${dataIt(e.at)}</small>`:``}</span></li>`;
+      }).join("")}
+    </ul>
+  </div>
+  ${fatta.length ? `
+  <div class="card tight">
+    <span class="tag">La strada che hai fatto</span>
+    <p style="margin:8px 0 2px"><b>${plur(fatta.length,"fase chiusa","fasi chiuse")}</b>
+      in ${plur(giorniTra(p.creato, fatta[fatta.length-1].quando),"giorno","giorni")}.</p>
+    <ul class="steps" style="margin-top:8px">
+      ${fatta.map(x=>`<li class="done"><span class="mark">✓</span>
+        <span class="grow"><span class="t">Fase ${x.fase} · ${esc(x.nome)}</span>
+        <br><small>chiusa il ${dataIt(x.quando)}, in ${plur(x.giorni,"giorno","giorni")}${
+          x.finestra && x.giorni <= x.finestra/2 ? " — in anticipo" : ""}</small></span></li>`).join("")}
+    </ul>
+  </div>`:``}
+  <button class="btn wide" data-act="apri-registra">Registra un fatto</button>`;
+}
+
+/* --- L'albero: chi hai portato, e chi hanno portato loro, a qualunque profondita'. --- */
+const PESO = { r:0, n:1, g:2, v:3 };
+function ordinaPersone(a,b){
+  return PESO[semaforo(a.id).k] - PESO[semaforo(b.id).k]
+      || giorniTra(b.creato,OGGI()) - giorniTra(a.creato,OGGI());
+}
+
+function nodoAlbero(x, prof){
+  const figli = figliDi(x.id).sort(ordinaPersone);
+  const sotto = discendenti(x.id).length;
+  const s = semaforo(x.id), f = faseDi(x.id), pipe = inPipeline(x.id);
+  const chiuso = chiusi.has(x.id);
+  const leva = figli.length
+    ? `<button class="tw" data-toggle="${x.id}" aria-label="apri o chiudi">${chiuso?"▶":"▼"}</button>`
+    : `<span class="tw vuoto">•</span>`;
+  return `<div class="nodo">
+    <div class="nodo-riga">${leva}
+      <button class="person" data-persona="${x.id}">
+        <span class="dot ${s.k}"></span>
+        <span class="grow">
+          <b>${esc(x.nome)}</b>${pipe?` <span class="pill s">★</span>`:``}
+          ${sotto?` <span class="sotto">${sotto} sotto</span>`:``}
+          <br><small>Giorno ${giorniTra(x.creato,OGGI())} · Fase ${f} · ${vpDi(x.id)} VP</small>
+          <br><small class="faint">${esc(s.txt)}</small>
+        </span>
+        <span class="chev">›</span></button>
+    </div>
+    ${figli.length && !chiuso
+      ? `<div class="rami">${figli.map(k=>nodoAlbero(k, prof+1)).join("")}</div>` : ``}
+  </div>`;
+}
+function alberoDi(radiceId){
+  const figli = figliDi(radiceId).sort(ordinaPersone);
+  return figli.length ? figli.map(x=>nodoAlbero(x,0)).join("") : "";
+}
+
+function rigaPersona(x, mostraSponsor){
+  const s = semaforo(x.id);
+  const f = faseDi(x.id);
+  const g = giorniTra(x.creato, OGGI());
+  const pipe = inPipeline(x.id);
+  return `<button class="person" data-persona="${x.id}">
+    <span class="dot ${s.k}"></span>
+    <span class="grow">
+      <b>${esc(x.nome)}</b>${pipe?` <span class="pill s">★</span>`:``}
+      <br><small>Giorno ${g} · Fase ${f} ${esc(FASI[f].breve)} · ${vpDi(x.id)} VP</small>
+      <br><small class="faint">${esc(s.txt)}${mostraSponsor&&x.sponsor&&S.persone[x.sponsor]?` · sponsor ${esc(S.persone[x.sponsor].nome.split(" ")[0])}`:""}</small>
+    </span>
+    <span class="chev">›</span></button>`;
+}
+
+function vistaPersone(){
+  const diretti = figliDi(S.me);
+  const tutti = discendenti(S.me);
+  const attivi = tutti.filter(x=>attivato(x.id)).length;
+  const duplicano = tutti.filter(x=>haDuplicato(x.id)).length;
+  const daSeguire = tutti.filter(x=>semaforo(x.id).k==="r").length;
+  return `
+  <h1>Le mie persone</h1>
+  <p class="small">${plur(diretti.length,"persona","persone")} in prima linea${
+    tutti.length>diretti.length?`, ${tutti.length} in tutto il tuo ramo`:""}.</p>
+  <div class="card tight">
+    <div class="kpi">
+      <div><b>${tutti.length}</b><span>nel tuo ramo</span></div>
+      <div><b>${attivi}</b><span>a 100 VP</span></div>
+      <div><b>${duplicano}</b><span>che duplicano</span></div>
+    </div>
+    ${daSeguire?`<p class="small" style="margin:10px 0 0">${plur(daSeguire,"persona","persone")}
+      non aggiorna da più di ${SOGLIE.gialloGiorni} giorni.</p>`:``}
+  </div>
+  <div class="card">
+    ${tutti.length ? alberoDi(S.me)
+      : `<div class="empty"><b>Ancora nessuno</b>Invita la prima persona: appena entra la vedi qui,
+         senza doverla inserire.</div>`}
+  </div>
+  <div class="stack">
+    <button class="btn primary wide" data-act="apri-invita">Invita una persona</button>
+    <button class="btn wide ghost" data-act="apri-nuovo">Aggiungi chi non usa l'app</button>
+  </div>
+  <p class="small faint" style="margin-top:12px">Il semaforo dice se la persona
+  <b>aggiorna l'app</b>, non se sta lavorando. Chi lavora senza aggiornare diventa rosso:
+  chiedilo, non darlo per fatto.</p>
+  ${S.sync.url?``:`<div class="card warn" style="margin-top:12px"><b>Manca il collegamento al foglio.</b>
+    <p class="small">Senza, chi apre il tuo link non ti compare qui da solo:
+    lo vedi solo se ti manda il codice a mano. Si mette una volta in <b>Dati</b>.</p></div>`}`;
+}
+
+/* --- Tutti + pipeline: la vista del leader. --- */
+function vistaTutti(){
+  const tutti = Object.values(S.persone).filter(p=>!S.cancellati[p.id] && p.id!==S.leader);
+  const per = n => tutti.filter(p=>faseDi(p.id)>=n).length;
+  const pipeline = tutti.map(p=>({p, s:inPipeline(p.id)})).filter(o=>o.s)
+    .sort((a,b)=>b.s.length-a.s.length);
+  const mai = tutti.filter(p=>faseDi(p.id)===0 && !ultimoTocco(p.id));
+  const ord = tutti.slice().sort((a,b)=> faseDi(b.id)-faseDi(a.id) || giorniTra(b.creato,OGGI())-giorniTra(a.creato,OGGI()));
+
+  return `
+  <h1>Tutti</h1>
+  <p class="small">${plur(tutti.length,"persona","persone")} nel percorso.</p>
+
+  <div class="card">
+    <span class="tag">Il funnel</span>
+    <ul class="steps" style="margin-top:8px">
+      ${FASI.map(x=>{
+        const n = per(x.n);
+        const pct = tutti.length? Math.round(n/tutti.length*100):0;
+        return `<li><span class="mark">${x.n}</span><span class="grow">
+          <div class="spread"><span class="t">${esc(x.nome)}</span><b>${n}</b></div>
+          ${x.domanda?`<small class="faint">${esc(x.domanda)}</small>`:``}
+          <div class="bar" style="margin-top:6px"><i style="width:${pct}%"></i></div>
+        </span></li>`;
+      }).join("")}
+    </ul>
+    ${mai.length?`<p class="small" style="margin-top:12px">
+      <b>${plur(mai.length,"persona","persone")}</b> non ha mai aperto l'app dopo l'invito.
+      È il dato più importante di questa schermata.</p>`:``}
+  </div>
+
+  <div class="sec">
+    <span class="tag">Leadership pipeline</span>
+    ${pipeline.length ? `<div class="card">${pipeline.map(o=>`
+      <button class="person" data-persona="${o.p.id}">
+        <span class="pill s">★</span>
+        <span class="grow"><b>${esc(o.p.nome)}</b>
+        <br><small>Fase ${faseDi(o.p.id)} · giorno ${giorniTra(o.p.creato,OGGI())}</small>
+        <br><small class="faint">${esc(o.s.map(x=>x.txt).join(" · "))}</small></span>
+        <span class="chev">›</span></button>`).join("")}</div>`
+      : `<div class="card"><div class="empty"><b>Nessuno, per ora</b>
+         È normale: qui compaiono pochi nomi, non una classifica.</div></div>`}
+  </div>
+
+  <div class="sec">
+    <span class="tag">L'organizzazione</span>
+    <div class="card">${S.leader && figliDi(S.leader).length
+      ? alberoDi(S.leader)
+      : (ord.length?ord.map(x=>rigaPersona(x,true)).join("")
+                   :`<div class="empty">Ancora nessuno.</div>`)}</div>
+  </div>`;
+}
+
+/* --- Dati: copia, invito, sincronizzazione --- */
+function vistaDati(){
+  const p = io();
+  return `
+  <h1>Dati</h1>
+  <div class="card stack">
+    <h2>Il tuo codice</h2>
+    <p><span class="code">${esc(p.id)}</span></p>
+    <p class="small">Serve al tuo sponsor per riconoscerti.</p>
+  </div>
+  <div class="card stack">
+    <h2>Il tuo numero</h2>
+    <p class="small">Facoltativo. Lo vede chi ti segue — il tuo sponsor e chi sta sopra di lui —
+    per poterti raggiungere. Non lo vede nessun altro.</p>
+    <input id="mioTel" type="tel" inputmode="tel" placeholder="+39 333 1234567" value="${esc(p.tel||"")}">
+    <button class="btn wide" data-act="salva-tel">Salva il numero</button>
+  </div>
+  <div class="card stack">
+    <h2>Copia di sicurezza</h2>
+    <p class="small">I dati stanno in questo browser. Se cambi telefono, o lo perdi, senza copia sono persi.</p>
+    <button class="btn wide" data-act="esporta">Salva una copia</button>
+    <button class="btn wide" data-act="apri-importa">Carica un file</button>
+  </div>
+  <div class="card stack">
+    <h2>Manda i tuoi progressi</h2>
+    <p class="small">Se non c'è la sincronizzazione, questo codice porta i tuoi passaggi
+    al tuo sponsor: lo copi e glielo mandi.</p>
+    <button class="btn wide" data-act="copia-agg">Copia il codice dei progressi</button>
+    <button class="btn wide ghost" data-act="apri-incolla">Incolla un aggiornamento ricevuto</button>
+  </div>
+  <div class="card stack">
+    <h2>Sincronizzazione</h2>
+    <p class="small">Con l'indirizzo del foglio condiviso i dati viaggiano da soli.
+    Senza, l'app funziona comunque: solo da sola.</p>
+    <label class="field"><span>Indirizzo dello script</span>
+      <input id="syncUrl" type="url" placeholder="https://script.google.com/..." value="${esc(S.sync.url)}"></label>
+    <button class="btn wide" data-act="salva-sync">Salva l'indirizzo</button>
+    ${S.sync.url?`<button class="btn primary wide" data-act="sincronizza">Sincronizza adesso</button>
+      <p class="small faint">${S.sync.ultimo?`Ultima volta: ${dataIt(S.sync.ultimo)}`:"Mai sincronizzato"}</p>`:``}
+  </div>
+  <div class="card stack">
+    <h2>Ricomincia</h2>
+    <button class="btn wide" data-act="reset">Cancella tutto da questo telefono</button>
+  </div>`;
+}
+
+/* ---- 7. Fogli ancorati in basso ---- */
+
+function apriFoglio(tipo, dati){ foglio = { tipo, dati:dati||{} }; render(); }
+function chiudiFoglio(){ foglio = null; render(); }
+
+function disegnaFoglio(){
+  document.querySelectorAll(".sheet").forEach(n=>n.remove());
+  if(!foglio) return;
+  const box = document.createElement("div");
+  box.className="sheet";
+  box.innerHTML = `<div class="sheet-box">
+    <div class="sheet-head"><h2>${esc(contenutoFoglio().titolo)}</h2>
+      <button class="x" data-act="chiudi">×</button></div>
+    <div class="sheet-body">${contenutoFoglio().body}</div>
+    ${contenutoFoglio().foot?`<div class="sheet-foot">${contenutoFoglio().foot}</div>`:``}
+  </div>`;
+  box.addEventListener("click", e => { if(e.target===box) chiudiFoglio(); });
+  document.body.appendChild(box);
+}
+
+function contenutoFoglio(){
+  const t = foglio.tipo;
+
+  if(t==="vp"){
+    const p = S.persone[foglio.dati.id] || io();
+    return { titolo:"Aggiorna i VP", body:`
+      <p class="small">Scrivi il totale dei VP che hai adesso. Non serve che sia perfetto.</p>
+      <label class="field"><span>VP totali</span>
+        <input id="vpVal" type="number" inputmode="numeric" value="${vpDi(p.id)}"></label>`,
+      foot:`<button class="btn primary wide" data-act="salva-vp" data-id="${p.id}">Salva</button>` };
+  }
+
+  if(t==="registra"){
+    const p = S.persone[foglio.dati.id] || io();
+    const f = faseDi(p.id);
+    return { titolo:"Registra", body:`
+      <p class="small">Solo fatti. Le sensazioni non stanno qui.</p>
+      <div class="stack" style="margin-top:12px">
+        <button class="btn wide" data-act="conta" data-t="conversazione" data-id="${p.id}">
+          Ho parlato con una persona <small>(${contaEventi(p.id,"conversazione")})</small></button>
+        <button class="btn wide" data-act="conta" data-t="presentazione" data-id="${p.id}">
+          Ho fatto una presentazione <small>(${contaEventi(p.id,"presentazione")})</small></button>
+        <button class="btn wide" data-act="apri-vp" data-id="${p.id}">Aggiorna i VP (${vpDi(p.id)})</button>
+      </div>
+      <div class="sec"><span class="tag">Traguardi</span>
+      ${(() => {
+        /* si mostrano solo quelli a portata: uno che comincia non deve leggere "Platino" */
+        const f = faseDi(p.id);
+        const visibili = FATTI.filter(x => x.fase <= f+1 || primoEvento(p.id,x.t));
+        const nascosti = FATTI.length - visibili.length;
+        return visibili.map(x=>{
+          const e = primoEvento(p.id,x.t);
+          return `<label class="chk"><input type="checkbox" ${e?"checked":""}
+            data-fatto="${x.t}" data-id="${p.id}">
+            <span class="grow">${esc(x.label)}${e?`<br><small class="faint">${dataIt(e.at)}</small>`:``}</span></label>`;
+        }).join("") + (nascosti?`<p class="small faint" style="margin-top:12px">
+          Gli altri traguardi compaiono quando ti avvicini.</p>`:``);
+      })()}</div>` };
+  }
+
+  if(t==="nuovo"){
+    return { titolo:"Ho sponsorizzato qualcuno", body:`
+      <p class="small">Inseriscila anche se non è sicura di partire: sapere quante persone
+      non partono è il motivo per cui questa app esiste.</p>
+      <label class="field"><span>Nome</span>
+        <input id="nvNome" type="text" autocomplete="name" placeholder="Nome e cognome"></label>
+      <label class="field"><span>Data della sponsorizzazione</span>
+        <input id="nvData" type="date" value="${giorno(OGGI())}"></label>
+      <label class="field"><span>Numero (facoltativo)</span>
+        <input id="nvTel" type="tel" inputmode="tel" placeholder="+39 333 1234567"></label>`,
+      foot:`<button class="btn primary wide" data-act="salva-nuovo">Crea e prendi il link</button>` };
+  }
+
+  if(t==="invita"){
+    const link = linkSponsor(S.me);
+    return { titolo:"Invita una persona", body:`
+      <p class="small">Un link solo, sempre lo stesso, per chiunque tu sponsorizzi.
+      Chi lo apre si iscrive da sé e ti compare in <b>Le mie persone</b>: non devi inserirlo.</p>
+      <label class="field"><span>Il tuo link</span><textarea id="linkBox" readonly>${esc(link)}</textarea></label>
+      <div class="stack" style="margin-top:12px">
+        <button class="btn primary wide" data-act="copia-mio-link">Copia il link</button>
+        <a class="btn wide" href="https://wa.me/?text=${encodeURIComponent("Ciao! Questo è il percorso di cui ti parlavo: "+link)}"
+           target="_blank" rel="noopener">Mandalo su WhatsApp</a>
+      </div>
+      ${S.sync.url?``:`<div class="card warn" style="margin-top:14px"><b>Attenzione</b>
+        <p class="small">Non hai ancora collegato il foglio, quindi il link non lo contiene:
+        chi si iscrive resterà sul suo telefono e non ti comparirà. Collegalo in <b>Dati</b>
+        e poi rigenera il link.</p></div>`}` };
+  }
+
+  if(t==="invito"){
+    const p = S.persone[foglio.dati.id];
+    const link = linkInvito(p);
+    return { titolo:`Il link per ${esc(p.nome)}`, body:`
+      <p class="small">Mandaglielo. Quando lo apre, sceglie i suoi obiettivi e parte.</p>
+      <label class="field"><span>Link</span><textarea id="linkBox" readonly>${esc(link)}</textarea></label>
+      <div class="stack" style="margin-top:12px">
+        <button class="btn primary wide" data-act="copia-link" data-id="${p.id}">Copia il link</button>
+        <a class="btn wide" href="https://wa.me/?text=${encodeURIComponent("Ciao "+p.nome+", questo è il tuo percorso: "+link)}"
+           target="_blank" rel="noopener">Mandalo su WhatsApp</a>
+      </div>` };
+  }
+
+  if(t==="persona"){
+    const p = S.persone[foglio.dati.id];
+    if(!p) return { titolo:"—", body:"" };
+    const f = faseDi(p.id), s = semaforo(p.id), r = ritmoDi(p);
+    const sg = segnaliDi(p.id), pipe = inPipeline(p.id);
+    const prom = promesse(p);
+    const figli = figliDi(p.id);
+    const mio = p.sponsor===S.me || sonoLeader();
+    const suaAzione = prossimaAzione(p);
+    const suoManca = mancanti(p);
+    const w = whatsapp(p.tel);
+    const ev = eventiDi(p.id).slice().sort((a,b)=>a.at<b.at?1:-1).slice(0,12);
+    return { titolo:p.nome, body:`
+      <div class="row wrap" style="gap:6px">
+        <span class="pill ${s.k}">${({v:"🟢",g:"🟡",r:"🔴",n:"⚪"})[s.k]} ${esc(s.txt)}</span>
+        ${r?`<span class="pill">${esc(r.txt)}</span>`:``}
+        ${pipe?`<span class="pill s">★ pipeline</span>`:``}
+      </div>
+
+      <div class="card">
+        <span class="tag">La sua prossima cosa</span>
+        <h2 style="margin-top:6px">${esc(suaAzione.titolo)}</h2>
+        ${suoManca.length?`<ul class="micro" style="margin-top:10px">
+          ${suoManca.map(m=>`<li class="${m.fatto?"ok":""}"><span class="m">${m.fatto?"✓":"○"}</span>
+            <span>${esc(m.txt)}${m.nota?`<small>${esc(m.nota)}</small>`:``}</span></li>`).join("")}
+        </ul>`:``}
+        ${p.tel?`<div class="row" style="margin-top:14px">
+          ${w?`<a class="btn primary grow" href="https://wa.me/${w}" target="_blank" rel="noopener">WhatsApp</a>`:``}
+          <a class="btn ${w?"":"primary grow"}" href="tel:${esc(p.tel)}">Chiama</a>
+        </div>`:`<p class="small faint" style="margin-top:12px">Non ha lasciato il numero.</p>`}
+      </div>
+
+      <div class="card tight" style="margin-top:12px">
+        <div class="kpi">
+          <div><b>${giorniTra(p.creato,OGGI())}</b><span>giorni</span></div>
+          <div><b>${vpDi(p.id)}</b><span>VP</span></div>
+          <div><b>${figli.length}</b><span>persone</span></div>
+        </div>
+        <p class="small" style="margin:10px 0 0">Fase ${f} · ${esc(FASI[f].nome)} ·
+        entrata il ${dataIt(p.creato)}${p.sponsor&&S.persone[p.sponsor]?` · sponsor ${esc(S.persone[p.sponsor].nome)}`:``}</p>
+      </div>
+
+      ${p.dichiarato?`<div class="card tight"><span class="tag">Cosa ha detto di voler fare</span>
+        <ul class="steps" style="margin-top:8px">
+        ${prom.length?prom.map(x=>`<li class="${x.fatto?"done":""}">
+          <span class="mark">${x.fatto?"✓":"○"}</span>
+          <span class="grow">${esc(x.txt)}<br><small>${esc(x.esito)}</small></span></li>`).join("")
+          :`<li><span class="mark">–</span><span class="grow small">Non ha dichiarato niente</span></li>`}
+        </ul>
+        ${p.dichiarato.euroMese?`<p class="small" style="margin-top:8px">Obiettivo: ${esc(p.dichiarato.euroMese)} € al mese${p.dichiarato.perche?` — ${esc(p.dichiarato.perche)}`:""}</p>`:``}
+      </div>`:``}
+
+      ${sg.length?`<div class="card tight"><span class="tag">${pipe?"Perché è in pipeline":"Segnali"}</span>
+        <ul class="steps" style="margin-top:8px">${sg.map(x=>`<li>
+          <span class="mark">${x.misurato?"◆":"◇"}</span>
+          <span class="grow">${esc(x.txt)}
+          <br><small class="faint">${x.misurato?"misurato dall'app":"dichiarato"}</small></span></li>`).join("")}</ul>
+      </div>`:``}
+
+      ${figli.length?`<div class="sec"><span class="tag">Il suo ramo</span>
+        ${alberoDi(p.id)}</div>`:``}
+
+      <div class="sec"><span class="tag">Ultimi fatti</span>
+        <ul class="steps" style="margin-top:8px">
+        ${ev.length?ev.map(e=>`<li><span class="mark">·</span><span class="grow">
+          ${esc(etichettaEvento(e))}<br><small class="faint">${dataIt(e.at)}${e.by!==p.id?" · segnato dallo sponsor":""}</small>
+        </span></li>`).join(""):`<li><span class="mark">–</span><span class="grow small">Niente ancora</span></li>`}
+        </ul></div>`,
+      foot: mio ? `<div class="row">
+        <button class="btn grow" data-act="apri-registra" data-id="${p.id}">Registra un fatto</button>
+        <button class="btn primary grow" data-act="apri-invito" data-id="${p.id}">Link</button>
+      </div>` : "" };
+  }
+
+  if(t==="importa"){
+    return { titolo:"Carica una copia", body:`
+      <p class="small">Unisce, non sostituisce: niente va perso.</p>
+      <input id="fileIn" type="file" accept=".json,application/json">` };
+  }
+  if(t==="incolla"){
+    return { titolo:"Incolla un aggiornamento", body:`
+      <p class="small">Il codice che ti ha mandato la persona.</p>
+      <textarea id="pasteIn" placeholder="Incolla qui"></textarea>`,
+      foot:`<button class="btn primary wide" data-act="salva-incolla">Unisci</button>` };
+  }
+  return { titolo:"", body:"" };
+}
+
+function etichettaEvento(e){
+  const m = {
+    iscrizione:"Sponsorizzata", primo_ordine:"Primo ordine", primo_cliente:"Primo cliente",
+    conversazione:"Ha parlato con una persona", presentazione:"Presentazione",
+    sponsorizzazione:"Ha sponsorizzato", path_to_bronze:"Path to Bronze",
+    foundation:"Bronze Foundation", pct15:"15%", pct18:"18%", pct21:"21%", platino:"Platino"
+  };
+  if(e.tipo==="vp") return `VP a ${e.valore}`;
+  return m[e.tipo] || e.tipo;
+}
+
+/* ---- 8. Invito: il link porta con sé la scheda, così funziona prima della sync ---- */
+
+/* Il link che lo sponsor manda a chiunque: non contiene una scheda gia' fatta,
+   contiene CHI invita e DOVE si sincronizza. Chi lo apre si iscrive da se'
+   e risulta agganciato allo sponsor senza che lo sponsor inserisca niente. */
+function linkSponsor(id){
+  const base = location.origin + location.pathname;
+  const q = new URLSearchParams({ sp:id, spn:(S.persone[id]||{}).nome || "" });
+  if(S.sync.url) q.set("u", S.sync.url);
+  return base + "#" + q.toString();
+}
+
+function linkInvito(p){
+  const base = location.origin + location.pathname;
+  const sp = p.sponsor && S.persone[p.sponsor] ? S.persone[p.sponsor].nome : "";
+  const q = new URLSearchParams({ i:p.id, n:p.nome, s:p.sponsor||"", sn:sp, d:giorno(p.creato) });
+  return base + "#" + q.toString();
+}
+function invitoDaHash(){
+  const h = location.hash.replace(/^#/,"");
+  if(!h) return null;
+  const q = new URLSearchParams(h);
+  if(q.get("sp")) return { tipo:"sponsor", sp:q.get("sp"), spn:q.get("spn")||"", u:q.get("u")||"" };
+  if(q.get("i") && q.get("n")) return { tipo:"scheda", i:q.get("i"), n:q.get("n"),
+    s:q.get("s")||null, sn:q.get("sn")||"", d:q.get("d")||giorno(OGGI()) };
+  return null;
+}
+
+/* ---- 9. Unione: mai sostituire. Idempotente. ---- */
+
+function unisci(altro){
+  if(!altro || typeof altro!=="object") throw new Error("formato");
+  Object.assign(S.cancellati, altro.cancellati||{});
+  for(const id in (altro.persone||{})){
+    if(S.cancellati[id]) continue;
+    const a = altro.persone[id], b = S.persone[id];
+    if(!b) S.persone[id] = a;
+    else if((a.updatedAt||"") > (b.updatedAt||"")) S.persone[id] = Object.assign({}, b, a);
+  }
+  const visti = new Set(S.eventi.map(e=>e.id));
+  for(const e of (altro.eventi||[])){
+    if(!visti.has(e.id) && !S.cancellati[e.id]){ S.eventi.push(e); visti.add(e.id); }
+  }
+  for(const id in (altro.aperture||{})){
+    const set = new Set((S.aperture[id]||[]).concat(altro.aperture[id]||[]));
+    S.aperture[id] = Array.from(set).sort().slice(-60);
+  }
+  if(!S.leader && altro.leader) S.leader = altro.leader;
+  salva();
+}
+function pacchetto(){
+  return { v:1, leader:S.leader, persone:S.persone, eventi:S.eventi,
+           aperture:S.aperture, cancellati:S.cancellati };
+}
+function pacchettoMio(){
+  const mieId = new Set([S.me].concat(discendenti(S.me).map(p=>p.id)));
+  const persone = {}; for(const id of mieId) if(S.persone[id]) persone[id]=S.persone[id];
+  const aperture = {}; for(const id of mieId) if(S.aperture[id]) aperture[id]=S.aperture[id];
+  return { v:1, leader:S.leader, persone,
+           eventi:S.eventi.filter(e=>mieId.has(e.persona) || mieId.has(e.by)),
+           aperture, cancellati:S.cancellati };
+}
+
+/* ---- 10. Sincronizzazione (foglio Google via Apps Script) ---- */
+
+async function sincronizza(){
+  if(!S.sync.url){ toast("Manca l'indirizzo"); return; }
+  toast("Sincronizzo…");
+  try{
+    const res = await fetch(S.sync.url, {
+      method:"POST",
+      headers:{ "Content-Type":"text/plain;charset=utf-8" }, // evita il preflight CORS
+      body: JSON.stringify({ azione:"sync", me:S.me, dati:pacchettoMio() })
+    });
+    const out = await res.json();
+    if(out && out.dati) unisci(out.dati);
+    S.sync.ultimo = iso(OGGI()); salva();
+    toast("Fatto");
+  }catch(e){
+    toast("Non riesco a collegarmi");
+  }
+  render();
+}
+
+/* ---- 11. Azioni ---- */
+
+function segnaApertura(){
+  if(!S.me) return;
+  const l = S.aperture[S.me] || [];
+  const oggi = giorno(OGGI());
+  if(!l.some(d=>giorno(d)===oggi)){ l.push(iso(OGGI())); S.aperture[S.me]=l.slice(-60); salva(); }
+}
+
+function creaPersona(nome, sponsor, data){
+  const id = codice();
+  S.persone[id] = { id, nome:nome.trim(), sponsor:sponsor||null,
+    creato: iso(new Date(data||OGGI())), dichiarato:null, updatedAt: iso(OGGI()) };
+  const quando = iso(new Date(data||OGGI()));
+  S.eventi.push({ id:uid(), persona:id, tipo:"iscrizione", valore:null, at:quando, by:sponsor||id });
+  if(sponsor) S.eventi.push({ id:uid(), persona:sponsor, tipo:"sponsorizzazione",
+                              valore:nome.trim(), at:quando, by:sponsor });
+  salva();
+  return id;
+}
+
+function scarica(nome, testo){
+  const b = new Blob([testo], {type:"application/json"});
+  const u = URL.createObjectURL(b);
+  const a = document.createElement("a");
+  a.href=u; a.download=nome; document.body.appendChild(a); a.click();
+  a.remove(); setTimeout(()=>URL.revokeObjectURL(u), 2000);
+}
+async function copia(testo){
+  try{ await navigator.clipboard.writeText(testo); toast("Copiato"); }
+  catch(e){ toast("Copia a mano dal riquadro"); }
+}
+
+document.addEventListener("click", async ev => {
+  const tab = ev.target.closest("[data-tab]");
+  if(tab){ vista = tab.dataset.tab; apertoId=null; render(); window.scrollTo(0,0); return; }
+
+  const tg = ev.target.closest("[data-toggle]");
+  if(tg){
+    const k = tg.dataset.toggle;
+    if(chiusi.has(k)) chiusi.delete(k); else chiusi.add(k);
+    render(); return;
+  }
+
+  const pb = ev.target.closest("[data-persona]");
+  if(pb){ apriFoglio("persona", { id: pb.dataset.persona }); return; }
+
+  const b = ev.target.closest("[data-act]");
+  if(!b) return;
+  const a = b.dataset.act, id = b.dataset.id;
+
+  if(a==="chiudi") return chiudiFoglio();
+
+  if(a==="crea-leader"){
+    const nome = (document.getElementById("leadName").value||"").trim();
+    if(!nome) return toast("Scrivi il tuo nome");
+    const nid = creaPersona(nome, null, OGGI());
+    S.me = nid; S.leader = nid; salva(); segnaApertura(); vista="tutti"; return render();
+  }
+
+  if(a==="entra-codice"){
+    const c = (document.getElementById("codeIn").value||"").trim().toUpperCase();
+    if(!c) return toast("Incolla il codice");
+    if(S.persone[c]){ S.me=c; salva(); segnaApertura(); return render(); }
+    return toast("Codice sconosciuto: apri il link dello sponsor");
+  }
+
+  if(a==="accetta-sponsor"){
+    const inv = invitoDaHash(); if(!inv) return;
+    const nome = (document.getElementById("s0").value||"").trim();
+    if(!nome) return toast("Scrivi il tuo nome");
+    const g = n => Number((document.getElementById(n).value||"").trim())||null;
+    const nid = codice();
+    const ora = iso(OGGI());
+    S.persone[nid] = { id:nid, nome, sponsor:inv.sp, creato:ora,
+      tel:(document.getElementById("s1").value||"").trim()||null,
+      dichiarato:{ euroMese:g("d1"), giorni100vp:g("d2"), personeDaSentire:g("d3"),
+                   perche:(document.getElementById("d4").value||"").trim()||null },
+      updatedAt: ora };
+    /* segnaposto per lo sponsor: updatedAt vuoto, cosi' la scheda vera vince all'unione */
+    if(!S.persone[inv.sp]) S.persone[inv.sp] = { id:inv.sp, nome:inv.spn||"Il mio sponsor",
+      sponsor:null, creato:ora, dichiarato:null, updatedAt:"" };
+    S.eventi.push({ id:uid(), persona:nid, tipo:"iscrizione", valore:null, at:ora, by:nid });
+    if(inv.u) S.sync.url = inv.u;
+    S.me = nid; salva(); segnaApertura();
+    history.replaceState(null,"",location.pathname);
+    vista="oggi"; render();
+    if(S.sync.url) sincronizza();   // cosi' lo sponsor lo vede comparire subito
+    return;
+  }
+
+  if(a==="accetta-invito"){
+    const inv = invitoDaHash(); if(!inv) return;
+    const g = n => Number((document.getElementById(n).value||"").trim())||null;
+    S.persone[inv.i] = { id:inv.i, nome:inv.n, sponsor:inv.s, creato:iso(new Date(inv.d)),
+      tel:(document.getElementById("s1").value||"").trim()||null,
+      dichiarato:{ euroMese:g("d1"), giorni100vp:g("d2"), personeDaSentire:g("d3"),
+                   perche:(document.getElementById("d4").value||"").trim()||null },
+      updatedAt: iso(OGGI()) };
+    if(!ha(inv.i,"iscrizione")) aggiungiEvento(inv.i,"iscrizione",null,inv.i);
+    S.me = inv.i; salva(); segnaApertura();
+    history.replaceState(null,"",location.pathname);
+    vista="oggi"; return render();
+  }
+
+  if(a==="apri-vp")       return apriFoglio("vp", { id: id||S.me });
+  if(a==="apri-registra") return apriFoglio("registra", { id: id||S.me });
+  if(a==="apri-nuovo")    return apriFoglio("nuovo");
+  if(a==="apri-invita")   return apriFoglio("invita");
+  if(a==="apri-invito")   return apriFoglio("invito", { id });
+  if(a==="apri-importa")  return apriFoglio("importa");
+  if(a==="apri-incolla")  return apriFoglio("incolla");
+
+  if(a==="salva-vp"){
+    const v = Number((document.getElementById("vpVal").value||"").trim());
+    if(isNaN(v)||v<0) return toast("Numero non valido");
+    aggiungiEvento(id, "vp", v); salva(); chiudiFoglio(); return toast("Segnato");
+  }
+
+  if(a==="fatto"){ aggiungiEvento(S.me, b.dataset.t); salva(); toast("Bene."); return render(); }
+
+  if(a==="conta"){ aggiungiEvento(id, b.dataset.t); salva(); render(); return toast("Segnato"); }
+
+  if(a==="salva-nuovo"){
+    const nome = (document.getElementById("nvNome").value||"").trim();
+    const data = document.getElementById("nvData").value;
+    if(!nome) return toast("Serve il nome");
+    const nid = creaPersona(nome, S.me, data);
+    const tel = (document.getElementById("nvTel").value||"").trim();
+    if(tel){ S.persone[nid].tel = tel; S.persone[nid].updatedAt = iso(OGGI()); salva(); }
+    return apriFoglio("invito", { id:nid });
+  }
+
+  if(a==="copia-link") return copia(linkInvito(S.persone[id]));
+  if(a==="copia-mio-link") return copia(linkSponsor(S.me));
+
+  if(a==="esporta"){
+    scarica(`growup-${giorno(OGGI())}.json`, JSON.stringify(pacchetto()));
+    return toast("Copia salvata");
+  }
+  if(a==="copia-agg") return copia(btoa(unescape(encodeURIComponent(JSON.stringify(pacchettoMio())))));
+
+  if(a==="salva-incolla"){
+    const t = (document.getElementById("pasteIn").value||"").trim();
+    if(!t) return toast("Vuoto");
+    try{
+      const testo = t.startsWith("{") ? t : decodeURIComponent(escape(atob(t)));
+      unisci(JSON.parse(testo)); chiudiFoglio(); return toast("Unito");
+    }catch(e){ return toast("Codice non leggibile"); }
+  }
+
+  if(a==="salva-sync"){
+    S.sync.url = (document.getElementById("syncUrl").value||"").trim(); salva();
+    render(); return toast(S.sync.url?"Indirizzo salvato":"Indirizzo rimosso");
+  }
+  if(a==="salva-tel"){
+    const t = (document.getElementById("mioTel").value||"").trim();
+    S.persone[S.me].tel = t || null;
+    S.persone[S.me].updatedAt = iso(OGGI()); salva(); render();
+    if(S.sync.url) sincronizza();
+    return toast(t?"Numero salvato":"Numero tolto");
+  }
+  if(a==="sincronizza") return sincronizza();
+
+  if(a==="reset"){
+    if(!confirm("Cancella tutti i dati da questo telefono. Sicuro?")) return;
+    localStorage.removeItem(CHIAVE); S = vuoto(); vista="oggi"; foglio=null; return render();
+  }
+});
+
+document.addEventListener("change", ev => {
+  const c = ev.target.closest("[data-fatto]");
+  if(c){
+    const tipo = c.dataset.fatto, pid = c.dataset.id;
+    const e = primoEvento(pid, tipo);
+    if(c.checked && !e) aggiungiEvento(pid, tipo);
+    else if(!c.checked && e) S.cancellati[e.id] = iso(OGGI());
+    salva(); render(); return;
+  }
+  const f = ev.target.closest("#fileIn");
+  if(f && f.files && f.files[0]){
+    const r = new FileReader();
+    r.onload = () => {
+      try{ unisci(JSON.parse(r.result)); chiudiFoglio(); toast("Unito"); }
+      catch(e){ toast("File non leggibile"); }
+    };
+    r.readAsText(f.files[0]);
+  }
+});
+
+/* ---- 12. Avvio ---- */
+segnaApertura();
+render();                                  // prima si disegna: la rete non deve far aspettare nessuno
+if(S.me && S.sync.url) sincronizza();      // poi si sincronizza, in sottofondo
+</script>
+</body>
+</html>
