@@ -518,6 +518,10 @@ function strada(p){
 function prossimaAzione(p){
   const f = faseDi(p.id);
   const vp = vpDi(p.id);
+  /* Il capofila non deve fare i primi 100 VP: deve far partire le persone. */
+  if(p.id===S.leader && !figliDi(p.id).length) return {
+    titolo:"Invita la prima persona",
+    perche:"Mandale il tuo link: quando entra, la vedi comparire qui.", azione:"invita" };
   if(f===0) return { titolo:"Fai il tuo primo ordine",
     perche:"È il gesto che trasforma l'iscrizione in un inizio.", azione:"primo_ordine" };
   if(f===1){
@@ -584,7 +588,7 @@ function disegnaTabs(){
     { k:"oggi", i:"◉", l:"Oggi" },
     { k:"percorso", i:"↗", l:"Percorso" }
   ];
-  if(hoPersone()) voci.push({ k:"persone", i:"◍", l:"Persone" });
+  if(hoPersone() || sonoLeader()) voci.push({ k:"persone", i:"◍", l:"Persone" });
   if(sonoLeader()) voci.push({ k:"tutti", i:"▦", l:"Tutti" });
   voci.push({ k:"dati", i:"≡", l:"Dati" });
   t.innerHTML = voci.map(v =>
@@ -741,6 +745,13 @@ function vistaOggi(){
   <div class="card tight">
     <span class="tag">Il tuo perché</span>
     <p style="margin:6px 0 0">${esc(p.dichiarato.perche)}</p>
+  </div>`:``}
+
+  ${az.azione!=="invita" ? `
+  <div class="sec">
+    <button class="btn wide ghost" data-act="apri-invita">Invita una persona</button>
+    <p class="small faint" style="margin-top:8px;text-align:center">Il tuo link: chi lo apre
+    entra nel tuo gruppo e comincia il suo percorso.</p>
   </div>`:``}
 
   ${salvaKo?`<div class="card warn"><b>Questo browser non salva.</b>
