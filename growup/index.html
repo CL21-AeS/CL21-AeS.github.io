@@ -1082,7 +1082,8 @@ function contenutoFoglio(){
     const link = linkSponsor(S.me);
     return { titolo:"Invita una persona", body:`
       <p class="small">Un link solo, sempre lo stesso, per chiunque tu sponsorizzi.
-      Chi lo apre si iscrive da sé e ti compare in <b>Le mie persone</b>: non devi inserirlo.</p>
+      Chi lo apre si iscrive da sé e ti compare in <b>Le mie persone</b>: non devi inserirlo.
+      Le ultime sei lettere sono il tuo codice: è quello che vi collega.</p>
       <label class="field"><span>Il tuo link</span><textarea id="linkBox" readonly>${esc(link)}</textarea></label>
       <div class="stack" style="margin-top:12px">
         <button class="btn primary wide" data-act="copia-mio-link">Copia il link</button>
@@ -1213,11 +1214,10 @@ function etichettaEvento(e){
    contiene CHI invita e DOVE si sincronizza. Chi lo apre si iscrive da se'
    e risulta agganciato allo sponsor senza che lo sponsor inserisca niente. */
 function linkSponsor(id){
-  /* Niente indirizzo del foglio nel link: l'app lo conosce da sola (FOGLIO_URL).
-     Il link resta corto e non cambia se un domani il foglio cambia. */
-  const base = location.origin + location.pathname;
-  const q = new URLSearchParams({ sp:id, spn:(S.persone[id]||{}).nome || "" });
-  return base + "#" + q.toString();
+  /* Solo il codice dopo il cancelletto. L'indirizzo del foglio l'app lo sa da sola (FOGLIO_URL),
+     e il nome dello sponsor arriva con la prima sincronizzazione: portarli nel link lo allungava
+     al doppio senza aggiungere niente. */
+  return location.origin + location.pathname + "#" + id;
 }
 
 function linkInvito(p){
@@ -1226,10 +1226,14 @@ function linkInvito(p){
   const q = new URLSearchParams({ i:p.id, n:p.nome, s:p.sponsor||"", sn:sp, d:giorno(p.creato) });
   return base + "#" + q.toString();
 }
+const FORMA_CODICE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
 function invitoDaHash(){
   const h = location.hash.replace(/^#/,"");
   if(!h) return null;
+  /* forma corta: #WZUXYT */
+  if(FORMA_CODICE.test(h.toUpperCase())) return { tipo:"sponsor", sp:h.toUpperCase(), spn:"", u:"" };
   const q = new URLSearchParams(h);
+  /* forma lunga, per i link gia' mandati in giro: #sp=...&spn=...&u=... */
   if(q.get("sp")) return { tipo:"sponsor", sp:q.get("sp"), spn:q.get("spn")||"", u:q.get("u")||"" };
   if(q.get("i") && q.get("n")) return { tipo:"scheda", i:q.get("i"), n:q.get("n"),
     s:q.get("s")||null, sn:q.get("sn")||"", d:q.get("d")||giorno(OGGI()) };
@@ -1281,6 +1285,7 @@ let syncProgrammata = null;
 
 async function sincronizza(opzioni){
   const zitto = !!(opzioni && opzioni.silenzioso);
+  const riprova = !(opzioni && opzioni.senzaRiprova);
   if(!S.sync.url){ if(!zitto) toast("Manca l'indirizzo"); return; }
   if(sincronizzando) return;                 // due giri insieme si pesterebbero i piedi
   sincronizzando = true; render();
@@ -1291,11 +1296,20 @@ async function sincronizza(opzioni){
       body: JSON.stringify({ azione:"sync", me:S.me, dati:pacchettoMio() })
     });
     const out = await res.json();
-    if(out && out.dati) unisci(out.dati);
+    if(!out || out.errore) throw new Error(out && out.errore ? out.errore : "risposta vuota");
+    if(out.dati) unisci(out.dati);
     S.sync.ultimo = iso(OGGI()); salva();
     if(!zitto) toast("Fatto");
   }catch(e){
-    if(!zitto) toast("Non riesco a collegarmi");
+    /* Niente e' perduto: quello che hai segnato resta sul telefono e riparte al prossimo giro.
+       Un tentativo solo in piu', poi si lascia stare: insistere peggiora la coda. */
+    if(riprova){
+      sincronizzando = false;
+      await new Promise(r=>setTimeout(r, 6000));
+      return sincronizza({ silenzioso:zitto, senzaRiprova:true });
+    }
+    if(!zitto) toast(String(e).includes("blocco") || String(e).includes("occupato")
+      ? "Il foglio è occupato, riprovo più tardi" : "Non riesco a collegarmi");
   }
   sincronizzando = false;
   render();
@@ -1319,7 +1333,8 @@ async function chiediAlFoglio(chi){
                              dati:{ v:1, persone:{}, eventi:[], aperture:{}, cancellati:{} } })
     });
     const out = await res.json();
-    return out && out.dati ? out.dati : null;
+    if(!out || out.errore) return null;      // un errore non e' una risposta
+    return out.dati || null;
   }catch(e){ return null; }
 }
 
