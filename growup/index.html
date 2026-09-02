@@ -978,22 +978,9 @@ function vistaDati(){
     <button class="btn wide" data-act="apri-importa">Carica un file</button>
   </div>
   <div class="card stack">
-    <h2>Manda i tuoi progressi</h2>
-    <p class="small">Se non c'è la sincronizzazione, questo codice porta i tuoi passaggi
-    al tuo sponsor: lo copi e glielo mandi.</p>
-    <button class="btn wide" data-act="copia-agg">Copia il codice dei progressi</button>
-    <button class="btn wide ghost" data-act="apri-incolla">Incolla un aggiornamento ricevuto</button>
-  </div>
-  <div class="card stack">
     <h2>Sincronizzazione</h2>
-    <p class="small">${S.sync.url===FOGLIO_URL
-      ? "Già collegata: i tuoi passaggi viaggiano da soli verso chi ti segue."
-      : "Attenzione: stai usando un indirizzo diverso da quello previsto dall'app."}</p>
-    <details><summary class="small faint" style="cursor:pointer;padding:8px 0">Cambia indirizzo</summary>
-      <label class="field"><span>Indirizzo dello script</span>
-        <input id="syncUrl" type="url" placeholder="https://script.google.com/..." value="${esc(S.sync.url)}"></label>
-      <button class="btn wide" data-act="salva-sync" style="margin-top:10px">Salva l'indirizzo</button>
-    </details>
+    <p class="small">I tuoi passaggi viaggiano da soli verso chi ti segue. Succede da sé
+    quando segni qualcosa: qui c'è solo per quando hai fretta.</p>
     ${S.sync.url?`<button class="btn primary wide" data-act="sincronizza" ${sincronizzando?"disabled":""}>${
         sincronizzando?"Sto sincronizzando…":"Sincronizza adesso"}</button>
       <p class="small faint">${sincronizzando
@@ -1207,12 +1194,6 @@ function contenutoFoglio(){
     return { titolo:"Carica una copia", body:`
       <p class="small">Unisce, non sostituisce: niente va perso.</p>
       <input id="fileIn" type="file" accept=".json,application/json">` };
-  }
-  if(t==="incolla"){
-    return { titolo:"Incolla un aggiornamento", body:`
-      <p class="small">Il codice che ti ha mandato la persona.</p>
-      <textarea id="pasteIn" placeholder="Incolla qui"></textarea>`,
-      foot:`<button class="btn primary wide" data-act="salva-incolla">Unisci</button>` };
   }
   return { titolo:"", body:"" };
 }
@@ -1485,7 +1466,7 @@ document.addEventListener("click", async ev => {
     if(!S.persone[inv.sp]) S.persone[inv.sp] = { id:inv.sp, nome:inv.spn||"Il mio sponsor",
       sponsor:null, creato:ora, dichiarato:null, updatedAt:"" };
     S.eventi.push({ id:uid(), persona:nid, tipo:"iscrizione", valore:null, at:ora, by:nid });
-    if(inv.u) S.sync.url = inv.u;
+    /* L'indirizzo del foglio resta quello dell'app: un link non puo' dirottarla altrove. */
     S.me = nid; salva(); segnaApertura();
     history.replaceState(null,"",location.pathname);
     vista="oggi"; render();
@@ -1513,7 +1494,6 @@ document.addEventListener("click", async ev => {
   if(a==="apri-invita")   return apriFoglio("invita");
   if(a==="apri-invito")   return apriFoglio("invito", { id });
   if(a==="apri-importa")  return apriFoglio("importa");
-  if(a==="apri-incolla")  return apriFoglio("incolla");
 
   if(a==="salva-vp"){
     const v = Number((document.getElementById("vpVal").value||"").trim());
@@ -1588,21 +1568,6 @@ document.addEventListener("click", async ev => {
   if(a==="esporta"){
     scarica(`growup-${giorno(OGGI())}.json`, JSON.stringify(pacchetto()));
     return toast("Copia salvata");
-  }
-  if(a==="copia-agg") return copia(btoa(unescape(encodeURIComponent(JSON.stringify(pacchettoMio())))));
-
-  if(a==="salva-incolla"){
-    const t = (document.getElementById("pasteIn").value||"").trim();
-    if(!t) return toast("Vuoto");
-    try{
-      const testo = t.startsWith("{") ? t : decodeURIComponent(escape(atob(t)));
-      unisci(JSON.parse(testo)); chiudiFoglio(); return toast("Unito");
-    }catch(e){ return toast("Codice non leggibile"); }
-  }
-
-  if(a==="salva-sync"){
-    S.sync.url = (document.getElementById("syncUrl").value||"").trim() || FOGLIO_URL; salva();
-    render(); return toast("Indirizzo salvato");
   }
   if(a==="salva-tel"){
     const t = (document.getElementById("mioTel").value||"").trim();
