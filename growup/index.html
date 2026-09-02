@@ -159,20 +159,22 @@ label.field>span{display:block;font-size:13px;color:var(--ink2);margin-bottom:5p
 /* ---- 1. Configurazione: le sei fasi, le finestre, le dichiarazioni ---- */
 
 const FASI = [
-  /* `domanda` e' la lingua del leader (serve a giudicare), `traguardo` e' la lingua
-     di chi il percorso lo sta facendo. Non vanno mai scambiate di schermata. */
-  { n:0, nome:"Ingresso",        domanda:"Ha iniziato davvero?",
-    traguardo:"Fare il primo ordine",             finestra:14,  breve:"Ingresso" },
-  { n:1, nome:"Attivazione",     domanda:"Fa ciò che ha detto di voler fare?",
-    traguardo:"100 VP e il primo cliente",        finestra:14,  breve:"Attivazione" },
-  { n:2, nome:"Duplicazione",    domanda:"Aiuta qualcun altro ad arrivare a 100 VP?",
-    traguardo:"Portare una persona a 100 VP",     finestra:60,  breve:"Duplicazione" },
-  { n:3, nome:"Builder",         domanda:"Prende iniziativa senza essere spinto?",
-    traguardo:"Path to Bronze e Bronze Foundation", finestra:120, breve:"Builder" },
-  { n:4, nome:"Emerging Leader", domanda:"Fa lavorare altre persone?",
-    traguardo:"Dal 15% al 18%",                   finestra:null, breve:"Emerging" },
-  { n:5, nome:"Leader",          domanda:"",
-    traguardo:"21% e oltre",                      finestra:null, breve:"Leader" }
+  /* La fase in cui sei e' l'obiettivo su cui stai lavorando, non uno gia' raggiunto:
+     in Fase 2 stai andando verso il Path to Bronze, non ce l'hai.
+     `domanda` e' la lingua del leader (serve a giudicare), `traguardo` quella di chi
+     il percorso lo sta facendo. Non vanno mai scambiate di schermata. */
+  { n:0, nome:"Inizio",            breve:"Inizio",      finestra:14,
+    traguardo:"Iscrizione e primo ordine",  domanda:"Ha iniziato davvero?" },
+  { n:1, nome:"Attivazione",       breve:"Attivazione", finestra:14,
+    traguardo:"100 VP e il primo cliente",  domanda:"Fa ciò che ha detto di voler fare?" },
+  { n:2, nome:"Path to Bronze",    breve:"Path to Bronze", finestra:90,
+    traguardo:"Tre persone che partono",    domanda:"Sta costruendo la sua base?" },
+  { n:3, nome:"Bronze Foundation", breve:"Foundation",  finestra:180,
+    traguardo:"La base che si regge",       domanda:"Le sue persone camminano da sole?" },
+  { n:4, nome:"Bronze Builder",    breve:"Builder",     finestra:null,
+    traguardo:"Il gruppo che cresce",       domanda:"Fa lavorare altre persone?" },
+  { n:5, nome:"Argento",           breve:"Argento",     finestra:null,
+    traguardo:"L'ultimo gradino",           domanda:"" }
 ];
 
 /* Soglie del semaforo e della pipeline. Qui si tarano, in un posto solo. */
@@ -187,14 +189,12 @@ const SOGLIE = {
 
 /* I traguardi dichiarabili: fatti, non sensazioni. */
 const FATTI = [
-  { t:"primo_ordine",   label:"Primo ordine fatto",              fase:0 },
-  { t:"primo_cliente",  label:"Primo cliente che compra",         fase:1 },
-  { t:"path_to_bronze", label:"Path to Bronze",                   fase:3 },
-  { t:"foundation",     label:"Bronze Foundation",                fase:3 },
-  { t:"pct15",          label:"Bronze Builder / 15%",             fase:4 },
-  { t:"pct18",          label:"18%",                              fase:5 },
-  { t:"pct21",          label:"21% / Argento",                    fase:5 },
-  { t:"platino",        label:"Platino",                          fase:5 }
+  { t:"primo_ordine",   label:"Primo ordine fatto",       fase:0 },
+  { t:"primo_cliente",  label:"Primo cliente che compra", fase:1 },
+  { t:"path_to_bronze", label:"Path to Bronze",           fase:2 },
+  { t:"foundation",     label:"Bronze Foundation",        fase:3 },
+  { t:"builder",        label:"Bronze Builder",           fase:4 },
+  { t:"argento",        label:"Argento",                  fase:5 }
 ];
 
 /* ---- 2. Stato e persistenza ---- */
@@ -320,20 +320,27 @@ function discendenti(id, out){
 function attivato(id){ return vpDi(id) >= SOGLIE.vpAttivazione && ha(id,"primo_cliente"); }
 function haDuplicato(id){ return figliDi(id).some(f => vpDi(f.id) >= SOGLIE.vpAttivazione); }
 
-/* La fase: il punto più avanzato raggiunto. Un fatto, non una data. */
+/* La fase e' l'obiettivo su cui stai lavorando: sali quando chiudi il precedente.
+   I nomi vecchi (pct15/pct21/platino) restano accettati per non perdere dati. */
+function haBuilder(id){ return ha(id,"builder") || ha(id,"pct15"); }
+function haArgento(id){ return ha(id,"argento") || ha(id,"pct21") || ha(id,"platino"); }
+
 function faseDi(id){
-  if(ha(id,"pct18") || ha(id,"pct21") || ha(id,"platino")) return 5;
-  if(ha(id,"foundation") || ha(id,"pct15"))                return 4;
-  /* la duplicazione porta in Fase 3 solo se la persona e' attivata lei stessa:
-     senza questo si diventa "Builder" senza aver fatto il primo ordine */
-  if((haDuplicato(id) && attivato(id)) || ha(id,"path_to_bronze")) return 3;
-  if(attivato(id))                                         return 2;
-  if(ha(id,"primo_ordine"))                                return 1;
-  return 0;
+  if(haBuilder(id))          return 5;   // verso Argento
+  if(ha(id,"foundation"))    return 4;   // verso Bronze Builder
+  if(ha(id,"path_to_bronze")) return 3;  // verso Bronze Foundation
+  if(attivato(id))           return 2;   // verso Path to Bronze
+  if(ha(id,"primo_ordine"))  return 1;   // verso l'attivazione
+  return 0;                              // verso il primo ordine
 }
+/* Chi ha chiuso anche l'ultimo: la scala e' finita. */
+function scalaFinita(id){ return haArgento(id); }
+
+/* Quante persone del proprio primo livello sono attivate (100 VP + primo cliente). */
+function attivatiSotto(id){ return figliDi(id).filter(x=>attivato(x.id)).length; }
 
 /* Le date di inizio di ogni fase. null = fase non ancora raggiunta.
-   Da qui escono sia il ritmo della fase aperta sia la velocità delle fasi chiuse. */
+   Da qui escono sia il ritmo della fase aperta sia la velocita' delle fasi chiuse. */
 function inizioFasi(p){
   const primo = t => { const x = primoEvento(p.id,t); return x?x.at:null; };
   const d = [p.creato, null, null, null, null, null];
@@ -342,16 +349,14 @@ function inizioFasi(p){
                    .sort((a,b)=>a.at<b.at?-1:1)[0];
   const cli = primo("primo_cliente");
   if(soglia && cli) d[2] = soglia.at > cli ? soglia.at : cli;
-  const dupl = !attivato(p.id) ? null : figliDi(p.id)
-    .map(f => { const e = eventiDi(f.id).filter(x=>x.tipo==="vp" && Number(x.valore)>=SOGLIE.vpAttivazione)
-                              .sort((a,b)=>a.at<b.at?-1:1)[0]; return e?e.at:null; })
-    .filter(Boolean).sort()[0] || null;
-  const ptb = primo("path_to_bronze");
-  d[3] = (dupl && ptb) ? (dupl < ptb ? dupl : ptb) : (dupl || ptb);
-  d[4] = primo("foundation") || primo("pct15");
-  d[5] = primo("pct18") || primo("pct21") || primo("platino");
+  d[3] = primo("path_to_bronze");
+  d[4] = primo("foundation");
+  d[5] = primo("builder") || primo("pct15");
   /* una fase raggiunta implica le precedenti: riempie i buchi guardando indietro */
   for(let i=1;i<d.length;i++) if(d[i] && !d[i-1]) d[i-1] = d[i];
+  /* e le date devono salire: chi segna un traguardo e solo dopo aggiorna i VP avrebbe
+     l'attivazione datata dopo il Path to Bronze, e i giorni verrebbero negativi */
+  for(let i=1;i<d.length;i++) if(d[i] && d[i-1] && d[i] < d[i-1]) d[i] = d[i-1];
   return d;
 }
 function inizioFase(p){ return inizioFasi(p)[faseDi(p.id)] || p.creato; }
@@ -372,7 +377,7 @@ function fasiVeloci(p){
   for(let i=0;i<d.length-1;i++){
     if(!d[i] || !d[i+1] || !FASI[i].finestra) continue;
     const g = giorniTra(d[i], d[i+1]);
-    if(g <= FASI[i].finestra*0.5) out.push({ fase:i, giorni:g, finestra:FASI[i].finestra });
+    if(g >= 0 && g <= FASI[i].finestra*0.5) out.push({ fase:i, giorni:g, finestra:FASI[i].finestra });
   }
   return out;
 }
@@ -427,7 +432,8 @@ function segnaliDi(id){
 
   if(haDuplicato(id)){
     const chi = figli.filter(f=>vpDi(f.id)>=SOGLIE.vpAttivazione).map(f=>f.nome);
-    out.push({ k:"duplicazione", misurato:false, txt:`${chi.join(", ")} ha superato i 100 VP` });
+    out.push({ k:"duplicazione", misurato:false,
+      txt:`${chi.join(", ")} ${chi.length===1?"ha":"hanno"} superato i 100 VP` });
   }
   const tutti = eventiDi(id);
   const suoi = tutti.filter(e=>e.by===id).length;
@@ -438,6 +444,30 @@ function segnaliDi(id){
   if(pres >= 3) out.push({ k:"presentazioni", misurato:false, txt:`${pres} presentazioni segnate` });
   return out;
 }
+/* Tre gruppi e uno solo per persona, in quest'ordine di priorita':
+   chi ha bisogno adesso viene prima di chi va bene, sempre. */
+function valuta(id){
+  const p = S.persone[id]; if(!p) return null;
+  const f = faseDi(id), s = semaforo(id), vp = vpDi(id);
+  const figli = figliDi(id), attivi = attivatiSotto(id);
+  const daLeader = (figli.length >= 2 && attivi >= 1) || !!inPipeline(id);
+  const motivi = [];
+
+  if(s.k === "n" || s.k === "r") motivi.push(s.txt);
+  if(f === 1 && vp > 0 && vp < SOGLIE.vpAttivazione && s.k !== "v")
+    motivi.push(`è a ${vp} VP e si è fermata`);
+  if(f === 1 && ha(id,"primo_cliente") === false && vp >= SOGLIE.vpAttivazione)
+    motivi.push("ha i VP, le manca solo il primo cliente");
+  if(f === 2 && figli.length > 0 && attivi < 3 && s.k !== "v")
+    motivi.push(`ha ${plur(figli.length,"persona","persone")}, ${attivi} partite su 3`);
+  if(f === 2 && figli.length === 0 && giorniTra(inizioFase(p), OGGI()) <= FASI[2].finestra)
+    motivi.push("attivata, non ha ancora portato nessuno");
+  if(motivi.length) return { gruppo:"seguire", motivi, stella:daLeader };
+
+  if(daLeader) return { gruppo:"crescere", motivi:segnaliDi(id).map(x=>x.txt), stella:true };
+  return { gruppo:"tempi", motivi:[s.txt], stella:false };
+}
+
 function inPipeline(id){
   const s = segnaliDi(id);
   if(s.some(x=>x.k==="duplicazione") && s.length >= 2) return s;
@@ -478,28 +508,36 @@ function promesse(p){
    a chi ci sta dentro serve l'elenco di quello che gli manca. */
 function mancanti(p){
   const f = faseDi(p.id), vp = vpDi(p.id), out = [];
-  if(f===0) out.push({ txt:"Il primo ordine", fatto:false });
+  const figli = figliDi(p.id), attivi = attivatiSotto(p.id);
+
+  if(f===0){
+    out.push({ txt:"Iscrizione completata", fatto:true });
+    out.push({ txt:"Il primo ordine", fatto:false });
+    out.push({ txt:"Il tuo obiettivo scritto",
+               fatto: !!(p.dichiarato && (p.dichiarato.euroMese || p.dichiarato.perche)) });
+  }
   if(f===1){
     out.push({ txt:`Arrivare a ${SOGLIE.vpAttivazione} VP`, fatto:vp>=SOGLIE.vpAttivazione,
                nota: vp>=SOGLIE.vpAttivazione?null:`ne mancano ${SOGLIE.vpAttivazione-vp}` });
     out.push({ txt:"Il primo cliente che compra", fatto:ha(p.id,"primo_cliente") });
+    const parlati = contaEventi(p.id,"conversazione");
+    const bersaglio = (p.dichiarato && p.dichiarato.personeDaSentire) || 5;
+    out.push({ txt:`Parlare con ${bersaglio} persone`, fatto:parlati>=bersaglio,
+               nota: parlati>=bersaglio?null:`${parlati} su ${bersaglio}` });
   }
   if(f===2){
-    const figli = figliDi(p.id);
-    if(!figli.length) out.push({ txt:"Portare la prima persona", fatto:false });
-    else figli.forEach(x=>{
-      const v = vpDi(x.id);
-      out.push({ txt:`${x.nome} a ${SOGLIE.vpAttivazione} VP`, fatto:v>=SOGLIE.vpAttivazione,
-                 nota: v>=SOGLIE.vpAttivazione?null:`è a ${v}` });
-    });
+    out.push({ txt:"Portare tre persone", fatto:figli.length>=3,
+               nota: figli.length>=3?null:`ne hai ${figli.length}` });
+    out.push({ txt:`Farne partire tre (${SOGLIE.vpAttivazione} VP e primo cliente)`,
+               fatto:attivi>=3, nota: attivi>=3?null:`ne sono partite ${attivi}` });
+    out.push({ txt:"Segnare il Path to Bronze quando arriva", fatto:false });
   }
-  if(f===3){
-    out.push({ txt:"Path to Bronze", fatto:ha(p.id,"path_to_bronze") });
-    out.push({ txt:"Bronze Foundation", fatto:ha(p.id,"foundation") });
-  }
-  if(f===4){
-    out.push({ txt:"Bronze Builder / 15%", fatto:ha(p.id,"pct15") });
-    out.push({ txt:"18%", fatto:ha(p.id,"pct18") });
+  if(f>=3 && f<=5){
+    const nome = f===3 ? "Bronze Foundation" : f===4 ? "Bronze Builder" : "Argento";
+    out.push({ txt:"Far crescere le linee che hai", fatto:false,
+               nota:`${figli.length} in prima linea, ${attivi} partite` });
+    out.push({ txt:"Portare nuove persone", fatto:false });
+    out.push({ txt:`Segnare ${nome} quando arriva`, fatto:false });
   }
   return out;
 }
@@ -515,16 +553,21 @@ function strada(p){
   return out;
 }
 
-/* La prossima cosa da fare: UNA. */
+/* La prossima cosa da fare: UNA, e sempre dentro l'obiettivo della fase. */
 function prossimaAzione(p){
   const f = faseDi(p.id);
   const vp = vpDi(p.id);
-  /* Il capofila non deve fare i primi 100 VP: deve far partire le persone. */
-  if(p.id===S.leader && !figliDi(p.id).length) return {
+  const figli = figliDi(p.id);
+  const attivi = attivatiSotto(p.id);
+
+  /* Il capofila non deve rifare i primi 100 VP: deve far partire le persone. */
+  if(p.id===S.leader && !figli.length) return {
     titolo:"Invita la prima persona",
     perche:"Mandale il tuo link: quando entra, la vedi comparire qui.", azione:"invita" };
+
   if(f===0) return { titolo:"Fai il tuo primo ordine",
     perche:"È il gesto che trasforma l'iscrizione in un inizio.", azione:"primo_ordine" };
+
   if(f===1){
     if(vp < SOGLIE.vpAttivazione) return {
       titolo:`Arriva a ${SOGLIE.vpAttivazione} VP`,
@@ -532,23 +575,29 @@ function prossimaAzione(p){
     return { titolo:"Trova il tuo primo cliente",
       perche:"La prima persona che compra da te è la prova che funziona.", azione:"primo_cliente" };
   }
+
   if(f===2){
-    const figli = figliDi(p.id);
-    if(!figli.length) return { titolo:"Porta la prima persona",
-      perche:"Manda il tuo link: quando entra, la vedi comparire.", azione:"invita" };
-    const indietro = figli.filter(x=>vpDi(x.id)<SOGLIE.vpAttivazione);
+    if(figli.length < 3) return {
+      titolo: figli.length ? `Porta la ${["prima","seconda","terza"][figli.length]} persona`
+                           : "Porta la prima persona",
+      perche:"Per il Path to Bronze te ne servono tre che partano.", azione:"invita" };
+    const indietro = figli.filter(x=>!attivato(x.id));
     if(indietro.length) return {
-      titolo:`Aiuta ${indietro[0].nome} ad arrivare a 100 VP`,
-      perche:"È il passaggio che conta più di tutti.", azione:null };
-    return { titolo:"Continua a portare persone", perche:"", azione:"invita" };
+      titolo:`Aiuta ${indietro[0].nome.split(" ")[0]} a partire`,
+      perche:`Gli serve arrivare a ${SOGLIE.vpAttivazione} VP e trovare il primo cliente.`, azione:null };
+    return { titolo:"Segna il Path to Bronze",
+      perche:"Hai tre persone partite: quando la qualifica arriva, segnala qui.", azione:"path_to_bronze" };
   }
-  if(f===3) return { titolo:"Path to Bronze",
-    perche:"Tre linee che si muovono da sole.", azione:"path_to_bronze" };
-  if(f===4) return ha(p.id,"pct15")
-    ? { titolo:"Verso il 18%", perche:"Adesso il lavoro è far lavorare gli altri.", azione:"pct18" }
-    : { titolo:"Verso il 15%", perche:"Adesso il lavoro è far lavorare gli altri.", azione:"pct15" };
+
+  if(f===3) return { titolo:"Verso la Bronze Foundation",
+    perche:`Hai ${plur(figli.length,"persona","persone")} in prima linea, ${attivi} partite.`, azione:"foundation" };
+  if(f===4) return { titolo:"Verso il Bronze Builder",
+    perche:"Adesso il lavoro è far lavorare gli altri.", azione:"builder" };
+  if(f===5 && !scalaFinita(p.id)) return { titolo:"Verso l'Argento",
+    perche:"L'ultimo gradino di questo percorso.", azione:"argento" };
   return { titolo:"Continua così", perche:"", azione:null };
 }
+
 
 /* ---- 5. Ruoli ---- */
 function io(){ return S.me ? S.persone[S.me] : null; }
@@ -569,7 +618,7 @@ function render(){
       case "oggi":     app.innerHTML = vistaOggi(); break;
       case "percorso": app.innerHTML = vistaPercorso(); break;
       case "persone":  app.innerHTML = vistaPersone(); break;
-      case "tutti":    app.innerHTML = vistaTutti(); break;
+      case "valuta":   app.innerHTML = vistaValuta(); break;
       case "dati":     app.innerHTML = vistaDati(); break;
       default:         app.innerHTML = vistaOggi();
     }
@@ -589,8 +638,10 @@ function disegnaTabs(){
     { k:"oggi", i:"◉", l:"Oggi" },
     { k:"percorso", i:"↗", l:"Percorso" }
   ];
-  if(hoPersone() || sonoLeader()) voci.push({ k:"persone", i:"◍", l:"Persone" });
-  if(sonoLeader()) voci.push({ k:"tutti", i:"▦", l:"Tutti" });
+  if(hoPersone() || sonoLeader()){
+    voci.push({ k:"persone", i:"◍", l:"Persone" });
+    voci.push({ k:"valuta",  i:"◈", l:"Chi seguire" });
+  }
   voci.push({ k:"dati", i:"≡", l:"Dati" });
   t.innerHTML = voci.map(v =>
     `<button class="${vista===v.k?"on":""}" data-tab="${v.k}"><b>${v.i}</b>${esc(v.l)}</button>`
@@ -768,7 +819,7 @@ function vistaPercorso(){
   const fatta = strada(p);
   return `
   <h1>Il mio percorso</h1>
-  <p class="small">La fase non è il calendario: è il punto più avanti a cui sei arrivato.</p>
+  <p class="small">La fase in cui sei è l'obiettivo su cui stai lavorando adesso. Il resto lo vedi, ma non ti riguarda ancora.</p>
   <div class="card">
     <ul class="steps">
     ${FASI.map(x=>{
@@ -875,6 +926,23 @@ function vistaPersone(){
   <h1>Le mie persone</h1>
   <p class="small">${plur(diretti.length,"persona","persone")} in prima linea${
     tutti.length>diretti.length?`, ${tutti.length} in tutto il tuo ramo`:""}.</p>
+  ${sonoLeader() ? `
+  <div class="card">
+    <span class="tag">Il funnel</span>
+    <ul class="steps" style="margin-top:8px">
+    ${FASI.map(x=>{
+      const n = tutti.filter(q=>faseDi(q.id)>=x.n).length;
+      const pct = tutti.length? Math.round(n/tutti.length*100):0;
+      return `<li><span class="mark">${x.n}</span><span class="grow">
+        <div class="spread"><span class="t">${esc(x.nome)}</span><b>${n}</b></div>
+        <div class="bar" style="margin-top:6px"><i style="width:${pct}%"></i></div>
+      </span></li>`;
+    }).join("")}
+    </ul>
+    ${(() => { const mai = tutti.filter(q=>faseDi(q.id)===0 && !ultimoTocco(q.id));
+      return mai.length?`<p class="small" style="margin-top:12px"><b>${plur(mai.length,"persona","persone")}</b>
+        non ha mai aperto l'app dopo l'invito.</p>`:``; })()}
+  </div>`:``}
   <div class="card tight">
     <div class="kpi">
       <div><b>${tutti.length}</b><span>nel tuo ramo</span></div>
@@ -901,57 +969,55 @@ function vistaPersone(){
     lo vedi solo se ti manda il codice a mano. Si mette una volta in <b>Dati</b>.</p></div>`}`;
 }
 
-/* --- Tutti + pipeline: la vista del leader. --- */
-function vistaTutti(){
-  const tutti = Object.values(S.persone).filter(p=>!S.cancellati[p.id] && p.id!==S.leader);
-  const per = n => tutti.filter(p=>faseDi(p.id)>=n).length;
-  const pipeline = tutti.map(p=>({p, s:inPipeline(p.id)})).filter(o=>o.s)
-    .sort((a,b)=>b.s.length-a.s.length);
-  const mai = tutti.filter(p=>faseDi(p.id)===0 && !ultimoTocco(p.id));
-  const ord = tutti.slice().sort((a,b)=> faseDi(b.id)-faseDi(a.id) || giorniTra(b.creato,OGGI())-giorniTra(a.creato,OGGI()));
+/* --- Chi seguire: la valutazione delle persone del gruppo. --- */
+function rigaValutata(x, v){
+  return `<button class="person" data-persona="${x.id}">
+    <span class="dot ${semaforo(x.id).k}"></span>
+    <span class="grow">
+      <b>${esc(x.nome)}</b>${v.stella?` <span class="pill s">★</span>`:``}
+      <br><small>Giorno ${giorniTra(x.creato,OGGI())} · Fase ${faseDi(x.id)} ${esc(FASI[faseDi(x.id)].breve)}</small>
+      <br><small class="faint">${esc(v.motivi.filter(Boolean).join(" · ") || "—")}</small>
+    </span>
+    <span class="chev">›</span></button>`;
+}
+
+function vistaValuta(){
+  const tutti = discendenti(S.me);
+  const gruppi = { seguire:[], crescere:[], tempi:[] };
+  tutti.forEach(x => { const v = valuta(x.id); if(v) gruppi[v.gruppo].push({x, v}); });
+  const ord = a => a.sort((p,q)=>PESO[semaforo(p.x.id).k]-PESO[semaforo(q.x.id).k]);
+  ord(gruppi.seguire); ord(gruppi.tempi);
+  gruppi.crescere.sort((p,q)=>q.v.motivi.length-p.v.motivi.length);
+
+  const blocco = (titolo, spiega, lista, vuoto) => `
+    <div class="sec">
+      <span class="tag">${titolo}</span>
+      <p class="small" style="margin:2px 0 8px">${spiega}</p>
+      <div class="card">${lista.length
+        ? lista.map(o=>rigaValutata(o.x,o.v)).join("")
+        : `<div class="empty">${vuoto}</div>`}</div>
+    </div>`;
 
   return `
-  <h1>Tutti</h1>
-  <p class="small">${plur(tutti.length,"persona","persone")} nel percorso.</p>
+  <h1>Chi seguire</h1>
+  <p class="small">${tutti.length
+    ? `${plur(tutti.length,"persona","persone")} nel tuo ramo, divise per quello che serve loro adesso.`
+    : "Quando avrai persone nel gruppo, qui trovi chi ha bisogno di te."}</p>
 
-  <div class="card">
-    <span class="tag">Il funnel</span>
-    <ul class="steps" style="margin-top:8px">
-      ${FASI.map(x=>{
-        const n = per(x.n);
-        const pct = tutti.length? Math.round(n/tutti.length*100):0;
-        return `<li><span class="mark">${x.n}</span><span class="grow">
-          <div class="spread"><span class="t">${esc(x.nome)}</span><b>${n}</b></div>
-          ${x.domanda?`<small class="faint">${esc(x.domanda)}</small>`:``}
-          <div class="bar" style="margin-top:6px"><i style="width:${pct}%"></i></div>
-        </span></li>`;
-      }).join("")}
-    </ul>
-    ${mai.length?`<p class="small" style="margin-top:12px">
-      <b>${plur(mai.length,"persona","persone")}</b> non ha mai aperto l'app dopo l'invito.
-      È il dato più importante di questa schermata.</p>`:``}
-  </div>
+  ${blocco("Da seguire adesso",
+    "Si sono fermate, o sono a un passo da un traguardo. Una telefonata cambia qualcosa.",
+    gruppi.seguire, "Nessuno è fermo. È una buona notizia.")}
 
-  <div class="sec">
-    <span class="tag">Leadership pipeline</span>
-    ${pipeline.length ? `<div class="card">${pipeline.map(o=>`
-      <button class="person" data-persona="${o.p.id}">
-        <span class="pill s">★</span>
-        <span class="grow"><b>${esc(o.p.nome)}</b>
-        <br><small>Fase ${faseDi(o.p.id)} · giorno ${giorniTra(o.p.creato,OGGI())}</small>
-        <br><small class="faint">${esc(o.s.map(x=>x.txt).join(" · "))}</small></span>
-        <span class="chev">›</span></button>`).join("")}</div>`
-      : `<div class="card"><div class="empty"><b>Nessuno, per ora</b>
-         È normale: qui compaiono pochi nomi, non una classifica.</div></div>`}
-  </div>
+  ${blocco("Da far crescere",
+    "Portano persone e le fanno partire. Su queste vale il tuo tempo migliore.",
+    gruppi.crescere, "Nessuno, per ora. Sono pochi per definizione.")}
 
-  <div class="sec">
-    <span class="tag">L'organizzazione</span>
-    <div class="card">${S.leader && figliDi(S.leader).length
-      ? alberoDi(S.leader)
-      : (ord.length?ord.map(x=>rigaPersona(x,true)).join("")
-                   :`<div class="empty">Ancora nessuno.</div>`)}</div>
-  </div>`;
+  ${blocco("Ai loro tempi",
+    "Si muovono, ma senza costruire. Vanno lasciate andare al loro passo: inseguirle non le accelera.",
+    gruppi.tempi, "Nessuno qui.")}
+
+  <p class="small faint" style="margin-top:16px">I gruppi si rifanno da soli a ogni apertura,
+  su quello che le persone segnano. Nessuno sa in quale gruppo è: lo vedi solo tu.</p>`;
 }
 
 /* --- Dati: copia, invito, sincronizzazione --- */
