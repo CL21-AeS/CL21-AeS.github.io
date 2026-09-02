@@ -1029,6 +1029,19 @@ function disegnaFoglio(){
 function contenutoFoglio(){
   const t = foglio.tipo;
 
+  if(t==="primo-ordine"){
+    const p = S.persone[foglio.dati.id] || io();
+    const suo = p.id===S.me;
+    return { titolo:"Il primo ordine", body:`
+      <p class="small">${suo?"Quanti VP hai fatto con questo ordine?":`Quanti VP ha fatto ${esc(p.nome.split(" ")[0])} con il primo ordine?`}
+      Il numero sta sulla conferma dell'ordine.</p>
+      <label class="field"><span>VP dell'ordine</span>
+        <input id="poVp" type="number" inputmode="numeric" placeholder="es. 50"></label>
+      <p class="small faint" style="margin-top:12px">Se il numero non è esatto non è un problema:
+      i VP si aggiornano quando vuoi.</p>`,
+      foot:`<button class="btn primary wide" data-act="salva-primo-ordine" data-id="${p.id}">Salva</button>` };
+  }
+
   if(t==="vp"){
     const p = S.persone[foglio.dati.id] || io();
     return { titolo:"Aggiorna i VP", body:`
@@ -1508,7 +1521,21 @@ document.addEventListener("click", async ev => {
     aggiungiEvento(id, "vp", v); salva(); programmaSync(); chiudiFoglio(); return toast("Segnato");
   }
 
+  /* Il primo ordine non si spunta e basta: si dice anche di quanti VP era.
+     Chiederlo dopo, in un secondo passaggio, era un giro a vuoto. */
+  if(a==="fatto" && b.dataset.t==="primo_ordine") return apriFoglio("primo-ordine", { id:S.me });
   if(a==="fatto"){ aggiungiEvento(S.me, b.dataset.t); salva(); programmaSync(); toast("Bene."); return render(); }
+
+  if(a==="salva-primo-ordine"){
+    const grezzo = (document.getElementById("poVp").value||"").trim();
+    if(grezzo==="") return toast("Scrivi quanti VP");
+    const v = Number(grezzo);
+    if(isNaN(v) || v<0) return toast("Numero non valido");
+    aggiungiEvento(id, "primo_ordine");
+    aggiungiEvento(id, "vp", v);
+    salva(); programmaSync(); chiudiFoglio();
+    return toast(v>=SOGLIE.vpAttivazione ? "Bene, e sei già a " + v + " VP" : "Bene, sei partito");
+  }
 
   if(a==="conta"){ aggiungiEvento(id, b.dataset.t); salva(); programmaSync(); render(); return toast("Segnato"); }
 
@@ -1597,7 +1624,10 @@ document.addEventListener("change", ev => {
   if(c){
     const tipo = c.dataset.fatto, pid = c.dataset.id;
     const e = primoEvento(pid, tipo);
-    if(c.checked && !e) aggiungiEvento(pid, tipo);
+    if(c.checked && !e){
+      if(tipo==="primo_ordine"){ render(); return apriFoglio("primo-ordine", { id:pid }); }
+      aggiungiEvento(pid, tipo);
+    }
     else if(!c.checked && e) S.cancellati[e.id] = iso(OGGI());
     salva(); programmaSync(); render(); return;
   }
