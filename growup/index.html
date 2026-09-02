@@ -1330,6 +1330,32 @@ function programmaSync(){
   syncProgrammata = setTimeout(()=>sincronizza({silenzioso:true}), 2500);
 }
 
+/* Google concede a uno script circa 90 minuti di esecuzione al giorno, per tutti insieme, e ogni
+   chiamata ne consuma 6-20 secondi. Quindi le chiamate a vuoto non sono gratis: sono il margine
+   che serve quando le persone saranno molte. Si sincronizza all'apertura solo se c'e' davvero
+   qualcosa da mandare, o se i dati che si hanno sono vecchi. Il pulsante manuale non guarda nulla
+   di tutto questo: quando lo premi, parte. */
+const FRESCHEZZA_MINUTI = 20;
+
+function qualcosaDaMandare(){
+  const ultimo = S.sync.ultimo;
+  if(!ultimo) return true;
+  const mieId = new Set([S.me].concat(discendenti(S.me).map(p=>p.id)));
+  for(const e of S.eventi) if((mieId.has(e.persona) || mieId.has(e.by)) && e.at > ultimo) return true;
+  for(const id of mieId){
+    const p = S.persone[id];
+    if(p && (p.updatedAt||"") > ultimo) return true;
+  }
+  for(const id in S.cancellati) if(S.cancellati[id] > ultimo) return true;
+  const ap = S.aperture[S.me] || [];
+  return ap.some(d => d > ultimo);
+}
+
+function datiVecchi(){
+  if(!S.sync.ultimo) return true;
+  return (Date.now() - new Date(S.sync.ultimo).getTime()) > FRESCHEZZA_MINUTI*60000;
+}
+
 /* Chiede al foglio senza scrivere nulla. Restituisce l'archivio, o null se non si arriva. */
 async function chiediAlFoglio(chi){
   if(!S.sync.url) return null;
@@ -1589,7 +1615,8 @@ document.addEventListener("change", ev => {
 /* ---- 12. Avvio ---- */
 segnaApertura();
 render();                                  // prima si disegna: la rete non deve far aspettare nessuno
-if(S.me && S.sync.url) sincronizza();      // poi si sincronizza, in sottofondo
+if(S.me && S.sync.url && (qualcosaDaMandare() || datiVecchi()))
+  sincronizza({ silenzioso:true });        // poi si sincronizza, in sottofondo, solo se serve
 </script>
 </body>
 </html>
