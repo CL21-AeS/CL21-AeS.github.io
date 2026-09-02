@@ -168,18 +168,24 @@ const FASI = [
   { n:1, nome:"Attivazione",       breve:"Attivazione", finestra:14,
     traguardo:"100 VP e il primo cliente",  domanda:"Fa ciò che ha detto di voler fare?" },
   { n:2, nome:"Path to Bronze",    breve:"Path to Bronze", finestra:90,
-    traguardo:"Tre persone che partono",    domanda:"Sta costruendo la sua base?" },
+    traguardo:"3 linee da 100 VP e 100 tuoi", domanda:"Sta costruendo la sua base?" },
   { n:3, nome:"Bronze Foundation", breve:"Foundation",  finestra:180,
-    traguardo:"La base che si regge",       domanda:"Le sue persone camminano da sole?" },
+    traguardo:"9% — 1.200 VP di gruppo",     domanda:"Le sue persone camminano da sole?" },
   { n:4, nome:"Bronze Builder",    breve:"Builder",     finestra:null,
-    traguardo:"Il gruppo che cresce",       domanda:"Fa lavorare altre persone?" },
+    traguardo:"15% — 4.000 VP di gruppo",    domanda:"Fa lavorare altre persone?" },
   { n:5, nome:"Argento",           breve:"Argento",     finestra:null,
-    traguardo:"L'ultimo gradino",           domanda:"" }
+    traguardo:"21% — 10.000 VP di gruppo",   domanda:"" }
 ];
 
 /* Soglie del semaforo e della pipeline. Qui si tarano, in un posto solo. */
 const SOGLIE = {
   vpAttivazione: 100,
+  /* Parametri di qualifica presi dai documenti ufficiali CumLaude21 (02-05).
+     Valgono TUTTI nello stesso mese commerciale. */
+  ptb:        { linee:3, vpLinea:100, vpPersonali:100 },                    // Path to Bronze
+  foundation: { linee:3, vpLinea:200, vpPersonali:100, vpGruppo:1200 },     // 9%
+  builder:    { linee:3, vpLinea:600, vpPersonali:200, vpGruppo:4000 },     // 15%
+  argento:    { linee:2,               vpGruppo:10000 },                    // 21%
   verdeGiorni: 7,          // ultimo aggiornamento entro N giorni -> verde
   gialloGiorni: 14,        // oltre -> rosso
   freqAperture: 4,         // aperture negli ultimi 14 gg per il segnale "usa il sistema"
@@ -281,6 +287,8 @@ function whatsapp(tel){
 function esc(s){
   return String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
+/* toLocaleString("it-IT") non separa i numeri di quattro cifre: 4000 restava "4000". */
+function num(n){ return String(Math.round(Number(n)||0)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
 function plur(n,uno,molti){ return n===1?`${n} ${uno}`:`${n} ${molti}`; }
 
 let toastT = null;
@@ -304,10 +312,34 @@ function primoEvento(id, tipo){
   return eventiDi(id).filter(e=>e.tipo===tipo).sort((a,b)=>a.at<b.at?-1:1)[0] || null;
 }
 function ha(id, tipo){ return !!primoEvento(id, tipo); }
-function vpDi(id){
-  const v = eventiDi(id).filter(e=>e.tipo==="vp").sort((a,b)=>a.at<b.at?-1:1);
+/* I VP sono un dato MENSILE: ogni qualifica si valuta dentro il mese commerciale.
+   Un evento `vp` dice "a oggi, questo mese, sono a tanto": vale l'ultimo del mese. */
+function mese(d){ const t = valida(d); return t===null ? "" : new Date(t).toISOString().slice(0,7); }
+function meseOra(){ return mese(OGGI()); }
+
+function vpMese(id, m){
+  const v = eventiDi(id).filter(e=>e.tipo==="vp" && mese(e.at)===m).sort((a,b)=>a.at<b.at?-1:1);
   return v.length ? Number(v[v.length-1].valore)||0 : 0;
 }
+/* vpDi = i VP del mese in corso: e' il numero su cui si misurano le qualifiche. */
+function vpDi(id){ return vpMese(id, meseOra()); }
+
+/* Il massimo mai raggiunto in un mese: serve al traguardo d'attivazione, che si prende una volta. */
+function vpMaiRaggiunti(id){
+  let max = 0;
+  for(const e of eventiDi(id)) if(e.tipo==="vp") max = Math.max(max, Number(e.valore)||0);
+  return max;
+}
+/* Volume di gruppo del mese: i propri VP piu' quelli di tutto il ramo. */
+function vpGruppo(id){
+  return vpDi(id) + discendenti(id).reduce((t,x)=>t+vpDi(x.id), 0);
+}
+/* Volume di una linea frontale nel mese: quella persona piu' tutto cio' che ha sotto. */
+function vpLinea(id){
+  return vpDi(id) + discendenti(id).reduce((t,x)=>t+vpDi(x.id), 0);
+}
+/* Quante linee frontali hanno fatto almeno tot VP nel mese. */
+function lineeCon(id, soglia){ return figliDi(id).filter(x=>vpLinea(x.id) >= soglia).length; }
 function contaEventi(id, tipo){ return eventiDi(id).filter(e=>e.tipo===tipo).length; }
 function figliDi(id){
   return Object.values(S.persone).filter(p => p.sponsor===id && !S.cancellati[p.id]);
@@ -317,8 +349,8 @@ function discendenti(id, out){
   for(const f of figliDi(id)){ out.push(f); discendenti(f.id, out); }
   return out;
 }
-function attivato(id){ return vpDi(id) >= SOGLIE.vpAttivazione && ha(id,"primo_cliente"); }
-function haDuplicato(id){ return figliDi(id).some(f => vpDi(f.id) >= SOGLIE.vpAttivazione); }
+function attivato(id){ return vpMaiRaggiunti(id) >= SOGLIE.vpAttivazione && ha(id,"primo_cliente"); }
+function haDuplicato(id){ return figliDi(id).some(f => vpMaiRaggiunti(f.id) >= SOGLIE.vpAttivazione); }
 
 /* La fase e' l'obiettivo su cui stai lavorando: sali quando chiudi il precedente.
    I nomi vecchi (pct15/pct21/platino) restano accettati per non perdere dati. */
@@ -506,38 +538,58 @@ function promesse(p){
 
 /* Cosa manca per chiudere la fase in cui sei. La domanda della fase serve al leader,
    a chi ci sta dentro serve l'elenco di quello che gli manca. */
-function mancanti(p){
-  const f = faseDi(p.id), vp = vpDi(p.id), out = [];
-  const figli = figliDi(p.id), attivi = attivatiSotto(p.id);
+/* I criteri di una fase qualsiasi: serve per mostrare il traguardo di costruzione
+   anche a chi e' ancora all'inizio e non ci e' arrivato. */
+function mancanti(p){ return criteri(p, faseDi(p.id)); }
+
+function criteri(p, f){
+  const out = [];
+  const vpM = vpDi(p.id), gruppo = vpGruppo(p.id), figli = figliDi(p.id);
+  const riga = (txt, fatto, nota) => out.push({ txt, fatto, nota: fatto?null:nota });
 
   if(f===0){
-    out.push({ txt:"Iscrizione completata", fatto:true });
-    out.push({ txt:"Il primo ordine", fatto:false });
-    out.push({ txt:"Il tuo obiettivo scritto",
-               fatto: !!(p.dichiarato && (p.dichiarato.euroMese || p.dichiarato.perche)) });
+    riga("Iscrizione completata", true);
+    riga("Il primo ordine", false);
+    riga("Il tuo obiettivo scritto", !!(p.dichiarato && (p.dichiarato.euroMese || p.dichiarato.perche)));
   }
+
   if(f===1){
-    out.push({ txt:`Arrivare a ${SOGLIE.vpAttivazione} VP`, fatto:vp>=SOGLIE.vpAttivazione,
-               nota: vp>=SOGLIE.vpAttivazione?null:`ne mancano ${SOGLIE.vpAttivazione-vp}` });
-    out.push({ txt:"Il primo cliente che compra", fatto:ha(p.id,"primo_cliente") });
+    const mai = vpMaiRaggiunti(p.id);
+    riga(`Arrivare a ${SOGLIE.vpAttivazione} VP in un mese`, mai>=SOGLIE.vpAttivazione,
+         `sei a ${mai}, ne mancano ${Math.max(0,SOGLIE.vpAttivazione-mai)}`);
+    riga("Il primo cliente che compra", ha(p.id,"primo_cliente"));
     const parlati = contaEventi(p.id,"conversazione");
     const bersaglio = (p.dichiarato && p.dichiarato.personeDaSentire) || 5;
-    out.push({ txt:`Parlare con ${bersaglio} persone`, fatto:parlati>=bersaglio,
-               nota: parlati>=bersaglio?null:`${parlati} su ${bersaglio}` });
+    riga(`Parlare con ${bersaglio} persone`, parlati>=bersaglio, `${parlati} su ${bersaglio}`);
   }
+
   if(f===2){
-    out.push({ txt:"Portare tre persone", fatto:figli.length>=3,
-               nota: figli.length>=3?null:`ne hai ${figli.length}` });
-    out.push({ txt:`Farne partire tre (${SOGLIE.vpAttivazione} VP e primo cliente)`,
-               fatto:attivi>=3, nota: attivi>=3?null:`ne sono partite ${attivi}` });
-    out.push({ txt:"Segnare il Path to Bronze quando arriva", fatto:false });
+    const c = SOGLIE.ptb, qualificate = lineeCon(p.id, c.vpLinea);
+    riga(`${c.linee} prime linee tue`, figli.length>=c.linee, `ne hai ${figli.length}`);
+    riga(`Ognuna a ${c.vpLinea} VP questo mese`, qualificate>=c.linee,
+         `${qualificate} su ${c.linee} ci sono arrivate`);
+    riga(`${c.vpPersonali} VP personali tuoi questo mese`, vpM>=c.vpPersonali, `sei a ${vpM}`);
+    riga("Segnare il Path to Bronze quando arriva", false);
   }
-  if(f>=3 && f<=5){
-    const nome = f===3 ? "Bronze Foundation" : f===4 ? "Bronze Builder" : "Argento";
-    out.push({ txt:"Far crescere le linee che hai", fatto:false,
-               nota:`${figli.length} in prima linea, ${attivi} partite` });
-    out.push({ txt:"Portare nuove persone", fatto:false });
-    out.push({ txt:`Segnare ${nome} quando arriva`, fatto:false });
+
+  if(f===3 || f===4){
+    const c = f===3 ? SOGLIE.foundation : SOGLIE.builder;
+    const nome = f===3 ? "la Bronze Foundation" : "il Bronze Builder";
+    const livello = f===3 ? "9%" : "15%";
+    const qualificate = lineeCon(p.id, c.vpLinea);
+    riga(`${num(c.vpGruppo)} VP di gruppo questo mese (livello ${livello})`, gruppo>=c.vpGruppo, `siete a ${num(gruppo)}`);
+    riga(`${c.linee} linee frontali`, figli.length>=c.linee, `ne hai ${figli.length}`);
+    riga(`Ognuna a ${c.vpLinea} VP questo mese`, qualificate>=c.linee,
+         `${qualificate} su ${c.linee} ci sono arrivate`);
+    riga(`${c.vpPersonali} VP personali tuoi questo mese`, vpM>=c.vpPersonali, `sei a ${vpM}`);
+    riga(`Segnare ${nome} quando arriva`, false);
+  }
+
+  if(f===5 && !scalaFinita(p.id)){
+    const c = SOGLIE.argento, qualificate = lineeCon(p.id, 1);
+    riga(`${num(c.vpGruppo)} VP di gruppo questo mese (livello 21%)`, gruppo>=c.vpGruppo, `siete a ${num(gruppo)}`);
+    riga(`Volume su almeno ${c.linee} linee`, qualificate>=c.linee, `${qualificate} linee attive`);
+    riga("Segnare l'Argento quando arriva", false);
   }
   return out;
 }
@@ -551,6 +603,13 @@ function strada(p){
                giorni:giorniTra(d[i], d[i+1]), finestra:FASI[i].finestra });
   }
   return out;
+}
+
+/* Il traguardo di costruzione: da Fase 2 in su e' la fase stessa; chi e' ancora
+   all'inizio guarda comunque il Path to Bronze, che e' il primo. */
+function faseCostruzione(id){
+  if(scalaFinita(id)) return null;
+  return Math.min(5, Math.max(2, faseDi(id)));
 }
 
 /* La prossima cosa da fare: UNA, e sempre dentro l'obiettivo della fase. */
@@ -569,32 +628,46 @@ function prossimaAzione(p){
     perche:"È il gesto che trasforma l'iscrizione in un inizio.", azione:"primo_ordine" };
 
   if(f===1){
-    if(vp < SOGLIE.vpAttivazione) return {
+    /* Il traguardo d'attivazione si prende una volta: si guarda il massimo mai fatto,
+       non il mese in corso, altrimenti il primo del mese sembra di ripartire da zero. */
+    const mai = vpMaiRaggiunti(p.id);
+    if(mai < SOGLIE.vpAttivazione) return {
       titolo:`Arriva a ${SOGLIE.vpAttivazione} VP`,
-      perche:`Te ne mancano ${SOGLIE.vpAttivazione-vp}.`, azione:"vp" };
+      perche:`Te ne mancano ${SOGLIE.vpAttivazione-mai}.`, azione:"vp" };
     return { titolo:"Trova il tuo primo cliente",
       perche:"La prima persona che compra da te è la prova che funziona.", azione:"primo_cliente" };
   }
 
-  if(f===2){
-    if(figli.length < 3) return {
-      titolo: figli.length ? `Porta la ${["prima","seconda","terza"][figli.length]} persona`
-                           : "Porta la prima persona",
-      perche:"Per il Path to Bronze te ne servono tre che partano.", azione:"invita" };
-    const indietro = figli.filter(x=>!attivato(x.id));
-    if(indietro.length) return {
-      titolo:`Aiuta ${indietro[0].nome.split(" ")[0]} a partire`,
-      perche:`Gli serve arrivare a ${SOGLIE.vpAttivazione} VP e trovare il primo cliente.`, azione:null };
-    return { titolo:"Segna il Path to Bronze",
-      perche:"Hai tre persone partite: quando la qualifica arriva, segnala qui.", azione:"path_to_bronze" };
-  }
+  /* Dalla Fase 2 in su l'obiettivo e' mensile: la prossima cosa e' il criterio che manca. */
+  if(f>=2 && !scalaFinita(p.id)){
+    const c = f===2 ? SOGLIE.ptb : f===3 ? SOGLIE.foundation : f===4 ? SOGLIE.builder : SOGLIE.argento;
+    const nome = f===2 ? "il Path to Bronze" : f===3 ? "la Bronze Foundation"
+               : f===4 ? "il Bronze Builder" : "l'Argento";
+    const chiave = f===2 ? "path_to_bronze" : f===3 ? "foundation" : f===4 ? "builder" : "argento";
+    const vpM = vpDi(p.id), gruppo = vpGruppo(p.id);
 
-  if(f===3) return { titolo:"Verso la Bronze Foundation",
-    perche:`Hai ${plur(figli.length,"persona","persone")} in prima linea, ${attivi} partite.`, azione:"foundation" };
-  if(f===4) return { titolo:"Verso il Bronze Builder",
-    perche:"Adesso il lavoro è far lavorare gli altri.", azione:"builder" };
-  if(f===5 && !scalaFinita(p.id)) return { titolo:"Verso l'Argento",
-    perche:"L'ultimo gradino di questo percorso.", azione:"argento" };
+    if(c.linee && figli.length < c.linee) return {
+      titolo: figli.length ? "Porta un'altra persona" : "Porta la prima persona",
+      perche:`Per ${nome} ti servono ${c.linee} linee tue: ne hai ${figli.length}.`, azione:"invita" };
+
+    if(c.vpLinea){
+      const indietro = figli.filter(x=>vpLinea(x.id) < c.vpLinea)
+        .sort((a,b)=>vpLinea(b.id)-vpLinea(a.id));
+      if(figli.length - indietro.length < c.linee && indietro.length) return {
+        titolo:`Aiuta ${indietro[0].nome.split(" ")[0]} ad arrivare a ${c.vpLinea} VP`,
+        perche:`Questo mese la sua linea è a ${vpLinea(indietro[0].id)}. Per ${nome} servono ${c.linee} linee da ${c.vpLinea}.`,
+        azione:null };
+    }
+    if(c.vpPersonali && vpM < c.vpPersonali) return {
+      titolo:`Arriva a ${c.vpPersonali} VP tuoi`,
+      perche:`Questo mese sei a ${vpM}. Per ${nome} ne servono ${c.vpPersonali} personali.`, azione:"vp" };
+    if(c.vpGruppo && gruppo < c.vpGruppo) return {
+      titolo:"Fai crescere il volume di gruppo",
+      perche:`Questo mese siete a ${num(gruppo)} VP dei ${num(c.vpGruppo)} che servono per ${nome}.`, azione:null };
+
+    return { titolo:`Segna ${nome}`,
+      perche:"Hai tutti i criteri: quando la qualifica arriva, segnala qui.", azione:chiave };
+  }
   return { titolo:"Continua così", perche:"", azione:null };
 }
 
@@ -743,9 +816,11 @@ function vistaOggi(){
 
   let barra = "";
   if(f===1){
-    const pct = Math.min(100, Math.round(vp/SOGLIE.vpAttivazione*100));
+    const mai = vpMaiRaggiunti(p.id);
+    const pct = Math.min(100, Math.round(mai/SOGLIE.vpAttivazione*100));
     barra = `<div class="bar" style="margin:12px 0 6px"><i style="width:${pct}%"></i></div>
-             <div class="small">${vp} / ${SOGLIE.vpAttivazione} VP</div>`;
+             <div class="small">${mai} / ${SOGLIE.vpAttivazione} VP${
+               vp!==mai ? ` · ${vp} questo mese` : ""}</div>`;
   }
 
   const daSeguire = figli.map(x=>({x, s:semaforo(x.id)}))
@@ -766,7 +841,7 @@ function vistaOggi(){
     ${barra}
     <div class="row wrap" style="margin-top:12px">
       ${az.azione==="vp"
-        ? `<button class="btn primary grow" data-act="apri-vp">Aggiorna i miei VP</button>`
+        ? `<button class="btn primary grow" data-act="apri-vp">Aggiorna i VP del mese</button>`
         : az.azione==="invita"
           ? `<button class="btn primary grow" data-act="apri-invita">Invita una persona</button>`
           : az.azione
@@ -786,6 +861,33 @@ function vistaOggi(){
         <br><small>${esc(x.esito)}</small></span></li>`).join("")}
     </ul>
   </div>`:``}
+
+  ${(() => {
+    /* Il traguardo di costruzione, coi suoi parametri: e' il perche' di tutto il resto,
+       e avanza da solo quando la qualifica precedente e' segnata. */
+    const fc = faseCostruzione(p.id);
+    if(fc === null) return "";
+    const lista = criteri(p, fc).filter(x => !/^Segnare /.test(x.txt));
+    const presi = lista.filter(x=>x.fatto).length;
+    return `
+    <div class="card">
+      <div class="spread">
+        <span class="tag">Il traguardo da costruire</span>
+        <span class="pill">${presi} su ${lista.length}</span>
+      </div>
+      <h2 style="margin-top:6px">${esc(FASI[fc].nome)}</h2>
+      <p class="small">${esc(FASI[fc].traguardo)}${fc>faseDi(p.id)?" — ci arrivi dopo l'attivazione":""}</p>
+      <ul class="micro" style="margin-top:10px">
+        ${lista.map(m=>`<li class="${m.fatto?"ok":""}">
+          <span class="m">${m.fatto?"✓":"○"}</span>
+          <span>${esc(m.txt)}${m.nota?`<small>${esc(m.nota)}</small>`:``}</span></li>`).join("")}
+      </ul>
+      ${criteri(p,fc).every(x=>x.fatto || /^Segnare /.test(x.txt)) && fc===faseDi(p.id)
+        ? `<button class="btn primary wide" style="margin-top:14px" data-act="fatto"
+             data-t="${fc===2?"path_to_bronze":fc===3?"foundation":fc===4?"builder":"argento"}">
+             Ho raggiunto ${esc(FASI[fc].nome)}</button>` : ``}
+    </div>`;
+  })()}
 
   ${daSeguire.length ? `
   <div class="sec">
@@ -1098,8 +1200,9 @@ function contenutoFoglio(){
   if(t==="vp"){
     const p = S.persone[foglio.dati.id] || io();
     return { titolo:"Aggiorna i VP", body:`
-      <p class="small">Scrivi il totale dei VP che hai adesso. Non serve che sia perfetto.</p>
-      <label class="field"><span>VP totali</span>
+      <p class="small">Scrivi i VP che hai fatto <b>in questo mese</b>. Le qualifiche si contano
+      mese per mese, quindi il primo del mese si riparte da zero.</p>
+      <label class="field"><span>VP di ${new Date().toLocaleDateString("it-IT",{month:"long",year:"numeric"})}</span>
         <input id="vpVal" type="number" inputmode="numeric" value="${vpDi(p.id)}"></label>`,
       foot:`<button class="btn primary wide" data-act="salva-vp" data-id="${p.id}">Salva</button>` };
   }
@@ -1114,7 +1217,7 @@ function contenutoFoglio(){
           Ho parlato con una persona <small>(${contaEventi(p.id,"conversazione")})</small></button>
         <button class="btn wide" data-act="conta" data-t="presentazione" data-id="${p.id}">
           Ho fatto una presentazione <small>(${contaEventi(p.id,"presentazione")})</small></button>
-        <button class="btn wide" data-act="apri-vp" data-id="${p.id}">Aggiorna i VP (${vpDi(p.id)})</button>
+        <button class="btn wide" data-act="apri-vp" data-id="${p.id}">VP di questo mese (${vpDi(p.id)})</button>
       </div>
       <div class="sec"><span class="tag">Traguardi</span>
       ${(() => {
