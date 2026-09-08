@@ -191,14 +191,6 @@
       <p class="tiny">Con il prefisso internazionale. Senza numero l'app funziona comunque:
       il contatto ti copia e incolla le risposte a mano.</p>
     </div>
-    <div class="field">
-      <label class="small muted" for="p-base">L'indirizzo di questa app</label>
-      <input type="text" id="p-base" placeholder="https://…" spellcheck="false" autocapitalize="off">
-      <p class="tiny">Copialo dalla barra del browser (o dal menu di condivisione della pagina)
-      e incollalo qui. Serve a costruire i link da mandare ai contatti: l'app non può leggerlo
-      da sé, perché gira dentro una cornice e vede un indirizzo interno che a loro non si apre.
-      <button class="linkish" id="p-auto" type="button">Prova a rilevarlo</button></p>
-    </div>
     <button class="btn block" id="p-salva">Salva e comincia</button>
     <p class="tiny" id="p-err" hidden>Scrivi almeno il tuo nome.</p>
   </div>
@@ -240,8 +232,6 @@
     <div style="text-align:center">
       <button class="linkish" id="h-aiuto">Come funziona · passarla a un altro partner</button>
     </div>
-    <p class="tiny" id="h-nobase" hidden>Manca l'indirizzo dell'app: senza quello i link per i contatti
-    non si aprono. Copialo dalla barra del browser e incollalo dal tuo profilo, qui sopra a destra.</p>
     <p class="tiny" id="h-nostore" hidden>Attenzione: questo browser non permette di salvare niente
     (navigazione privata?). Puoi preparare inviti e leggere codici, ma l'archivio non si conserva.</p>
   </div>
@@ -375,8 +365,19 @@
     <div class="msgbox" id="x-link"></div>
     <div class="btn-row">
       <button class="btn ghost" id="x-copia">Copia il link da girare</button>
+      <button class="btn ghost" id="x-cambia">Correggi l'indirizzo</button>
     </div>
     <p class="ok" id="x-ok" hidden>Copiato.</p>
+    <div id="x-edit" hidden class="stack-s">
+      <label class="small muted" for="x-base">L'indirizzo di questa app</label>
+      <input type="text" id="x-base" placeholder="https://…" spellcheck="false" autocapitalize="off">
+      <p class="tiny">È la prima metà dei link che mandi ai contatti. L'app la riconosce da sé,
+      e qui puoi correggerla se per qualche motivo ha preso quella sbagliata.</p>
+      <div class="btn-row">
+        <button class="btn sm" id="x-basesalva">Salva</button>
+        <button class="btn ghost sm" id="x-baseno">Annulla</button>
+      </div>
+    </div>
     <p class="small muted">I dati non si mescolano perché non stanno da nessuna parte in comune:
     le schede di ognuno restano nel browser di quel telefono, e le risposte di un contatto
     tornano su WhatsApp solo al partner che gli ha mandato l'invito. Nemmeno tu vedi le schede
@@ -819,26 +820,18 @@ el('copy').onclick = function () { copia(messaggioContatto(), function () { lamp
 el('p-salva').onclick = function () {
   var nome = (el('p-nome').value || '').trim();
   if (!nome) { el('p-err').textContent = 'Scrivi almeno il tuo nome.'; el('p-err').hidden = false; return; }
-  var grezzo = (el('p-base').value || '').trim();
-  if (grezzo && !pulisciBase(grezzo)) {
-    el('p-err').textContent = 'L\'indirizzo dell\'app deve cominciare con http:// o https://. Copialo dalla barra del browser.';
-    el('p-err').hidden = false;
-    return;
-  }
   el('p-err').hidden = true;
   memoria.profilo = {
     nome: nome,
     tel: soloCifre(el('p-tel').value),
-    base: pulisciBase(el('p-base').value) || baseAffidabile()
+    base: (memoria.profilo && memoria.profilo.base) || baseAffidabile()
   };
   salva();
   vaiHome();
 };
-el('p-auto').onclick = function () { el('p-base').value = indirizzoVisto(); };
 el('h-profilo').onclick = function () {
   el('p-nome').value = memoria.profilo ? memoria.profilo.nome : '';
   el('p-tel').value = memoria.profilo ? memoria.profilo.tel : '';
-  el('p-base').value = memoria.profilo ? (memoria.profilo.base || '') : '';
   mostra('s-setup');
 };
 
@@ -851,15 +844,29 @@ function vaiHome() {
     ? (fatte + (fatte === 1 ? ' scheda letta' : ' schede lette') + ' · ' + att + ' in attesa di risposta')
     : 'Nessuna scheda ancora.';
   el('h-nostore').hidden = salvataggioOk;
-  el('h-nobase').hidden = !!linkBase();
   mostra('s-home');
 }
 el('h-archivio').onclick = function () { apriArchivio(); };
 el('h-leggi').onclick = function () { el('l-code').value = ''; el('l-err').hidden = true; el('l-assoc').hidden = true; mostra('s-leggi'); };
-el('h-aiuto').onclick = function () {
+el('h-aiuto').onclick = function () { apriAiuto(); };
+function apriAiuto() {
   var b = linkBase();
-  el('x-link').textContent = b || 'Manca l\'indirizzo dell\'app: aggiungilo dal tuo profilo (in alto a destra, «modifica»).';
+  el('x-link').textContent = b || 'L\'indirizzo si riconosce da sé quando apri l\'app dal browser. Se non è comparso, lo puoi scrivere qui sotto.';
+  el('x-edit').hidden = true;
   mostra('s-aiuto');
+}
+el('x-cambia').onclick = function () {
+  el('x-base').value = linkBase() || indirizzoVisto();
+  el('x-edit').hidden = false;
+};
+el('x-baseno').onclick = function () { el('x-edit').hidden = true; };
+el('x-basesalva').onclick = function () {
+  var b = pulisciBase(el('x-base').value);
+  if (!b) return;
+  if (!memoria.profilo) memoria.profilo = { nome: '', tel: '', base: '' };
+  memoria.profilo.base = b;
+  salva();
+  apriAiuto();
 };
 el('a-home').onclick = vaiHome;
 el('l-home').onclick = vaiHome;
