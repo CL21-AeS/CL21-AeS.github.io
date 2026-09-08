@@ -1,0 +1,1265 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Target</title>
+<style>
+  /* ── Tokens: light is the base set ─────────────────────────────────── */
+  :root {
+    --ground: #EDF0EC;
+    --surface: #FFFFFF;
+    --surface-2: #F6F8F5;
+    --ink: #131A16;
+    --ink-2: #4C5852;
+    --ink-3: #66726B;
+    --rule: #DBE1DA;
+    --rule-soft: #E8ECE6;
+    --accent: #1D6A52;
+    --accent-ink: #FFFFFF;
+    --accent-wash: #E2EDE6;
+    --good: #0F7A45;
+    --warn: #8A6410;
+    --crit: #9E2B25;
+    --off: #66726B;
+    --focus: #1D6A52;
+    --shadow: 0 1px 2px rgba(19, 26, 22, .05), 0 8px 24px rgba(19, 26, 22, .07);
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --r: 8px;
+    --gap: 16px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0E1310; --surface: #161D19; --surface-2: #1D2621;
+      --ink: #E6EBE6; --ink-2: #A3AEA7; --ink-3: #8A968F;
+      --rule: #29332D; --rule-soft: #222B26;
+      --accent: #63BF9B; --accent-ink: #0E1310; --accent-wash: #1B2E26;
+      --good: #4FB477; --warn: #C79A3E; --crit: #D9756B; --off: #8A968F; --focus: #63BF9B;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.45);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0E1310; --surface: #161D19; --surface-2: #1D2621;
+    --ink: #E6EBE6; --ink-2: #A3AEA7; --ink-3: #8A968F;
+    --rule: #29332D; --rule-soft: #222B26;
+    --accent: #63BF9B; --accent-ink: #0E1310; --accent-wash: #1B2E26;
+    --good: #4FB477; --warn: #C79A3E; --crit: #D9756B; --off: #8A968F; --focus: #63BF9B;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.45);
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] { color-scheme: light; }
+
+  /* ── Base ──────────────────────────────────────────────────────────── */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--sans); font-size: 16px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%;
+  }
+  h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -.015em; text-wrap: balance; }
+  h1 { font-size: 25px; }
+  h2 { font-size: 18px; }
+  h3 { font-size: 15px; }
+  p { margin: 0; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+  input[type="text"], input[type="tel"], input[type="password"], textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 6px;
+    background: var(--surface); color: var(--ink); outline: none; appearance: none; -webkit-appearance: none;
+  }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  ::placeholder { color: var(--ink-3); opacity: 1; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+
+  /* ── Layout ────────────────────────────────────────────────────────── */
+  .wrap { max-width: 620px; margin: 0 auto; padding: 20px 18px 64px; }
+  .card { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r); box-shadow: var(--shadow); padding: 22px; }
+  .stack { display: flex; flex-direction: column; gap: var(--gap); }
+  .stack-s { display: flex; flex-direction: column; gap: 8px; }
+  .muted { color: var(--ink-2); }
+  .small { font-size: 14px; }
+  .tiny { font-size: 13px; color: var(--ink-3); }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 420px) { .two { grid-template-columns: 1fr; } }
+
+  /* ── Topbar ────────────────────────────────────────────────────────── */
+  .topbar { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .topbar .who { font-size: 13px; color: var(--ink-3); text-align: right; }
+
+  /* ── Buttons ───────────────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 18px; border-radius: 6px; border: 1px solid var(--accent);
+    background: var(--accent); color: var(--accent-ink); font-weight: 600;
+    cursor: pointer; text-decoration: none; -webkit-tap-highlight-color: transparent;
+  }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.ghost { background: transparent; color: var(--ink); border-color: var(--rule); font-weight: 500; }
+  .btn.danger { background: transparent; color: var(--crit); border-color: var(--crit); font-weight: 500; }
+  .btn.sm { padding: 8px 12px; font-size: 14px; }
+  .btn.block { width: 100%; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .linkish { background: none; border: 0; padding: 0; color: var(--ink-3); font-size: 13px; text-decoration: underline; cursor: pointer; }
+
+  /* ── Progress ──────────────────────────────────────────────────────── */
+  .progress { display: flex; gap: 4px; margin-bottom: 18px; }
+  .progress i { flex: 1; height: 3px; border-radius: 2px; background: var(--rule); }
+  .progress i.on { background: var(--accent); }
+
+  /* ── Options ───────────────────────────────────────────────────────── */
+  .opts { display: grid; gap: 10px; }
+  .opt {
+    display: block; width: 100%; text-align: left; padding: 14px 16px;
+    border: 1px solid var(--rule); border-radius: 6px; background: var(--surface-2);
+    color: var(--ink); cursor: pointer; line-height: 1.4; -webkit-tap-highlight-color: transparent;
+  }
+  .opt:hover { border-color: var(--accent); }
+  .opt.sel { border-color: var(--accent); background: var(--accent-wash); box-shadow: inset 0 0 0 1px var(--accent); }
+
+  /* ── Elenco schede ─────────────────────────────────────────────────── */
+  .rows { display: flex; flex-direction: column; }
+  .row {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    padding: 14px 4px; border: 0; border-bottom: 1px solid var(--rule-soft);
+    background: none; color: var(--ink); cursor: pointer;
+  }
+  .row:last-child { border-bottom: 0; }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .nm { font-weight: 600; }
+  .row .sub { font-size: 13px; color: var(--ink-3); }
+  .pill {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+    padding: 4px 8px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-2); white-space: nowrap;
+  }
+  .pill.go { border-color: var(--good); color: var(--good); }
+  .pill.care { border-color: var(--warn); color: var(--warn); }
+  .pill.no { border-color: var(--crit); color: var(--crit); }
+  .pill.wait { border-style: dashed; }
+
+  /* ── Scheda ────────────────────────────────────────────────────────── */
+  .code { font-family: var(--mono); font-size: 20px; letter-spacing: .06em; text-align: center; padding: 14px; border: 1px dashed var(--rule); border-radius: 6px; background: var(--surface-2); word-break: break-all; }
+  .band { padding: 14px 16px; border-radius: 6px; border-left: 3px solid var(--off); background: var(--surface-2); }
+  .band.go { border-color: var(--good); }
+  .band.care { border-color: var(--warn); }
+  .band.no { border-color: var(--crit); }
+  .score { font-family: var(--mono); font-size: 30px; font-weight: 600; }
+  table.ans { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.ans th, table.ans td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  table.ans th { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; }
+  table.ans td.p { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  .flag { color: var(--crit); font-weight: 600; }
+  ul.clean { margin: 0; padding-left: 18px; }
+  ul.clean li + li { margin-top: 6px; }
+  ol.clean { margin: 0; padding-left: 20px; }
+  ol.clean li + li { margin-top: 8px; }
+  details { border: 1px solid var(--rule); border-radius: 6px; padding: 12px 14px; background: var(--surface-2); }
+  summary { cursor: pointer; font-weight: 600; font-size: 15px; }
+  details[open] summary { margin-bottom: 10px; }
+  .msgbox { font-size: 14px; white-space: pre-wrap; padding: 14px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface-2); max-height: 240px; overflow-y: auto; }
+  .msgbox a { color: var(--accent); word-break: break-all; }
+  .ok { color: var(--good); font-size: 13px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ══════════════ 1. PRIMO AVVIO: IL TUO PROFILO ══════════════ -->
+<section id="s-setup" hidden class="stack">
+  <div class="card stack">
+    <div>
+      <p class="eyebrow">Target</p>
+      <h1>Prima di cominciare</h1>
+    </div>
+    <p class="muted">Questa app serve a capire se un contatto è in target <em>prima</em> di dargli il piano.
+    Tu scrivi il suo nome, lei prepara l'invito, lui risponde a otto domande e ti rimanda le risposte.
+    Il punteggio lo vedi solo tu.</p>
+    <p class="small muted">Serve una volta sola: i tuoi dati e le tue schede restano su questo
+    dispositivo, non finiscono su nessun server e nessun altro partner li vede.</p>
+    <div class="field">
+      <label class="small muted" for="p-nome">Il tuo nome, come lo vedrà il contatto</label>
+      <input type="text" id="p-nome" placeholder="Stefano" autocomplete="name">
+    </div>
+    <div class="field">
+      <label class="small muted" for="p-tel">Il tuo WhatsApp, per ricevere le risposte</label>
+      <input type="tel" id="p-tel" placeholder="39 333 1234567" autocomplete="tel">
+      <p class="tiny">Con il prefisso internazionale. Senza numero l'app funziona comunque:
+      il contatto ti copia e incolla le risposte a mano.</p>
+    </div>
+    <button class="btn block" id="p-salva">Salva e comincia</button>
+    <p class="tiny" id="p-err" hidden>Scrivi almeno il tuo nome.</p>
+  </div>
+</section>
+
+<!-- ══════════════ 2. HOME PARTNER ══════════════ -->
+<section id="s-home" hidden>
+  <div class="topbar">
+    <p class="eyebrow">Target</p>
+    <p class="who">Stai usando la tua copia,<br><span id="h-chi"></span> · <button class="linkish" id="h-profilo">modifica</button></p>
+  </div>
+  <div class="stack">
+    <div class="card stack">
+      <h2>Nuovo invito</h2>
+      <p class="small muted">Scrivi tu nome e cognome del contatto, poi gli mandi l'invito già intestato a lui.</p>
+      <div class="two">
+        <div class="field">
+          <label class="small muted" for="c-nome">Nome</label>
+          <input type="text" id="c-nome" placeholder="Marco">
+        </div>
+        <div class="field">
+          <label class="small muted" for="c-cognome">Cognome</label>
+          <input type="text" id="c-cognome" placeholder="Rossi">
+        </div>
+      </div>
+      <button class="btn block" id="c-prepara">Prepara l'invito</button>
+      <p class="tiny" id="c-err" hidden>Scrivi almeno il nome del contatto.</p>
+    </div>
+
+    <div class="card stack">
+      <h2>Le tue schede</h2>
+      <p class="small muted" id="h-conteggio">Nessuna scheda ancora.</p>
+      <div class="btn-row">
+        <button class="btn ghost" id="h-archivio">Apri l'archivio</button>
+        <button class="btn ghost" id="h-leggi">Leggi un codice</button>
+      </div>
+    </div>
+
+    <div style="text-align:center">
+      <button class="linkish" id="h-aiuto">Come funziona · passarla a un altro partner</button>
+    </div>
+    <p class="tiny" id="h-nostore" hidden>Attenzione: questo browser non permette di salvare niente
+    (navigazione privata?). Puoi preparare inviti e leggere codici, ma l'archivio non si conserva.</p>
+  </div>
+</section>
+
+<!-- ══════════════ 3. INVITO PRONTO ══════════════ -->
+<section id="s-invito" hidden class="stack">
+  <div class="card stack">
+    <div>
+      <p class="eyebrow">Invito pronto</p>
+      <h1 id="i-nome">Marco Rossi</h1>
+    </div>
+    <p class="small muted">Manda questo messaggio al contatto. Le otto domande si apriranno
+    già intestate a lui, e le risposte torneranno a te.</p>
+    <div class="band no" id="i-warn" hidden>
+      <p class="small"><strong>Manca l'indirizzo dell'app.</strong> Senza quello il link nel messaggio
+      non porta da nessuna parte. Copialo dalla barra del browser e incollalo qui sotto:
+      lo chiedo una volta sola.</p>
+      <div class="stack-s" style="margin-top:10px">
+        <input type="text" id="i-base" placeholder="https://…" spellcheck="false" autocapitalize="off">
+        <div class="btn-row"><button class="btn sm" id="i-basesalva">Salva l'indirizzo</button></div>
+      </div>
+    </div>
+    <div class="msgbox" id="i-msg"></div>
+    <div class="btn-row">
+      <a class="btn" id="i-wa" href="#" target="_blank" rel="noopener">Manda su WhatsApp</a>
+      <button class="btn ghost" id="i-copia">Copia il messaggio</button>
+    </div>
+    <p class="ok" id="i-ok" hidden>Copiato.</p>
+    <details>
+      <summary>Il link da solo</summary>
+      <p class="small muted" style="margin-top:10px">Toccalo per provarlo: devi vedere
+      «Ciao <span id="i-primo">…</span>» e le otto domande, esattamente come le vedrà lui.</p>
+      <p class="msgbox" style="margin-top:10px"><a id="i-link" href="#" target="_blank" rel="noopener"></a></p>
+      <div class="btn-row" style="margin-top:10px"><button class="btn ghost sm" id="i-copialink">Copia il link</button></div>
+    </details>
+    <p class="tiny">Nel messaggio il link è testo: diventa cliccabile quando WhatsApp lo invia,
+    non mentre lo stai ancora scrivendo.</p>
+    <div class="btn-row">
+      <button class="btn ghost" id="i-home">Torna alla home</button>
+    </div>
+    <p class="tiny">L'invito è già in archivio, in attesa di risposta. Quando ti manda il codice,
+    apri «Leggi un codice»: la scheda si aggancia da sola a questo contatto.</p>
+  </div>
+</section>
+
+<!-- ══════════════ 4. ARCHIVIO ══════════════ -->
+<section id="s-archivio" hidden class="stack">
+  <div class="topbar">
+    <p class="eyebrow">Archivio</p>
+    <button class="linkish" id="a-home">Home</button>
+  </div>
+  <div class="card stack">
+    <h2>Le tue schede</h2>
+    <p class="small muted" id="a-vuoto" hidden>Ancora niente. Prepara il primo invito dalla home.</p>
+    <div class="rows" id="a-rows"></div>
+  </div>
+  <div class="card stack">
+    <h2>La tua copia</h2>
+    <p class="small muted">Le schede vivono in questo browser: se lo svuoti o cambi telefono, le perdi.
+    Tienine una copia ogni tanto.</p>
+    <div class="btn-row">
+      <button class="btn ghost" id="a-esporta" hidden>Scarica la copia</button>
+      <button class="btn ghost" id="a-copia">Salva la copia</button>
+      <button class="btn ghost" id="a-importa">Ripristina una copia</button>
+    </div>
+    <p class="ok" id="a-ok" hidden>Fatto.</p>
+    <div id="a-imp" hidden class="stack-s">
+      <label class="small muted" for="a-imptxt">Incolla qui la copia</label>
+      <textarea id="a-imptxt" rows="4" placeholder='{"profilo":…}'></textarea>
+      <div class="btn-row">
+        <button class="btn sm" id="a-impgo">Ripristina</button>
+        <button class="btn ghost sm" id="a-impno">Annulla</button>
+      </div>
+      <p class="tiny" id="a-imperr" hidden>Copia non leggibile.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ 5. SCHEDA ══════════════ -->
+<section id="s-scheda" hidden class="stack">
+  <div class="topbar">
+    <p class="eyebrow">Scheda</p>
+    <button class="linkish" id="s-back">Archivio</button>
+  </div>
+  <div id="s-body" class="stack"></div>
+</section>
+
+<!-- ══════════════ 6. LEGGI UN CODICE ══════════════ -->
+<section id="s-leggi" hidden class="stack">
+  <div class="topbar">
+    <p class="eyebrow">Leggi un codice</p>
+    <button class="linkish" id="l-home">Home</button>
+  </div>
+  <div class="card stack">
+    <h2>Le risposte che ti ha mandato</h2>
+    <div class="field">
+      <label class="small muted" for="l-code">Incolla qui il messaggio che ti ha mandato</label>
+      <textarea id="l-code" rows="3" placeholder="Tieni premuto sul messaggio in WhatsApp, «Copia», e incollalo qui: il codice lo trovo io." spellcheck="false"></textarea>
+      <p class="tiny">Di solito non serve: nel messaggio c'è un link, e ti basta toccarlo.</p>
+    </div>
+    <button class="btn block" id="l-go">Leggi</button>
+    <p class="tiny" id="l-err" hidden>Codice non riconosciuto: ricontrolla che sia completo.</p>
+    <div id="l-assoc" hidden class="stack-s">
+      <p class="small muted" id="l-spiega">Le risposte ci sono, ma l'invito non è in questo archivio —
+      capita se l'hai preparato da un altro telefono o browser. A chi appartengono?</p>
+      <div class="rows" id="l-attesa"></div>
+      <label class="small muted" for="l-nome">Oppure è una persona che non trovi in elenco:</label>
+      <input type="text" id="l-nome" placeholder="Nome e cognome del contatto">
+      <button class="btn sm" id="l-salva">Salva come scheda nuova</button>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ 7. AIUTO ══════════════ -->
+<section id="s-aiuto" hidden class="stack">
+  <div class="topbar">
+    <p class="eyebrow">Come funziona</p>
+    <button class="linkish" id="x-home">Home</button>
+  </div>
+  <div class="card stack">
+    <h2>Il giro completo</h2>
+    <ol class="clean small">
+      <li><strong>Scrivi nome e cognome del contatto</strong> e prepari l'invito.</li>
+      <li><strong>Gli mandi il messaggio.</strong> Lui apre, trova il suo nome e risponde a otto domande in tre minuti.</li>
+      <li><strong>Ti rimanda le risposte</strong> con un codice. Lui non vede né punteggio né giudizio.</li>
+      <li><strong>Incolli il codice</strong> e leggi la scheda: punteggio, esito, cosa affrontare prima del piano.</li>
+    </ol>
+  </div>
+  <div class="card stack">
+    <h2>Passarla a un altro partner</h2>
+    <p class="small muted">Girargli lo stesso link basta e avanza. Al primo avvio lui mette il suo nome,
+    il suo numero e questo stesso indirizzo — quello che gli hai mandato — e da quel momento lavora
+    sulla <em>sua</em> copia.</p>
+    <div class="msgbox" id="x-link"></div>
+    <div class="btn-row">
+      <button class="btn ghost" id="x-copia">Copia il link da girare</button>
+      <button class="btn ghost" id="x-cambia">Correggi l'indirizzo</button>
+    </div>
+    <p class="ok" id="x-ok" hidden>Copiato.</p>
+    <div id="x-edit" hidden class="stack-s">
+      <label class="small muted" for="x-base">L'indirizzo di questa app</label>
+      <input type="text" id="x-base" placeholder="https://…" spellcheck="false" autocapitalize="off">
+      <p class="tiny">È la prima metà dei link che mandi ai contatti. L'app la riconosce da sé,
+      e qui puoi correggerla se per qualche motivo ha preso quella sbagliata.</p>
+      <div class="btn-row">
+        <button class="btn sm" id="x-basesalva">Salva</button>
+        <button class="btn ghost sm" id="x-baseno">Annulla</button>
+      </div>
+    </div>
+    <p class="small muted">I dati non si mescolano perché non stanno da nessuna parte in comune:
+    le schede di ognuno restano nel browser di quel telefono, e le risposte di un contatto
+    tornano su WhatsApp solo al partner che gli ha mandato l'invito. Nemmeno tu vedi le schede
+    dei tuoi partner — se vuoi sapere come stanno andando, glielo chiedi.</p>
+    <p class="tiny">Ricordagli la copia di sicurezza: dall'archivio, «Salva la copia».
+    Se svuota il browser senza averla fatta, le sue schede sono perse.</p>
+  </div>
+  <div class="card stack">
+    <h2>Il codice, in breve</h2>
+    <p class="small muted">Otto risposte, 32 punti. <strong>27+</strong> piano subito ·
+    <strong>21-26</strong> piano ma prima chiarisci · <strong>14-20</strong> da coltivare ·
+    <strong>sotto 14</strong> fuori target. Chi risponde con buonsenso senza entusiasmo
+    si assesta intorno a 24: la fascia normale è «piano con riserve».</p>
+    <p class="small muted">Tre risposte sono <strong>knock-out</strong> e valgono più del punteggio:
+    nessun motivo suo, zero tempo, «se non paga subito non mi interessa». La quarta —
+    i 130-160€ oggi non ci sono — non è un no alla persona ma un «non ora».</p>
+  </div>
+</section>
+
+<!-- ══════════════ 8. CONTATTO: INTRO ══════════════ -->
+<section id="s-intro" hidden class="card stack">
+  <div>
+    <p class="eyebrow">Otto domande · circa 3 minuti</p>
+    <h1 id="q-hello">Prima di parlarne davvero</h1>
+  </div>
+  <p class="muted" id="q-da"></p>
+  <p class="muted">Ci siamo detti che ti farebbe piacere capire di cosa si tratta. Prima di vederci
+  e perdere un'ora a guardare numeri e meccanismi, otto domande.</p>
+  <p class="muted">Servono a una cosa sola: capire se questa attività ha senso <em>per te</em>. Non è un esame
+  e non ci sono risposte giuste: se dalle risposte viene fuori che non è cosa tua, te lo diciamo
+  chiaramente e ci siamo risparmiati entrambi del tempo. Rispondi di istinto e con sincerità —
+  una risposta di comodo fa male solo a te.</p>
+  <button class="btn block" id="go">Comincia</button>
+  <p class="tiny">Le risposte restano su questo telefono finché non le invii tu.</p>
+</section>
+
+<!-- ══════════════ 9. CONTATTO: DOMANDE ══════════════ -->
+<section id="s-quiz" hidden>
+  <div class="progress" id="prog"></div>
+  <div class="card stack">
+    <p class="eyebrow" id="q-count"></p>
+    <h2 id="q-text"></h2>
+    <div class="opts" id="q-opts"></div>
+    <div class="btn-row">
+      <button class="btn ghost" id="back">Indietro</button>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ 10. CONTATTO: FINE ══════════════ -->
+<section id="s-done" hidden class="stack">
+  <div class="card stack">
+    <p class="eyebrow">Fatto</p>
+    <h1 id="done-nome">Grazie.</h1>
+    <p class="muted" id="done-txt">Le tue risposte sono pronte. Mandamele e ci sentiamo: se ha
+    senso vederci, ti spiego come funziona nel dettaglio; se secondo me non è cosa tua, te lo dico
+    con la stessa sincerità con cui hai risposto.</p>
+    <div class="field">
+      <label class="small muted" for="libero">C'è qualcosa che vorresti cambiare nella tua situazione, o una domanda che ti porti dietro? (facoltativo)</label>
+      <textarea id="libero" rows="3" placeholder="Due righe, se ti va"></textarea>
+    </div>
+    <div class="btn-row">
+      <a class="btn" id="wa" href="#" target="_blank" rel="noopener">Invia su WhatsApp</a>
+      <button class="btn ghost" id="copy">Copia le risposte</button>
+    </div>
+    <p class="ok" id="copy-ok" hidden>Copiato. Incollalo nella chat.</p>
+    <details>
+      <summary>Se i pulsanti non funzionano</summary>
+      <p class="small muted" style="margin-top:10px">Copia questo indirizzo e mandalo a mano:</p>
+      <p class="msgbox" style="margin-top:8px"><span id="link-out"></span></p>
+      <p class="tiny">Codice: <span class="num" id="code-out">—</span></p>
+    </details>
+  </div>
+
+  <div class="card stack">
+    <h2>Una cosa sola, prima di lasciarti</h2>
+    <p class="muted">Questa è un'attività, non un premio: i soldi non li regala nessuno, qui come
+    in qualsiasi altro posto. Come in ogni lavoro che valga qualcosa, i risultati vanno a chi ci
+    mette del tempo — anche poco, ma con costanza — e ci mette la responsabilità di chi ha deciso
+    di prenderlo sul serio.</p>
+    <p class="muted">Se questo ti sembra normale, siamo già d'accordo sulla cosa più importante.
+    Se invece cercavi qualcosa che rendesse senza impegno, è giusto dirselo adesso: non è questo.</p>
+  </div>
+
+</section>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   TARGET — il filtro sul contatto prima del piano.
+
+   Due modi, decisi dal link:
+   · link nudo            -> modalità partner (inviti, archivio, schede)
+   · link con #c=<nome>   -> modalità contatto (solo le otto domande)
+
+   Niente server e niente archivio comune: le schede di ogni partner stanno
+   nel localStorage del suo browser, e le risposte di un contatto tornano via
+   WhatsApp solo al partner che gli ha mandato l'invito. È per questo che i
+   dati di partner diversi non possono mescolarsi: non vengono mai messi
+   insieme da nessuna parte.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── LE OTTO DOMANDE ───────────────────────────────────────────────────────
+   p = punti (0-4). ko = la condizione di base che quella risposta fa cadere.
+   L'ordine delle opzioni NON è per punteggio: la migliore non sta sempre
+   nello stesso posto, così non si indovina la risposta "giusta".
+   ─────────────────────────────────────────────────────────────────────────── */
+var Q = [
+  {
+    tema: 'Il motivo',
+    t: 'Se nei prossimi due anni qualcosa della tua situazione — soldi o tempo — potesse cambiare, cosa cambieresti per primo?',
+    o: [
+      { t: 'Un\'entrata in più, che alleggerisca il mese', p: 3, s: 'entrata extra' },
+      { t: 'A dire il vero sto bene così: non cambierei niente', p: 0, s: 'nessun motivo', ko: 'motivo' },
+      { t: 'Costruire nel tempo qualcosa di mio, che resti', p: 4, s: 'costruire qualcosa di proprio' },
+      { t: 'Più tempo per me e per i miei, senza perdere reddito', p: 3, s: 'tempo' }
+    ]
+  },
+  {
+    tema: 'Il tempo',
+    t: 'Senza stravolgere la tua vita, quanto tempo potresti dedicare ogni giorno a una cosa nuova?',
+    o: [
+      { t: 'Circa mezz\'ora, nei ritagli della giornata', p: 3, s: '~30 min' },
+      { t: 'Un\'ora o più: se una cosa mi convince, il tempo lo trovo', p: 4, s: '1 ora o più' },
+      { t: 'Oggi zero: non ho spazio per aggiungere niente', p: 0, s: 'zero tempo', ko: 'tempo' },
+      { t: 'Meno di un quarto d\'ora, ho le giornate piene', p: 1, s: '<15 min' }
+    ]
+  },
+  {
+    tema: 'Le aspettative',
+    t: 'Come qualsiasi attività, all\'inizio rende poco: la parte interessante si costruisce in quattro, sei, otto mesi di lavoro costante. Come la vedi?',
+    o: [
+      { t: 'Se non paga subito, non mi interessa', p: 0, s: 'vuole subito', ko: 'aspettative' },
+      { t: 'Mi torna: le cose che valgono chiedono tempo', p: 4, s: 'orizzonte lungo' },
+      { t: 'Difficile: mi servirebbe un risultato importante entro pochi mesi', p: 1, s: 'urgenza economica' },
+      { t: 'Va bene, purché veda che qualcosa si muove già dai primi mesi', p: 3, s: 'ok con primi segnali' }
+    ]
+  },
+  {
+    tema: 'I no',
+    t: 'Quanto ti pesa sentirti dire no? Pensa a quando proponi qualcosa — al lavoro, tra amici — e la risposta è negativa.',
+    o: [
+      { t: 'Poco: chi dice no ha i suoi motivi, io vado avanti', p: 4, s: 'regge bene' },
+      { t: 'Mi resta addosso: mi chiedo se ho sbagliato io', p: 2, s: 'si mette in dubbio' },
+      { t: 'Tanto: preferisco non espormi a un no', p: 0, s: 'evita di esporsi' },
+      { t: 'Mi pesa sul momento, poi passa e riprovo', p: 3, s: 'regge, con fatica' }
+    ]
+  },
+  {
+    tema: 'Il metodo',
+    t: 'Qui si parte seguendo un metodo già collaudato, affiancati da qualcuno passo a passo, anche su cose che all\'inizio non ti vengono naturali.',
+    o: [
+      { t: 'Bene, se capisco il perché di ogni passo', p: 3, s: 'segue capendo' },
+      { t: 'Non mi piace essere seguito, né imparare da altri', p: 0, s: 'rifiuta l\'affiancamento' },
+      { t: 'Bene: preferisco un percorso chiaro all\'improvvisare', p: 4, s: 'allineato al metodo' },
+      { t: 'Farei fatica: preferisco fare a modo mio', p: 1, s: 'vuole fare da sé' }
+    ]
+  },
+  {
+    tema: 'Un\'attività basata sulle relazioni',
+    t: 'L\'attività si costruisce parlando con le persone che conosci e conoscendone di nuove nel tempo.',
+    o: [
+      { t: 'Sono riservato, ma se mi insegnano credo di poterlo imparare', p: 2, s: 'riservato ma disponibile' },
+      { t: 'Mi viene naturale: con le persone ci sto volentieri', p: 4, s: 'a suo agio' },
+      { t: 'È la cosa che meno mi va di fare', p: 0, s: 'rifiuta il contatto' },
+      { t: 'Non sono un venditore, ma con la gente me la cavo', p: 3, s: 'se la cava' }
+    ]
+  },
+  {
+    tema: 'Le opinioni degli altri',
+    t: 'Se un\'opportunità ti convincesse ma intorno a te non tutti fossero d\'accordo, la prenderesti in considerazione lo stesso?',
+    o: [
+      { t: 'Sì, anche se il parere contrario di qualcuno mi peserebbe', p: 3, s: 'decide lui, con fatica' },
+      { t: 'Solo se fossi molto convinto: altrimenti lascerei stare', p: 2, s: 'ha bisogno di convinzione' },
+      { t: 'No: se una persona a cui tengo non è d\'accordo, mi fermo', p: 0, s: 'dipende dagli altri' },
+      { t: 'Sì. Le opinioni le ascolto, ma la decisione è mia', p: 4, s: 'indipendente' }
+    ]
+  },
+  {
+    tema: 'L\'avvio',
+    t: 'Per iniziare l\'attività serve una spesa fra i 15 e i 55 €.',
+    o: [
+      { t: 'Ci arrivo, se capisco bene cosa ci sta dietro', p: 3, s: 'ok con chiarezza' },
+      { t: 'È una cifra che decido io, senza problemi', p: 4, s: 'nessun problema' },
+      { t: 'Oggi non è nelle mie possibilità', p: 0, s: 'non ora', ko: 'avvio' },
+      { t: 'Sarebbe uno sforzo: dovrei pensarci', p: 2, s: 'sforzo' }
+    ]
+  }
+];
+
+/* Cosa affrontare, punto per punto, quando una risposta vale 2 o meno. */
+var SCOPERTI = [
+  'Motivo debole o assente. Senza un perché suo, nessun piano regge: prima di parlare di attività, fallo raccontare (cosa vorrebbe, cosa gli manca). Se non emerge nulla, non forzare.',
+  'Poco tempo dichiarato. Non discutere la quantità: lavora sui micro-momenti (tragitto, pausa, sera) e sulla costanza. Se dichiara zero, non è il momento suo.',
+  'Aspettative fuori misura o urgenza economica. Rischio abbandono alto. Metti in chiaro i numeri veri dei primi mesi prima del piano: se cerca soldi subito, meglio dirglielo che venderglielo.',
+  'Fragile davanti al no. Va preparato: il no è statistica, non giudizio. Da seguire da vicino nelle prime settimane, o non parte.',
+  'Vuole fare a modo suo. Qui il metodo è il valore: se non lo segue, brucia la lista e si ferma. Verifica quanto è disposto a essere affiancato.',
+  'Chiuso o riservato sul contatto con le persone. Non è squalificante di per sé — si impara — ma serve accertarsi che sia disposto a imparare, non solo a evitare.',
+  'Le opinioni intorno a lui lo condizionano. Chiarisci presto la posizione di partner e famiglia: se una persona vicina lo frena, si ferma dopo poche settimane.',
+  'Avvio economico in dubbio. Non è un giudizio sulla persona: se oggi la cifra non c\'è, la strada è partire da cliente e riparlarne. Non insistere.'
+];
+
+/* ─── UTILITÀ ─────────────────────────────────────────────────────────────── */
+var el = function (id) { return document.getElementById(id); };
+function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function soloCifre(s) { return String(s || '').replace(/[^0-9]/g, ''); }
+function oggi() { return new Date().toISOString().slice(0, 10); }
+function dataIt(iso) {
+  if (!iso) return '';
+  var p = String(iso).slice(0, 10).split('-');
+  return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0].slice(2) : iso;
+}
+function copia(txt, poi) {
+  var fine = function () { if (poi) poi(); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(fine, function () { manuale(txt, fine); });
+  } else { manuale(txt, fine); }
+}
+function manuale(txt, fine) {
+  var t = document.createElement('textarea');
+  t.value = txt; t.style.position = 'fixed'; t.style.opacity = '0';
+  document.body.appendChild(t); t.select();
+  try { document.execCommand('copy'); fine(); } catch (e) {}
+  document.body.removeChild(t);
+}
+function lampo(id) {
+  var n = el(id); if (!n) return;
+  n.hidden = false; setTimeout(function () { n.hidden = true; }, 2200);
+}
+
+/* ─── ARCHIVIO LOCALE ──────────────────────────────────────────────────────
+   Sta nel browser di chi usa l'app, e solo lì: non esce dal dispositivo e
+   nessun altro partner lo vede. Ogni lettura e scrittura è protetta, perché
+   in navigazione privata l'accesso può fallire di netto.
+   ─────────────────────────────────────────────────────────────────────────── */
+var CHIAVE = 'target.v1';
+var CHIAVE_VECCHIA = 'ottodomande.v1';   /* quando l'app si chiamava Otto Domande */
+var memoria = { profilo: null, schede: [] };   /* copia in RAM: l'app funziona anche senza salvataggio */
+var salvataggioOk = true;
+
+function carica() {
+  try {
+    var raw = localStorage.getItem(CHIAVE) || localStorage.getItem(CHIAVE_VECCHIA);
+    if (raw) {
+      var d = JSON.parse(raw);
+      memoria = { profilo: d.profilo || null, schede: Array.isArray(d.schede) ? d.schede : [] };
+    }
+  } catch (e) { salvataggioOk = false; }
+}
+function salva() {
+  try { localStorage.setItem(CHIAVE, JSON.stringify(memoria)); }
+  catch (e) { salvataggioOk = false; }
+}
+function nuovoId() {
+  var alfabeto = 'ACDEFGHJKLMNPQRTUVWXY2346789';   /* niente caratteri che si confondono */
+  var s = '', usati = memoria.schede.map(function (x) { return x.id; });
+  do {
+    s = '';
+    for (var k = 0; k < 4; k++) s += alfabeto.charAt(Math.floor(Math.random() * alfabeto.length));
+  } while (usati.indexOf(s) > -1);
+  return s;
+}
+
+/* ─── CODICE ESITO ─────────────────────────────────────────────────────────
+   CL21-<8 cifre 1..4>-<controllo>[-<id invito>]
+   Porta le risposte, non il punteggio: il contatto non ha niente da leggere.
+   L'id invito serve solo ad agganciare la scheda al contatto giusto.
+   ─────────────────────────────────────────────────────────────────────────── */
+function controllo(cifre) {
+  var s = 0;
+  for (var k = 0; k < cifre.length; k++) s += (cifre.charCodeAt(k) - 48) * (k + 1);
+  return String(s % 9 + 1);
+}
+function codifica(risposte, id) {
+  var d = risposte.map(function (x) { return x + 1; }).join('');
+  return 'CL21-' + d + '-' + controllo(d) + (id ? '-' + id : '');
+}
+function decodifica(txt) {
+  /* Cerca il codice DENTRO qualsiasi testo: su WhatsApp non si può selezionare
+     un pezzo di messaggio, quindi si incolla tutto il messaggio o tutto il link. */
+  var m = String(txt || '').toUpperCase()
+    .match(/CL21-([1-4]{8})-([1-9])(?:-([A-Z0-9]{4}))?/);
+  if (!m || controllo(m[1]) !== m[2]) return null;
+  return {
+    risposte: m[1].split('').map(function (c) { return parseInt(c, 10) - 1; }),
+    id: m[3] || null
+  };
+}
+
+/* ─── VALUTAZIONE ─────────────────────────────────────────────────────────── */
+function valuta(a) {
+  var tot = 0, ko = [], deboli = [];
+  a.forEach(function (k, qi) {
+    var o = Q[qi].o[k];
+    tot += o.p;
+    if (o.ko) ko.push(o.ko);
+    if (o.p <= 2) deboli.push(qi);
+  });
+
+  var band, titolo, azione;
+  if (ko.indexOf('motivo') > -1 || ko.indexOf('aspettative') > -1 || ko.indexOf('tempo') > -1) {
+    band = 'no';
+    titolo = 'Fuori target';
+    azione = 'Non dare il piano. Manca una condizione di base (' + ko.join(', ') +
+      '): un piano qui non convince, e se convince porta dentro una persona che si ferma in poche settimane. ' +
+      'Chiudi con onestà — «guarda, per come me l\'hai raccontata questa cosa non fa per te» — e, se i prodotti gli possono servire, proponigli di restare come cliente. Il rapporto resta intatto, e fra un anno la situazione può essere diversa.';
+  } else if (ko.indexOf('avvio') > -1) {
+    band = 'care';
+    titolo = 'Non ora — solo per l\'avvio economico';
+    azione = 'Non è un no alla persona: oggi la cifra di partenza non c\'è. Fallo partire come cliente, tienilo vicino e riparlane fra qualche mese. Se il resto del punteggio è alto, vale la pena ricontattarlo: è la persona giusta nel momento sbagliato.';
+  } else if (tot >= 27) {
+    band = 'go';
+    titolo = 'In target — dagli il piano';
+    azione = 'Fissa l\'incontro entro pochi giorni, mentre l\'interesse è caldo. Parti dal suo motivo (vedi sotto), poi il metodo, poi i numeri. Non gonfiare niente: con questo profilo l\'onestà è il tuo argomento migliore.';
+  } else if (tot >= 21) {
+    band = 'go';
+    titolo = 'In target, con riserve — dagli il piano, ma prima chiarisci';
+    azione = 'Vale l\'incontro. Prima di aprire il piano, però, affronta i punti scoperti qui sotto: se li lasci lì, tornano fuori dopo l\'iscrizione, quando costano di più.';
+  } else if (tot >= 14) {
+    band = 'care';
+    titolo = 'Da coltivare — piano non ancora';
+    azione = 'Troppi punti scoperti per un piano che regga. Non chiudere: fallo provare come cliente, mandagli qualcosa da ascoltare, risentitevi fra qualche settimana. Le persone cambiano quando cambia la loro situazione, non quando insisti.';
+  } else {
+    band = 'no';
+    titolo = 'Fuori target';
+    azione = 'Non dare il piano. Il quadro complessivo dice che questa attività non è cosa sua: nessun motivo forte, e più condizioni che mancano insieme. Dillo chiaramente — è la cosa che ti farà rispettare — e proponigli il ruolo di cliente se i prodotti gli interessano.';
+  }
+  return { tot: tot, band: band, titolo: titolo, azione: azione, ko: ko, deboli: deboli };
+}
+function fascia(a) {
+  var v = valuta(a);
+  return { pill: v.band, testo: v.tot + '/32' };
+}
+
+/* ─── NAVIGAZIONE ─────────────────────────────────────────────────────────── */
+var SCHERMATE = ['s-setup', 's-home', 's-invito', 's-archivio', 's-scheda', 's-leggi', 's-aiuto', 's-intro', 's-quiz', 's-done'];
+function mostra(quale) {
+  SCHERMATE.forEach(function (s) { el(s).hidden = (s !== quale); });
+  window.scrollTo(0, 0);
+}
+
+/* ─── MODALITÀ CONTATTO ────────────────────────────────────────────────────
+   Attiva solo se il link porta un nome: #c=Marco%20Rossi&s=Stefano&t=39...&i=A7K2
+   ─────────────────────────────────────────────────────────────────────────── */
+var INV = (function () {
+  var p = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+  return {
+    contatto: (p.get('c') || '').trim(),
+    sponsor: (p.get('s') || '').trim(),
+    tel: soloCifre(p.get('t')),
+    id: (p.get('i') || '').trim().toUpperCase(),
+    risultato: (p.get('r') || '').trim()
+  };
+})();
+var modoContatto = !!INV.contatto;
+
+var ans = new Array(Q.length).fill(null);
+var i = 0;
+var locked = false;   /* durante la transizione i tap non contano: due tap rapidi
+                         facevano saltare una domanda e scrivere la risposta sulla
+                         domanda sbagliata. */
+
+(function () { for (var k = 0; k < Q.length; k++) el('prog').appendChild(document.createElement('i')); })();
+
+function render() {
+  if (i < 0) i = 0;
+  if (i > Q.length - 1) i = Q.length - 1;
+  var q = Q[i];
+  el('q-count').textContent = 'Domanda ' + (i + 1) + ' di ' + Q.length + ' · ' + q.tema;
+  el('q-text').textContent = q.t;
+  var box = el('q-opts');
+  box.innerHTML = '';
+  q.o.forEach(function (o, k) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'opt' + (ans[i] === k ? ' sel' : '');
+    b.textContent = o.t;
+    b.onclick = function () { scegli(k); };
+    box.appendChild(b);
+  });
+  var barre = el('prog').children;
+  for (var k = 0; k < barre.length; k++) barre[k].className = (k <= i ? 'on' : '');
+  el('back').hidden = (i === 0);
+}
+function scegli(k) {
+  if (locked) return;
+  ans[i] = k;
+  locked = true;
+  render();
+  setTimeout(function () {
+    locked = false;
+    if (i < Q.length - 1) { i++; render(); } else { concludi(); }
+  }, 180);
+}
+el('go').onclick = function () { i = 0; locked = false; mostra('s-quiz'); render(); };
+el('back').onclick = function () { if (!locked && i > 0) { i--; render(); } };
+
+function concludi() {
+  var nome = INV.contatto.split(' ')[0];
+  el('done-nome').textContent = nome ? 'Grazie, ' + nome + '.' : 'Grazie.';
+  el('code-out').textContent = codifica(ans, INV.id);
+  el('link-out').textContent = linkRisultato();
+  mostra('s-done');
+  aggiornaInvio();
+}
+function linkRisultato() {
+  /* L'indirizzo da cui il contatto ha aperto le domande è, per costruzione,
+     quello che lo sponsor ha usato per generare l'invito. */
+  return location.href.split('#')[0] + '#r=' + codifica(ans, INV.id);
+}
+function messaggioContatto() {
+  var righe = [];
+  righe.push('Ciao' + (INV.sponsor ? ' ' + INV.sponsor : '') + ', ho risposto alle otto domande.');
+  righe.push('');
+  righe.push(INV.contatto);
+  righe.push('');
+  ans.forEach(function (k, qi) { righe.push((qi + 1) + '. ' + Q[qi].tema + ': ' + Q[qi].o[k].t); });
+  var libero = (el('libero').value || '').trim();
+  if (libero) { righe.push(''); righe.push('Nota: ' + libero); }
+  righe.push('');
+  righe.push('Apri le risposte: ' + linkRisultato());
+  return righe.join('\n');
+}
+function aggiornaInvio() {
+  var a = el('wa');
+  if (INV.tel) {
+    a.href = 'https://wa.me/' + INV.tel + '?text=' + encodeURIComponent(messaggioContatto());
+    a.hidden = false;
+  } else { a.hidden = true; }
+}
+el('libero').addEventListener('input', aggiornaInvio);
+el('copy').onclick = function () { copia(messaggioContatto(), function () { lampo('copy-ok'); }); };
+
+/* ─── MODALITÀ PARTNER: PROFILO ───────────────────────────────────────────── */
+el('p-salva').onclick = function () {
+  var nome = (el('p-nome').value || '').trim();
+  if (!nome) { el('p-err').textContent = 'Scrivi almeno il tuo nome.'; el('p-err').hidden = false; return; }
+  el('p-err').hidden = true;
+  memoria.profilo = {
+    nome: nome,
+    tel: soloCifre(el('p-tel').value),
+    base: (memoria.profilo && memoria.profilo.base) || baseAffidabile()
+  };
+  salva();
+  vaiHome();
+};
+el('h-profilo').onclick = function () {
+  el('p-nome').value = memoria.profilo ? memoria.profilo.nome : '';
+  el('p-tel').value = memoria.profilo ? memoria.profilo.tel : '';
+  mostra('s-setup');
+};
+
+function vaiHome() {
+  var pr = memoria.profilo;
+  el('h-chi').textContent = pr ? (pr.nome + (pr.tel ? ' · ' + pr.tel : ' · nessun numero')) : '';
+  var att = memoria.schede.filter(function (s) { return !s.risposte; }).length;
+  var fatte = memoria.schede.length - att;
+  el('h-conteggio').textContent = memoria.schede.length
+    ? (fatte + (fatte === 1 ? ' scheda letta' : ' schede lette') + ' · ' + att + ' in attesa di risposta')
+    : 'Nessuna scheda ancora.';
+  el('h-nostore').hidden = salvataggioOk;
+  mostra('s-home');
+}
+el('h-archivio').onclick = function () { apriArchivio(); };
+el('h-leggi').onclick = function () { el('l-code').value = ''; el('l-err').hidden = true; el('l-assoc').hidden = true; mostra('s-leggi'); };
+el('h-aiuto').onclick = function () { apriAiuto(); };
+function apriAiuto() {
+  var b = linkBase();
+  el('x-link').textContent = b || 'L\'indirizzo si riconosce da sé quando apri l\'app dal browser. Se non è comparso, lo puoi scrivere qui sotto.';
+  el('x-edit').hidden = true;
+  mostra('s-aiuto');
+}
+el('x-cambia').onclick = function () {
+  el('x-base').value = linkBase() || indirizzoVisto();
+  el('x-edit').hidden = false;
+};
+el('x-baseno').onclick = function () { el('x-edit').hidden = true; };
+el('x-basesalva').onclick = function () {
+  var b = pulisciBase(el('x-base').value);
+  if (!b) return;
+  if (!memoria.profilo) memoria.profilo = { nome: '', tel: '', base: '' };
+  memoria.profilo.base = b;
+  salva();
+  apriAiuto();
+};
+el('a-home').onclick = vaiHome;
+el('l-home').onclick = vaiHome;
+el('x-home').onclick = vaiHome;
+el('i-home').onclick = vaiHome;
+
+/* L'indirizzo pubblico dell'app.
+   Non si può ricavare da location.href: la pagina pubblicata gira dentro una
+   cornice, con un indirizzo interno che al contatto non si apre. Quindi lo
+   chiediamo una volta e lo teniamo nel profilo. */
+function indirizzoVisto() {
+  try {
+    if (window.top !== window.self && document.referrer) return document.referrer.split('#')[0];
+  } catch (e) {}
+  return location.href.split('#')[0];
+}
+function pulisciBase(v) {
+  var s = String(v || '').trim().split('#')[0];
+  if (!s) return '';
+  if (!/^https?:\/\//i.test(s)) return '';
+  return s;
+}
+function baseAffidabile() {
+  var inCornice = true;
+  try { inCornice = (window.top !== window.self); } catch (e) { inCornice = true; }
+  return inCornice ? '' : pulisciBase(location.href.split('#')[0]);
+}
+function linkBase() { return (memoria.profilo && memoria.profilo.base) || ''; }
+el('x-copia').onclick = function () {
+  var b = linkBase();
+  if (!b) { el('h-profilo').click(); return; }
+  copia(b, function () { lampo('x-ok'); });
+};
+
+/* ─── MODALITÀ PARTNER: NUOVO INVITO ──────────────────────────────────────── */
+el('c-prepara').onclick = function () {
+  var nome = (el('c-nome').value || '').trim();
+  var cognome = (el('c-cognome').value || '').trim();
+  if (!nome) { el('c-err').hidden = false; return; }
+  el('c-err').hidden = true;
+  var completo = (nome + ' ' + cognome).trim();
+  var scheda = { id: nuovoId(), nome: completo, creato: oggi(), risposte: null, nota: '' };
+  memoria.schede.unshift(scheda);
+  salva();
+  el('c-nome').value = ''; el('c-cognome').value = '';
+  apriInvito(scheda);
+};
+
+function linkInvito(scheda) {
+  var base = linkBase();
+  if (!base) return '';
+  var pr = memoria.profilo || { nome: '', tel: '' };
+  /* I parametri stanno nel frammento (#) e non nella query, così restano sul
+     dispositivo del contatto e non finiscono in nessun log di server.
+     Spazi come %20 e non come +: i riconoscitori di link di certe app si
+     fermano prima del +, e il link arriverebbe spezzato. */
+  var p = [];
+  p.push('c=' + encodeURIComponent(scheda.nome));
+  if (pr.nome) p.push('s=' + encodeURIComponent(pr.nome));
+  if (pr.tel) p.push('t=' + encodeURIComponent(pr.tel));
+  p.push('i=' + scheda.id);
+  return base + '#' + p.join('&');
+}
+function messaggioInvito(scheda) {
+  var pr = memoria.profilo || { nome: '' };
+  var primo = scheda.nome.split(' ')[0];
+  var url = linkInvito(scheda);
+  return 'Ciao ' + primo + ', come promesso.\n\n' +
+    'Prima di vederci e perdere un\'ora a guardare numeri, ti chiedo otto domande: ' +
+    'tre minuti, servono a capire se questa attività ha senso per te. ' +
+    'Rispondi di istinto — anche un «no» va benissimo.\n\n' +
+    (url || '[manca l\'indirizzo dell\'app]') + '\n\n' +
+    'Quando hai finito ti compare un pulsante che mi rimanda le risposte. A dopo' +
+    (pr.nome ? ',\n' + pr.nome : '!');
+}
+function apriInvito(scheda) {
+  el('i-nome').textContent = scheda.nome;
+  el('i-primo').textContent = scheda.nome.split(' ')[0];
+
+  var manca = !linkBase();
+  el('i-warn').hidden = !manca;
+  el('i-base').value = manca ? indirizzoVisto() : '';
+  el('i-basesalva').onclick = function () {
+    var b = pulisciBase(el('i-base').value);
+    if (!b) return;
+    if (!memoria.profilo) memoria.profilo = { nome: '', tel: '', base: '' };
+    memoria.profilo.base = b;
+    salva();
+    apriInvito(scheda);
+  };
+
+  var url = linkInvito(scheda);
+  var msg = messaggioInvito(scheda);
+  el('i-msg').textContent = msg;
+  var a = el('i-link');
+  a.textContent = url || '(manca l\'indirizzo dell\'app)';
+  a.href = url || '#';
+  /* wa.me senza numero: apre WhatsApp e fa scegliere a chi mandarlo, perché
+     il numero del contatto non ce l'abbiamo (e non serve chiederlo). */
+  el('i-wa').href = 'https://wa.me/?text=' + encodeURIComponent(msg);
+  el('i-copia').onclick = function () { copia(msg, function () { lampo('i-ok'); }); };
+  el('i-copialink').onclick = function () { copia(url, function () { lampo('i-ok'); }); };
+  mostra('s-invito');
+}
+
+/* ─── MODALITÀ PARTNER: ARCHIVIO ──────────────────────────────────────────── */
+function apriArchivio() {
+  var box = el('a-rows');
+  box.innerHTML = '';
+  el('a-vuoto').hidden = memoria.schede.length > 0;
+  memoria.schede.forEach(function (s) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'row';
+    var f = s.risposte ? fascia(s.risposte) : { pill: 'wait', testo: 'in attesa' };
+    b.innerHTML = '<span class="grow"><span class="nm">' + esc(s.nome) + '</span><br>' +
+      '<span class="sub">' + dataIt(s.creato) + ' · codice ' + esc(s.id) + '</span></span>' +
+      '<span class="pill ' + f.pill + '">' + esc(f.testo) + '</span>';
+    b.onclick = function () { apriScheda(s.id); };
+    box.appendChild(b);
+  });
+  mostra('s-archivio');
+}
+el('s-back').onclick = apriArchivio;
+
+/* ─── MODALITÀ PARTNER: SCHEDA ────────────────────────────────────────────── */
+function apriScheda(id) {
+  var s = memoria.schede.filter(function (x) { return x.id === id; })[0];
+  if (!s) { apriArchivio(); return; }
+  var out = [];
+
+  if (!s.risposte) {
+    out.push('<div class="card stack">' +
+      '<div><p class="eyebrow">In attesa di risposta</p><h1>' + esc(s.nome) + '</h1></div>' +
+      '<p class="small muted">Invito preparato il ' + dataIt(s.creato) + '. Quando ti manda il codice, ' +
+      'aprilo da «Leggi un codice»: si aggancia da solo a questa scheda.</p>' +
+      '<div class="btn-row">' +
+        '<button class="btn" id="sc-rimanda">Rimanda l\'invito</button>' +
+        '<button class="btn ghost" id="sc-leggi">Leggi il codice</button>' +
+      '</div>' +
+      '<div class="btn-row"><button class="btn danger sm" id="sc-del">Elimina</button>' +
+      '<button class="btn danger sm" id="sc-del2" hidden>Confermi?</button></div>' +
+    '</div>');
+    el('s-body').innerHTML = out.join('');
+    el('sc-rimanda').onclick = function () { apriInvito(s); };
+    el('sc-leggi').onclick = function () { el('l-code').value = ''; el('l-err').hidden = true; el('l-assoc').hidden = true; mostra('s-leggi'); };
+    armaElimina(s);
+    mostra('s-scheda');
+    return;
+  }
+
+  var a = s.risposte, v = valuta(a);
+
+  out.push('<div class="card stack">' +
+    '<div><p class="eyebrow">' + dataIt(s.letto || s.creato) + ' · codice ' + esc(s.id) + '</p>' +
+    '<h1>' + esc(s.nome) + '</h1></div>' +
+    '<div class="band ' + v.band + '">' +
+      '<p class="eyebrow">Esito</p><h2>' + esc(v.titolo) + '</h2>' +
+      '<p class="small muted" style="margin-top:8px">' + esc(v.azione) + '</p>' +
+    '</div>' +
+    '<div style="display:flex;align-items:baseline;gap:10px">' +
+      '<span class="score">' + v.tot + '</span><span class="muted small">su ' + (Q.length * 4) + ' punti</span>' +
+    '</div>' +
+    '<p class="tiny">Soglie: 27+ piano subito · 21-26 piano con riserve · 14-20 da coltivare · sotto 14 fuori target. ' +
+    'Una condizione di base che manca (motivo, tempo, aspettative) vale più del punteggio.</p>' +
+  '</div>');
+
+  out.push('<div class="card stack">' +
+    '<h2>Da dove partire</h2>' +
+    '<p class="small"><strong>Cosa cerca:</strong> ' + esc(Q[0].o[a[0]].s) + ' — «' + esc(Q[0].o[a[0]].t) + '»</p>' +
+    '<p class="small"><strong>Cosa lo trattiene:</strong> ' +
+      esc(v.deboli.length ? v.deboli.map(function (qi) { return Q[qi].tema; }).join(' · ') : 'niente di evidente dalle risposte') +
+    '</p>' +
+    '<p class="tiny">Apri l\'incontro dal suo motivo, con le sue parole. Poi il metodo, poi i numeri: mai il contrario.</p>' +
+  '</div>');
+
+  var righe = a.map(function (k, qi) {
+    var o = Q[qi].o[k];
+    return '<tr><td><strong>' + esc(Q[qi].tema) + '</strong><br><span class="muted">' + esc(o.t) + '</span></td>' +
+      '<td class="p' + (o.p <= 2 ? ' flag' : '') + '">' + o.p + '</td></tr>';
+  }).join('');
+  out.push('<div class="card stack">' +
+    '<h2>Le risposte</h2>' +
+    '<table class="ans"><thead><tr><th>Tema e risposta</th><th style="text-align:right">Pt</th></tr></thead>' +
+    '<tbody>' + righe + '</tbody></table>' +
+    '<p class="tiny">In rosso i punti scoperti (2 o meno).</p>' +
+  '</div>');
+
+  if (v.deboli.length) {
+    out.push('<div class="card stack"><h2>Cosa affrontare prima del piano</h2><ul class="clean small">' +
+      v.deboli.map(function (qi) { return '<li><strong>' + esc(Q[qi].tema) + '.</strong> ' + esc(SCOPERTI[qi]) + '</li>'; }).join('') +
+    '</ul></div>');
+  } else {
+    out.push('<div class="card stack"><h2>Cosa affrontare prima del piano</h2>' +
+      '<p class="small muted">Nessun punto scoperto. Profilo pulito: vai di piano, e non riempirlo di entusiasmo — a questa persona serve sostanza.</p></div>');
+  }
+
+  out.push('<div class="card stack">' +
+    '<h2>Promemoria per l\'incontro</h2>' +
+    '<details><summary>Cosa si fa davvero, in concreto</summary><ul class="clean small">' +
+      '<li><strong>Si usano i prodotti.</strong> Il consumo personale è la base: si consiglia ciò che si usa, non ciò che si è studiato.</li>' +
+      '<li><strong>Si costruisce una base di clienti che riordinano.</strong> Ordinano da soli sull\'e-commerce, il legame è tracciato dall\'azienda, nessun magazzino e nessuna consegna a mano.</li>' +
+      '<li><strong>Si parla con le persone, ogni giorno un po\'.</strong> Circa un\'ora presa dai ritagli: contatti, inviti, materiali da ascoltare.</li>' +
+      '<li><strong>Si segue il metodo e la formazione.</strong> App CumLaude21, i tre incontri iniziali con lo sponsor, gli audio.</li>' +
+      '<li><strong>Si aiutano gli altri a fare le stesse cose.</strong> Il bonus differenziale premia chi fa crescere i suoi: per salire bisogna far salire.</li>' +
+    '</ul></details>' +
+    '<details><summary>Cosa si può ottenere, con che tempi</summary><ul class="clean small">' +
+      '<li><strong>Primi mesi:</strong> margine del 20% lordo (circa 16% netto) sulla vendita diretta. Serve a rientrare dell\'avvio. Con una decina di clienti, cifre modeste.</li>' +
+      '<li><strong>Il mattone base:</strong> 10 clienti da circa 50€ al mese fanno 500€ di fatturato ricorrente. È da lì che parte il bonus.</li>' +
+      '<li><strong>La scala del bonus:</strong> si sale col volume del gruppo, dal 3% (200 VP) fino al 21% (10.000 VP). Il 21% è l\'obiettivo primario di costruzione.</li>' +
+      '<li><strong>Il lungo termine:</strong> quando un gruppo raggiunge il 21% scatta un 6% fisso sul suo fatturato. Le qualifiche alte richiedono anni di lavoro costante, non mesi.</li>' +
+      '<li><strong>Reddito trasmissibile:</strong> l\'attività, in caso di successione, si può trasmettere agli eredi. Poche attività alla portata di una persona comune lo permettono.</li>' +
+    '</ul><p class="tiny">Cifre indicative, di riferimento per te: non sono una promessa di guadagno e non vanno presentate come tale. Quanto si ottiene dipende dal lavoro che la persona fa.</p></details>' +
+    '<details><summary>Cosa dire se l\'esito è no</summary>' +
+      '<p class="small">«Ti ringrazio di aver risposto con sincerità. Da quello che mi hai detto, secondo me questa attività adesso non fa per te: ' +
+      'chiede tempo ogni giorno e mesi di costanza prima di dare qualcosa di serio, e non voglio venderti un\'illusione. ' +
+      'Se invece i prodotti ti incuriosiscono, quelli te li faccio provare volentieri.»</p>' +
+      '<p class="tiny">Un no detto bene vale più di un\'iscrizione che si spegne in tre settimane: resta il rapporto, e resta la tua credibilità con chi lo verrà a sapere.</p>' +
+    '</details>' +
+  '</div>');
+
+  out.push('<div class="card stack">' +
+    '<div class="field"><label class="small muted" for="sc-nota">Le tue note su questo contatto</label>' +
+    '<textarea id="sc-nota" rows="3" placeholder="Cosa ti ha detto, quando lo risenti…"></textarea></div>' +
+    '<div class="btn-row"><button class="btn ghost sm" id="sc-nota-salva">Salva la nota</button>' +
+    '<span class="ok" id="sc-nota-ok" hidden>Salvata.</span></div>' +
+    '<div class="btn-row" style="margin-top:8px"><button class="btn danger sm" id="sc-del">Elimina la scheda</button>' +
+    '<button class="btn danger sm" id="sc-del2" hidden>Confermi?</button></div>' +
+  '</div>');
+
+  el('s-body').innerHTML = out.join('');
+  el('sc-nota').value = s.nota || '';
+  el('sc-nota-salva').onclick = function () {
+    s.nota = el('sc-nota').value; salva(); lampo('sc-nota-ok');
+  };
+  armaElimina(s);
+  mostra('s-scheda');
+}
+
+function armaElimina(s) {
+  var uno = el('sc-del'), due = el('sc-del2');
+  if (!uno || !due) return;
+  uno.onclick = function () { uno.hidden = true; due.hidden = false; };
+  due.onclick = function () {
+    memoria.schede = memoria.schede.filter(function (x) { return x.id !== s.id; });
+    salva(); apriArchivio();
+  };
+}
+
+/* ─── MODALITÀ PARTNER: LEGGI UN CODICE ───────────────────────────────────── */
+var inSospeso = null;   /* risposte decodificate in attesa di un nome */
+
+function registra(risposte, id) {
+  /* Aggancia le risposte all'invito che le aspettava. Idempotente: rileggere
+     lo stesso codice riapre la scheda, non ne crea una seconda. */
+  var scheda = id ? memoria.schede.filter(function (x) { return x.id === id; })[0] : null;
+  if (!scheda) return null;
+  scheda.risposte = risposte;
+  if (!scheda.letto) scheda.letto = oggi();
+  salva();
+  return scheda;
+}
+function chiediDiChiSono(risposte) {
+  inSospeso = risposte;
+  el('l-nome').value = '';
+  var box = el('l-attesa');
+  box.innerHTML = '';
+  var attesa = memoria.schede.filter(function (x) { return !x.risposte; });
+  attesa.forEach(function (x) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'row';
+    b.innerHTML = '<span class="grow"><span class="nm">' + esc(x.nome) + '</span><br>' +
+      '<span class="sub">invito del ' + dataIt(x.creato) + '</span></span><span class="pill">aggancia</span>';
+    b.onclick = function () {
+      x.risposte = inSospeso; x.letto = oggi(); salva();
+      inSospeso = null; el('l-assoc').hidden = true; apriScheda(x.id);
+    };
+    box.appendChild(b);
+  });
+  el('l-spiega').textContent = attesa.length
+    ? 'Le risposte ci sono, ma non riesco a capire di chi sono. Scegli l\'invito a cui agganciarle:'
+    : 'Le risposte ci sono, ma in questo archivio non c\'è nessun invito in attesa — capita se l\'hai preparato da un altro telefono o browser. Di chi sono?';
+  el('l-assoc').hidden = false;
+  mostra('s-leggi');
+}
+el('l-go').onclick = function () {
+  var d = decodifica(el('l-code').value);
+  if (!d) { el('l-err').hidden = false; el('l-assoc').hidden = true; return; }
+  el('l-err').hidden = true;
+  var scheda = registra(d.risposte, d.id);
+  if (scheda) { apriScheda(scheda.id); return; }
+  chiediDiChiSono(d.risposte);
+};
+el('l-salva').onclick = function () {
+  if (!inSospeso) return;
+  var nome = (el('l-nome').value || '').trim() || 'Senza nome';
+  /* se il nome è già in archivio senza risposte, agganciamo lì invece di duplicare */
+  var esistente = memoria.schede.filter(function (x) {
+    return !x.risposte && x.nome.toLowerCase() === nome.toLowerCase();
+  })[0];
+  var scheda = esistente || { id: nuovoId(), nome: nome, creato: oggi(), risposte: null, nota: '' };
+  scheda.risposte = inSospeso;
+  scheda.letto = oggi();
+  if (!esistente) memoria.schede.unshift(scheda);
+  salva();
+  inSospeso = null;
+  el('l-assoc').hidden = true;
+  apriScheda(scheda.id);
+};
+
+/* ─── COPIA DI SICUREZZA ──────────────────────────────────────────────────── */
+function backup() { return JSON.stringify(memoria); }
+el('a-copia').onclick = function () { copia(backup(), function () { lampo('a-ok'); }); };
+el('a-importa').onclick = function () { el('a-imp').hidden = false; el('a-imperr').hidden = true; };
+el('a-impno').onclick = function () { el('a-imp').hidden = true; };
+el('a-impgo').onclick = function () {
+  try {
+    var d = JSON.parse(el('a-imptxt').value);
+    if (!d || !Array.isArray(d.schede)) throw new Error('forma');
+    memoria = { profilo: d.profilo || memoria.profilo, schede: d.schede };
+    salva();
+    el('a-imp').hidden = true;
+    apriArchivio();
+  } catch (e) { el('a-imperr').hidden = false; }
+};
+
+/* Il download di un file lo può offrire solo il visualizzatore: se non c'è,
+   resta la copia negli appunti, che funziona sempre. */
+if (window.claude && typeof window.claude.use === 'function') {
+  window.claude.use('downloads').then(function (dl) {
+    if (!dl) return;
+    var b = el('a-esporta');
+    b.hidden = false;
+    b.onclick = function () {
+      dl.save({ filename: 'target-copia-' + oggi() + '.json', data: backup() })
+        .then(function () { lampo('a-ok'); }, function () {});
+    };
+  }, function () {});
+}
+
+/* ─── IL LINK DELLE RISPOSTE ────────────────────────────────────────────────
+   Lo sponsor tocca il link nel messaggio: niente da copiare, niente da
+   incollare. Puliamo il frammento, così una ricarica non rifà l'import.
+   ─────────────────────────────────────────────────────────────────────────── */
+function importaRisultato(codice) {
+  var letto = decodifica(codice);
+  try { history.replaceState(null, '', location.href.split('#')[0]); } catch (e) {}
+  if (!letto) {
+    vaiHome();
+    el('l-code').value = codice;
+    el('h-leggi').click();
+    el('l-err').hidden = false;
+    return;
+  }
+  var agganciata = registra(letto.risposte, letto.id);
+  if (agganciata) { apriScheda(agganciata.id); } else { chiediDiChiSono(letto.risposte); }
+}
+window.addEventListener('hashchange', function () {
+  var p = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+  var r = (p.get('r') || '').trim();
+  if (r && !modoContatto) importaRisultato(r);
+});
+
+/* ─── AVVIO ───────────────────────────────────────────────────────────────── */
+carica();
+/* Se la pagina è aperta per conto suo (non dentro una cornice), l'indirizzo che
+   vediamo è quello vero: lo prendiamo senza chiedere niente a nessuno. Dentro
+   una cornice invece non è affidabile, e allora lo chiediamo. */
+if (memoria.profilo && !memoria.profilo.base) {
+  var suo = pulisciBase(location.href.split('#')[0]);
+  var inCornice = true;
+  try { inCornice = (window.top !== window.self); } catch (e) { inCornice = true; }
+  if (suo && !inCornice) { memoria.profilo.base = suo; salva(); }
+}
+if (modoContatto) {
+  var primo = INV.contatto.split(' ')[0];
+  el('q-hello').textContent = 'Ciao ' + primo;
+  el('q-da').textContent = INV.sponsor
+    ? 'Otto domande da parte di ' + INV.sponsor + '.'
+    : '';
+  el('q-da').hidden = !INV.sponsor;
+  el('done-txt').textContent = INV.sponsor
+    ? 'Le tue risposte sono pronte. Mandale a ' + INV.sponsor + ' e vi sentite: se ha senso vedersi, ti spiega come funziona nel dettaglio; se secondo lui non è cosa tua, te lo dice con la stessa sincerità con cui hai risposto.'
+    : el('done-txt').textContent;
+  mostra('s-intro');
+} else if (INV.risultato) {
+  importaRisultato(INV.risultato);
+} else if (memoria.profilo) {
+  vaiHome();
+} else {
+  mostra('s-setup');
+}
+</script>
+</body>
+</html>
