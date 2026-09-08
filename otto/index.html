@@ -420,7 +420,6 @@
   <div class="card stack">
     <p class="eyebrow" id="q-count"></p>
     <h2 id="q-text"></h2>
-    <p class="small muted" id="q-note"></p>
     <div class="opts" id="q-opts"></div>
     <div class="btn-row">
       <button class="btn ghost" id="back">Indietro</button>
@@ -489,7 +488,6 @@ var Q = [
   {
     tema: 'Il motivo',
     t: 'Se nei prossimi due anni qualcosa della tua situazione — soldi o tempo — potesse cambiare, cosa cambieresti per primo?',
-    note: 'Rispondi guardando alla tua vita, non a questa attività.',
     o: [
       { t: 'Un\'entrata in più, che alleggerisca il mese', p: 3, s: 'entrata extra' },
       { t: 'A dire il vero sto bene così: non cambierei niente', p: 0, s: 'nessun motivo', ko: 'motivo' },
@@ -500,7 +498,6 @@ var Q = [
   {
     tema: 'Il tempo',
     t: 'Senza stravolgere la tua vita, quanto tempo potresti dedicare ogni giorno a una cosa nuova?',
-    note: 'Qui l\'attività si porta avanti con circa un\'ora al giorno, presa dai ritagli.',
     o: [
       { t: 'Circa mezz\'ora, nei ritagli della giornata', p: 3, s: '~30 min' },
       { t: 'Un\'ora o più: se una cosa mi convince, il tempo lo trovo', p: 4, s: '1 ora o più' },
@@ -511,7 +508,6 @@ var Q = [
   {
     tema: 'Le aspettative',
     t: 'Come qualsiasi attività, all\'inizio rende poco: la parte interessante si costruisce in quattro, sei, otto mesi di lavoro costante. Come la vedi?',
-    note: 'È il punto su cui più persone si illudono e poi smettono. Meglio dirselo adesso.',
     o: [
       { t: 'Se non paga subito, non mi interessa', p: 0, s: 'vuole subito', ko: 'aspettative' },
       { t: 'Mi torna: le cose che valgono chiedono tempo', p: 4, s: 'orizzonte lungo' },
@@ -521,19 +517,17 @@ var Q = [
   },
   {
     tema: 'I no',
-    t: 'Parlando con le persone, molte diranno no. Se dieci di fila ti dicessero no, cosa succederebbe?',
-    note: '',
+    t: 'Quanto ti pesa sentirti dire no? Pensa a quando proponi qualcosa — al lavoro, tra amici — e la risposta è negativa.',
     o: [
-      { t: 'Ci starei male, ma se so che è normale vado avanti', p: 3, s: 'regge con supporto' },
-      { t: 'Mi fermerei a chiedermi se sto sbagliando qualcosa', p: 2, s: 'si mette in dubbio' },
-      { t: 'Andrei avanti: fa parte del gioco, come in qualsiasi attività', p: 4, s: 'regge bene' },
-      { t: 'Probabilmente lascerei perdere', p: 0, s: 'non regge il no' }
+      { t: 'Poco: chi dice no ha i suoi motivi, io vado avanti', p: 4, s: 'regge bene' },
+      { t: 'Mi resta addosso: mi chiedo se ho sbagliato io', p: 2, s: 'si mette in dubbio' },
+      { t: 'Tanto: preferisco non espormi a un no', p: 0, s: 'evita di esporsi' },
+      { t: 'Mi pesa sul momento, poi passa e riprovo', p: 3, s: 'regge, con fatica' }
     ]
   },
   {
     tema: 'Il metodo',
     t: 'Qui si parte seguendo un metodo già collaudato, affiancati da qualcuno passo a passo, anche su cose che all\'inizio non ti vengono naturali.',
-    note: '',
     o: [
       { t: 'Bene, se capisco il perché di ogni passo', p: 3, s: 'segue capendo' },
       { t: 'Non mi piace essere seguito, né imparare da altri', p: 0, s: 'rifiuta l\'affiancamento' },
@@ -542,9 +536,8 @@ var Q = [
     ]
   },
   {
-    tema: 'Le persone',
+    tema: 'Un\'attività basata sulle relazioni',
     t: 'L\'attività si costruisce parlando con le persone che conosci e conoscendone di nuove nel tempo.',
-    note: 'Non è vendita porta a porta: è consigliare qualcosa che usi. Ma le persone ci sono.',
     o: [
       { t: 'Sono riservato, ma se mi insegnano credo di poterlo imparare', p: 2, s: 'riservato ma disponibile' },
       { t: 'Mi viene naturale: con le persone ci sto volentieri', p: 4, s: 'a suo agio' },
@@ -555,7 +548,6 @@ var Q = [
   {
     tema: 'Le opinioni degli altri',
     t: 'Se un\'opportunità ti convincesse ma intorno a te non tutti fossero d\'accordo, la prenderesti in considerazione lo stesso?',
-    note: '',
     o: [
       { t: 'Sì, anche se il parere contrario di qualcuno mi peserebbe', p: 3, s: 'decide lui, con fatica' },
       { t: 'Solo se fossi molto convinto: altrimenti lascerei stare', p: 2, s: 'ha bisogno di convinzione' },
@@ -565,8 +557,7 @@ var Q = [
   },
   {
     tema: 'L\'avvio',
-    t: 'Per partire servono dai 15 ai 55 €: la formazione, 15 € al mese, più la quota d\'iscrizione se non parti con un primo ordine di prodotti. I prodotti non li conto: sono spesa che faresti comunque, spostata.',
-    note: 'Nessun magazzino, nessuna penale, nessun contratto vincolante.',
+    t: 'Per iniziare l\'attività serve una spesa fra i 15 e i 55 €.',
     o: [
       { t: 'Ci arrivo, se capisco bene cosa ci sta dietro', p: 3, s: 'ok con chiarezza' },
       { t: 'È una cifra che decido io, senza problemi', p: 4, s: 'nessun problema' },
@@ -752,8 +743,6 @@ function render() {
   var q = Q[i];
   el('q-count').textContent = 'Domanda ' + (i + 1) + ' di ' + Q.length + ' · ' + q.tema;
   el('q-text').textContent = q.t;
-  el('q-note').textContent = q.note || '';
-  el('q-note').hidden = !q.note;
   var box = el('q-opts');
   box.innerHTML = '';
   q.o.forEach(function (o, k) {
