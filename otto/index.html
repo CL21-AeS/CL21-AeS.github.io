@@ -327,17 +327,21 @@
     <button class="linkish" id="l-home">Home</button>
   </div>
   <div class="card stack">
-    <h2>Il codice che ti ha mandato</h2>
+    <h2>Le risposte che ti ha mandato</h2>
     <div class="field">
-      <label class="small muted" for="l-code">Incollalo qui</label>
-      <input type="text" id="l-code" placeholder="CL21-XXXXXXXX-X-XXXX" autocapitalize="characters" spellcheck="false">
+      <label class="small muted" for="l-code">Incolla qui il messaggio che ti ha mandato</label>
+      <textarea id="l-code" rows="3" placeholder="Tieni premuto sul messaggio in WhatsApp, «Copia», e incollalo qui: il codice lo trovo io." spellcheck="false"></textarea>
+      <p class="tiny">Di solito non serve: nel messaggio c'è un link, e ti basta toccarlo.</p>
     </div>
     <button class="btn block" id="l-go">Leggi</button>
     <p class="tiny" id="l-err" hidden>Codice non riconosciuto: ricontrolla che sia completo.</p>
     <div id="l-assoc" hidden class="stack-s">
-      <p class="small muted">Questo codice non è agganciato a nessun invito in archivio. A chi appartiene?</p>
+      <p class="small muted" id="l-spiega">Le risposte ci sono, ma l'invito non è in questo archivio —
+      capita se l'hai preparato da un altro telefono o browser. A chi appartengono?</p>
+      <div class="rows" id="l-attesa"></div>
+      <label class="small muted" for="l-nome">Oppure è una persona che non trovi in elenco:</label>
       <input type="text" id="l-nome" placeholder="Nome e cognome del contatto">
-      <button class="btn sm" id="l-salva">Salva la scheda</button>
+      <button class="btn sm" id="l-salva">Salva come scheda nuova</button>
     </div>
   </div>
 </section>
@@ -444,10 +448,12 @@
       <button class="btn ghost" id="copy">Copia le risposte</button>
     </div>
     <p class="ok" id="copy-ok" hidden>Copiato. Incollalo nella chat.</p>
-    <div class="stack-s">
-      <p class="eyebrow">Il tuo codice</p>
-      <p class="code" id="code-out">—</p>
-    </div>
+    <details>
+      <summary>Se i pulsanti non funzionano</summary>
+      <p class="small muted" style="margin-top:10px">Copia questo indirizzo e mandalo a mano:</p>
+      <p class="msgbox" style="margin-top:8px"><span id="link-out"></span></p>
+      <p class="tiny">Codice: <span class="num" id="code-out">—</span></p>
+    </details>
   </div>
 
   <div class="card stack">
@@ -455,7 +461,7 @@
     <p class="muted">Questa è un'attività, non un premio: i soldi non li regala nessuno, qui come
     in qualsiasi altro posto. Come in ogni lavoro che valga qualcosa, i risultati vanno a chi ci
     mette del tempo — anche poco, ma con costanza — e ci mette la responsabilità di chi ha deciso
-    di prendersela sul serio.</p>
+    di prenderlo sul serio.</p>
     <p class="muted">Se questo ti sembra normale, siamo già d'accordo sulla cosa più importante.
     Se invece cercavi qualcosa che rendesse senza impegno, è giusto dirselo adesso: non è questo.</p>
   </div>
@@ -654,8 +660,10 @@ function codifica(risposte, id) {
   return 'CL21-' + d + '-' + controllo(d) + (id ? '-' + id : '');
 }
 function decodifica(txt) {
-  var m = String(txt || '').toUpperCase().replace(/\s/g, '')
-    .match(/^CL21-([1-4]{8})-([1-9])(?:-([A-Z0-9]{4}))?$/);
+  /* Cerca il codice DENTRO qualsiasi testo: su WhatsApp non si può selezionare
+     un pezzo di messaggio, quindi si incolla tutto il messaggio o tutto il link. */
+  var m = String(txt || '').toUpperCase()
+    .match(/CL21-([1-4]{8})-([1-9])(?:-([A-Z0-9]{4}))?/);
   if (!m || controllo(m[1]) !== m[2]) return null;
   return {
     risposte: m[1].split('').map(function (c) { return parseInt(c, 10) - 1; }),
@@ -724,7 +732,8 @@ var INV = (function () {
     contatto: (p.get('c') || '').trim(),
     sponsor: (p.get('s') || '').trim(),
     tel: soloCifre(p.get('t')),
-    id: (p.get('i') || '').trim().toUpperCase()
+    id: (p.get('i') || '').trim().toUpperCase(),
+    risultato: (p.get('r') || '').trim()
   };
 })();
 var modoContatto = !!INV.contatto;
@@ -774,8 +783,14 @@ function concludi() {
   var nome = INV.contatto.split(' ')[0];
   el('done-nome').textContent = nome ? 'Grazie, ' + nome + '.' : 'Grazie.';
   el('code-out').textContent = codifica(ans, INV.id);
+  el('link-out').textContent = linkRisultato();
   mostra('s-done');
   aggiornaInvio();
+}
+function linkRisultato() {
+  /* L'indirizzo da cui il contatto ha aperto le domande è, per costruzione,
+     quello che lo sponsor ha usato per generare l'invito. */
+  return location.href.split('#')[0] + '#r=' + codifica(ans, INV.id);
 }
 function messaggioContatto() {
   var righe = [];
@@ -787,7 +802,7 @@ function messaggioContatto() {
   var libero = (el('libero').value || '').trim();
   if (libero) { righe.push(''); righe.push('Nota: ' + libero); }
   righe.push('');
-  righe.push('Codice: ' + codifica(ans, INV.id));
+  righe.push('Apri le risposte: ' + linkRisultato());
   return righe.join('\n');
 }
 function aggiornaInvio() {
@@ -1103,35 +1118,64 @@ function armaElimina(s) {
 /* ─── MODALITÀ PARTNER: LEGGI UN CODICE ───────────────────────────────────── */
 var inSospeso = null;   /* risposte decodificate in attesa di un nome */
 
+function registra(risposte, id) {
+  /* Aggancia le risposte all'invito che le aspettava. Idempotente: rileggere
+     lo stesso codice riapre la scheda, non ne crea una seconda. */
+  var scheda = id ? memoria.schede.filter(function (x) { return x.id === id; })[0] : null;
+  if (!scheda) return null;
+  scheda.risposte = risposte;
+  if (!scheda.letto) scheda.letto = oggi();
+  salva();
+  return scheda;
+}
+function chiediDiChiSono(risposte) {
+  inSospeso = risposte;
+  el('l-nome').value = '';
+  var box = el('l-attesa');
+  box.innerHTML = '';
+  var attesa = memoria.schede.filter(function (x) { return !x.risposte; });
+  attesa.forEach(function (x) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'row';
+    b.innerHTML = '<span class="grow"><span class="nm">' + esc(x.nome) + '</span><br>' +
+      '<span class="sub">invito del ' + dataIt(x.creato) + '</span></span><span class="pill">aggancia</span>';
+    b.onclick = function () {
+      x.risposte = inSospeso; x.letto = oggi(); salva();
+      inSospeso = null; el('l-assoc').hidden = true; apriScheda(x.id);
+    };
+    box.appendChild(b);
+  });
+  el('l-spiega').textContent = attesa.length
+    ? 'Le risposte ci sono, ma non riesco a capire di chi sono. Scegli l\'invito a cui agganciarle:'
+    : 'Le risposte ci sono, ma in questo archivio non c\'è nessun invito in attesa — capita se l\'hai preparato da un altro telefono o browser. Di chi sono?';
+  el('l-assoc').hidden = false;
+  mostra('s-leggi');
+}
 el('l-go').onclick = function () {
   var d = decodifica(el('l-code').value);
   if (!d) { el('l-err').hidden = false; el('l-assoc').hidden = true; return; }
   el('l-err').hidden = true;
-
-  var scheda = d.id ? memoria.schede.filter(function (x) { return x.id === d.id; })[0] : null;
-  if (scheda) {
-    scheda.risposte = d.risposte;
-    scheda.letto = oggi();
-    salva();
-    apriScheda(scheda.id);
-    return;
-  }
-  /* codice senza id, o invito non più in archivio: chiediamo di chi è */
-  inSospeso = d.risposte;
-  el('l-nome').value = '';
-  el('l-assoc').hidden = false;
+  var scheda = registra(d.risposte, d.id);
+  if (scheda) { apriScheda(scheda.id); return; }
+  chiediDiChiSono(d.risposte);
 };
 el('l-salva').onclick = function () {
   if (!inSospeso) return;
   var nome = (el('l-nome').value || '').trim() || 'Senza nome';
-  var scheda = { id: nuovoId(), nome: nome, creato: oggi(), letto: oggi(), risposte: inSospeso, nota: '' };
-  memoria.schede.unshift(scheda);
+  /* se il nome è già in archivio senza risposte, agganciamo lì invece di duplicare */
+  var esistente = memoria.schede.filter(function (x) {
+    return !x.risposte && x.nome.toLowerCase() === nome.toLowerCase();
+  })[0];
+  var scheda = esistente || { id: nuovoId(), nome: nome, creato: oggi(), risposte: null, nota: '' };
+  scheda.risposte = inSospeso;
+  scheda.letto = oggi();
+  if (!esistente) memoria.schede.unshift(scheda);
   salva();
   inSospeso = null;
   el('l-assoc').hidden = true;
   apriScheda(scheda.id);
 };
-el('l-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') el('l-go').click(); });
 
 /* ─── COPIA DI SICUREZZA ──────────────────────────────────────────────────── */
 function backup() { return JSON.stringify(memoria); }
@@ -1163,6 +1207,29 @@ if (window.claude && typeof window.claude.use === 'function') {
   }, function () {});
 }
 
+/* ─── IL LINK DELLE RISPOSTE ────────────────────────────────────────────────
+   Lo sponsor tocca il link nel messaggio: niente da copiare, niente da
+   incollare. Puliamo il frammento, così una ricarica non rifà l'import.
+   ─────────────────────────────────────────────────────────────────────────── */
+function importaRisultato(codice) {
+  var letto = decodifica(codice);
+  try { history.replaceState(null, '', location.href.split('#')[0]); } catch (e) {}
+  if (!letto) {
+    vaiHome();
+    el('l-code').value = codice;
+    el('h-leggi').click();
+    el('l-err').hidden = false;
+    return;
+  }
+  var agganciata = registra(letto.risposte, letto.id);
+  if (agganciata) { apriScheda(agganciata.id); } else { chiediDiChiSono(letto.risposte); }
+}
+window.addEventListener('hashchange', function () {
+  var p = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+  var r = (p.get('r') || '').trim();
+  if (r && !modoContatto) importaRisultato(r);
+});
+
 /* ─── AVVIO ───────────────────────────────────────────────────────────────── */
 carica();
 /* Se la pagina è aperta per conto suo (non dentro una cornice), l'indirizzo che
@@ -1185,6 +1252,8 @@ if (modoContatto) {
     ? 'Le tue risposte sono pronte. Mandale a ' + INV.sponsor + ' e vi sentite: se ha senso vedersi, ti spiega come funziona nel dettaglio; se secondo lui non è cosa tua, te lo dice con la stessa sincerità con cui hai risposto.'
     : el('done-txt').textContent;
   mostra('s-intro');
+} else if (INV.risultato) {
+  importaRisultato(INV.risultato);
 } else if (memoria.profilo) {
   vaiHome();
 } else {
