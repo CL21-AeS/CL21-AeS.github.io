@@ -390,6 +390,19 @@
     Se svuota il browser senza averla fatta, le sue schede sono perse.</p>
   </div>
   <div class="card stack">
+    <h2>Ricominciare da zero</h2>
+    <p class="small muted">Cancella da questo dispositivo il tuo nome, il tuo numero, l'indirizzo
+    dell'app e <strong>tutte le schede</strong>, e riparte dalla schermata iniziale. Serve quando
+    hai sbagliato il primo avvio, quando il telefono passa a un'altra persona, o per rifare una
+    prova pulita. Non si torna indietro: se le schede ti servono, prima «Salva la copia»
+    dall'archivio.</p>
+    <div class="btn-row">
+      <button class="btn danger" id="x-reset">Svuota tutto</button>
+      <button class="btn danger" id="x-reset2" hidden>Confermi? Le schede vanno perse</button>
+    </div>
+  </div>
+
+  <div class="card stack">
     <h2>Il codice, in breve</h2>
     <p class="small muted">Otto risposte, 32 punti. <strong>27+</strong> piano subito ·
     <strong>21-26</strong> piano ma prima chiarisci · <strong>14-20</strong> da coltivare ·
@@ -1176,6 +1189,20 @@ el('l-salva').onclick = function () {
   inSospeso = null;
   el('l-assoc').hidden = true;
   apriScheda(scheda.id);
+};
+
+/* ─── RICOMINCIARE DA ZERO ──────────────────────────────────────────────────
+   Toglie ogni traccia da questo dispositivo, vecchia chiave compresa: senza
+   quella, l'app si ritroverebbe l'archivio di prima al primo avvio.
+   ─────────────────────────────────────────────────────────────────────────── */
+el('x-reset').onclick = function () {
+  el('x-reset').hidden = true;
+  el('x-reset2').hidden = false;
+};
+el('x-reset2').onclick = function () {
+  try { localStorage.removeItem(CHIAVE); localStorage.removeItem(CHIAVE_VECCHIA); } catch (e) {}
+  memoria = { profilo: null, schede: [] };
+  location.replace(location.href.split('#')[0]);
 };
 
 /* ─── COPIA DI SICUREZZA ──────────────────────────────────────────────────── */
