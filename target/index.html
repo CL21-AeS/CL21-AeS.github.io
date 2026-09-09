@@ -508,20 +508,18 @@ var Q = [
     tema: 'Il motivo',
     t: 'Se nei prossimi due anni qualcosa della tua situazione — soldi o tempo — potesse cambiare, cosa cambieresti per primo?',
     o: [
-      { t: 'Un\'entrata in più, che alleggerisca il mese', p: 3, s: 'entrata extra' },
+      { t: 'Un\'entrata in più, o più tempo per me e per i miei', p: 2, s: 'entrata o tempo' },
       { t: 'A dire il vero sto bene così: non cambierei niente', p: 0, s: 'nessun motivo', ko: 'motivo' },
-      { t: 'Costruire nel tempo qualcosa di mio, che resti', p: 4, s: 'costruire qualcosa di proprio' },
-      { t: 'Più tempo per me e per i miei, senza perdere reddito', p: 3, s: 'tempo' }
+      { t: 'Costruire nel tempo qualcosa di mio, che resti', p: 4, s: 'costruire qualcosa di proprio' }
     ]
   },
   {
     tema: 'Il tempo',
     t: 'Senza stravolgere la tua vita, quanto tempo potresti dedicare ogni giorno a una cosa nuova?',
     o: [
-      { t: 'Circa mezz\'ora, nei ritagli della giornata', p: 3, s: '~30 min' },
+      { t: 'Una mezz\'ora, nei ritagli della giornata', p: 2, s: '~30 min' },
       { t: 'Un\'ora o più: se una cosa mi convince, il tempo lo trovo', p: 4, s: '1 ora o più' },
-      { t: 'Oggi zero: non ho spazio per aggiungere niente', p: 0, s: 'zero tempo', ko: 'tempo' },
-      { t: 'Meno di un quarto d\'ora, ho le giornate piene', p: 1, s: '<15 min' }
+      { t: 'Oggi niente: non ho spazio per aggiungere altro', p: 0, s: 'zero tempo', ko: 'tempo' }
     ]
   },
   {
@@ -530,8 +528,7 @@ var Q = [
     o: [
       { t: 'Se non paga subito, non mi interessa', p: 0, s: 'vuole subito', ko: 'aspettative' },
       { t: 'Mi torna: le cose che valgono chiedono tempo', p: 4, s: 'orizzonte lungo' },
-      { t: 'Difficile: mi servirebbe un risultato importante entro pochi mesi', p: 1, s: 'urgenza economica' },
-      { t: 'Va bene, purché veda che qualcosa si muove già dai primi mesi', p: 3, s: 'ok con primi segnali' }
+      { t: 'Va bene, purché veda che qualcosa si muove già dai primi mesi', p: 2, s: 'ok con primi segnali' }
     ]
   },
   {
@@ -539,49 +536,44 @@ var Q = [
     t: 'Quanto ti pesa sentirti dire no? Pensa a quando proponi qualcosa — al lavoro, tra amici — e la risposta è negativa.',
     o: [
       { t: 'Poco: chi dice no ha i suoi motivi, io vado avanti', p: 4, s: 'regge bene' },
-      { t: 'Mi resta addosso: mi chiedo se ho sbagliato io', p: 2, s: 'si mette in dubbio' },
       { t: 'Tanto: preferisco non espormi a un no', p: 0, s: 'evita di esporsi' },
-      { t: 'Mi pesa sul momento, poi passa e riprovo', p: 3, s: 'regge, con fatica' }
+      { t: 'Mi pesa sul momento, poi passa e riprovo', p: 2, s: 'regge, con fatica' }
     ]
   },
   {
     tema: 'Il metodo',
     t: 'Qui si parte seguendo un metodo già collaudato, affiancati da qualcuno passo a passo, anche su cose che all\'inizio non ti vengono naturali.',
     o: [
-      { t: 'Bene, se capisco il perché di ogni passo', p: 3, s: 'segue capendo' },
-      { t: 'Non mi piace essere seguito, né imparare da altri', p: 0, s: 'rifiuta l\'affiancamento' },
       { t: 'Bene: preferisco un percorso chiaro all\'improvvisare', p: 4, s: 'allineato al metodo' },
-      { t: 'Farei fatica: preferisco fare a modo mio', p: 1, s: 'vuole fare da sé' }
+      { t: 'Bene, se capisco il perché di ogni passo', p: 2, s: 'segue capendo' },
+      { t: 'Faccio fatica: preferisco fare a modo mio', p: 0, s: 'vuole fare da sé' }
     ]
   },
   {
     tema: 'Un\'attività basata sulle relazioni',
     t: 'L\'attività si costruisce parlando con le persone che conosci e conoscendone di nuove nel tempo.',
     o: [
-      { t: 'Sono riservato, ma se mi insegnano credo di poterlo imparare', p: 2, s: 'riservato ma disponibile' },
-      { t: 'Mi viene naturale: con le persone ci sto volentieri', p: 4, s: 'a suo agio' },
+      { t: 'Sono riservato, ma se mi insegnano posso impararlo', p: 2, s: 'riservato ma disponibile' },
       { t: 'È la cosa che meno mi va di fare', p: 0, s: 'rifiuta il contatto' },
-      { t: 'Non sono un venditore, ma con la gente me la cavo', p: 3, s: 'se la cava' }
+      { t: 'Mi viene naturale: con le persone ci sto volentieri', p: 4, s: 'a suo agio' }
     ]
   },
   {
     tema: 'Le opinioni degli altri',
     t: 'Se un\'opportunità ti convincesse ma intorno a te non tutti fossero d\'accordo, la prenderesti in considerazione lo stesso?',
     o: [
-      { t: 'Sì, anche se il parere contrario di qualcuno mi peserebbe', p: 3, s: 'decide lui, con fatica' },
-      { t: 'Solo se fossi molto convinto: altrimenti lascerei stare', p: 2, s: 'ha bisogno di convinzione' },
-      { t: 'No: se una persona a cui tengo non è d\'accordo, mi fermo', p: 0, s: 'dipende dagli altri' },
-      { t: 'Sì. Le opinioni le ascolto, ma la decisione è mia', p: 4, s: 'indipendente' }
+      { t: 'Sì, anche se il parere contrario di qualcuno mi peserebbe', p: 2, s: 'decide lui, con fatica' },
+      { t: 'Sì. Le opinioni le ascolto, ma la decisione è mia', p: 4, s: 'indipendente' },
+      { t: 'No: se una persona a cui tengo non è d\'accordo, mi fermo', p: 0, s: 'dipende dagli altri' }
     ]
   },
   {
     tema: 'L\'avvio',
     t: 'Per iniziare l\'attività serve una spesa fra i 15 e i 55 €.',
     o: [
-      { t: 'Ci arrivo, se capisco bene cosa ci sta dietro', p: 3, s: 'ok con chiarezza' },
-      { t: 'È una cifra che decido io, senza problemi', p: 4, s: 'nessun problema' },
+      { t: 'Ci arrivo, se capisco bene cosa ci sta dietro', p: 2, s: 'ok con chiarezza' },
       { t: 'Oggi non è nelle mie possibilità', p: 0, s: 'non ora', ko: 'avvio' },
-      { t: 'Sarebbe uno sforzo: dovrei pensarci', p: 2, s: 'sforzo' }
+      { t: 'È una cifra che decido io, senza problemi', p: 4, s: 'nessun problema' }
     ]
   }
 ];
@@ -677,7 +669,7 @@ function decodifica(txt) {
   /* Cerca il codice DENTRO qualsiasi testo: su WhatsApp non si può selezionare
      un pezzo di messaggio, quindi si incolla tutto il messaggio o tutto il link. */
   var m = String(txt || '').toUpperCase()
-    .match(/CL21-([1-4]{8})-([1-9])(?:-([A-Z0-9]{4}))?/);
+    .match(/CL21-([1-3]{8})-([1-9])(?:-([A-Z0-9]{4}))?/);
   if (!m || controllo(m[1]) !== m[2]) return null;
   return {
     risposte: m[1].split('').map(function (c) { return parseInt(c, 10) - 1; }),
@@ -686,14 +678,27 @@ function decodifica(txt) {
 }
 
 /* ─── VALUTAZIONE ─────────────────────────────────────────────────────────── */
+function valide(a) {
+  return Array.isArray(a) && a.length === Q.length && a.every(function (k, qi) {
+    return Q[qi] && Q[qi].o[k] !== undefined;
+  });
+}
 function valuta(a) {
-  var tot = 0, ko = [], deboli = [];
+  var tot = 0, ko = [], zeri = [], riserve = [];
   a.forEach(function (k, qi) {
     var o = Q[qi].o[k];
     tot += o.p;
     if (o.ko) ko.push(o.ko);
-    if (o.p <= 2) deboli.push(qi);
+    if (o.p === 0) zeri.push(qi); else if (o.p === 2) riserve.push(qi);
   });
+
+  /* Con tre risposte per domanda la scala è netta: sì pieno (4), sì con riserva
+     (2), no (0). Il punteggio dà la fascia, ma un "no" secco la abbassa: otto
+     riserve non sono la stessa cosa di sette sì e un rifiuto. */
+  var livello = tot >= 26 ? 3 : tot >= 18 ? 2 : tot >= 11 ? 1 : 0;
+  if (zeri.length >= 3) livello = 0;
+  else if (zeri.length === 2) livello = Math.min(livello, 1);
+  else if (zeri.length === 1) livello = Math.min(livello, 2);
 
   var band, titolo, azione;
   if (ko.indexOf('motivo') > -1 || ko.indexOf('aspettative') > -1 || ko.indexOf('tempo') > -1) {
@@ -706,26 +711,27 @@ function valuta(a) {
     band = 'care';
     titolo = 'Non ora — solo per l\'avvio economico';
     azione = 'Non è un no alla persona: oggi la cifra di partenza non c\'è. Fallo partire come cliente, tienilo vicino e riparlane fra qualche mese. Se il resto del punteggio è alto, vale la pena ricontattarlo: è la persona giusta nel momento sbagliato.';
-  } else if (tot >= 27) {
+  } else if (livello === 3) {
     band = 'go';
     titolo = 'In target — dagli il piano';
     azione = 'Fissa l\'incontro entro pochi giorni, mentre l\'interesse è caldo. Parti dal suo motivo (vedi sotto), poi il metodo, poi i numeri. Non gonfiare niente: con questo profilo l\'onestà è il tuo argomento migliore.';
-  } else if (tot >= 21) {
+  } else if (livello === 2) {
     band = 'go';
     titolo = 'In target, con riserve — dagli il piano, ma prima chiarisci';
-    azione = 'Vale l\'incontro. Prima di aprire il piano, però, affronta i punti scoperti qui sotto: se li lasci lì, tornano fuori dopo l\'iscrizione, quando costano di più.';
-  } else if (tot >= 14) {
+    azione = 'Vale l\'incontro. Prima di aprire il piano, però, affronta i punti qui sotto: se li lasci lì, tornano fuori dopo l\'iscrizione, quando costano di più.';
+  } else if (livello === 1) {
     band = 'care';
     titolo = 'Da coltivare — piano non ancora';
-    azione = 'Troppi punti scoperti per un piano che regga. Non chiudere: fallo provare come cliente, mandagli qualcosa da ascoltare, risentitevi fra qualche settimana. Le persone cambiano quando cambia la loro situazione, non quando insisti.';
+    azione = 'Troppe cose in sospeso per un piano che regga. Non chiudere: fallo provare come cliente, mandagli qualcosa da ascoltare, risentitevi fra qualche settimana. Le persone cambiano quando cambia la loro situazione, non quando insisti.';
   } else {
     band = 'no';
     titolo = 'Fuori target';
-    azione = 'Non dare il piano. Il quadro complessivo dice che questa attività non è cosa sua: nessun motivo forte, e più condizioni che mancano insieme. Dillo chiaramente — è la cosa che ti farà rispettare — e proponigli il ruolo di cliente se i prodotti gli interessano.';
+    azione = 'Non dare il piano. Il quadro complessivo dice che questa attività non è cosa sua: più rifiuti secchi su punti che non si aggirano. Dillo chiaramente — è la cosa che ti farà rispettare — e proponigli il ruolo di cliente se i prodotti gli interessano.';
   }
-  return { tot: tot, band: band, titolo: titolo, azione: azione, ko: ko, deboli: deboli };
+  return { tot: tot, band: band, titolo: titolo, azione: azione, ko: ko, zeri: zeri, riserve: riserve, deboli: zeri };
 }
 function fascia(a) {
+  if (!valide(a)) return { pill: 'wait', testo: 'vecchia versione' };
   var v = valuta(a);
   return { pill: v.band, testo: v.tot + '/32' };
 }
@@ -1031,6 +1037,26 @@ function apriScheda(id) {
     return;
   }
 
+  if (!valide(s.risposte)) {
+    /* Scheda compilata quando le domande avevano quattro risposte: il punteggio
+       di allora non è confrontabile con quello di adesso, e inventarlo sarebbe
+       peggio che dirlo. */
+    el('s-body').innerHTML = '<div class="card stack">' +
+      '<div><p class="eyebrow">' + dataIt(s.letto || s.creato) + ' · codice ' + esc(s.id) + '</p>' +
+      '<h1>' + esc(s.nome) + '</h1></div>' +
+      '<p class="small muted">Questa scheda è stata compilata con la versione precedente del ' +
+      'questionario, quando ogni domanda aveva quattro risposte. Il punteggio di allora non è ' +
+      'confrontabile con quello di adesso, quindi non te lo mostro: se ti serve, rimanda l\'invito ' +
+      'e fagli rifare le otto domande.</p>' +
+      '<div class="btn-row"><button class="btn" id="sc-rimanda">Rimanda l\'invito</button></div>' +
+      '<div class="btn-row"><button class="btn danger sm" id="sc-del">Elimina la scheda</button>' +
+      '<button class="btn danger sm" id="sc-del2" hidden>Confermi?</button></div>' +
+    '</div>';
+    el('sc-rimanda').onclick = function () { s.risposte = null; s.letto = null; salva(); apriInvito(s); };
+    armaElimina(s);
+    mostra('s-scheda');
+    return;
+  }
   var a = s.risposte, v = valuta(a);
 
   out.push('<div class="card stack">' +
@@ -1043,15 +1069,17 @@ function apriScheda(id) {
     '<div style="display:flex;align-items:baseline;gap:10px">' +
       '<span class="score">' + v.tot + '</span><span class="muted small">su ' + (Q.length * 4) + ' punti</span>' +
     '</div>' +
-    '<p class="tiny">Soglie: 27+ piano subito · 21-26 piano con riserve · 14-20 da coltivare · sotto 14 fuori target. ' +
-    'Una condizione di base che manca (motivo, tempo, aspettative) vale più del punteggio.</p>' +
+    '<p class="tiny">Ogni domanda vale 4 (sì pieno), 2 (sì con riserva) o 0 (no). Soglie: 26+ piano subito · ' +
+    '18-25 piano con riserve · 11-17 da coltivare · sotto 11 fuori target. Un no secco abbassa la fascia di un gradino, ' +
+    'due la abbassano di due, tre mettono fuori target: una condizione di base che manca vale più del punteggio.</p>' +
   '</div>');
 
   out.push('<div class="card stack">' +
     '<h2>Da dove partire</h2>' +
     '<p class="small"><strong>Cosa cerca:</strong> ' + esc(Q[0].o[a[0]].s) + ' — «' + esc(Q[0].o[a[0]].t) + '»</p>' +
     '<p class="small"><strong>Cosa lo trattiene:</strong> ' +
-      esc(v.deboli.length ? v.deboli.map(function (qi) { return Q[qi].tema; }).join(' · ') : 'niente di evidente dalle risposte') +
+      esc(v.zeri.length ? v.zeri.map(function (qi) { return Q[qi].tema; }).join(' · ')
+          : (v.riserve.length ? 'nessun no secco; riserve su ' + v.riserve.map(function (qi) { return Q[qi].tema; }).join(' · ') : 'niente di evidente dalle risposte')) +
     '</p>' +
     '<p class="tiny">Apri l\'incontro dal suo motivo, con le sue parole. Poi il metodo, poi i numeri: mai il contrario.</p>' +
   '</div>');
@@ -1059,23 +1087,31 @@ function apriScheda(id) {
   var righe = a.map(function (k, qi) {
     var o = Q[qi].o[k];
     return '<tr><td><strong>' + esc(Q[qi].tema) + '</strong><br><span class="muted">' + esc(o.t) + '</span></td>' +
-      '<td class="p' + (o.p <= 2 ? ' flag' : '') + '">' + o.p + '</td></tr>';
+      '<td class="p' + (o.p === 0 ? ' flag' : '') + '">' + o.p + '</td></tr>';
   }).join('');
   out.push('<div class="card stack">' +
     '<h2>Le risposte</h2>' +
     '<table class="ans"><thead><tr><th>Tema e risposta</th><th style="text-align:right">Pt</th></tr></thead>' +
     '<tbody>' + righe + '</tbody></table>' +
-    '<p class="tiny">In rosso i punti scoperti (2 o meno).</p>' +
+    '<p class="tiny">In rosso i no secchi. Il 2 è un sì con riserva.</p>' +
   '</div>');
 
-  if (v.deboli.length) {
-    out.push('<div class="card stack"><h2>Cosa affrontare prima del piano</h2><ul class="clean small">' +
-      v.deboli.map(function (qi) { return '<li><strong>' + esc(Q[qi].tema) + '.</strong> ' + esc(SCOPERTI[qi]) + '</li>'; }).join('') +
-    '</ul></div>');
+  var blocco = '<div class="card stack"><h2>Cosa affrontare prima del piano</h2>';
+  if (v.zeri.length) {
+    blocco += '<ul class="clean small">' + v.zeri.map(function (qi) {
+      return '<li><strong>' + esc(Q[qi].tema) + '.</strong> ' + esc(SCOPERTI[qi]) + '</li>';
+    }).join('') + '</ul>';
   } else {
-    out.push('<div class="card stack"><h2>Cosa affrontare prima del piano</h2>' +
-      '<p class="small muted">Nessun punto scoperto. Profilo pulito: vai di piano, e non riempirlo di entusiasmo — a questa persona serve sostanza.</p></div>');
+    blocco += '<p class="small muted">Nessun no secco. ' + (v.riserve.length
+      ? 'Le riserve qui sotto si sciolgono parlando, non sono ostacoli.'
+      : 'Profilo pulito: vai di piano, e non riempirlo di entusiasmo — a questa persona serve sostanza.') + '</p>';
   }
+  if (v.riserve.length) {
+    blocco += '<p class="small"><strong>Sì con riserva su:</strong> ' +
+      esc(v.riserve.map(function (qi) { return Q[qi].tema; }).join(' · ')) + '</p>' +
+      '<p class="tiny">Non sono no: sono i punti su cui vuole capire meglio prima di decidere.</p>';
+  }
+  out.push(blocco + '</div>');
 
   out.push('<div class="card stack">' +
     '<h2>Promemoria per l\'incontro</h2>' +
