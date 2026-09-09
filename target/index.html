@@ -256,7 +256,7 @@
     </div>
 
     <div style="text-align:center">
-      <button class="linkish" id="h-aiuto">Come funziona · passarla a un altro partner</button>
+      <button class="linkish" id="h-aiuto">Come funziona · condividerla con un contatto</button>
     </div>
     <p class="tiny" id="h-nostore" hidden>Attenzione: questo browser non permette di salvare niente
     (navigazione privata?). Puoi preparare inviti e leggere codici, ma l'archivio non si conserva.</p>
@@ -379,45 +379,38 @@
     <button class="linkish" id="x-home">Home</button>
   </div>
   <div class="card stack">
-    <h2>Il giro completo</h2>
+    <h2>Condividerla con un contatto</h2>
     <ol class="clean small">
       <li><strong>Scrivi nome e cognome del contatto</strong> e prepari l'invito.</li>
       <li><strong>Gli mandi il messaggio.</strong> Lui apre, trova il suo nome e risponde a otto domande in tre minuti.</li>
-      <li><strong>Ti rimanda le risposte</strong> con un codice. Lui non vede né punteggio né giudizio.</li>
-      <li><strong>Incolli il codice</strong> e leggi la scheda: punteggio, esito, cosa affrontare prima del piano.</li>
+      <li><strong>Ti rimanda le risposte</strong> con un link. Lui non vede né punteggio né giudizio.</li>
+      <li><strong>Tocchi quel link</strong> e si apre la sua scheda: punteggio, esito, cosa affrontare
+      prima del piano. Niente da ricopiare — se il link si spezzasse in chat, incolli tutto il
+      messaggio in «Leggi un codice» e il codice lo trovo io.</li>
     </ol>
   </div>
   <div class="card stack">
-    <h2>Passarla a un altro partner</h2>
-    <p class="small muted">Al primo avvio il partner mette il suo nome e il suo numero, e da quel
-    momento lavora sulla <em>sua</em> copia.</p>
-    <p class="small muted" id="x-nota-prova" hidden><strong>Durante la prova sul campo non si passa
-    di mano.</strong> Ogni partner ha un link personale, che vale solo per lui e solo su due
-    dispositivi: se giri il tuo, all'altro l'app si rifiuta di partire e la cosa si vede.
-    I link nuovi li dà chi coordina la prova.</p>
+    <h2>L'indirizzo dell'app</h2>
+    <p class="small muted">È la prima metà dei link che mandi ai contatti. L'app la riconosce da sé;
+    qui puoi correggerla se avesse preso quella sbagliata.</p>
     <div class="msgbox" id="x-link"></div>
     <div class="btn-row">
-      <button class="btn ghost" id="x-copia">Copia il link da girare</button>
       <button class="btn ghost" id="x-cambia">Correggi l'indirizzo</button>
     </div>
     <p class="ok" id="x-ok" hidden>Copiato.</p>
     <div id="x-edit" hidden class="stack-s">
       <label class="small muted" for="x-base">L'indirizzo di questa app</label>
       <input type="text" id="x-base" placeholder="https://…" spellcheck="false" autocapitalize="off">
-      <p class="tiny">È la prima metà dei link che mandi ai contatti. L'app la riconosce da sé,
-      e qui puoi correggerla se per qualche motivo ha preso quella sbagliata.</p>
       <div class="btn-row">
         <button class="btn sm" id="x-basesalva">Salva</button>
         <button class="btn ghost sm" id="x-baseno">Annulla</button>
       </div>
     </div>
-    <p class="small muted">I dati non si mescolano perché non stanno da nessuna parte in comune:
-    le schede di ognuno restano nel browser di quel telefono, e le risposte di un contatto
-    tornano su WhatsApp solo al partner che gli ha mandato l'invito. Nemmeno tu vedi le schede
-    dei tuoi partner — se vuoi sapere come stanno andando, glielo chiedi.</p>
-    <p class="tiny">Ricordagli la copia di sicurezza: dall'archivio, «Salva la copia».
-    Se svuota il browser senza averla fatta, le sue schede sono perse.</p>
+    <p class="tiny">Le tue schede vivono nel browser di questo dispositivo e non le vede nessun
+    altro — nemmeno chi coordina la prova. Per questo la copia di sicurezza dall'archivio è
+    l'unico modo di non perderle.</p>
   </div>
+
   <div class="card stack" id="x-prova" hidden>
     <h2>La prova sul campo</h2>
     <p class="small muted" id="x-prova-testo"></p>
@@ -440,13 +433,16 @@
 
   <div class="card stack">
     <h2>Il codice, in breve</h2>
-    <p class="small muted">Otto risposte, 32 punti. <strong>27+</strong> piano subito ·
-    <strong>21-26</strong> piano ma prima chiarisci · <strong>14-20</strong> da coltivare ·
-    <strong>sotto 14</strong> fuori target. Chi risponde con buonsenso senza entusiasmo
-    si assesta intorno a 24: la fascia normale è «piano con riserve».</p>
+    <p class="small muted">Ogni domanda vale <strong>4</strong> (sì pieno), <strong>2</strong>
+    (sì con riserva) o <strong>0</strong> (no). Massimo 32. <strong>26+</strong> piano subito ·
+    <strong>18-25</strong> piano ma prima chiarisci · <strong>11-17</strong> da coltivare ·
+    <strong>sotto 11</strong> fuori target.</p>
+    <p class="small muted">Un <strong>no secco abbassa la fascia</strong> di un gradino, due di due,
+    tre mettono fuori target: otto «sì con riserva» non sono la stessa cosa di sette sì pieni e un
+    rifiuto. Le riserve si sciolgono parlando, un no secco no.</p>
     <p class="small muted">Tre risposte sono <strong>knock-out</strong> e valgono più del punteggio:
-    nessun motivo suo, zero tempo, «se non paga subito non mi interessa». La quarta —
-    i 130-160€ oggi non ci sono — non è un no alla persona ma un «non ora».</p>
+    nessun motivo suo, zero tempo, «se non paga subito non mi interessa». La quarta — i 15-55 €
+    oggi non ci sono — non è un no alla persona ma un «non ora».</p>
   </div>
 </section>
 
@@ -931,7 +927,6 @@ el('h-aiuto').onclick = function () { apriAiuto(); };
 function apriAiuto() {
   var pr = memoria.accesso;
   el('x-prova').hidden = !SYNC;
-  el('x-nota-prova').hidden = !SYNC;
   if (SYNC) {
     el('x-prova-testo').textContent = 'Codice ' + ((pr && pr.codice) || '—') +
       ' · dispositivo ' + dispositivo() +
@@ -983,11 +978,7 @@ function baseAffidabile() {
   return inCornice ? '' : pulisciBase(location.href.split('#')[0]);
 }
 function linkBase() { return (memoria.profilo && memoria.profilo.base) || ''; }
-el('x-copia').onclick = function () {
-  var b = linkBase();
-  if (!b) { el('h-profilo').click(); return; }
-  copia(b, function () { lampo('x-ok'); });
-};
+
 
 /* ─── MODALITÀ PARTNER: NUOVO INVITO ──────────────────────────────────────── */
 el('c-prepara').onclick = function () {
