@@ -4,49 +4,65 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Target</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap">
 <style>
-  /* ── Tokens: light is the base set ─────────────────────────────────── */
+  /* ── Tokens: light is the base set ─────────────────────────────────────
+     Ardesia e mattone: i due colori del marchio CumLaude21 su carta calda.
+     L'ardesia (--accent) veste i pulsanti e le decisioni; il mattone
+     (--mark) segna solo dove sei arrivato e cosa hai scelto. I colori
+     dell'esito — verde, ocra, mattone — vivono nella parte partner, che il
+     contatto non vede mai: nessuno dei due usi si pesta i piedi.
+     ─────────────────────────────────────────────────────────────────────── */
   :root {
-    --ground: #EDF0EC;
+    --ground: #F4EEE7;
     --surface: #FFFFFF;
-    --surface-2: #F6F8F5;
-    --ink: #131A16;
-    --ink-2: #4C5852;
-    --ink-3: #66726B;
-    --rule: #DBE1DA;
-    --rule-soft: #E8ECE6;
-    --accent: #1D6A52;
-    --accent-ink: #FFFFFF;
-    --accent-wash: #E2EDE6;
-    --good: #0F7A45;
+    --surface-2: #FBF7F2;
+    --ink: #2E3742;
+    --ink-2: #6A7381;
+    --ink-3: #8C867F;
+    --taupe: #A9968C;
+    --rule: #E7DFD8;
+    --rule-soft: #EFE9E3;
+    --accent: #2E3742;
+    --accent-ink: #FBF8F5;
+    --accent-wash: #F3F0EC;
+    --mark: #9E2B2B;
+    --mark-wash: #FDF2F0;
+    --good: #1F6A4C;
     --warn: #8A6410;
-    --crit: #9E2B25;
-    --off: #66726B;
-    --focus: #1D6A52;
-    --shadow: 0 1px 2px rgba(19, 26, 22, .05), 0 8px 24px rgba(19, 26, 22, .07);
+    --crit: #9E2B2B;
+    --off: #8C867F;
+    --focus: #9E2B2B;
+    --shadow: 0 1px 2px rgba(46, 55, 66, .05), 0 10px 28px rgba(46, 55, 66, .08);
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Fraunces", Georgia, "Times New Roman", serif;
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-    --r: 8px;
+    --r: 14px;
+    --r-s: 10px;
     --gap: 16px;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --ground: #0E1310; --surface: #161D19; --surface-2: #1D2621;
-      --ink: #E6EBE6; --ink-2: #A3AEA7; --ink-3: #8A968F;
-      --rule: #29332D; --rule-soft: #222B26;
-      --accent: #63BF9B; --accent-ink: #0E1310; --accent-wash: #1B2E26;
-      --good: #4FB477; --warn: #C79A3E; --crit: #D9756B; --off: #8A968F; --focus: #63BF9B;
+      --ground: #1A2028; --surface: #232B35; --surface-2: #29323D;
+      --ink: #F1EBE4; --ink-2: #A3AEBA; --ink-3: #8A94A0; --taupe: #9AA3AE;
+      --rule: #37414D; --rule-soft: #2E3743;
+      --accent: #C9645C; --accent-ink: #1C232B; --accent-wash: #2B3440;
+      --mark: #D97A72; --mark-wash: #33302F;
+      --good: #5FB88C; --warn: #D6A354; --crit: #E08A80; --off: #8A94A0; --focus: #D97A72;
       --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.45);
       color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
-    --ground: #0E1310; --surface: #161D19; --surface-2: #1D2621;
-    --ink: #E6EBE6; --ink-2: #A3AEA7; --ink-3: #8A968F;
-    --rule: #29332D; --rule-soft: #222B26;
-    --accent: #63BF9B; --accent-ink: #0E1310; --accent-wash: #1B2E26;
-    --good: #4FB477; --warn: #C79A3E; --crit: #D9756B; --off: #8A968F; --focus: #63BF9B;
+    --ground: #1A2028; --surface: #232B35; --surface-2: #29323D;
+    --ink: #F1EBE4; --ink-2: #A3AEBA; --ink-3: #8A94A0; --taupe: #9AA3AE;
+    --rule: #37414D; --rule-soft: #2E3743;
+    --accent: #C9645C; --accent-ink: #1C232B; --accent-wash: #2B3440;
+    --mark: #D97A72; --mark-wash: #33302F;
+    --good: #5FB88C; --warn: #D6A354; --crit: #E08A80; --off: #8A94A0; --focus: #D97A72;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.45);
     color-scheme: dark;
   }
@@ -59,21 +75,21 @@
     font-family: var(--sans); font-size: 16px; line-height: 1.5;
     -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%;
   }
-  h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -.015em; text-wrap: balance; }
-  h1 { font-size: 25px; }
-  h2 { font-size: 18px; }
+  h1, h2, h3 { margin: 0; font-family: var(--serif); font-weight: 600; letter-spacing: -.015em; text-wrap: balance; }
+  h1 { font-size: 27px; line-height: 1.18; }
+  h2 { font-size: 19px; }
   h3 { font-size: 15px; }
   p { margin: 0; }
   button, input, select, textarea { font: inherit; color: inherit; }
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
   input[type="text"], input[type="tel"], input[type="password"], textarea {
-    width: 100%; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 6px;
+    width: 100%; padding: 11px 13px; border: 1px solid var(--rule); border-radius: var(--r-s);
     background: var(--surface); color: var(--ink); outline: none; appearance: none; -webkit-appearance: none;
   }
-  input:focus, textarea:focus { border-color: var(--accent); }
+  input:focus, textarea:focus { border-color: var(--mark); }
   ::placeholder { color: var(--ink-3); opacity: 1; }
   .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .13em; text-transform: uppercase; color: var(--taupe); }
 
   /* ── Layout ────────────────────────────────────────────────────────── */
   .wrap { max-width: 620px; margin: 0 auto; padding: 20px 18px 64px; }
@@ -94,32 +110,44 @@
   /* ── Buttons ───────────────────────────────────────────────────────── */
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    padding: 12px 18px; border-radius: 6px; border: 1px solid var(--accent);
-    background: var(--accent); color: var(--accent-ink); font-weight: 600;
+    padding: 13px 19px; border-radius: var(--r-s); border: 1px solid var(--accent);
+    background: var(--accent); color: var(--accent-ink); font-weight: 600; letter-spacing: .005em;
     cursor: pointer; text-decoration: none; -webkit-tap-highlight-color: transparent;
+    transition: filter .18s ease, transform .16s ease, border-color .18s ease, background .18s ease;
   }
+  .btn:hover { filter: brightness(1.12); }
+  .btn:active { transform: scale(.99); }
   .btn:disabled { opacity: .45; cursor: not-allowed; }
   .btn.ghost { background: transparent; color: var(--ink); border-color: var(--rule); font-weight: 500; }
+  .btn.ghost:hover { filter: none; border-color: var(--ink-3); background: var(--surface-2); }
   .btn.danger { background: transparent; color: var(--crit); border-color: var(--crit); font-weight: 500; }
-  .btn.sm { padding: 8px 12px; font-size: 14px; }
+  .btn.danger:hover { filter: none; background: var(--mark-wash); }
+  .btn.sm { padding: 8px 13px; font-size: 14px; }
   .btn.block { width: 100%; }
   .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
   .linkish { background: none; border: 0; padding: 0; color: var(--ink-3); font-size: 13px; text-decoration: underline; cursor: pointer; }
 
   /* ── Progress ──────────────────────────────────────────────────────── */
   .progress { display: flex; gap: 4px; margin-bottom: 18px; }
-  .progress i { flex: 1; height: 3px; border-radius: 2px; background: var(--rule); }
-  .progress i.on { background: var(--accent); }
+  .progress i { flex: 1; height: 3px; border-radius: 2px; background: var(--rule); transition: background .5s ease; }
+  .progress i.on { background: var(--mark); }
+
+  /* La domanda è la cosa più importante della schermata: qui il serif può
+     prendersi un po' più di spazio. */
+  #q-text { font-size: 22px; line-height: 1.24; }
 
   /* ── Options ───────────────────────────────────────────────────────── */
   .opts { display: grid; gap: 10px; }
   .opt {
-    display: block; width: 100%; text-align: left; padding: 14px 16px;
-    border: 1px solid var(--rule); border-radius: 6px; background: var(--surface-2);
+    display: block; width: 100%; text-align: left; padding: 15px 17px;
+    border: 1px solid var(--rule); border-radius: 12px; background: var(--surface);
     color: var(--ink); cursor: pointer; line-height: 1.4; -webkit-tap-highlight-color: transparent;
+    box-shadow: 0 1px 2px rgba(46, 55, 66, .04);
+    transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .16s ease;
   }
-  .opt:hover { border-color: var(--accent); }
-  .opt.sel { border-color: var(--accent); background: var(--accent-wash); box-shadow: inset 0 0 0 1px var(--accent); }
+  .opt:hover { border-color: var(--mark); }
+  .opt:active { transform: scale(.985); }
+  .opt.sel { border-color: var(--mark); background: var(--mark-wash); box-shadow: inset 0 0 0 1px var(--mark); }
 
   /* ── Elenco schede ─────────────────────────────────────────────────── */
   .rows { display: flex; flex-direction: column; }
@@ -133,8 +161,9 @@
   .row .nm { font-weight: 600; }
   .row .sub { font-size: 13px; color: var(--ink-3); }
   .pill {
-    font-family: var(--mono); font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
-    padding: 4px 8px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-2); white-space: nowrap;
+    font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+    padding: 4px 9px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-2); white-space: nowrap;
   }
   .pill.go { border-color: var(--good); color: var(--good); }
   .pill.care { border-color: var(--warn); color: var(--warn); }
@@ -142,28 +171,47 @@
   .pill.wait { border-style: dashed; }
 
   /* ── Scheda ────────────────────────────────────────────────────────── */
-  .code { font-family: var(--mono); font-size: 20px; letter-spacing: .06em; text-align: center; padding: 14px; border: 1px dashed var(--rule); border-radius: 6px; background: var(--surface-2); word-break: break-all; }
-  .band { padding: 14px 16px; border-radius: 6px; border-left: 3px solid var(--off); background: var(--surface-2); }
+  .code { font-family: var(--mono); font-size: 20px; letter-spacing: .06em; text-align: center; padding: 14px; border: 1px dashed var(--rule); border-radius: var(--r-s); background: var(--surface-2); word-break: break-all; }
+  .band { padding: 15px 17px; border-radius: var(--r-s); border-left: 3px solid var(--off); background: var(--surface-2); }
   .band.go { border-color: var(--good); }
   .band.care { border-color: var(--warn); }
   .band.no { border-color: var(--crit); }
-  .score { font-family: var(--mono); font-size: 30px; font-weight: 600; }
+  .score { font-family: var(--serif); font-size: 36px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
   table.ans { width: 100%; border-collapse: collapse; font-size: 14px; }
   table.ans th, table.ans td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
-  table.ans th { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; }
+  table.ans th { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--taupe); font-weight: 600; }
   table.ans td.p { text-align: right; font-family: var(--mono); white-space: nowrap; }
   .flag { color: var(--crit); font-weight: 600; }
   ul.clean { margin: 0; padding-left: 18px; }
   ul.clean li + li { margin-top: 6px; }
   ol.clean { margin: 0; padding-left: 20px; }
   ol.clean li + li { margin-top: 8px; }
-  details { border: 1px solid var(--rule); border-radius: 6px; padding: 12px 14px; background: var(--surface-2); }
+  details { border: 1px solid var(--rule); border-radius: var(--r-s); padding: 12px 14px; background: var(--surface-2); }
   summary { cursor: pointer; font-weight: 600; font-size: 15px; }
   details[open] summary { margin-bottom: 10px; }
-  .msgbox { font-size: 14px; white-space: pre-wrap; padding: 14px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface-2); max-height: 240px; overflow-y: auto; }
-  .msgbox a { color: var(--accent); word-break: break-all; }
+  .msgbox { font-size: 14px; white-space: pre-wrap; padding: 14px; border: 1px solid var(--rule); border-radius: var(--r-s); background: var(--surface-2); max-height: 240px; overflow-y: auto; }
+  .msgbox a { color: var(--mark); word-break: break-all; }
   .ok { color: var(--good); font-size: 13px; }
   [hidden] { display: none !important; }
+
+  /* ── Movimento ──────────────────────────────────────────────────────────
+     Discreto per scelta: ogni schermata entra con un respiro dal basso e i
+     suoi pezzi a scalare di cinquanta millesimi. Chi risponde in fretta non
+     lo nota; chi guarda, sì. Per chi ha ridotto le animazioni nel telefono
+     sparisce del tutto.
+     ─────────────────────────────────────────────────────────────────────── */
+  @keyframes sali { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+  .entra > * { animation: sali .42s cubic-bezier(.22, .7, .3, 1) both; }
+  .entra > *:nth-child(2) { animation-delay: .05s; }
+  .entra > *:nth-child(3) { animation-delay: .10s; }
+  .entra > *:nth-child(4) { animation-delay: .15s; }
+  .entra > *:nth-child(5) { animation-delay: .20s; }
+  .entra > *:nth-child(6) { animation-delay: .25s; }
+  .entra > *:nth-child(n+7) { animation-delay: .30s; }
+  @media (prefers-reduced-motion: reduce) {
+    .entra > * { animation: none !important; }
+    * { transition: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -795,6 +843,19 @@ var SCHERMATE = ['s-gate', 's-blocco', 's-setup', 's-home', 's-invito', 's-archi
 function mostra(quale) {
   SCHERMATE.forEach(function (s) { el(s).hidden = (s !== quale); });
   window.scrollTo(0, 0);
+  respira(el(quale));
+  /* La scheda è tutta dentro un contenitore: senza questo i suoi riquadri
+     entrerebbero come un blocco solo. */
+  if (quale === 's-scheda') respira(el('s-body'));
+}
+/* Riarma l'animazione d'ingresso: la classe va togliata e rimessa, e in mezzo
+   serve rileggere una misura del nodo, altrimenti il browser accorpa le due
+   modifiche e l'animazione non riparte. */
+function respira(n) {
+  if (!n) return;
+  n.classList.remove('entra');
+  void n.offsetWidth;
+  n.classList.add('entra');
 }
 
 /* ─── MODALITÀ CONTATTO ────────────────────────────────────────────────────
@@ -822,7 +883,7 @@ var locked = false;   /* durante la transizione i tap non contano: due tap rapid
 
 (function () { for (var k = 0; k < Q.length; k++) el('prog').appendChild(document.createElement('i')); })();
 
-function render() {
+function render(anima) {
   if (i < 0) i = 0;
   if (i > Q.length - 1) i = Q.length - 1;
   var q = Q[i];
@@ -841,16 +902,19 @@ function render() {
   var barre = el('prog').children;
   for (var k = 0; k < barre.length; k++) barre[k].className = (k <= i ? 'on' : '');
   el('back').hidden = (i === 0);
+  /* Ogni domanda nuova entra col suo respiro; la scelta appena fatta no,
+     altrimenti la lista sfarfalla sotto il dito. */
+  if (anima !== false) respira(el('s-quiz').querySelector('.card'));
 }
 function scegli(k) {
   if (locked) return;
   ans[i] = k;
   locked = true;
-  render();
+  render(false);
   setTimeout(function () {
     locked = false;
     if (i < Q.length - 1) { i++; render(); } else { concludi(); }
-  }, 180);
+  }, 240);
 }
 el('go').onclick = function () { i = 0; locked = false; mostra('s-quiz'); render(); };
 el('back').onclick = function () { if (!locked && i > 0) { i--; render(); } };
