@@ -546,6 +546,11 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 var SYNC = 'https://script.google.com/macros/s/AKfycbznMU35Q5dD7iDigaENJs676If-yml6WFSIArbu3uwBixYDYuMKq2Rbk8ll-ymB6Iew/exec';
 
+/* La versione del questionario: viaggia con ogni scheda e finisce nel foglio,
+   così una risposta di oggi resta leggibile anche dopo aver cambiato le domande.
+   Cambiala quando cambi le domande, insieme alla tabella in foglio.gs. */
+var VERSIONE_DOMANDE = '2026-09-09';
+
 /* ─── LE OTTO DOMANDE ───────────────────────────────────────────────────────
    p = punti (0-4). ko = la condizione di base che quella risposta fa cadere.
    L'ordine delle opzioni NON è per punteggio: la migliore non sta sempre
@@ -1239,6 +1244,8 @@ function datiScheda(scheda) {
   var v = valuta(scheda.risposte);
   return {
     invito: scheda.id,
+    versione: VERSIONE_DOMANDE,
+    scelte: scheda.risposte.map(function (k) { return k + 1; }),   /* quale: 1, 2 o 3 */
     punti: scheda.risposte.map(function (k, qi) { return Q[qi].o[k].p; }),
     punteggio: v.tot,
     esito: v.titolo,
