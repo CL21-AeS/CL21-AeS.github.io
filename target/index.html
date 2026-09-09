@@ -169,6 +169,32 @@
 <body>
 <div class="wrap">
 
+<!-- ══════════════ 0. LA PROVA È SU INVITO ══════════════ -->
+<section id="s-gate" hidden class="stack">
+  <div class="card stack">
+    <div>
+      <p class="eyebrow">Target</p>
+      <h1>Serve il tuo link personale</h1>
+    </div>
+    <p class="muted">Questa app è in prova con un gruppo ristretto di partner, e ognuno ha
+    un suo link. Quello che hai aperto è l'indirizzo generico: da qui non si entra.</p>
+    <p class="small muted">Apri il link che ti è stato mandato — è lo stesso indirizzo con un
+    codice in fondo — e sei dentro. Se non lo trovi più, chiedilo a chi ti ha proposto la prova.</p>
+  </div>
+</section>
+
+<!-- ══════════════ 0b. ACCESSO FERMATO ══════════════ -->
+<section id="s-blocco" hidden class="stack">
+  <div class="card stack">
+    <div>
+      <p class="eyebrow">Target</p>
+      <h1 id="b-titolo">Accesso non attivo</h1>
+    </div>
+    <p class="muted" id="b-testo"></p>
+    <p class="tiny">Quello che hai già in archivio su questo dispositivo non è stato toccato.</p>
+  </div>
+</section>
+
 <!-- ══════════════ 1. PRIMO AVVIO: IL TUO PROFILO ══════════════ -->
 <section id="s-setup" hidden class="stack">
   <div class="card stack">
@@ -363,9 +389,12 @@
   </div>
   <div class="card stack">
     <h2>Passarla a un altro partner</h2>
-    <p class="small muted">Girargli lo stesso link basta e avanza. Al primo avvio lui mette il suo nome,
-    il suo numero e questo stesso indirizzo — quello che gli hai mandato — e da quel momento lavora
-    sulla <em>sua</em> copia.</p>
+    <p class="small muted">Al primo avvio il partner mette il suo nome e il suo numero, e da quel
+    momento lavora sulla <em>sua</em> copia.</p>
+    <p class="small muted" id="x-nota-prova" hidden><strong>Durante la prova sul campo non si passa
+    di mano.</strong> Ogni partner ha un link personale, che vale solo per lui e solo su due
+    dispositivi: se giri il tuo, all'altro l'app si rifiuta di partire e la cosa si vede.
+    I link nuovi li dà chi coordina la prova.</p>
     <div class="msgbox" id="x-link"></div>
     <div class="btn-row">
       <button class="btn ghost" id="x-copia">Copia il link da girare</button>
@@ -389,6 +418,13 @@
     <p class="tiny">Ricordagli la copia di sicurezza: dall'archivio, «Salva la copia».
     Se svuota il browser senza averla fatta, le sue schede sono perse.</p>
   </div>
+  <div class="card stack" id="x-prova" hidden>
+    <h2>La prova sul campo</h2>
+    <p class="small muted" id="x-prova-testo"></p>
+    <p class="tiny">Se l'app si fermasse dicendo che l'accesso non è attivo, questi sono i dati
+    da riferire a chi ti ha dato il link.</p>
+  </div>
+
   <div class="card stack">
     <h2>Ricominciare da zero</h2>
     <p class="small muted">Cancella da questo dispositivo il tuo nome, il tuo numero, l'indirizzo
@@ -497,6 +533,18 @@
    dati di partner diversi non possono mescolarsi: non vengono mai messi
    insieme da nessuna parte.
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   IL FOGLIO DELLA PROVA SUL CAMPO
+
+   Incolla qui sotto l'indirizzo /exec dell'App Web di Google (le istruzioni
+   stanno in foglio.gs). Con questa riga piena l'app chiede al foglio se il
+   codice del partner è abilitato, e gli manda le registrazioni d'uso.
+
+   Lasciandola VUOTA l'app funziona come prima: nessun codice, nessun controllo,
+   nessuna registrazione. È il modo di provarla senza il foglio.
+   ═══════════════════════════════════════════════════════════════════════════ */
+var SYNC = 'https://script.google.com/macros/s/AKfycbznMU35Q5dD7iDigaENJs676If-yml6WFSIArbu3uwBixYDYuMKq2Rbk8ll-ymB6Iew/exec';
 
 /* ─── LE OTTO DOMANDE ───────────────────────────────────────────────────────
    p = punti (0-4). ko = la condizione di base che quella risposta fa cadere.
@@ -625,7 +673,7 @@ function lampo(id) {
    ─────────────────────────────────────────────────────────────────────────── */
 var CHIAVE = 'target.v1';
 var CHIAVE_VECCHIA = 'ottodomande.v1';   /* quando l'app si chiamava Otto Domande */
-var memoria = { profilo: null, schede: [] };   /* copia in RAM: l'app funziona anche senza salvataggio */
+var memoria = { profilo: null, schede: [], accesso: null, coda: [] };   /* copia in RAM: l'app funziona anche senza salvataggio */
 var salvataggioOk = true;
 
 function carica() {
@@ -633,7 +681,12 @@ function carica() {
     var raw = localStorage.getItem(CHIAVE) || localStorage.getItem(CHIAVE_VECCHIA);
     if (raw) {
       var d = JSON.parse(raw);
-      memoria = { profilo: d.profilo || null, schede: Array.isArray(d.schede) ? d.schede : [] };
+      memoria = {
+        profilo: d.profilo || null,
+        schede: Array.isArray(d.schede) ? d.schede : [],
+        accesso: d.accesso || null,
+        coda: Array.isArray(d.coda) ? d.coda : []
+      };
     }
   } catch (e) { salvataggioOk = false; }
 }
@@ -737,7 +790,7 @@ function fascia(a) {
 }
 
 /* ─── NAVIGAZIONE ─────────────────────────────────────────────────────────── */
-var SCHERMATE = ['s-setup', 's-home', 's-invito', 's-archivio', 's-scheda', 's-leggi', 's-aiuto', 's-intro', 's-quiz', 's-done'];
+var SCHERMATE = ['s-gate', 's-blocco', 's-setup', 's-home', 's-invito', 's-archivio', 's-scheda', 's-leggi', 's-aiuto', 's-intro', 's-quiz', 's-done'];
 function mostra(quale) {
   SCHERMATE.forEach(function (s) { el(s).hidden = (s !== quale); });
   window.scrollTo(0, 0);
@@ -753,7 +806,9 @@ var INV = (function () {
     sponsor: (p.get('s') || '').trim(),
     tel: soloCifre(p.get('t')),
     id: (p.get('i') || '').trim().toUpperCase(),
-    risultato: (p.get('r') || '').trim()
+    risultato: (p.get('r') || '').trim(),
+    partner: (p.get('p') || '').trim().toUpperCase(),
+    nomePartner: (p.get('n') || '').trim()
   };
 })();
 var modoContatto = !!INV.contatto;
@@ -869,6 +924,15 @@ el('h-archivio').onclick = function () { apriArchivio(); };
 el('h-leggi').onclick = function () { el('l-code').value = ''; el('l-err').hidden = true; el('l-assoc').hidden = true; mostra('s-leggi'); };
 el('h-aiuto').onclick = function () { apriAiuto(); };
 function apriAiuto() {
+  var pr = memoria.accesso;
+  el('x-prova').hidden = !SYNC;
+  el('x-nota-prova').hidden = !SYNC;
+  if (SYNC) {
+    el('x-prova-testo').textContent = 'Codice ' + ((pr && pr.codice) || '—') +
+      ' · dispositivo ' + dispositivo() +
+      ((pr && pr.dispositivi) ? ' · ' + pr.dispositivi + ' di 2 abilitati' : '') +
+      ((memoria.coda && memoria.coda.length) ? ' · ' + memoria.coda.length + ' registrazioni da mandare' : '');
+  }
   var b = linkBase();
   el('x-link').textContent = b || 'L\'indirizzo si riconosce da sé quando apri l\'app dal browser. Se non è comparso, lo puoi scrivere qui sotto.';
   el('x-edit').hidden = true;
@@ -930,6 +994,7 @@ el('c-prepara').onclick = function () {
   var scheda = { id: nuovoId(), nome: completo, creato: oggi(), risposte: null, nota: '' };
   memoria.schede.unshift(scheda);
   salva();
+  registra_evento('invito', { invito: scheda.id });
   el('c-nome').value = ''; el('c-cognome').value = '';
   apriInvito(scheda);
 };
@@ -1168,14 +1233,30 @@ function armaElimina(s) {
 /* ─── MODALITÀ PARTNER: LEGGI UN CODICE ───────────────────────────────────── */
 var inSospeso = null;   /* risposte decodificate in attesa di un nome */
 
+function datiScheda(scheda) {
+  /* Quello che va nel foglio: gli otto punteggi, l'esito, l'identificativo
+     dell'invito. Il nome del contatto resta qui e non parte. */
+  var v = valuta(scheda.risposte);
+  return {
+    invito: scheda.id,
+    punti: scheda.risposte.map(function (k, qi) { return Q[qi].o[k].p; }),
+    punteggio: v.tot,
+    esito: v.titolo,
+    ko: v.ko.join(' '),
+    zeri: v.zeri.map(function (qi) { return qi + 1; }).join(' '),
+    codice: codifica(scheda.risposte, scheda.id)
+  };
+}
 function registra(risposte, id) {
   /* Aggancia le risposte all'invito che le aspettava. Idempotente: rileggere
      lo stesso codice riapre la scheda, non ne crea una seconda. */
   var scheda = id ? memoria.schede.filter(function (x) { return x.id === id; })[0] : null;
   if (!scheda) return null;
+  var nuova = !scheda.letto;
   scheda.risposte = risposte;
-  if (!scheda.letto) scheda.letto = oggi();
+  if (nuova) scheda.letto = oggi();
   salva();
+  if (nuova) registra_evento('scheda', datiScheda(scheda));
   return scheda;
 }
 function chiediDiChiSono(risposte) {
@@ -1192,6 +1273,7 @@ function chiediDiChiSono(risposte) {
       '<span class="sub">invito del ' + dataIt(x.creato) + '</span></span><span class="pill">aggancia</span>';
     b.onclick = function () {
       x.risposte = inSospeso; x.letto = oggi(); salva();
+      registra_evento('scheda', datiScheda(x));
       inSospeso = null; el('l-assoc').hidden = true; apriScheda(x.id);
     };
     box.appendChild(b);
@@ -1222,6 +1304,7 @@ el('l-salva').onclick = function () {
   scheda.letto = oggi();
   if (!esistente) memoria.schede.unshift(scheda);
   salva();
+  registra_evento('scheda', datiScheda(scheda));
   inSospeso = null;
   el('l-assoc').hidden = true;
   apriScheda(scheda.id);
@@ -1237,7 +1320,7 @@ el('x-reset').onclick = function () {
 };
 el('x-reset2').onclick = function () {
   try { localStorage.removeItem(CHIAVE); localStorage.removeItem(CHIAVE_VECCHIA); } catch (e) {}
-  memoria = { profilo: null, schede: [] };
+  memoria = { profilo: null, schede: [], accesso: null, coda: [] };
   location.replace(location.href.split('#')[0]);
 };
 
@@ -1250,7 +1333,8 @@ el('a-impgo').onclick = function () {
   try {
     var d = JSON.parse(el('a-imptxt').value);
     if (!d || !Array.isArray(d.schede)) throw new Error('forma');
-    memoria = { profilo: d.profilo || memoria.profilo, schede: d.schede };
+    memoria = { profilo: d.profilo || memoria.profilo, schede: d.schede,
+                accesso: memoria.accesso, coda: memoria.coda };
     salva();
     el('a-imp').hidden = true;
     apriArchivio();
@@ -1269,6 +1353,95 @@ if (window.claude && typeof window.claude.use === 'function') {
         .then(function () { lampo('a-ok'); }, function () {});
     };
   }, function () {});
+}
+
+/* ─── IL FOGLIO: CONTROLLO DEL CODICE E REGISTRAZIONI ──────────────────────
+   Parla solo il dispositivo del partner. La pagina del contatto non chiama
+   niente e non manda niente: le sue risposte passano dal suo WhatsApp al
+   telefono dello sponsor, e nel foglio arrivano senza il suo nome.
+   ─────────────────────────────────────────────────────────────────────────── */
+var CHIAVE_DISP = 'target.dispositivo';   /* fuori dall'archivio: «Svuota tutto» non
+                                             deve bruciare uno dei due slot */
+function dispositivo() {
+  try {
+    var d = localStorage.getItem(CHIAVE_DISP);
+    if (!d) {
+      d = 'd' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+      localStorage.setItem(CHIAVE_DISP, d);
+    }
+    return d;
+  } catch (e) { return 'd-senza-memoria'; }
+}
+function idEvento() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+function inProva() { return !!SYNC && !modoContatto; }
+
+function registra_evento(tipo, extra) {
+  if (!inProva()) return;
+  var ev = { id: idEvento(), quando: new Date().toISOString(), tipo: tipo };
+  if (extra) Object.keys(extra).forEach(function (k) { ev[k] = extra[k]; });
+  memoria.coda.push(ev);
+  if (memoria.coda.length > 200) memoria.coda = memoria.coda.slice(-200);
+  salva();
+  sincronizza();
+}
+
+var inCorso = false, attese = [];
+/* Chi aspetta l'esito viene messo in coda, non scartato: l'evento d'avvio e la
+   verifica del codice partono insieme, e prima questa scartava il verdetto
+   perché una chiamata era già in volo — un codice bloccato passava. */
+function finisci(out) {
+  inCorso = false;
+  var a = attese; attese = [];
+  a.forEach(function (f) { try { f(out); } catch (e) {} });
+}
+function sincronizza(poi) {
+  if (poi) attese.push(poi);
+  if (!inProva()) { finisci(null); return; }
+  var codice = memoria.accesso && memoria.accesso.codice;
+  if (!codice) { finisci(null); return; }
+  if (inCorso) return;
+  inCorso = true;
+  var mandati = memoria.coda.slice(0, 50);
+  fetch(SYNC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },   /* evita il preflight CORS */
+    body: JSON.stringify({ codice: codice, dispositivo: dispositivo(), eventi: mandati })
+  }).then(function (r) { return r.json(); }).then(function (out) {
+    if (!out) { finisci(null); return; }
+    if (out.ok) {
+      /* Andati: si tolgono dalla coda solo quelli davvero mandati. */
+      memoria.coda = memoria.coda.slice(mandati.length);
+      memoria.accesso = { codice: codice, stato: 'attivo', nome: out.nome || '',
+                          quando: new Date().toISOString(), dispositivi: out.dispositivi };
+      salva();
+      finisci(out);
+      return;
+    }
+    if (out.riprovabile) { finisci(null); return; }   /* foglio occupato: non è un verdetto */
+    memoria.accesso = { codice: codice, stato: out.motivo || 'bloccato',
+                        nome: out.nome || '', quando: new Date().toISOString() };
+    salva();
+    finisci(out);
+  }).catch(function () {
+    /* Rete assente, quota, script in aggiornamento: non è un verdetto.
+       Vale l'ultimo esito conosciuto e la coda resta lì per il prossimo giro. */
+    finisci(null);
+  });
+}
+
+var MOTIVI = {
+  bloccato: ['Accesso sospeso', 'Il tuo accesso alla prova è stato sospeso. Se pensi che sia un errore, scrivi a chi ti ha dato il link.'],
+  sconosciuto: ['Link non riconosciuto', 'Questo codice non risulta fra quelli della prova. Controlla di aver aperto per intero il link che ti è stato mandato — se si è spezzato in chat, l\'ultima parte potrebbe mancare.'],
+  'troppi dispositivi': ['Già in uso su due dispositivi', 'Questo codice è abilitato su due dispositivi, che è il massimo. Se hai cambiato telefono o svuotato il browser, chiedi di liberare uno spazio.'],
+  'senza codice': ['Serve il tuo link personale', 'Apri il link che ti è stato mandato, con il codice in fondo.']
+};
+function mostraBlocco(motivo) {
+  var m = MOTIVI[motivo] || MOTIVI.bloccato;
+  el('b-titolo').textContent = m[0];
+  el('b-testo').textContent = m[1];
+  mostra('s-blocco');
 }
 
 /* ─── IL LINK DELLE RISPOSTE ────────────────────────────────────────────────
@@ -1296,6 +1469,23 @@ window.addEventListener('hashchange', function () {
 
 /* ─── AVVIO ───────────────────────────────────────────────────────────────── */
 carica();
+
+/* Il codice della prova arriva dal link personale e resta su questo dispositivo.
+   Lo togliamo subito dall'indirizzo: così un pezzo di schermata condiviso non
+   regala l'accesso a nessuno. */
+if (INV.partner && !modoContatto) {
+  memoria.accesso = memoria.accesso && memoria.accesso.codice === INV.partner
+    ? memoria.accesso
+    : { codice: INV.partner, stato: 'da verificare', nome: '', quando: null };
+  if (INV.nomePartner && !memoria.profilo) {
+    /* Il nome scritto nel foglio arriva già compilato: una casella in meno al
+       primo avvio. Resta modificabile — è un comodo, non un'identità. */
+    el('p-nome').value = INV.nomePartner;
+  }
+  salva();
+  try { history.replaceState(null, '', location.href.split('#')[0]); } catch (e) {}
+}
+
 /* Se la pagina è aperta per conto suo (non dentro una cornice), l'indirizzo che
    vediamo è quello vero: lo prendiamo senza chiedere niente a nessuno. Dentro
    una cornice invece non è affidabile, e allora lo chiediamo. */
@@ -1316,12 +1506,39 @@ if (modoContatto) {
     ? 'Le tue risposte sono pronte. Mandale a ' + INV.sponsor + ' e vi sentite: se ha senso vedersi, ti spiega come funziona nel dettaglio; se secondo lui non è cosa tua, te lo dice con la stessa sincerità con cui hai risposto.'
     : el('done-txt').textContent;
   mostra('s-intro');
-} else if (INV.risultato) {
-  importaRisultato(INV.risultato);
-} else if (memoria.profilo) {
-  vaiHome();
+} else if (SYNC && !(memoria.accesso && memoria.accesso.codice)) {
+  /* Prova su invito: l'indirizzo generico non apre niente. */
+  mostra('s-gate');
+} else if (SYNC && memoria.accesso && MOTIVI[memoria.accesso.stato]) {
+  /* Ultimo verdetto conosciuto: fermo. Ricontrolliamo comunque, perché uno
+     sblocco nel foglio deve poter riaprire l'app senza altri passaggi. */
+  mostraBlocco(memoria.accesso.stato);
+  sincronizza(function (out) { if (out && out.ok) location.reload(); });
 } else {
-  mostra('s-setup');
+  partenzaNormale();
+  if (SYNC) {
+    /* Il controllo non fa aspettare nessuno: l'app parte con l'ultimo esito
+       conosciuto e si ferma solo se il foglio risponde che è il caso. */
+    registraAvvio();
+    sincronizza(function (out) {
+      if (out && !out.ok && !out.riprovabile) mostraBlocco(out.motivo || 'bloccato');
+    });
+  }
+}
+
+function partenzaNormale() {
+  if (INV.risultato) { importaRisultato(INV.risultato); }
+  else if (memoria.profilo) { vaiHome(); }
+  else { mostra('s-setup'); }
+}
+
+/* Un avvio al giorno per dispositivo: serve a sapere chi la usa, non a contare
+   quante volte apre la pagina. */
+function registraAvvio() {
+  var g = oggi();
+  if (memoria.accesso && memoria.accesso.avvio === g) { sincronizza(); return; }
+  if (memoria.accesso) memoria.accesso.avvio = g;
+  registra_evento('avvio', {});
 }
 </script>
 </body>
