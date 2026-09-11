@@ -82,9 +82,15 @@
   p { margin: 0; }
   button, input, select, textarea { font: inherit; color: inherit; }
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
-  input[type="text"], input[type="tel"], input[type="password"], textarea {
+  input[type="text"], input[type="tel"], input[type="password"], textarea, select {
     width: 100%; padding: 11px 13px; border: 1px solid var(--rule); border-radius: var(--r-s);
     background: var(--surface); color: var(--ink); outline: none; appearance: none; -webkit-appearance: none;
+  }
+  select {
+    cursor: pointer;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%), linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+    background-position: calc(100% - 18px) calc(50% + 1px), calc(100% - 13px) calc(50% + 1px);
+    background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
   }
   input:focus, textarea:focus { border-color: var(--mark); }
   ::placeholder { color: var(--ink-3); opacity: 1; }
@@ -290,6 +296,19 @@
           <input type="text" id="c-cognome" placeholder="Rossi">
         </div>
       </div>
+      <div class="field">
+        <label class="small muted" for="c-giorni">Per quanti giorni resta attivo il link</label>
+        <select id="c-giorni">
+          <option value="3">3 giorni</option>
+          <option value="7">7 giorni</option>
+          <option value="14" selected>14 giorni</option>
+          <option value="30">30 giorni</option>
+          <option value="60">60 giorni</option>
+          <option value="0">Senza scadenza</option>
+        </select>
+        <p class="tiny">Passata la scadenza il link non si apre più. In ogni caso vale una volta
+        sola: quando ti ha risposto, si chiude da sé.</p>
+      </div>
       <button class="btn block" id="c-prepara">Prepara l'invito</button>
       <p class="tiny" id="c-err" hidden>Scrivi almeno il nome del contatto.</p>
     </div>
@@ -320,6 +339,7 @@
     </div>
     <p class="small muted">Manda questo messaggio al contatto. Le otto domande si apriranno
     già intestate a lui, e le risposte torneranno a te.</p>
+    <p class="small muted" id="i-scade"></p>
     <div class="band no" id="i-warn" hidden>
       <p class="small"><strong>Manca l'indirizzo dell'app.</strong> Senza quello il link nel messaggio
       non porta da nessuna parte. Copialo dalla barra del browser e incollalo qui sotto:
@@ -438,6 +458,23 @@
     </ol>
   </div>
   <div class="card stack">
+    <h2>Chiudere un link già mandato</h2>
+    <p class="small muted">Ogni invito ha tre serrature, e le prime due le decidi tu quando lo prepari:</p>
+    <ol class="clean small">
+      <li><strong>La scadenza.</strong> Scegli quanti giorni deve restare attivo. È scritta dentro
+      il link, quindi vale anche se il contatto è senza rete. Dalla sua scheda puoi allungarla o
+      accorciarla anche dopo, senza rimandargli niente.</li>
+      <li><strong>Il blocco.</strong> Dalla scheda del contatto, «Blocca il link»: alla prossima
+      volta che lo apre non si apre più. Serve che il suo telefono raggiunga il foglio in quel
+      momento — se è senza campo proprio allora, gli si apre lo stesso.</li>
+      <li><strong>Una volta sola.</strong> Appena ti manda le risposte, l'invito è consumato: se
+      riapre il link, o se lo gira a un amico, non funziona.</li>
+    </ol>
+    <p class="tiny">Anche eliminare un invito che non ha ancora risposto lo blocca: un link buono
+    per una scheda che non esiste più non serve a nessuno.</p>
+  </div>
+
+  <div class="card stack">
     <h2>L'indirizzo dell'app</h2>
     <p class="small muted">È la prima metà dei link che mandi ai contatti. L'app la riconosce da sé;
     qui puoi correggerla se avesse preso quella sbagliata.</p>
@@ -492,6 +529,16 @@
     nessun motivo suo, zero tempo, «se non paga subito non mi interessa». La quarta — i 15-55 €
     oggi non ci sono — non è un no alla persona ma un «non ora».</p>
   </div>
+</section>
+
+<!-- ══════════════ 7b. CONTATTO: LINK CHIUSO ══════════════ -->
+<section id="s-chiuso" hidden class="card stack">
+  <div>
+    <p class="eyebrow">Target</p>
+    <h1 id="ch-titolo">Questo link non è più attivo</h1>
+  </div>
+  <p class="muted" id="ch-testo"></p>
+  <p class="small muted" id="ch-chiedi"></p>
 </section>
 
 <!-- ══════════════ 8. CONTATTO: INTRO ══════════════ -->
@@ -743,14 +790,39 @@ function salva() {
   try { localStorage.setItem(CHIAVE, JSON.stringify(memoria)); }
   catch (e) { salvataggioOk = false; }
 }
+var ALFABETO = 'ACDEFGHJKLMNPQRTUVWXY2346789';   /* niente caratteri che si confondono */
+/* Sei caratteri, non quattro: da quando il foglio deve poter riconoscere un
+   invito senza sapere di quale partner sia, l'identificativo deve essere unico
+   fra tutti i partner, non solo dentro un archivio. Quelli vecchi a quattro
+   continuano a funzionare. */
 function nuovoId() {
-  var alfabeto = 'ACDEFGHJKLMNPQRTUVWXY2346789';   /* niente caratteri che si confondono */
   var s = '', usati = memoria.schede.map(function (x) { return x.id; });
   do {
     s = '';
-    for (var k = 0; k < 4; k++) s += alfabeto.charAt(Math.floor(Math.random() * alfabeto.length));
+    for (var k = 0; k < 6; k++) s += ALFABETO.charAt(Math.floor(Math.random() * ALFABETO.length));
   } while (usati.indexOf(s) > -1);
   return s;
+}
+
+/* ─── SCADENZA DEL LINK ─────────────────────────────────────────────────────
+   La data di scadenza viaggia dentro il link, così vale anche quando il
+   telefono del contatto è senza rete. Le due lettere di firma non la rendono
+   inviolabile — chi sa leggere un indirizzo può provare a cambiarla — ma
+   fermano la modifica fatta a occhio, e comunque il foglio ha l'ultima parola
+   ogni volta che lo si può raggiungere.
+   ─────────────────────────────────────────────────────────────────────────── */
+function scadenzaDa(creato, giorni) {
+  if (!giorni) return '';                       /* zero = senza scadenza */
+  var d = new Date(creato + 'T12:00:00');
+  if (isNaN(d.getTime())) d = new Date();
+  d.setDate(d.getDate() + Number(giorni));
+  return d.toISOString().slice(0, 10);
+}
+function compatta(iso) { return String(iso || '').slice(0, 10).replace(/-/g, ''); }
+function firmaInvito(id, aaaammgg) {
+  var s = String(id) + '|' + String(aaaammgg), n = 7;
+  for (var k = 0; k < s.length; k++) n = (n * 31 + s.charCodeAt(k)) % 99991;
+  return ALFABETO.charAt(n % 28) + ALFABETO.charAt(Math.floor(n / 28) % 28);
 }
 
 /* ─── CODICE ESITO ─────────────────────────────────────────────────────────
@@ -771,7 +843,7 @@ function decodifica(txt) {
   /* Cerca il codice DENTRO qualsiasi testo: su WhatsApp non si può selezionare
      un pezzo di messaggio, quindi si incolla tutto il messaggio o tutto il link. */
   var m = String(txt || '').toUpperCase()
-    .match(/CL21-([1-3]{8})-([1-9])(?:-([A-Z0-9]{4}))?/);
+    .match(/CL21-([1-3]{8})-([1-9])(?:-([A-Z0-9]{4,8}))?/);
   if (!m || controllo(m[1]) !== m[2]) return null;
   return {
     risposte: m[1].split('').map(function (c) { return parseInt(c, 10) - 1; }),
@@ -832,6 +904,13 @@ function valuta(a) {
   }
   return { tot: tot, band: band, titolo: titolo, azione: azione, ko: ko, zeri: zeri, riserve: riserve, deboli: zeri };
 }
+/* Com'è messo un invito che non ha ancora risposta. */
+function etichettaInvito(s) {
+  if (s.risposto) return { pill: 'go', testo: 'ha risposto' };
+  if (s.bloccato) return { pill: 'no', testo: 'bloccato' };
+  if (s.scade && compatta(oggi()) > compatta(s.scade)) return { pill: 'no', testo: 'scaduto' };
+  return { pill: 'wait', testo: 'in attesa' };
+}
 function fascia(a) {
   if (!valide(a)) return { pill: 'wait', testo: 'vecchia versione' };
   var v = valuta(a);
@@ -839,7 +918,7 @@ function fascia(a) {
 }
 
 /* ─── NAVIGAZIONE ─────────────────────────────────────────────────────────── */
-var SCHERMATE = ['s-gate', 's-blocco', 's-setup', 's-home', 's-invito', 's-archivio', 's-scheda', 's-leggi', 's-aiuto', 's-intro', 's-quiz', 's-done'];
+var SCHERMATE = ['s-gate', 's-blocco', 's-setup', 's-home', 's-invito', 's-archivio', 's-scheda', 's-leggi', 's-aiuto', 's-chiuso', 's-intro', 's-quiz', 's-done'];
 function mostra(quale) {
   SCHERMATE.forEach(function (s) { el(s).hidden = (s !== quale); });
   window.scrollTo(0, 0);
@@ -868,6 +947,8 @@ var INV = (function () {
     sponsor: (p.get('s') || '').trim(),
     tel: soloCifre(p.get('t')),
     id: (p.get('i') || '').trim().toUpperCase(),
+    scade: (p.get('e') || '').trim(),          /* aaaammgg: la scadenza viaggia nel link */
+    firma: (p.get('k') || '').trim().toUpperCase(),
     risultato: (p.get('r') || '').trim(),
     partner: (p.get('p') || '').trim().toUpperCase(),
     nomePartner: (p.get('n') || '').trim()
@@ -953,7 +1034,11 @@ function aggiornaInvio() {
   } else { a.hidden = true; }
 }
 el('libero').addEventListener('input', aggiornaInvio);
-el('copy').onclick = function () { copia(messaggioContatto(), function () { lampo('copy-ok'); }); };
+el('copy').onclick = function () { segnalaFatto(); copia(messaggioContatto(), function () { lampo('copy-ok'); }); };
+/* Il segnale «finito» parte quando le risposte escono davvero — non appena
+   compare l'ultima schermata: se il contatto ricaricasse la pagina prima di
+   mandarle, si ritroverebbe un link già consumato e le risposte perse. */
+el('wa').addEventListener('click', segnalaFatto);
 
 /* ─── MODALITÀ PARTNER: PROFILO ───────────────────────────────────────────── */
 el('p-salva').onclick = function () {
@@ -983,6 +1068,7 @@ function vaiHome() {
     ? (fatte + (fatte === 1 ? ' scheda letta' : ' schede lette') + ' · ' + att + ' in attesa di risposta')
     : 'Nessuna scheda ancora.';
   el('h-nostore').hidden = salvataggioOk;
+  el('c-giorni').value = giorniProposti();
   mostra('s-home');
 }
 el('h-archivio').onclick = function () { apriArchivio(); };
@@ -1051,13 +1137,27 @@ el('c-prepara').onclick = function () {
   if (!nome) { el('c-err').hidden = false; return; }
   el('c-err').hidden = true;
   var completo = (nome + ' ' + cognome).trim();
-  var scheda = { id: nuovoId(), nome: completo, creato: oggi(), risposte: null, nota: '' };
+  var giorni = Number(el('c-giorni').value);
+  var scheda = {
+    id: nuovoId(), nome: completo, creato: oggi(), risposte: null, nota: '',
+    giorni: giorni, scade: scadenzaDa(oggi(), giorni), bloccato: false
+  };
   memoria.schede.unshift(scheda);
+  ricordaGiorni(giorni);
   salva();
-  registra_evento('invito', { invito: scheda.id });
+  registra_evento('invito', { invito: scheda.id, scade: scheda.scade, giorni: giorni });
   el('c-nome').value = ''; el('c-cognome').value = '';
   apriInvito(scheda);
 };
+/* La durata scelta l'ultima volta diventa la proposta della volta dopo. */
+function ricordaGiorni(g) {
+  if (!memoria.profilo) memoria.profilo = { nome: '', tel: '', base: '' };
+  memoria.profilo.giorni = g;
+}
+function giorniProposti() {
+  var g = memoria.profilo && memoria.profilo.giorni;
+  return (g === 0 || g) ? String(g) : '14';
+}
 
 function linkInvito(scheda) {
   var base = linkBase();
@@ -1072,6 +1172,11 @@ function linkInvito(scheda) {
   if (pr.nome) p.push('s=' + encodeURIComponent(pr.nome));
   if (pr.tel) p.push('t=' + encodeURIComponent(pr.tel));
   p.push('i=' + scheda.id);
+  if (scheda.scade) {
+    var e = compatta(scheda.scade);
+    p.push('e=' + e);
+    p.push('k=' + firmaInvito(scheda.id, e));
+  }
   return base + '#' + p.join('&');
 }
 function messaggioInvito(scheda) {
@@ -1089,6 +1194,11 @@ function messaggioInvito(scheda) {
 function apriInvito(scheda) {
   el('i-nome').textContent = scheda.nome;
   el('i-primo').textContent = scheda.nome.split(' ')[0];
+  el('i-scade').textContent = scheda.bloccato
+    ? 'Questo link è bloccato: al contatto non si apre. Puoi riaprirlo dalla sua scheda.'
+    : (scheda.scade
+        ? 'Il link resta attivo fino al ' + dataIt(scheda.scade) + ', e si chiude da sé appena ti risponde.'
+        : 'Il link non ha scadenza: si chiude da sé appena ti risponde, oppure quando lo blocchi tu.');
 
   var manca = !linkBase();
   el('i-warn').hidden = !manca;
@@ -1125,7 +1235,7 @@ function apriArchivio() {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'row';
-    var f = s.risposte ? fascia(s.risposte) : { pill: 'wait', testo: 'in attesa' };
+    var f = s.risposte ? fascia(s.risposte) : etichettaInvito(s);
     b.innerHTML = '<span class="grow"><span class="nm">' + esc(s.nome) + '</span><br>' +
       '<span class="sub">' + dataIt(s.creato) + ' · codice ' + esc(s.id) + '</span></span>' +
       '<span class="pill ' + f.pill + '">' + esc(f.testo) + '</span>';
@@ -1144,19 +1254,52 @@ function apriScheda(id) {
 
   if (!s.risposte) {
     out.push('<div class="card stack">' +
-      '<div><p class="eyebrow">In attesa di risposta</p><h1>' + esc(s.nome) + '</h1></div>' +
-      '<p class="small muted">Invito preparato il ' + dataIt(s.creato) + '. Quando ti manda il codice, ' +
-      'aprilo da «Leggi un codice»: si aggancia da solo a questa scheda.</p>' +
+      '<div><p class="eyebrow">' + (s.risposto ? 'Ha risposto' : (s.bloccato ? 'Link bloccato' : 'In attesa di risposta')) + '</p><h1>' + esc(s.nome) + '</h1></div>' +
+      '<p class="small muted">' + (s.risposto
+        ? 'Ha compilato le domande e ti ha mandato le risposte: aprile con «Leggi il codice». Se il messaggio non ti è arrivato, richiediglielo — le risposte ce le ha lui, qui non passano.'
+        : 'Invito preparato il ' + dataIt(s.creato) + '. Quando ti manda il codice, ' +
+          'aprilo da «Leggi un codice»: si aggancia da solo a questa scheda.') + '</p>' +
       '<div class="btn-row">' +
         '<button class="btn" id="sc-rimanda">Rimanda l\'invito</button>' +
         '<button class="btn ghost" id="sc-leggi">Leggi il codice</button>' +
       '</div>' +
       '<div class="btn-row"><button class="btn danger sm" id="sc-del">Elimina</button>' +
-      '<button class="btn danger sm" id="sc-del2" hidden>Confermi?</button></div>' +
+      '<button class="btn danger sm" id="sc-del2" hidden>Confermi? Il link si blocca</button></div>' +
     '</div>');
+
+    /* Il link: quanto dura, e il pulsante per chiuderlo. */
+    out.push('<div class="card stack">' +
+      '<h2>Il link che gli hai mandato</h2>' +
+      '<p class="small muted" id="sc-statolink">' + esc(statoLink(s)) + '</p>' +
+      '<div class="field"><label class="small muted" for="sc-giorni">Cambia la scadenza</label>' +
+      '<select id="sc-giorni">' + opzioniGiorni(s) + '</select></div>' +
+      '<div class="btn-row"><button class="btn ghost sm" id="sc-giorni-salva">Salva la scadenza</button>' +
+      '<span class="ok" id="sc-giorni-ok" hidden>Fatto.</span></div>' +
+      '<div class="btn-row">' +
+        (s.bloccato
+          ? '<button class="btn ghost" id="sc-sblocca">Riapri il link</button>'
+          : '<button class="btn danger" id="sc-blocca">Blocca il link</button>') +
+      '</div>' +
+      '<p class="tiny">Il blocco vale dal momento in cui il contatto apre il link, e ha bisogno che ' +
+      'il suo telefono raggiunga il foglio: se è senza rete proprio in quel momento, le domande gli ' +
+      'si aprono lo stesso. La scadenza invece è scritta dentro il link e vale sempre.</p>' +
+    '</div>');
+
     el('s-body').innerHTML = out.join('');
     el('sc-rimanda').onclick = function () { apriInvito(s); };
     el('sc-leggi').onclick = function () { el('l-code').value = ''; el('l-err').hidden = true; el('l-assoc').hidden = true; mostra('s-leggi'); };
+    if (el('sc-blocca')) el('sc-blocca').onclick = function () { cambiaBlocco(s, true); };
+    if (el('sc-sblocca')) el('sc-sblocca').onclick = function () { cambiaBlocco(s, false); };
+    el('sc-giorni-salva').onclick = function () {
+      var g = Number(el('sc-giorni').value);
+      s.giorni = g;
+      s.scade = scadenzaDa(oggi(), g);   /* si riparte da oggi: allungare un link
+                                            scaduto deve poterlo far rivivere */
+      salva();
+      registra_evento('invito', { invito: s.id, scade: s.scade, giorni: g });
+      el('sc-statolink').textContent = statoLink(s);
+      lampo('sc-giorni-ok');
+    };
     armaElimina(s);
     mostra('s-scheda');
     return;
@@ -1285,9 +1428,69 @@ function armaElimina(s) {
   if (!uno || !due) return;
   uno.onclick = function () { uno.hidden = true; due.hidden = false; };
   due.onclick = function () {
+    /* Cancellare un invito ancora in attesa lo chiude anche per il contatto:
+       altrimenti resterebbe in giro un link buono per una scheda che non c'è più. */
+    if (!s.risposte) registra_evento('blocca', { invito: s.id });
     memoria.schede = memoria.schede.filter(function (x) { return x.id !== s.id; });
     salva(); apriArchivio();
   };
+}
+
+/* ─── MODALITÀ PARTNER: BLOCCO E SCADENZA DEL LINK ────────────────────────── */
+
+/* Il foglio risponde anche con lo stato degli inviti di questo partner, e le
+   schede si allineano: un link bloccato da chi coordina la prova qui si vede
+   bloccato, e un contatto che ha già mandato le risposte si vede prima ancora
+   di aver letto il suo codice. Senza questo, l'app direbbe «attivo» a un link
+   che al contatto non si apre più. */
+function allineaInviti(mappa, tutti) {
+  if (!mappa) return;
+  var cambiato = false;
+  /* Un blocco appena premuto che non è ancora arrivato al foglio non deve
+     essere sbiancato dalla risposta di un giro precedente: finché l'evento è in
+     coda, comanda quello che ha fatto il partner. */
+  var inViaggio = {};
+  (memoria.coda || []).forEach(function (ev) {
+    if (ev.invito && (ev.tipo === 'blocca' || ev.tipo === 'sblocca')) inViaggio[String(ev.invito).toUpperCase()] = true;
+  });
+  memoria.schede.forEach(function (s) {
+    if (s.risposte) return;                     /* già letta: il link è storia */
+    if (inViaggio[String(s.id).toUpperCase()]) return;
+    var st = mappa[String(s.id).toUpperCase()];
+    var bloccato = (st === 'bloccato');
+    var risposto = (st === 'usato');
+    if (!st && !tutti) return;                  /* elenco parziale: non si conclude niente */
+    if (!!s.bloccato !== bloccato) { s.bloccato = bloccato; cambiato = true; }
+    if (!!s.risposto !== risposto) { s.risposto = risposto; cambiato = true; }
+  });
+  if (cambiato) {
+    salva();
+    /* Se il partner sta guardando proprio quelle schede, si aggiornano sotto gli occhi. */
+    if (!el('s-archivio').hidden) apriArchivio();
+  }
+}
+function statoLink(s) {
+  if (s.bloccato) return 'Bloccato. Al contatto le domande non si aprono più.';
+  if (!s.scade) return 'Attivo, senza scadenza. Si chiude da sé appena ti risponde.';
+  var passato = compatta(oggi()) > compatta(s.scade);
+  return passato
+    ? 'Scaduto il ' + dataIt(s.scade) + '. Per riaprirlo, allunga la scadenza qui sotto.'
+    : 'Attivo fino al ' + dataIt(s.scade) + '.';
+}
+function opzioniGiorni(s) {
+  var scelte = [[3, '3 giorni'], [7, '7 giorni'], [14, '14 giorni'], [30, '30 giorni'],
+                [60, '60 giorni'], [0, 'Senza scadenza']];
+  var ora = (s.giorni === 0 || s.giorni) ? Number(s.giorni) : 14;
+  return scelte.map(function (o) {
+    return '<option value="' + o[0] + '"' + (o[0] === ora ? ' selected' : '') + '>' +
+      (o[0] ? 'Ancora ' + o[1].replace(' giorni', ' giorni da oggi') : o[1]) + '</option>';
+  }).join('');
+}
+function cambiaBlocco(s, bloccare) {
+  s.bloccato = !!bloccare;
+  salva();
+  registra_evento(bloccare ? 'blocca' : 'sblocca', { invito: s.id });
+  apriScheda(s.id);
 }
 
 /* ─── MODALITÀ PARTNER: LEGGI UN CODICE ───────────────────────────────────── */
@@ -1477,6 +1680,7 @@ function sincronizza(poi) {
       memoria.coda = memoria.coda.slice(mandati.length);
       memoria.accesso = { codice: codice, stato: 'attivo', nome: out.nome || '',
                           quando: new Date().toISOString(), dispositivi: out.dispositivi };
+      allineaInviti(out.inviti, out.invitiTutti);
       salva();
       finisci(out);
       return;
@@ -1504,6 +1708,84 @@ function mostraBlocco(motivo) {
   el('b-titolo').textContent = m[0];
   el('b-testo').textContent = m[1];
   mostra('s-blocco');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   IL LINK DEL CONTATTO SI PUÒ CHIUDERE
+
+   Tre serrature, dalla più semplice alla più sicura:
+
+   1. la scadenza scritta nel link, che funziona anche senza rete;
+   2. la domanda al foglio — «questo invito è ancora buono?» — che è l'unica
+      che permette di bloccare adesso un link già mandato;
+   3. una volta sola: appena il contatto finisce, l'invito è consumato.
+
+   La domanda al foglio manda SOLO l'identificativo dell'invito: non il nome
+   del contatto, non le risposte, non il codice del partner. E se il foglio non
+   risponde — telefono senza campo, script in aggiornamento — il contatto entra
+   lo stesso: meglio una risposta in più che un contatto perso per la rete.
+   ═══════════════════════════════════════════════════════════════════════════ */
+var CHIUSI = {
+  bloccato: ['Questo link è stato chiuso',
+             'Chi te l\'ha mandato ha chiuso questo link, quindi le domande non si aprono più.'],
+  usato:    ['Hai già risposto',
+             'Queste domande le hai già compilate e le risposte sono partite. Non serve rifarle.'],
+  scaduto:  ['Questo link è scaduto',
+             'Il link aveva una scadenza, ed è passata. Le domande non si aprono più.'],
+  manomesso: ['Link non valido',
+             'Questo indirizzo non risulta valido: può essersi spezzato o modificato lungo la strada.']
+};
+function mostraChiuso(motivo) {
+  var m = CHIUSI[motivo] || CHIUSI.bloccato;
+  el('ch-titolo').textContent = m[0];
+  el('ch-testo').textContent = m[1];
+  el('ch-chiedi').textContent = (motivo === 'usato')
+    ? (INV.sponsor ? 'Se qualcosa non ti torna, scrivi a ' + INV.sponsor + '.' : '')
+    : (INV.sponsor ? 'Se vuoi rispondere, chiedi a ' + INV.sponsor + ' di rimandartelo: gliene basta uno nuovo.'
+                   : 'Se vuoi rispondere, chiedi a chi te l\'ha mandato di rimandartelo.');
+  mostra('s-chiuso');
+}
+/* La scadenza viaggia nel link: si controlla senza chiedere niente a nessuno. */
+function scadutoNelLink() {
+  if (!INV.scade) return '';
+  if (!/^\d{8}$/.test(INV.scade)) return 'manomesso';
+  if (INV.firma !== firmaInvito(INV.id, INV.scade)) return 'manomesso';
+  return (compatta(oggi()) > INV.scade) ? 'scaduto' : '';
+}
+/* La domanda al foglio. Non blocca la pagina: il contatto legge l'introduzione
+   mentre la risposta arriva, e se arriva un no mentre è ancora lì si ferma. Se
+   ha già cominciato lo lasciamo finire: interrompere qualcuno a metà domanda
+   sarebbe una scortesia, e le sue risposte comunque le legge solo il partner. */
+function chiediInvito(riapri) {
+  if (!SYNC || !INV.id) return;
+  var u = SYNC + (SYNC.indexOf('?') > -1 ? '&' : '?') + 'a=invito&i=' + encodeURIComponent(INV.id);
+  var opzioni = {};
+  var taglia = null;
+  if (typeof AbortController === 'function') {
+    var ac = new AbortController();
+    opzioni.signal = ac.signal;
+    taglia = setTimeout(function () { try { ac.abort(); } catch (e) {} }, 6000);
+  }
+  fetch(u, opzioni)
+    .then(function (r) { return r.json(); })
+    .then(function (out) {
+      if (taglia) clearTimeout(taglia);
+      if (!out) return;
+      if (out.ok === false) {
+        if (!el('s-intro').hidden) mostraChiuso(out.motivo || 'bloccato');
+        else if (riapri) mostraChiuso(out.motivo || 'scaduto');
+        return;
+      }
+      /* Il foglio dice che è buono: se eravamo fermi sulla scadenza, si apre. */
+      if (riapri && !el('s-chiuso').hidden) mostra('s-intro');
+    })
+    .catch(function () { if (taglia) clearTimeout(taglia); });   /* si va avanti lo stesso */
+}
+/* Finito: l'invito è consumato. Una riga sola, con il solo identificativo. */
+function segnalaFatto() {
+  if (!SYNC || !INV.id) return;
+  var u = SYNC + (SYNC.indexOf('?') > -1 ? '&' : '?') + 'a=fatto&i=' + encodeURIComponent(INV.id);
+  try { fetch(u, { keepalive: true }).catch(function () {}); } catch (e) {}
 }
 
 /* ─── IL LINK DELLE RISPOSTE ────────────────────────────────────────────────
@@ -1567,7 +1849,15 @@ if (modoContatto) {
   el('done-txt').textContent = INV.sponsor
     ? 'Le tue risposte sono pronte. Mandale a ' + INV.sponsor + ' e vi sentite: se ha senso vedersi, ti spiega come funziona nel dettaglio; se secondo lui non è cosa tua, te lo dice con la stessa sincerità con cui hai risposto.'
     : el('done-txt').textContent;
-  mostra('s-intro');
+  var fermo = scadutoNelLink();
+  if (fermo === 'manomesso') { mostraChiuso(fermo); }
+  else if (fermo === 'scaduto') {
+    /* Scaduto secondo il link. Chiediamo lo stesso al foglio: se nel frattempo
+       il partner ha allungato la scadenza, il link che il contatto ha già in
+       mano deve tornare buono senza che nessuno gliene mandi un altro. */
+    mostraChiuso('scaduto');
+    chiediInvito(true);
+  } else { mostra('s-intro'); chiediInvito(false); }
 } else if (SYNC && !(memoria.accesso && memoria.accesso.codice)) {
   /* Prova su invito: l'indirizzo generico non apre niente. */
   mostra('s-gate');
