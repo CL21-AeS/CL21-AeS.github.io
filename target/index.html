@@ -519,14 +519,17 @@
   <div class="card stack">
     <h2>Il codice, in breve</h2>
     <p class="small muted">Ogni domanda vale <strong>4</strong> (sì pieno), <strong>2</strong>
-    (sì con riserva) o <strong>0</strong> (no). Massimo 32. <strong>26+</strong> piano subito ·
-    <strong>18-25</strong> piano ma prima chiarisci · <strong>11-17</strong> da coltivare ·
-    <strong>sotto 11</strong> fuori target.</p>
+    (sì con riserva) o <strong>0</strong> (no). Massimo <strong>28</strong>. <strong>23+</strong> piano subito ·
+    <strong>16-22</strong> piano ma prima chiarisci · <strong>10-15</strong> da coltivare ·
+    <strong>sotto 10</strong> fuori target.</p>
+    <p class="small muted">La <strong>prima domanda non dà punti</strong>: chiede se conta più il
+    tempo o i soldi, e fra le due non c'è una risposta migliore. Serve a escludere chi non vuole
+    cambiare niente e a dirti cosa cerca. Per questo il massimo è 28 e non 32.</p>
     <p class="small muted">Un <strong>no secco abbassa la fascia</strong> di un gradino, due di due,
-    tre mettono fuori target: otto «sì con riserva» non sono la stessa cosa di sette sì pieni e un
+    tre mettono fuori target: sette «sì con riserva» non sono la stessa cosa di sei sì pieni e un
     rifiuto. Le riserve si sciolgono parlando, un no secco no.</p>
     <p class="small muted">Tre risposte sono <strong>knock-out</strong> e valgono più del punteggio:
-    nessun motivo suo, zero tempo, «se non paga subito non mi interessa». La quarta — i 15-55 €
+    non cambierei niente, zero tempo, «ho bisogno di un risultato immediato». La quarta — i 15-55 €
     oggi non ci sono — non è un no alla persona ma un «non ora».</p>
   </div>
 </section>
@@ -598,12 +601,15 @@
 
   <div class="card stack">
     <h2>Una cosa sola, prima di lasciarti</h2>
-    <p class="muted">Questa è un'attività, non un premio: i soldi non li regala nessuno, qui come
-    in qualsiasi altro posto. Come in ogni lavoro che valga qualcosa, i risultati vanno a chi ci
-    mette del tempo — anche poco, ma con costanza — e ci mette la responsabilità di chi ha deciso
-    di prenderlo sul serio.</p>
-    <p class="muted">Se questo ti sembra normale, siamo già d'accordo sulla cosa più importante.
-    Se invece cercavi qualcosa che rendesse senza impegno, è giusto dirselo adesso: non è questo.</p>
+    <p class="muted">Questa è un'attività: non è un premio, non è un passatempo e soprattutto non
+    è qualcosa che funziona da sola. I soldi non li regala nessuno, né qui né in qualsiasi altro
+    lavoro.</p>
+    <p class="muted">Quello che cambia è una cosa sola: qui hai la possibilità di costruire un
+    risultato tuo. Ma per farlo servono tempo, costanza e responsabilità.</p>
+    <p class="muted">Non devi fare tutto subito, non devi essere perfetto e non devi avere tutto
+    sotto controllo. Devi solo decidere di esserci e fare la tua parte, anche un piccolo passo
+    alla volta. Perché alla fine non conta quanto sei motivato il primo giorno: conta quello che
+    fai giorno per giorno, con costanza.</p>
   </div>
 
 </section>
@@ -640,74 +646,81 @@ var SYNC = 'https://script.google.com/macros/s/AKfycbznMU35Q5dD7iDigaENJs676If-y
 /* La versione del questionario: viaggia con ogni scheda e finisce nel foglio,
    così una risposta di oggi resta leggibile anche dopo aver cambiato le domande.
    Cambiala quando cambi le domande, insieme alla tabella in foglio.gs. */
-var VERSIONE_DOMANDE = '2026-09-09';
+var VERSIONE_DOMANDE = '2026-09-11';
 
 /* ─── LE OTTO DOMANDE ───────────────────────────────────────────────────────
    p = punti (0-4). ko = la condizione di base che quella risposta fa cadere.
    L'ordine delle opzioni NON è per punteggio: la migliore non sta sempre
    nello stesso posto, così non si indovina la risposta "giusta".
+
+   La prima porta `senzaPunti`: chiede una priorità — soldi o tempo — e le due
+   risposte valgono uguale, perché nessuna delle due è migliore dell'altra. Una
+   domanda che sa dire solo sì o no non deve fingere di misurare: serve a
+   escludere chi non vuole cambiare niente e a dire allo sponsor cosa cerca.
+   Per questo il massimo è 28 e non 32.
    ─────────────────────────────────────────────────────────────────────────── */
 var Q = [
   {
-    tema: 'Il motivo',
-    t: 'Se nei prossimi due anni qualcosa della tua situazione — soldi o tempo — potesse cambiare, cosa cambieresti per primo?',
+    tema: 'La priorità',
+    senzaPunti: true,
+    t: 'Se nei prossimi due anni potessi cambiare una di queste due situazioni — soldi o tempo — quale avrebbe la priorità?',
     o: [
-      { t: 'Un\'entrata in più, o più tempo per me e per i miei', p: 2, s: 'entrata o tempo' },
-      { t: 'A dire il vero sto bene così: non cambierei niente', p: 0, s: 'nessun motivo', ko: 'motivo' },
-      { t: 'Costruire nel tempo qualcosa di mio, che resti', p: 4, s: 'costruire qualcosa di proprio' }
+      { t: 'Un\'entrata economica maggiore', p: 0, s: 'più soldi' },
+      { t: 'Non cambierei niente, va bene così', p: 0, s: 'nessun motivo', ko: 'motivo' },
+      { t: 'Avere più tempo a mia disposizione', p: 0, s: 'più tempo' }
     ]
   },
   {
     tema: 'Il tempo',
-    t: 'Senza stravolgere la tua vita, quanto tempo potresti dedicare ogni giorno a una cosa nuova?',
+    t: 'Quanto tempo potresti dedicare a migliorare quella situazione?',
     o: [
-      { t: 'Una mezz\'ora, nei ritagli della giornata', p: 2, s: '~30 min' },
-      { t: 'Un\'ora o più: se una cosa mi convince, il tempo lo trovo', p: 4, s: '1 ora o più' },
-      { t: 'Oggi niente: non ho spazio per aggiungere altro', p: 0, s: 'zero tempo', ko: 'tempo' }
+      { t: 'Un blocco di tempo dedicato, una o due volte a settimana', p: 2, s: 'un blocco a settimana' },
+      { t: 'Tutti i giorni, nei ritagli che riesco a trovare', p: 4, s: 'ogni giorno nei ritagli' },
+      { t: 'Niente: non ho tempo', p: 0, s: 'zero tempo', ko: 'tempo' }
     ]
   },
   {
     tema: 'Le aspettative',
-    t: 'Come qualsiasi attività, all\'inizio rende poco: la parte interessante si costruisce in quattro, sei, otto mesi di lavoro costante. Come la vedi?',
+    t: 'Come qualunque attività, all\'inizio bisogna preparare il terreno: i risultati si costruiscono fra i quattro e gli otto mesi, a seconda del tempo che ci dedichi. Cosa ne pensi?',
     o: [
-      { t: 'Se non paga subito, non mi interessa', p: 0, s: 'vuole subito', ko: 'aspettative' },
-      { t: 'Mi torna: le cose che valgono chiedono tempo', p: 4, s: 'orizzonte lungo' },
-      { t: 'Va bene, purché veda che qualcosa si muove già dai primi mesi', p: 2, s: 'ok con primi segnali' }
+      { t: 'Ho bisogno di un risultato immediato', p: 0, s: 'vuole subito', ko: 'aspettative' },
+      { t: 'Va bene, purché veda che qualcosa si muove già dai primi mesi', p: 2, s: 'ok con primi segnali' },
+      { t: 'È giusto: così funzionano le attività', p: 4, s: 'orizzonte lungo' }
     ]
   },
   {
     tema: 'I no',
-    t: 'Quanto ti pesa sentirti dire no? Pensa a quando proponi qualcosa — al lavoro, tra amici — e la risposta è negativa.',
+    t: 'Quanto ti pesa sentirti dire no? Pensa a quando proponi qualcosa ad amici o al lavoro.',
     o: [
-      { t: 'Poco: chi dice no ha i suoi motivi, io vado avanti', p: 4, s: 'regge bene' },
-      { t: 'Tanto: preferisco non espormi a un no', p: 0, s: 'evita di esporsi' },
-      { t: 'Mi pesa sul momento, poi passa e riprovo', p: 2, s: 'regge, con fatica' }
+      { t: 'Niente: è un loro diritto, io vado avanti', p: 4, s: 'regge bene' },
+      { t: 'Tanto: faccio fatica ad accettarlo', p: 0, s: 'evita di esporsi' },
+      { t: 'Mi pesa lì per lì, poi mi passa e riprovo', p: 2, s: 'regge, con fatica' }
     ]
   },
   {
     tema: 'Il metodo',
-    t: 'Qui si parte seguendo un metodo già collaudato, affiancati da qualcuno passo a passo, anche su cose che all\'inizio non ti vengono naturali.',
+    t: 'Cosa ne pensi di partire con un metodo già collaudato, affiancato da chi l\'ha già fatto?',
     o: [
-      { t: 'Bene: preferisco un percorso chiaro all\'improvvisare', p: 4, s: 'allineato al metodo' },
       { t: 'Bene, se capisco il perché di ogni passo', p: 2, s: 'segue capendo' },
-      { t: 'Faccio fatica: preferisco fare a modo mio', p: 0, s: 'vuole fare da sé' }
+      { t: 'Faccio fatica: preferisco fare a modo mio', p: 0, s: 'vuole fare da sé' },
+      { t: 'Ottimo: all\'inizio è un grande aiuto', p: 4, s: 'allineato al metodo' }
     ]
   },
   {
     tema: 'Un\'attività basata sulle relazioni',
-    t: 'L\'attività si costruisce parlando con le persone che conosci e conoscendone di nuove nel tempo.',
+    t: 'L\'attività si costruisce parlando con le persone che conosci — familiari e amici — e conoscendone di nuove nel tempo.',
     o: [
-      { t: 'Sono riservato, ma se mi insegnano posso impararlo', p: 2, s: 'riservato ma disponibile' },
       { t: 'È la cosa che meno mi va di fare', p: 0, s: 'rifiuta il contatto' },
-      { t: 'Mi viene naturale: con le persone ci sto volentieri', p: 4, s: 'a suo agio' }
+      { t: 'Sono estroverso: stare con le persone mi viene naturale', p: 4, s: 'a suo agio' },
+      { t: 'Non sono molto estroverso, ma posso imparare a gestirlo', p: 2, s: 'riservato ma disponibile' }
     ]
   },
   {
     tema: 'Le opinioni degli altri',
-    t: 'Se un\'opportunità ti convincesse ma intorno a te non tutti fossero d\'accordo, la prenderesti in considerazione lo stesso?',
+    t: 'Se un\'attività ti convincesse, ma non tutti intorno a te fossero d\'accordo, andresti avanti lo stesso?',
     o: [
+      { t: 'Sì: le opinioni le ascolto, ma alla fine decido io', p: 4, s: 'indipendente' },
       { t: 'Sì, anche se il parere contrario di qualcuno mi peserebbe', p: 2, s: 'decide lui, con fatica' },
-      { t: 'Sì. Le opinioni le ascolto, ma la decisione è mia', p: 4, s: 'indipendente' },
       { t: 'No: se una persona a cui tengo non è d\'accordo, mi fermo', p: 0, s: 'dipende dagli altri' }
     ]
   },
@@ -724,8 +737,8 @@ var Q = [
 
 /* Cosa affrontare, punto per punto, quando una risposta vale 2 o meno. */
 var SCOPERTI = [
-  'Motivo debole o assente. Senza un perché suo, nessun piano regge: prima di parlare di attività, fallo raccontare (cosa vorrebbe, cosa gli manca). Se non emerge nulla, non forzare.',
-  'Poco tempo dichiarato. Non discutere la quantità: lavora sui micro-momenti (tragitto, pausa, sera) e sulla costanza. Se dichiara zero, non è il momento suo.',
+  'Nessuna priorità da cambiare. Senza un perché suo, nessun piano regge: prima di parlare di attività, fallo raccontare (cosa vorrebbe, cosa gli manca). Se non emerge nulla, non forzare.',
+  'Tempo concentrato in un blocco, non quotidiano. Meglio di niente, ma questa attività va avanti con la costanza dei piccoli momenti: lavora sui ritagli (tragitto, pausa, sera) più che sulla sessione lunga del sabato. Se dichiara zero, non è il momento suo.',
   'Aspettative fuori misura o urgenza economica. Rischio abbandono alto. Metti in chiaro i numeri veri dei primi mesi prima del piano: se cerca soldi subito, meglio dirglielo che venderglielo.',
   'Fragile davanti al no. Va preparato: il no è statistica, non giudizio. Da seguire da vicino nelle prime settimane, o non parte.',
   'Vuole fare a modo suo. Qui il metodo è il valore: se non lo segue, brucia la lista e si ferma. Verifica quanto è disposto a essere affiancato.',
@@ -852,6 +865,9 @@ function decodifica(txt) {
 }
 
 /* ─── VALUTAZIONE ─────────────────────────────────────────────────────────── */
+/* Il massimo si conta dalle domande che danno punti: se un giorno se ne aggiunge
+   o se ne toglie una, soglie e denominatore restano coerenti da soli. */
+var MASSIMO = Q.reduce(function (n, q) { return n + (q.senzaPunti ? 0 : 4); }, 0);
 function valide(a) {
   return Array.isArray(a) && a.length === Q.length && a.every(function (k, qi) {
     return Q[qi] && Q[qi].o[k] !== undefined;
@@ -861,15 +877,24 @@ function valuta(a) {
   var tot = 0, ko = [], zeri = [], riserve = [];
   a.forEach(function (k, qi) {
     var o = Q[qi].o[k];
-    tot += o.p;
     if (o.ko) ko.push(o.ko);
+    if (Q[qi].senzaPunti) {
+      /* Non entra nel punteggio. Ma se la risposta è quella che fa cadere una
+         condizione di base, resta fra i "no secchi": allo sponsor serve vederla
+         nella lista delle cose da affrontare, non solo nell'esito. */
+      if (o.ko) zeri.push(qi);
+      return;
+    }
+    tot += o.p;
     if (o.p === 0) zeri.push(qi); else if (o.p === 2) riserve.push(qi);
   });
 
   /* Con tre risposte per domanda la scala è netta: sì pieno (4), sì con riserva
-     (2), no (0). Il punteggio dà la fascia, ma un "no" secco la abbassa: otto
-     riserve non sono la stessa cosa di sette sì e un rifiuto. */
-  var livello = tot >= 26 ? 3 : tot >= 18 ? 2 : tot >= 11 ? 1 : 0;
+     (2), no (0). Il punteggio dà la fascia, ma un "no" secco la abbassa: sette
+     riserve non sono la stessa cosa di sei sì e un rifiuto.
+     Le soglie sono le stesse di prima, riscalate su 28 invece di 32: 23 vale
+     26, 16 vale 18, 10 vale 11. */
+  var livello = tot >= 23 ? 3 : tot >= 16 ? 2 : tot >= 10 ? 1 : 0;
   if (zeri.length >= 3) livello = 0;
   else if (zeri.length === 2) livello = Math.min(livello, 1);
   else if (zeri.length === 1) livello = Math.min(livello, 2);
@@ -914,7 +939,7 @@ function etichettaInvito(s) {
 function fascia(a) {
   if (!valide(a)) return { pill: 'wait', testo: 'vecchia versione' };
   var v = valuta(a);
-  return { pill: v.band, testo: v.tot + '/32' };
+  return { pill: v.band, testo: v.tot + '/' + MASSIMO };
 }
 
 /* ─── NAVIGAZIONE ─────────────────────────────────────────────────────────── */
@@ -1339,10 +1364,11 @@ function apriScheda(id) {
       '<p class="small muted" style="margin-top:8px">' + esc(v.azione) + '</p>' +
     '</div>' +
     '<div style="display:flex;align-items:baseline;gap:10px">' +
-      '<span class="score">' + v.tot + '</span><span class="muted small">su ' + (Q.length * 4) + ' punti</span>' +
+      '<span class="score">' + v.tot + '</span><span class="muted small">su ' + MASSIMO + ' punti</span>' +
     '</div>' +
-    '<p class="tiny">Ogni domanda vale 4 (sì pieno), 2 (sì con riserva) o 0 (no). Soglie: 26+ piano subito · ' +
-    '18-25 piano con riserve · 11-17 da coltivare · sotto 11 fuori target. Un no secco abbassa la fascia di un gradino, ' +
+    '<p class="tiny">Sette domande da 4 (sì pieno), 2 (sì con riserva) o 0 (no); la prima, la priorità, non dà punti. ' +
+    'Soglie: 23+ piano subito · ' +
+    '16-22 piano con riserve · 10-15 da coltivare · sotto 10 fuori target. Un no secco abbassa la fascia di un gradino, ' +
     'due la abbassano di due, tre mettono fuori target: una condizione di base che manca vale più del punteggio.</p>' +
   '</div>');
 
@@ -1508,7 +1534,9 @@ function datiScheda(scheda) {
     invito: scheda.id,
     versione: VERSIONE_DOMANDE,
     scelte: scheda.risposte.map(function (k) { return k + 1; }),   /* quale: 1, 2 o 3 */
-    punti: scheda.risposte.map(function (k, qi) { return Q[qi].o[k].p; }),
+    /* La domanda senza punti manda una cella vuota, non uno zero: nel foglio
+       uno zero vorrebbe dire «no secco», e qui non c'è nessun no. */
+    punti: scheda.risposte.map(function (k, qi) { return Q[qi].senzaPunti ? '' : Q[qi].o[k].p; }),
     punteggio: v.tot,
     esito: v.titolo,
     ko: v.ko.join(' '),
