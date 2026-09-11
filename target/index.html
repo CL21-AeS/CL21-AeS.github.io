@@ -548,12 +548,12 @@
     <h1 id="q-hello">Prima di parlarne davvero</h1>
   </div>
   <p class="muted" id="q-da"></p>
-  <p class="muted">Ci siamo detti che ti farebbe piacere capire di cosa si tratta. Prima di vederci
-  e perdere un'ora a guardare numeri e meccanismi, otto domande.</p>
-  <p class="muted">Servono a una cosa sola: capire se questa attività ha senso <em>per te</em>. Non è un esame
-  e non ci sono risposte giuste: se dalle risposte viene fuori che non è cosa tua, te lo diciamo
-  chiaramente e ci siamo risparmiati entrambi del tempo. Rispondi di istinto e con sincerità —
-  una risposta di comodo fa male solo a te.</p>
+  <p class="muted">Non servono a valutarti: servono a capire se c'è un incastro reale fra quello
+  che cerchi e quello che questa attività può offrirti.</p>
+  <p class="muted">Per questo non cercare la risposta giusta, e non cercare di compiacere
+  nessuno — più sei diretto, più è facile capirlo.</p>
+  <p class="muted">Se emerge che non fa al caso tuo lo capiamo subito e ci siamo risparmiati del
+  tempo entrambi. Se invece l'incastro c'è, abbiamo una base concreta da cui partire.</p>
   <button class="btn block" id="go">Comincia</button>
   <p class="tiny">Le risposte restano su questo telefono finché non le invii tu.</p>
 </section>
@@ -1183,12 +1183,16 @@ function messaggioInvito(scheda) {
   var pr = memoria.profilo || { nome: '' };
   var primo = scheda.nome.split(' ')[0];
   var url = linkInvito(scheda);
-  return 'Ciao ' + primo + ', come promesso.\n\n' +
-    'Prima di vederci e perdere un\'ora a guardare numeri, ti chiedo otto domande: ' +
-    'tre minuti, servono a capire se questa attività ha senso per te. ' +
-    'Rispondi di istinto — anche un «no» va benissimo.\n\n' +
+  /* Corto di proposito: su WhatsApp il link deve restare sopra il muro di testo,
+     altrimenti si tocca di meno. Il discorso lungo sta nella prima schermata,
+     dove lui sta già leggendo e lo spazio non costa niente. */
+  return 'Ciao ' + primo + ', come ci siamo detti.\n\n' +
+    'Prima di vederci, ti mando otto domande: tre minuti. Servono a capire se quello che ' +
+    'cerchi e quello che questa attività può darti stanno davvero insieme.\n\n' +
+    'Non c\'è una risposta giusta e non devi dimostrare di essere adatto: rispondi di istinto. ' +
+    'Se viene fuori che non fa per te lo vediamo subito e ci siamo risparmiati del tempo tutti e due.\n\n' +
     (url || '[manca l\'indirizzo dell\'app]') + '\n\n' +
-    'Quando hai finito ti compare un pulsante che mi rimanda le risposte. A dopo' +
+    'Alla fine ti compare un pulsante che mi rimanda le risposte. A dopo' +
     (pr.nome ? ',\n' + pr.nome : '!');
 }
 function apriInvito(scheda) {
@@ -1843,7 +1847,7 @@ if (modoContatto) {
   var primo = INV.contatto.split(' ')[0];
   el('q-hello').textContent = 'Ciao ' + primo;
   el('q-da').textContent = INV.sponsor
-    ? 'Otto domande da parte di ' + INV.sponsor + '.'
+    ? 'Da parte di ' + INV.sponsor + '.'
     : '';
   el('q-da').hidden = !INV.sponsor;
   el('done-txt').textContent = INV.sponsor
