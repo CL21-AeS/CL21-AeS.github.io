@@ -699,7 +699,7 @@ var Q = [
   },
   {
     tema: 'Il metodo',
-    t: 'Cosa ne pensi di partire con un metodo già collaudato, affiancato da chi l\'ha già fatto?',
+    t: 'Come ti trovi a seguire un metodo già collaudato, con accanto chi l\'ha già fatto?',
     o: [
       { t: 'Bene, se capisco il perché di ogni passo', p: 2, s: 'segue capendo' },
       { t: 'Faccio fatica: preferisco fare a modo mio', p: 0, s: 'vuole fare da sé' },
@@ -940,6 +940,12 @@ function fascia(a) {
   if (!valide(a)) return { pill: 'wait', testo: 'vecchia versione' };
   var v = valuta(a);
   return { pill: v.band, testo: v.tot + '/' + MASSIMO };
+}
+
+/* La prima frase di una nota: la diagnosi, senza il consiglio che le sta dietro. */
+function diagnosi(testo) {
+  var m = String(testo || '').match(/^[^.]+\./);
+  return m ? m[0] : testo;
 }
 
 /* ─── NAVIGAZIONE ─────────────────────────────────────────────────────────── */
@@ -1213,7 +1219,7 @@ function messaggioInvito(scheda) {
      dove lui sta già leggendo e lo spazio non costa niente. */
   return 'Ciao ' + primo + ', come ci siamo detti.\n\n' +
     'Prima di vederci, ti mando otto domande: tre minuti. Servono a capire se quello che ' +
-    'cerchi e quello che questa attività può darti stanno davvero insieme.\n\n' +
+    'cerchi e quello che questa attività può darti coincidono.\n\n' +
     'Non c\'è una risposta giusta e non devi dimostrare di essere adatto: rispondi di istinto. ' +
     'Se viene fuori che non fa per te lo vediamo subito e ci siamo risparmiati del tempo tutti e due.\n\n' +
     (url || '[manca l\'indirizzo dell\'app]') + '\n\n' +
@@ -1384,8 +1390,11 @@ function apriScheda(id) {
 
   var righe = a.map(function (k, qi) {
     var o = Q[qi].o[k];
+    /* La domanda che non dà punti mostra un trattino, non uno zero rosso: lì
+       non c'è nessun no da segnalare. */
+    var senza = Q[qi].senzaPunti;
     return '<tr><td><strong>' + esc(Q[qi].tema) + '</strong><br><span class="muted">' + esc(o.t) + '</span></td>' +
-      '<td class="p' + (o.p === 0 ? ' flag' : '') + '">' + o.p + '</td></tr>';
+      '<td class="p' + (!senza && o.p === 0 ? ' flag' : '') + '">' + (senza ? '–' : o.p) + '</td></tr>';
   }).join('');
   out.push('<div class="card stack">' +
     '<h2>Le risposte</h2>' +
@@ -1394,17 +1403,31 @@ function apriScheda(id) {
     '<p class="tiny">In rosso i no secchi. Il 2 è un sì con riserva.</p>' +
   '</div>');
 
-  var blocco = '<div class="card stack"><h2>Cosa affrontare prima del piano</h2>';
+  /* Con un esito fuori target il riquadro cambia mestiere. Spiegare a un partner
+     come preparare un piano che non darà è un invito a insistere: qui serve
+     invece sapere cos'è mancato — da dire adesso, e da riguardare se fra un
+     anno la situazione di quella persona è diversa. Quindi solo la diagnosi,
+     che è la prima frase di ogni nota; i consigli restano per chi il piano lo
+     riceve davvero. */
+  var fuori = (v.band === 'no');
+  var blocco = '<div class="card stack"><h2>' +
+    (fuori ? 'Cosa manca' : 'Cosa affrontare prima del piano') + '</h2>';
   if (v.zeri.length) {
     blocco += '<ul class="clean small">' + v.zeri.map(function (qi) {
-      return '<li><strong>' + esc(Q[qi].tema) + '.</strong> ' + esc(SCOPERTI[qi]) + '</li>';
+      return '<li><strong>' + esc(Q[qi].tema) + '.</strong> ' +
+        esc(fuori ? diagnosi(SCOPERTI[qi]) : SCOPERTI[qi]) + '</li>';
     }).join('') + '</ul>';
+    if (fuori) {
+      blocco += '<p class="tiny">Non sono cose da sistemare adesso: sono i motivi per cui, oggi, ' +
+        'il piano non regge. Diglielo con queste parole — è la cosa che ti farà rispettare. ' +
+        'E se fra un anno la sua situazione è cambiata, questi sono i punti da riguardare.</p>';
+    }
   } else {
     blocco += '<p class="small muted">Nessun no secco. ' + (v.riserve.length
       ? 'Le riserve qui sotto si sciolgono parlando, non sono ostacoli.'
       : 'Profilo pulito: vai di piano, e non riempirlo di entusiasmo — a questa persona serve sostanza.') + '</p>';
   }
-  if (v.riserve.length) {
+  if (v.riserve.length && !fuori) {
     blocco += '<p class="small"><strong>Sì con riserva su:</strong> ' +
       esc(v.riserve.map(function (qi) { return Q[qi].tema; }).join(' · ')) + '</p>' +
       '<p class="tiny">Non sono no: sono i punti su cui vuole capire meglio prima di decidere.</p>';
@@ -1412,7 +1435,11 @@ function apriScheda(id) {
   out.push(blocco + '</div>');
 
   out.push('<div class="card stack">' +
-    '<h2>Promemoria per l\'incontro</h2>' +
+    '<h2>' + (fuori ? 'Come chiudere' : 'Promemoria per l\'incontro') + '</h2>' +
+    /* Con un esito fuori target l'incontro non ci sarà: le due voci che
+       preparano il piano restano fuori, e resta quella che serve davvero —
+       cosa dirgli. */
+    (fuori ? '' :
     '<details><summary>Cosa si fa davvero, in concreto</summary><ul class="clean small">' +
       '<li><strong>Si usano i prodotti.</strong> Il consumo personale è la base: si consiglia ciò che si usa, non ciò che si è studiato.</li>' +
       '<li><strong>Si costruisce una base di clienti che riordinano.</strong> Ordinano da soli sull\'e-commerce, il legame è tracciato dall\'azienda, nessun magazzino e nessuna consegna a mano.</li>' +
@@ -1426,8 +1453,8 @@ function apriScheda(id) {
       '<li><strong>La scala del bonus:</strong> si sale col volume del gruppo, dal 3% (200 VP) fino al 21% (10.000 VP). Il 21% è l\'obiettivo primario di costruzione.</li>' +
       '<li><strong>Il lungo termine:</strong> quando un gruppo raggiunge il 21% scatta un 6% fisso sul suo fatturato. Le qualifiche alte richiedono anni di lavoro costante, non mesi.</li>' +
       '<li><strong>Reddito trasmissibile:</strong> l\'attività, in caso di successione, si può trasmettere agli eredi. Poche attività alla portata di una persona comune lo permettono.</li>' +
-    '</ul><p class="tiny">Cifre indicative, di riferimento per te: non sono una promessa di guadagno e non vanno presentate come tale. Quanto si ottiene dipende dal lavoro che la persona fa.</p></details>' +
-    '<details><summary>Cosa dire se l\'esito è no</summary>' +
+    '</ul><p class="tiny">Cifre indicative, di riferimento per te: non sono una promessa di guadagno e non vanno presentate come tale. Quanto si ottiene dipende dal lavoro che la persona fa.</p></details>') +
+    '<details' + (fuori ? ' open' : '') + '><summary>Cosa dire se l\'esito è no</summary>' +
       '<p class="small">«Ti ringrazio di aver risposto con sincerità. Da quello che mi hai detto, secondo me questa attività adesso non fa per te: ' +
       'chiede tempo ogni giorno e mesi di costanza prima di dare qualcosa di serio, e non voglio venderti un\'illusione. ' +
       'Se invece i prodotti ti incuriosiscono, quelli te li faccio provare volentieri.»</p>' +
