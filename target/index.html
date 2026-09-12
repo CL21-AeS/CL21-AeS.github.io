@@ -528,11 +528,14 @@
     <p class="small muted">Le schede vivono in questo browser: se lo svuoti o cambi telefono, le perdi.
     Tienine una copia ogni tanto.</p>
     <div class="btn-row">
-      <button class="btn ghost" id="a-esporta" hidden>Scarica la copia</button>
-      <button class="btn ghost" id="a-copia">Salva la copia</button>
+      <button class="btn" id="a-esporta">Scarica il file</button>
+      <button class="btn ghost" id="a-copia">Copia negli appunti</button>
       <button class="btn ghost" id="a-importa">Ripristina una copia</button>
     </div>
     <p class="ok" id="a-ok" hidden>Fatto.</p>
+    <p class="tiny" id="a-dove"></p>
+    <p class="tiny">Se copi negli appunti, <strong>incolla subito</strong> da qualche parte — una nota,
+    una mail a te stesso, la chat con te stesso: negli appunti resta finché non copi altro.</p>
     <div id="a-imp" hidden class="stack-s">
       <label class="small muted" for="a-imptxt">Incolla qui la copia</label>
       <textarea id="a-imptxt" rows="4" placeholder='{"profilo":…}'></textarea>
@@ -648,7 +651,7 @@
     <p class="small muted">Cancella da questo dispositivo il tuo nome, il tuo numero, l'indirizzo
     dell'app e <strong>tutte le schede</strong>, e riparte dalla schermata iniziale. Serve quando
     hai sbagliato il primo avvio, quando il telefono passa a un'altra persona, o per rifare una
-    prova pulita. Non si torna indietro: se le schede ti servono, prima «Salva la copia»
+    prova pulita. Non si torna indietro: se le schede ti servono, prima «Scarica il file»
     dall'archivio.</p>
     <div class="btn-row">
       <button class="btn danger" id="x-reset">Svuota tutto</button>
@@ -1840,16 +1843,69 @@ el('a-impgo').onclick = function () {
   } catch (e) { el('a-imperr').hidden = false; }
 };
 
-/* Il download di un file lo può offrire solo il visualizzatore: se non c'è,
-   resta la copia negli appunti, che funziona sempre. */
+/* ─── SCARICARE LA COPIA ────────────────────────────────────────────────────
+   Tre strade, perché i telefoni non si comportano allo stesso modo:
+
+   · sul computer e su Android il link con `download` salva il file dove
+     finiscono i download, ed è la strada normale;
+   · su iPhone, e dentro i browser incorporati (quello che si apre toccando un
+     link da WhatsApp), quel link a volte non fa niente: lì si passa dal
+     pannello di condivisione, dove c'è «Salva su File»;
+   · se non funziona nessuna delle due, restano gli appunti.
+
+   Il nome del file porta la data, così due copie non si sovrascrivono.
+   ─────────────────────────────────────────────────────────────────────────── */
+function nomeCopia() { return 'target-copia-' + oggi() + '.json'; }
+
+function scaricaCopia() {
+  var nome = nomeCopia(), testo = backup();
+  var telefono = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
+  var file = null;
+  try { file = new File([testo], nome, { type: 'application/json' }); } catch (e) {}
+
+  if (telefono && file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: 'Copia di Target' }).then(function () {
+      dove('Scegli «Salva su File» per tenertela sul telefono.');
+      lampo('a-ok');
+    }, function (err) {
+      /* Se l'utente chiude il pannello non è un errore: non si insiste. */
+      if (err && err.name === 'AbortError') return;
+      scaricaLink(nome, testo);
+    });
+    return;
+  }
+  scaricaLink(nome, testo);
+}
+
+function scaricaLink(nome, testo) {
+  try {
+    var url = URL.createObjectURL(new Blob([testo], { type: 'application/json' }));
+    var a = document.createElement('a');
+    a.href = url; a.download = nome; a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      try { URL.revokeObjectURL(url); } catch (e) {}
+      if (a.parentNode) a.parentNode.removeChild(a);
+    }, 4000);
+    dove('Salvato come ' + nome + ', dove il telefono o il computer mette i download.');
+    lampo('a-ok');
+  } catch (e) {
+    dove('Questo browser non lascia scaricare il file. Usa «Copia negli appunti» e incollalo in una nota.');
+  }
+}
+function dove(t) { var n = el('a-dove'); if (n) n.textContent = t; }
+
+el('a-esporta').onclick = scaricaCopia;
+
+/* Dentro l'anteprima di Claude il download passa dal visualizzatore: il link
+   normale lì non funziona, e questo lo sostituisce. */
 if (window.claude && typeof window.claude.use === 'function') {
   window.claude.use('downloads').then(function (dl) {
     if (!dl) return;
-    var b = el('a-esporta');
-    b.hidden = false;
-    b.onclick = function () {
-      dl.save({ filename: 'target-copia-' + oggi() + '.json', data: backup() })
-        .then(function () { lampo('a-ok'); }, function () {});
+    el('a-esporta').onclick = function () {
+      dl.save({ filename: nomeCopia(), data: backup() })
+        .then(function () { dove('Salvato come ' + nomeCopia() + '.'); lampo('a-ok'); }, function () {});
     };
   }, function () {});
 }
