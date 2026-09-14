@@ -794,7 +794,7 @@ var SYNC = 'https://script.google.com/macros/s/AKfycbznMU35Q5dD7iDigaENJs676If-y
 /* La versione del questionario: viaggia con ogni scheda e finisce nel foglio,
    così una risposta di oggi resta leggibile anche dopo aver cambiato le domande.
    Cambiala quando cambi le domande, insieme alla tabella in foglio.gs. */
-var VERSIONE_DOMANDE = '2026-09-11';
+var VERSIONE_DOMANDE = '2026-09-14';
 
 /* ─── LE OTTO DOMANDE ───────────────────────────────────────────────────────
    p = punti (0-4). ko = la condizione di base che quella risposta fa cadere.
@@ -822,18 +822,18 @@ var Q = [
     tema: 'Il tempo',
     t: 'Quanto tempo potresti dedicare a migliorare quella situazione?',
     o: [
-      { t: 'Un blocco di tempo dedicato, una o due volte a settimana', p: 2, s: 'un blocco a settimana' },
-      { t: 'Tutti i giorni, nei ritagli che riesco a trovare', p: 4, s: 'ogni giorno nei ritagli' },
+      { t: 'Dedicare 8-10 ore alla settimana', p: 4, s: '8-10 ore a settimana' },
+      { t: 'Tutti i giorni, nei ritagli che riesco a trovare', p: 2, s: 'i ritagli di ogni giorno' },
       { t: 'Niente: non ho tempo', p: 0, s: 'zero tempo', ko: 'tempo' }
     ]
   },
   {
     tema: 'Le aspettative',
-    t: 'Come qualunque attività, all\'inizio bisogna preparare il terreno: i risultati si costruiscono fra i quattro e gli otto mesi, a seconda del tempo che ci dedichi. Cosa ne pensi?',
+    t: 'Quando inizi qualcosa di nuovo, quale di queste situazioni ti rappresenta meglio?',
     o: [
-      { t: 'Ho bisogno di un risultato immediato', p: 0, s: 'vuole subito', ko: 'aspettative' },
-      { t: 'Va bene, purché veda che qualcosa si muove già dai primi mesi', p: 2, s: 'ok con primi segnali' },
-      { t: 'È giusto: così funzionano le attività', p: 4, s: 'orizzonte lungo' }
+      { t: 'Preferisco sapere fin dall\'inizio cosa otterrò e avere risultati sicuri nel breve periodo', p: 0, s: 'vuole risultati certi e subito', ko: 'aspettative' },
+      { t: 'Sono disposto a costruire qualcosa che possa crescere nel tempo, anche se all\'inizio i risultati sono graduali', p: 4, s: 'orizzonte lungo' },
+      { t: 'Voglio una base sicura e allo stesso tempo valuto opportunità di crescita', p: 2, s: 'sicurezza più crescita' }
     ]
   },
   {
@@ -841,7 +841,7 @@ var Q = [
     t: 'Quanto ti pesa sentirti dire no? Pensa a quando proponi qualcosa ad amici o al lavoro.',
     o: [
       { t: 'Niente: è un loro diritto, io vado avanti', p: 4, s: 'regge bene' },
-      { t: 'Tanto: faccio fatica ad accettarlo', p: 0, s: 'evita di esporsi' },
+      { t: 'Tanto: mi dispiace e la prendo sul personale', p: 0, s: 'lo prende sul personale' },
       { t: 'Mi pesa lì per lì, poi mi passa e riprovo', p: 2, s: 'regge, con fatica' }
     ]
   },
@@ -886,9 +886,9 @@ var Q = [
 /* Cosa affrontare, punto per punto, quando una risposta vale 2 o meno. */
 var SCOPERTI = [
   'Nessuna priorità da cambiare. Senza un perché suo, nessun piano regge: prima di parlare di attività, fallo raccontare (cosa vorrebbe, cosa gli manca). Se non emerge nulla, non forzare.',
-  'Tempo concentrato in un blocco, non quotidiano. Meglio di niente, ma questa attività va avanti con la costanza dei piccoli momenti: lavora sui ritagli (tragitto, pausa, sera) più che sulla sessione lunga del sabato. Se dichiara zero, non è il momento suo.',
-  'Aspettative fuori misura o urgenza economica. Rischio abbandono alto. Metti in chiaro i numeri veri dei primi mesi prima del piano: se cerca soldi subito, meglio dirglielo che venderglielo.',
-  'Fragile davanti al no. Va preparato: il no è statistica, non giudizio. Da seguire da vicino nelle prime settimane, o non parte.',
+  'Ritagli quotidiani, ma poche ore in tutto. Il ritmo è quello giusto — è il monte ore a essere sottile. Prima del piano metti in chiaro quanto serve davvero: circa un\'ora al giorno vera, non cinque minuti fra una cosa e l\'altra. Se dichiara zero, non è il momento suo.',
+  'Cerca sicurezza e risultati certi nel breve. È l\'aspettativa che rompe al terzo mese. Metti in chiaro i numeri veri dei primi mesi prima del piano: se quello che cerca è una certezza immediata, è più onesto dirglielo che venderglielo.',
+  'Il no lo prende sul personale. Va preparato: il no è statistica, non giudizio. Da seguire da vicino nelle prime settimane, o non parte.',
   'Vuole fare a modo suo. Qui il metodo è il valore: se non lo segue, brucia la lista e si ferma. Verifica quanto è disposto a essere affiancato.',
   'Chiuso o riservato sul contatto con le persone. Non è squalificante di per sé — si impara — ma serve accertarsi che sia disposto a imparare, non solo a evitare.',
   'Le opinioni intorno a lui lo condizionano. Chiarisci presto la posizione di partner e famiglia: se una persona vicina lo frena, si ferma dopo poche settimane.',
