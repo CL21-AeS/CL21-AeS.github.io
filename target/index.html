@@ -160,7 +160,6 @@
     cursor: pointer; text-decoration: none; -webkit-tap-highlight-color: transparent;
     transition: filter .18s ease, transform .16s ease, border-color .18s ease, background .18s ease;
   }
-  .btn:hover { filter: brightness(1.12); }
   .btn:active { transform: scale(.99); }
   /* La freccia che scivola: l'unico ornamento del pulsante principale, e c'è
      solo dove si va avanti davvero. */
@@ -168,12 +167,9 @@
     content: '→'; display: inline-block; margin-left: 2px;
     transition: transform .25s cubic-bezier(.2, .8, .2, 1);
   }
-  .btn.avanti:hover::after { transform: translateX(4px); }
   .btn:disabled { opacity: .45; cursor: not-allowed; }
   .btn.ghost { background: transparent; color: var(--ink); border-color: var(--rule); font-weight: 500; }
-  .btn.ghost:hover { filter: none; border-color: var(--ink-3); background: var(--surface-2); }
   .btn.danger { background: transparent; color: var(--crit); border-color: var(--crit); font-weight: 500; }
-  .btn.danger:hover { filter: none; background: var(--mark-wash); }
   .btn.sm { padding: 8px 13px; font-size: 14px; }
   .btn.block { width: 100%; }
   .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -234,8 +230,6 @@
     font-size: 12px; font-weight: 700; letter-spacing: .02em; color: var(--ink-3);
     transition: background .2s ease, border-color .2s ease, color .2s ease, transform .25s cubic-bezier(.2, 1.5, .4, 1);
   }
-  .opt:hover { border-color: var(--mark); transform: translateY(-1px); box-shadow: var(--shadow); }
-  .opt:hover .lett { border-color: var(--mark); color: var(--mark); }
   .opt:active { transform: scale(.985); }
   .opt.sel {
     border-color: var(--mark); background: var(--mark-wash);
@@ -255,7 +249,6 @@
     background: none; color: var(--ink); cursor: pointer; border-radius: 10px;
     transition: background .16s ease;
   }
-  .row:hover { background: var(--surface-2); }
   .row:last-child { border-bottom: 0; }
   /* Il pallino dello stato: si vede prima del testo, scorrendo l'elenco. */
   .row .segno { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--rule); }
@@ -326,6 +319,25 @@
   .msgbox a { color: var(--mark); word-break: break-all; }
   .ok { color: var(--good); font-size: 13px; }
   [hidden] { display: none !important; }
+
+
+  /* ── Il passaggio del mouse, solo dove un mouse c'è ──────────────────────
+     Su iPhone il :hover non esiste ma non viene ignorato: Safari lo applica
+     all'elemento che sta sotto l'ultimo tocco e ce lo lascia. Siccome a ogni
+     domanda le risposte vengono ricostruite nello stesso posto, quella sotto
+     il dito si ritrovava il bordo rosso senza che nessuno l'avesse scelta —
+     e sembrava che stessimo suggerendo la risposta. Con questa media query
+     su un telefono l'effetto non esiste proprio.
+     ─────────────────────────────────────────────────────────────────────── */
+  @media (hover: hover) and (pointer: fine) {
+    .btn:hover { filter: brightness(1.12); }
+    .btn.avanti:hover::after { transform: translateX(4px); }
+    .btn.ghost:hover { filter: none; border-color: var(--ink-3); background: var(--surface-2); }
+    .btn.danger:hover { filter: none; background: var(--mark-wash); }
+    .opt:hover { border-color: var(--mark); transform: translateY(-1px); box-shadow: var(--shadow); }
+    .opt:hover .lett { border-color: var(--mark); color: var(--mark); }
+    .row:hover { background: var(--surface-2); }
+  }
 
   /* ── Movimento ──────────────────────────────────────────────────────────
      Discreto per scelta: ogni schermata entra con un respiro dal basso e i
