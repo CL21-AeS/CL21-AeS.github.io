@@ -138,6 +138,19 @@
   /* ── Spia in basso ──────────────────────────────────────────────────── */
 
   let spia = null;
+
+  /* Su telefono le sezioni diventano una barra in fondo allo schermo: la
+     pastiglia va appoggiata sopra quella, o ne copre il primo pulsante.
+     L'altezza si misura invece di indovinarla, così torna anche sui
+     telefoni che tengono una striscia libera in fondo. */
+  function posiziona() {
+    if (!spia) return;
+    const barra = document.getElementById("rail");
+    const stretto = window.innerWidth <= 900;
+    const h = stretto && barra ? Math.round(barra.getBoundingClientRect().height) : 0;
+    spia.style.bottom = (h ? h + 8 : 10) + "px";
+  }
+
   function segna(testo, colore) {
     if (!spia) {
       spia = document.createElement("button");
@@ -148,9 +161,12 @@
         "font:500 11px/1.4 ui-monospace,Menlo,monospace;text-transform:uppercase;letter-spacing:.06em";
       spia.addEventListener("click", () => (PAROLA ? sincronizza() : chiedi()));
       document.body.appendChild(spia);
+      window.addEventListener("resize", posiziona);
+      window.addEventListener("orientationchange", () => setTimeout(posiziona, 250));
     }
     spia.title = PAROLA ? "Tocca per sincronizzare adesso" : "Tocca per collegare il foglio";
     spia.innerHTML = `<i style="width:6px;height:6px;border-radius:999px;background:${colore};display:block"></i>foglio: ${testo}`;
+    posiziona();
   }
   const ok = () => segna("salvato", "var(--good,#0F7A45)");
   const attesa = () => segna("salvo…", "var(--warn,#8A6410)");
