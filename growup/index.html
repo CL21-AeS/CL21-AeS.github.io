@@ -545,12 +545,15 @@ function mancanti(p){ return criteri(p, faseDi(p.id)); }
 function criteri(p, f){
   const out = [];
   const vpM = vpDi(p.id), gruppo = vpGruppo(p.id), figli = figliDi(p.id);
-  const riga = (txt, fatto, nota) => out.push({ txt, fatto, nota: fatto?null:nota });
+  /* `azione` e `bottone`: una riga che si puo' chiudere da li', senza cercare dove si fa. */
+  const riga = (txt, fatto, nota, azione, bottone) =>
+    out.push({ txt, fatto, nota: fatto?null:nota, azione: fatto?null:azione, bottone });
 
   if(f===0){
     riga("Iscrizione completata", true);
     riga("Il primo ordine", false);
-    riga("Il tuo obiettivo scritto", !!(p.dichiarato && (p.dichiarato.euroMese || p.dichiarato.perche)));
+    riga("Il tuo obiettivo scritto", !!(p.dichiarato && (p.dichiarato.euroMese || p.dichiarato.perche)),
+         "quanto vuoi guadagnare, e perché", "apri-obiettivo", "Scrivilo adesso");
   }
 
   if(f===1){
@@ -560,7 +563,8 @@ function criteri(p, f){
     riga("Il primo cliente che compra", ha(p.id,"primo_cliente"));
     const parlati = contaEventi(p.id,"conversazione");
     const bersaglio = (p.dichiarato && p.dichiarato.personeDaSentire) || 5;
-    riga(`Parlare con ${bersaglio} persone`, parlati>=bersaglio, `${parlati} su ${bersaglio}`);
+    riga(`Parlare con ${bersaglio} persone`, parlati>=bersaglio, `${parlati} su ${bersaglio}`,
+         "apri-registra", "Ne ho parlata una");
   }
 
   if(f===2){
@@ -603,13 +607,6 @@ function strada(p){
                giorni:giorniTra(d[i], d[i+1]), finestra:FASI[i].finestra });
   }
   return out;
-}
-
-/* Il traguardo di costruzione: da Fase 2 in su e' la fase stessa; chi e' ancora
-   all'inizio guarda comunque il Path to Bronze, che e' il primo. */
-function faseCostruzione(id){
-  if(scalaFinita(id)) return null;
-  return Math.min(5, Math.max(2, faseDi(id)));
 }
 
 /* La prossima cosa da fare: UNA, e sempre dentro l'obiettivo della fase. */
@@ -863,29 +860,35 @@ function vistaOggi(){
   </div>`:``}
 
   ${(() => {
-    /* Il traguardo di costruzione, coi suoi parametri: e' il perche' di tutto il resto,
-       e avanza da solo quando la qualifica precedente e' segnata. */
-    const fc = faseCostruzione(p.id);
-    if(fc === null) return "";
-    const lista = criteri(p, fc).filter(x => !/^Segnare /.test(x.txt));
+    /* SOLO il passo in cui si e'. Il percorso intero sta nella scheda Percorso: qui una cosa
+       alla volta, e il passo dopo non si mostra finche' questo non e' chiuso. Mostrare il
+       traguardo lontano a chi e' appena entrato era l'errore: guardava la cima, non il gradino. */
+    if(scalaFinita(p.id)) return "";
+    const tutte = mancanti(p);
+    const lista = tutte.filter(x => !/^Segnare /.test(x.txt));
+    if(!lista.length) return "";
     const presi = lista.filter(x=>x.fatto).length;
+    const chiave = f===2?"path_to_bronze":f===3?"foundation":f===4?"builder":f===5?"argento":null;
+    const pronto = chiave && tutte.every(x=>x.fatto || /^Segnare /.test(x.txt));
     return `
     <div class="card">
       <div class="spread">
-        <span class="tag">Il traguardo da costruire</span>
+        <span class="tag">Questo passo</span>
         <span class="pill">${presi} su ${lista.length}</span>
       </div>
-      <h2 style="margin-top:6px">${esc(FASI[fc].nome)}</h2>
-      <p class="small">${esc(FASI[fc].traguardo)}${fc>faseDi(p.id)?" — ci arrivi dopo l'attivazione":""}</p>
+      <h2 style="margin-top:6px">Fase ${f} · ${esc(fase.nome)}</h2>
+      <p class="small">${esc(fase.traguardo)}</p>
       <ul class="micro" style="margin-top:10px">
         ${lista.map(m=>`<li class="${m.fatto?"ok":""}">
           <span class="m">${m.fatto?"✓":"○"}</span>
-          <span>${esc(m.txt)}${m.nota?`<small>${esc(m.nota)}</small>`:``}</span></li>`).join("")}
+          <span>${esc(m.txt)}${m.nota?`<small>${esc(m.nota)}</small>`:``}${
+            m.azione?`<br><button class="btn small" style="margin-top:6px" data-act="${m.azione}">${
+              esc(m.bottone||"Fallo adesso")}</button>`:``}</span></li>`).join("")}
       </ul>
-      ${criteri(p,fc).every(x=>x.fatto || /^Segnare /.test(x.txt)) && fc===faseDi(p.id)
-        ? `<button class="btn primary wide" style="margin-top:14px" data-act="fatto"
-             data-t="${fc===2?"path_to_bronze":fc===3?"foundation":fc===4?"builder":"argento"}">
-             Ho raggiunto ${esc(FASI[fc].nome)}</button>` : ``}
+      ${pronto
+        ? `<button class="btn primary wide" style="margin-top:14px" data-act="fatto" data-t="${chiave}">
+             Ho raggiunto ${esc(fase.nome)}</button>`
+        : `<p class="small faint" style="margin-top:10px">Il passo dopo si apre quando questo è chiuso.</p>`}
     </div>`;
   })()}
 
@@ -1140,6 +1143,12 @@ function vistaDati(){
     <button class="btn wide" data-act="salva-tel">Salva il numero</button>
   </div>
   <div class="card stack">
+    <h2>Il tuo obiettivo</h2>
+    <p class="small">Quanto vuoi guadagnare, in quanti giorni i primi 100 VP, con quante persone
+    parlare, e il tuo perché. È quello che l'app confronta coi fatti.</p>
+    <button class="btn wide" data-act="apri-obiettivo">Scrivi o cambia l'obiettivo</button>
+  </div>
+  <div class="card stack">
     <h2>Copia di sicurezza</h2>
     <p class="small">I dati stanno in questo browser. Se cambi telefono, o lo perdi, senza copia sono persi.</p>
     <button class="btn wide" data-act="esporta">Salva una copia</button>
@@ -1205,6 +1214,25 @@ function contenutoFoglio(){
       <label class="field"><span>VP di ${new Date().toLocaleDateString("it-IT",{month:"long",year:"numeric"})}</span>
         <input id="vpVal" type="number" inputmode="numeric" value="${vpDi(p.id)}"></label>`,
       foot:`<button class="btn primary wide" data-act="salva-vp" data-id="${p.id}">Salva</button>` };
+  }
+
+  if(t==="obiettivo"){
+    const p = io();
+    const d = p.dichiarato || {};
+    return { titolo:"Il tuo obiettivo", body:`
+      <p class="small">È il tuo metro, non un questionario: lascia in bianco quello che non sai
+      ancora, e cambialo quando cambia.</p>
+      <div class="stack" style="margin-top:12px">
+        <label class="field"><span>Quanto vuoi guadagnare al mese, per iniziare</span>
+          <input id="o1" type="number" inputmode="numeric" placeholder="es. 300" value="${d.euroMese||""}"></label>
+        <label class="field"><span>Entro quanti giorni vuoi fare i primi 100 VP</span>
+          <input id="o2" type="number" inputmode="numeric" placeholder="es. 14" value="${d.giorni100vp||""}"></label>
+        <label class="field"><span>Con quante persone vuoi parlare nelle prime due settimane</span>
+          <input id="o3" type="number" inputmode="numeric" placeholder="es. 10" value="${d.personeDaSentire||""}"></label>
+        <label class="field"><span>Il tuo perché, in una riga</span>
+          <input id="o4" type="text" placeholder="es. pagare la vacanza di agosto" value="${esc(d.perche||"")}"></label>
+      </div>`,
+      foot:`<button class="btn primary wide" data-act="salva-obiettivo">Salva</button>` };
   }
 
   if(t==="registra"){
@@ -1743,6 +1771,16 @@ document.addEventListener("click", async ev => {
     scarica(`growup-${giorno(OGGI())}.json`, JSON.stringify(pacchetto()));
     return toast("Copia salvata");
   }
+  if(a==="apri-obiettivo") return apriFoglio("obiettivo");
+  if(a==="salva-obiettivo"){
+    const g = n => Number((document.getElementById(n).value||"").trim())||null;
+    const p = io();
+    p.dichiarato = { euroMese:g("o1"), giorni100vp:g("o2"), personeDaSentire:g("o3"),
+                     perche:(document.getElementById("o4").value||"").trim()||null };
+    p.updatedAt = iso(OGGI()); salva(); programmaSync(); chiudiFoglio();
+    return toast("Salvato");
+  }
+
   if(a==="salva-tel"){
     const t = (document.getElementById("mioTel").value||"").trim();
     S.persone[S.me].tel = t || null;
