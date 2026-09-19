@@ -1602,7 +1602,12 @@ document.addEventListener("click", async ev => {
       return alert("L'organizzazione esiste già: l'ha aperta "
         + gia.persone[gia.leader].nome + ".\n\nPer entrare serve il link del tuo sponsor.");
     const nid = creaPersona(nome, null, OGGI());
-    S.me = nid; S.leader = nid; salva(); segnaApertura(); vista="tutti"; return render();
+    S.me = nid; S.leader = nid; salva(); segnaApertura(); vista="tutti"; render();
+    /* Il capofila deve arrivare al foglio SUBITO: finche' non c'e', il controllo qui sopra
+       ("esiste gia' un capofila?") risponde no a chiunque, e due persone possono aprire due
+       organizzazioni che non si uniranno mai. Senza questa riga restava solo sul telefono. */
+    if(S.sync.url) sincronizza();
+    return;
   }
 
   if(a==="entra-codice"){
