@@ -203,6 +203,50 @@ const FATTI = [
   { t:"argento",        label:"Argento",                  fase:5 }
 ];
 
+/* ---- I gradini economici: dalla cifra che vuoi, la struttura che serve ----
+   Cifre, struttura e tempi vengono dai documenti ufficiali CumLaude21 (00 Strategia
+   START-Argento e 02-05), che li riprendono dal Calcolatore dei Guadagni Amway.
+   Sono simulazioni a valore didattico: non sono una promessa ne' una garanzia di reddito,
+   e vanno mostrate sempre con la loro nota. Si tarano qui, in un posto solo. */
+const VP_EURO = 2.26194;                       // quanto vale 1 VP in Italia
+const GRADINI = [
+  { k:"path_to_bronze", fase:2, nome:"Path to Bronze", livello:null,
+    euro:167.14, media:"circa 60 giorni", vpGruppo:null,
+    struttura:["3 nuove prime linee da 100 VP ciascuna",
+               "100 VP personali tuoi",
+               "tutto nello stesso mese"] },
+  { k:"foundation", fase:3, nome:"Bronze Foundation", livello:"9%",
+    euro:444.65, media:"90-120 giorni", vpGruppo:1200,
+    struttura:["1.200 VP di gruppo nel mese",
+               "3 linee frontali da 200 VP ciascuna",
+               "100 VP personali tuoi"] },
+  { k:"builder", fase:4, nome:"Bronze Builder", livello:"15%",
+    euro:1187.08, media:"150-180 giorni", vpGruppo:4000,
+    struttura:["4.000 VP di gruppo nel mese",
+               "3 linee frontali da 600 VP ciascuna",
+               "200 VP personali tuoi"] },
+  { k:"argento", fase:5, nome:"Argento", livello:"21%",
+    euro:4533.94, media:"circa 300 giorni", vpGruppo:10000,
+    struttura:["10.000 VP di gruppo nel mese",
+               "distribuiti su almeno 2 linee commerciali"] }
+];
+const NOTA_CIFRE = "Simulazione dal Calcolatore dei Guadagni Amway: ha valore didattico e di "
+  + "riferimento, non è una promessa né una garanzia di reddito. I numeri veri stanno nel tuo "
+  + "ufficio virtuale Amway.";
+
+/* Il primo gradino che arriva alla cifra chiesta. Oltre l'ultimo, si punta all'ultimo. */
+function gradinoPer(euro){
+  const e = Number(euro)||0;
+  if(e<=0) return null;
+  return GRADINI.find(g => g.euro >= e) || GRADINI[GRADINI.length-1];
+}
+function fatturatoDi(vp){ return Math.round(vp * VP_EURO); }
+/* 1187.08 -> "1.187,08": il punto separa le migliaia, la virgola i centesimi. */
+function euroIt(n){
+  const x = Number(n)||0, i = Math.floor(x), c = Math.round((x - i) * 100);
+  return num(i) + "," + String(c).padStart(2, "0");
+}
+
 /* ---- 2. Stato e persistenza ---- */
 
 /* L'indirizzo del foglio e' scritto qui dentro: cosi' ogni installazione sa gia' dove
@@ -506,34 +550,19 @@ function inPipeline(id){
   return s.length >= SOGLIE.segnaliPerPipeline ? s : null;
 }
 
-/* Ha fatto ciò che ha detto? Confronto dichiarazione / fatti. */
-function promesse(p){
+/* L'obiettivo dichiarato, tradotto in struttura da costruire.
+   Due numeri soli: quanto vuole guadagnare al mese e tra quanto. Da quanto, esce il gradino;
+   dal gradino, cosa c'e' da costruire. Il tempo NON viene giudicato: si dice la media del
+   percorso e basta, perche' quanto ci mette una persona non lo decide un'app. */
+function obiettivo(p){
   const d = p.dichiarato || {};
-  const out = [];
-  if(d.giorni100vp){
-    const scadenza = new Date(new Date(p.creato).getTime() + d.giorni100vp*86400000);
-    const raggiunto = eventiDi(p.id).filter(e=>e.tipo==="vp"&&Number(e.valore)>=100)
-                        .sort((a,b)=>a.at<b.at?-1:1)[0];
-    out.push({
-      txt:`100 VP entro ${d.giorni100vp} giorni`,
-      fatto: !!raggiunto,
-      esito: raggiunto
-        ? (raggiunto.at <= iso(scadenza) ? "mantenuta" : "in ritardo")
-        : (OGGI() <= scadenza ? "in corso" : "scaduta")
-    });
-  }
-  if(d.personeDaSentire){
-    const n = contaEventi(p.id,"conversazione");
-    const scaduta = giorniTra(p.creato, OGGI()) > FASI[1].finestra;
-    out.push({
-      txt:`parlare con ${d.personeDaSentire} persone nelle prime due settimane`,
-      fatto: n >= d.personeDaSentire,
-      esito: n >= d.personeDaSentire ? "mantenuta"
-           : scaduta ? `${n} su ${d.personeDaSentire}, tempo scaduto`
-           : `${n} su ${d.personeDaSentire}`
-    });
-  }
-  return out;
+  const euroMese = Number(d.euroMese)||0;
+  if(euroMese<=0) return null;
+  const g = gradinoPer(euroMese);
+  const mesi = Number(d.mesi)||null;
+  return { euroMese, mesi, gradino:g, perche:d.perche||null,
+           oltre: euroMese > GRADINI[GRADINI.length-1].euro,
+           preso: false };
 }
 
 /* Cosa manca per chiudere la fase in cui sei. La domanda della fase serve al leader,
@@ -561,10 +590,6 @@ function criteri(p, f){
     riga(`Arrivare a ${SOGLIE.vpAttivazione} VP in un mese`, mai>=SOGLIE.vpAttivazione,
          `sei a ${mai}, ne mancano ${Math.max(0,SOGLIE.vpAttivazione-mai)}`);
     riga("Il primo cliente che compra", ha(p.id,"primo_cliente"));
-    const parlati = contaEventi(p.id,"conversazione");
-    const bersaglio = (p.dichiarato && p.dichiarato.personeDaSentire) || 5;
-    riga(`Parlare con ${bersaglio} persone`, parlati>=bersaglio, `${parlati} su ${bersaglio}`,
-         "apri-registra", "Registra azione");
   }
 
   if(f===2){
@@ -732,13 +757,11 @@ function vistaIngresso(){
     <div class="card stack">
       <label class="field"><span>Come ti chiami</span>
         <input id="s0" type="text" autocomplete="name" placeholder="Nome e cognome"></label>
-      <label class="field"><span>Quanto vuoi guadagnare al mese, per iniziare</span>
+      <label class="field"><span>Quanto vuoi guadagnare al mese, per iniziare?</span>
         <input id="d1" type="number" inputmode="numeric" placeholder="es. 300"></label>
-      <label class="field"><span>Entro quanti giorni vuoi fare i primi 100 VP</span>
-        <input id="d2" type="number" inputmode="numeric" placeholder="es. 14"></label>
-      <label class="field"><span>Con quante persone vuoi parlare nelle prime due settimane</span>
-        <input id="d3" type="number" inputmode="numeric" placeholder="es. 10"></label>
-      <label class="field"><span>Il tuo perché, in una riga (facoltativo)</span>
+      <label class="field"><span>Tra quanto tempo vorresti guadagnarli? (mesi)</span>
+        <input id="d2" type="number" inputmode="numeric" placeholder="es. 6"></label>
+      <label class="field"><span>Il tuo perché, in una riga</span>
         <input id="d4" type="text" placeholder="es. pagare la vacanza di agosto"></label>
       <label class="field"><span>Il tuo numero (facoltativo)</span>
         <input id="s1" type="tel" inputmode="tel" autocomplete="tel" placeholder="+39 333 1234567"></label>
@@ -755,13 +778,11 @@ function vistaIngresso(){
       <p class="muted">Quello che scrivi qui è il tuo metro, non un questionario: lascia in bianco quello che non sai ancora.</p>
     </div>
     <div class="card stack">
-      <label class="field"><span>Quanto vuoi guadagnare al mese, per iniziare</span>
+      <label class="field"><span>Quanto vuoi guadagnare al mese, per iniziare?</span>
         <input id="d1" type="number" inputmode="numeric" placeholder="es. 300"></label>
-      <label class="field"><span>Entro quanti giorni vuoi fare i primi 100 VP</span>
-        <input id="d2" type="number" inputmode="numeric" placeholder="es. 14"></label>
-      <label class="field"><span>Con quante persone vuoi parlare nelle prime due settimane</span>
-        <input id="d3" type="number" inputmode="numeric" placeholder="es. 10"></label>
-      <label class="field"><span>Il tuo perché, in una riga (facoltativo)</span>
+      <label class="field"><span>Tra quanto tempo vorresti guadagnarli? (mesi)</span>
+        <input id="d2" type="number" inputmode="numeric" placeholder="es. 6"></label>
+      <label class="field"><span>Il tuo perché, in una riga</span>
         <input id="d4" type="text" placeholder="es. pagare la vacanza di agosto"></label>
       <label class="field"><span>Il tuo numero (facoltativo)</span>
         <input id="s1" type="tel" inputmode="tel" autocomplete="tel" placeholder="+39 333 1234567"></label>
@@ -808,7 +829,6 @@ function vistaOggi(){
   const vp = vpDi(p.id);
   const g = giorniTra(p.creato, OGGI());
   const r = ritmoDi(p);
-  const prom = promesse(p);
   const figli = figliDi(p.id);
 
   let barra = "";
@@ -849,20 +869,34 @@ function vistaOggi(){
   </div>
 
   ${(() => {
-    /* L'obiettivo scritto all'iscrizione deve restare sotto gli occhi: la cifra, non solo
-       le promesse misurabili. Chi aveva scritto solo gli euro non lo rivedeva piu' da nessuna parte. */
-    const d = p.dichiarato || {};
-    if(!d.euroMese && !prom.length) return "";
+    /* L'obiettivo, tradotto in struttura. La cifra dice a quale gradino si punta; il gradino
+       dice cosa c'e' da costruire. Le cifre sono simulazioni ufficiali e viaggiano sempre con
+       la loro nota: proiezioni sulla rete di una persona non se ne fanno. */
+    const o = obiettivo(p);
+    if(!o) return "";
+    const g = o.gradino, arrivato = faseDi(p.id) > g.fase || ha(p.id, g.k);
     return `
     <div class="card tight">
-      <span class="tag">Quello che hai detto di voler fare</span>
-      ${d.euroMese?`<h2 style="margin:6px 0 2px">${num(d.euroMese)} € al mese</h2>`:``}
-      ${prom.length?`<ul class="steps" style="margin-top:8px">
-        ${prom.map(x=>`<li class="${x.fatto?"done":""}">
-          <span class="mark">${x.fatto?"✓":"○"}</span>
-          <span class="grow"><span class="t">${esc(x.txt)}</span>
-          <br><small>${esc(x.esito)}</small></span></li>`).join("")}
-      </ul>`:``}
+      <span class="tag">Il tuo obiettivo</span>
+      <h2 style="margin:6px 0 2px">${num(o.euroMese)} € al mese${
+        o.mesi?` <span class="faint">entro ${plur(o.mesi,"mese","mesi")}</span>`:``}</h2>
+      ${o.perche?`<p class="small faint">${esc(o.perche)}</p>`:``}
+      <p class="small" style="margin-top:8px">Il gradino che ci arriva:
+        <b>${esc(g.nome)}</b>${g.livello?` — livello ${g.livello}`:``}${
+        arrivato?` · <span class="pill v">preso</span>`:``}</p>
+      ${o.oltre?`<p class="small">La tua cifra sta oltre l'Argento, che è l'ultimo gradino di
+        questo percorso: si punta lì, e da lì in avanti se ne parla con il tuo sponsor.</p>`:``}
+
+      <span class="tag" style="display:block;margin-top:14px">Cosa devi costruire</span>
+      <ul class="micro">
+        ${g.struttura.map(x=>`<li><span class="m">▸</span><span>${esc(x)}</span></li>`).join("")}
+        ${g.vpGruppo?`<li><span class="m">≈</span><span>${num(fatturatoDi(g.vpGruppo))} € di fatturato
+          del gruppo nel mese<small>${num(g.vpGruppo)} VP × ${String(VP_EURO).replace(".", ",")} €</small></span></li>`:``}
+      </ul>
+
+      <p class="small faint" style="margin-top:12px">Riferimento ${esc(g.nome)}:
+        ${euroIt(g.euro)} € al mese, in media ${esc(g.media)} dall'iscrizione.
+        ${esc(NOTA_CIFRE)}</p>
       <button class="btn small" style="margin-top:10px" data-act="apri-obiettivo">Cambia l'obiettivo</button>
     </div>`;
   })()}
@@ -930,6 +964,7 @@ function vistaPercorso(){
   const f = faseDi(p.id);
   const manca = mancanti(p);
   const fatta = strada(p);
+  const o = obiettivo(p);
   return `
   <h1>Il mio percorso</h1>
   <p class="small">La fase in cui sei è l'obiettivo su cui stai lavorando adesso. Il resto lo vedi, ma non ti riguarda ancora.</p>
@@ -941,7 +976,8 @@ function vistaPercorso(){
       return `<li class="${cls}">
         <span class="mark">${mark}</span>
         <span class="grow">
-          <span class="t"><b>Fase ${x.n} · ${esc(x.nome)}</b></span>
+          <span class="t"><b>Fase ${x.n} · ${esc(x.nome)}</b>${
+            o && o.gradino.fase===x.n ? ` <span class="pill">il tuo obiettivo</span>`:``}</span>
           ${x.n===f
             ? `<br><small>Sei qui — per chiudere questa fase:</small>
                <ul class="micro">${manca.map(m=>`<li class="${m.fatto?"ok":""}">
@@ -1228,15 +1264,13 @@ function contenutoFoglio(){
     const p = io();
     const d = p.dichiarato || {};
     return { titolo:"Il tuo obiettivo", body:`
-      <p class="small">È il tuo metro, non un questionario: lascia in bianco quello che non sai
-      ancora, e cambialo quando cambia.</p>
+      <p class="small">Da questi due numeri l'app calcola il gradino a cui puntare e la struttura
+      da costruire per arrivarci. Cambiali quando cambiano.</p>
       <div class="stack" style="margin-top:12px">
-        <label class="field"><span>Quanto vuoi guadagnare al mese, per iniziare</span>
+        <label class="field"><span>Quanto vuoi guadagnare al mese, per iniziare?</span>
           <input id="o1" type="number" inputmode="numeric" placeholder="es. 300" value="${d.euroMese||""}"></label>
-        <label class="field"><span>Entro quanti giorni vuoi fare i primi 100 VP</span>
-          <input id="o2" type="number" inputmode="numeric" placeholder="es. 14" value="${d.giorni100vp||""}"></label>
-        <label class="field"><span>Con quante persone vuoi parlare nelle prime due settimane</span>
-          <input id="o3" type="number" inputmode="numeric" placeholder="es. 10" value="${d.personeDaSentire||""}"></label>
+        <label class="field"><span>Tra quanto tempo vorresti guadagnarli? (mesi)</span>
+          <input id="o2" type="number" inputmode="numeric" placeholder="es. 6" value="${d.mesi||""}"></label>
         <label class="field"><span>Il tuo perché, in una riga</span>
           <input id="o4" type="text" placeholder="es. pagare la vacanza di agosto" value="${esc(d.perche||"")}"></label>
       </div>`,
@@ -1319,7 +1353,6 @@ function contenutoFoglio(){
     if(!p) return { titolo:"—", body:"" };
     const f = faseDi(p.id), s = semaforo(p.id), r = ritmoDi(p);
     const sg = segnaliDi(p.id), pipe = inPipeline(p.id);
-    const prom = promesse(p);
     const figli = figliDi(p.id);
     const mio = p.sponsor===S.me || sonoLeader();
     const suaAzione = prossimaAzione(p);
@@ -1356,15 +1389,23 @@ function contenutoFoglio(){
         entrata il ${dataIt(p.creato)}${p.sponsor&&S.persone[p.sponsor]?` · sponsor ${esc(S.persone[p.sponsor].nome)}`:``}</p>
       </div>
 
-      ${p.dichiarato?`<div class="card tight"><span class="tag">Cosa ha detto di voler fare</span>
-        <ul class="steps" style="margin-top:8px">
-        ${prom.length?prom.map(x=>`<li class="${x.fatto?"done":""}">
-          <span class="mark">${x.fatto?"✓":"○"}</span>
-          <span class="grow">${esc(x.txt)}<br><small>${esc(x.esito)}</small></span></li>`).join("")
-          :`<li><span class="mark">–</span><span class="grow small">Non ha dichiarato niente</span></li>`}
-        </ul>
-        ${p.dichiarato.euroMese?`<p class="small" style="margin-top:8px">Obiettivo: ${esc(p.dichiarato.euroMese)} € al mese${p.dichiarato.perche?` — ${esc(p.dichiarato.perche)}`:""}</p>`:``}
-      </div>`:``}
+      ${(() => {
+        /* Quello che ha detto di voler fare, e il gradino che ci arriva: senza, lo sponsor non
+           sa su cosa tenerlo. Se non ha dichiarato niente si dice anche quello: e' un dato. */
+        const o = obiettivo(p);
+        if(!o) return `<div class="card tight"><span class="tag">Cosa ha detto di voler fare</span>
+          <p class="small" style="margin-top:6px">Non ha ancora scritto il suo obiettivo.</p></div>`;
+        return `<div class="card tight">
+          <span class="tag">Cosa ha detto di voler fare</span>
+          <h2 style="margin:6px 0 2px">${num(o.euroMese)} € al mese${
+            o.mesi?` <span class="faint">entro ${plur(o.mesi,"mese","mesi")}</span>`:``}</h2>
+          ${o.perche?`<p class="small faint">${esc(o.perche)}</p>`:``}
+          <p class="small" style="margin-top:8px">Gradino: <b>${esc(o.gradino.nome)}</b>${
+            o.gradino.livello?` — ${o.gradino.livello}`:``}</p>
+          <ul class="micro">${o.gradino.struttura.map(x=>`<li><span class="m">▸</span>
+            <span>${esc(x)}</span></li>`).join("")}</ul>
+        </div>`;
+      })()}
 
       ${sg.length?`<div class="card tight"><span class="tag">${pipe?"Perché è in pipeline":"Segnali"}</span>
         <ul class="steps" style="margin-top:8px">${sg.map(x=>`<li>
@@ -1668,7 +1709,7 @@ document.addEventListener("click", async ev => {
     const ora = iso(OGGI());
     S.persone[nid] = { id:nid, nome, sponsor:inv.sp, creato:ora,
       tel:(document.getElementById("s1").value||"").trim()||null,
-      dichiarato:{ euroMese:g("d1"), giorni100vp:g("d2"), personeDaSentire:g("d3"),
+      dichiarato:{ euroMese:g("d1"), mesi:g("d2"),
                    perche:(document.getElementById("d4").value||"").trim()||null },
       updatedAt: ora };
     /* segnaposto per lo sponsor: updatedAt vuoto, cosi' la scheda vera vince all'unione */
@@ -1688,7 +1729,7 @@ document.addEventListener("click", async ev => {
     const g = n => Number((document.getElementById(n).value||"").trim())||null;
     S.persone[inv.i] = { id:inv.i, nome:inv.n, sponsor:inv.s, creato:iso(new Date(inv.d)),
       tel:(document.getElementById("s1").value||"").trim()||null,
-      dichiarato:{ euroMese:g("d1"), giorni100vp:g("d2"), personeDaSentire:g("d3"),
+      dichiarato:{ euroMese:g("d1"), mesi:g("d2"),
                    perche:(document.getElementById("d4").value||"").trim()||null },
       updatedAt: iso(OGGI()) };
     if(!ha(inv.i,"iscrizione")) aggiungiEvento(inv.i,"iscrizione",null,inv.i);
@@ -1782,7 +1823,7 @@ document.addEventListener("click", async ev => {
   if(a==="salva-obiettivo"){
     const g = n => Number((document.getElementById(n).value||"").trim())||null;
     const p = io();
-    p.dichiarato = { euroMese:g("o1"), giorni100vp:g("o2"), personeDaSentire:g("o3"),
+    p.dichiarato = { euroMese:g("o1"), mesi:g("o2"),
                      perche:(document.getElementById("o4").value||"").trim()||null };
     p.updatedAt = iso(OGGI()); salva(); programmaSync(); chiudiFoglio();
     return toast("Salvato");
