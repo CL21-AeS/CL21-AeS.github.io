@@ -564,7 +564,7 @@ function criteri(p, f){
     const parlati = contaEventi(p.id,"conversazione");
     const bersaglio = (p.dichiarato && p.dichiarato.personeDaSentire) || 5;
     riga(`Parlare con ${bersaglio} persone`, parlati>=bersaglio, `${parlati} su ${bersaglio}`,
-         "apri-registra", "Ne ho parlata una");
+         "apri-registra", "Registra azione");
   }
 
   if(f===2){
@@ -848,16 +848,24 @@ function vistaOggi(){
     </div>
   </div>
 
-  ${prom.length ? `
-  <div class="card tight">
-    <span class="tag">Quello che hai detto di voler fare</span>
-    <ul class="steps" style="margin-top:8px">
-      ${prom.map(x=>`<li class="${x.fatto?"done":""}">
-        <span class="mark">${x.fatto?"✓":"○"}</span>
-        <span class="grow"><span class="t">${esc(x.txt)}</span>
-        <br><small>${esc(x.esito)}</small></span></li>`).join("")}
-    </ul>
-  </div>`:``}
+  ${(() => {
+    /* L'obiettivo scritto all'iscrizione deve restare sotto gli occhi: la cifra, non solo
+       le promesse misurabili. Chi aveva scritto solo gli euro non lo rivedeva piu' da nessuna parte. */
+    const d = p.dichiarato || {};
+    if(!d.euroMese && !prom.length) return "";
+    return `
+    <div class="card tight">
+      <span class="tag">Quello che hai detto di voler fare</span>
+      ${d.euroMese?`<h2 style="margin:6px 0 2px">${num(d.euroMese)} € al mese</h2>`:``}
+      ${prom.length?`<ul class="steps" style="margin-top:8px">
+        ${prom.map(x=>`<li class="${x.fatto?"done":""}">
+          <span class="mark">${x.fatto?"✓":"○"}</span>
+          <span class="grow"><span class="t">${esc(x.txt)}</span>
+          <br><small>${esc(x.esito)}</small></span></li>`).join("")}
+      </ul>`:``}
+      <button class="btn small" style="margin-top:10px" data-act="apri-obiettivo">Cambia l'obiettivo</button>
+    </div>`;
+  })()}
 
   ${(() => {
     /* SOLO il passo in cui si e'. Il percorso intero sta nella scheda Percorso: qui una cosa
@@ -1243,15 +1251,14 @@ function contenutoFoglio(){
       <div class="stack" style="margin-top:12px">
         <button class="btn wide" data-act="conta" data-t="conversazione" data-id="${p.id}">
           Ho parlato con una persona <small>(${contaEventi(p.id,"conversazione")})</small></button>
-        <button class="btn wide" data-act="conta" data-t="presentazione" data-id="${p.id}">
-          Ho fatto una presentazione <small>(${contaEventi(p.id,"presentazione")})</small></button>
         <button class="btn wide" data-act="apri-vp" data-id="${p.id}">VP di questo mese (${vpDi(p.id)})</button>
       </div>
       <div class="sec"><span class="tag">Traguardi</span>
       ${(() => {
-        /* si mostrano solo quelli a portata: uno che comincia non deve leggere "Platino" */
+        /* Solo i traguardi del passo in cui si e', o gia' presi. Quello dopo non si spunta
+           in anticipo: comparirebbe "Path to Bronze" a chi sta cercando il primo cliente. */
         const f = faseDi(p.id);
-        const visibili = FATTI.filter(x => x.fase <= f+1 || primoEvento(p.id,x.t));
+        const visibili = FATTI.filter(x => x.fase <= f || primoEvento(p.id,x.t));
         const nascosti = FATTI.length - visibili.length;
         return visibili.map(x=>{
           const e = primoEvento(p.id,x.t);
@@ -1259,7 +1266,7 @@ function contenutoFoglio(){
             data-fatto="${x.t}" data-id="${p.id}">
             <span class="grow">${esc(x.label)}${e?`<br><small class="faint">${dataIt(e.at)}</small>`:``}</span></label>`;
         }).join("") + (nascosti?`<p class="small faint" style="margin-top:12px">
-          Gli altri traguardi compaiono quando ti avvicini.</p>`:``);
+          Gli altri traguardi compaiono quando è il loro turno.</p>`:``);
       })()}</div>` };
   }
 
