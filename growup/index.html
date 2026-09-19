@@ -126,6 +126,10 @@ label.field>span{display:block;font-size:13px;color:var(--ink2);margin-bottom:5p
 .micro .m{width:14px;flex:none;color:var(--ink3);font-weight:700}
 .micro li.ok .m{color:var(--verde)}
 .micro small{display:block;color:var(--ink3)}
+.chk small{display:block;color:var(--ink3);font-weight:400}
+.chk .mstat{width:24px;flex:none;text-align:center;font-weight:700;color:var(--ink3);font-size:17px}
+.chk .mstat.ok{color:var(--verde)}
+.chk.ok .grow{color:var(--ink2)}
 .btn.tolgo{background:transparent;border-color:transparent;color:var(--rosso);font-weight:600}
 .sec{margin-top:22px}
 .sec>.tag{display:block;margin-bottom:6px}
@@ -574,13 +578,16 @@ function mancanti(p){ return criteri(p, faseDi(p.id)); }
 function criteri(p, f){
   const out = [];
   const vpM = vpDi(p.id), gruppo = vpGruppo(p.id), figli = figliDi(p.id);
-  /* `azione` e `bottone`: una riga che si puo' chiudere da li', senza cercare dove si fa. */
-  const riga = (txt, fatto, nota, azione, bottone) =>
-    out.push({ txt, fatto, nota: fatto?null:nota, azione: fatto?null:azione, bottone });
+  /* Tre modi di chiudere una riga, e non di piu':
+     - `tipo`: e' un fatto che si dichiara -> casella da spuntare (l'evento e' la verita');
+     - `azione` + `bottone`: e' un numero che si aggiorna -> scorciatoia a dove si aggiorna;
+     - niente: e' un numero che dipende dagli altri, e si muove quando si muovono loro. */
+  const riga = (txt, fatto, nota, azione, bottone, tipo) =>
+    out.push({ txt, fatto, nota: fatto?null:nota, azione: fatto?null:azione, bottone, tipo });
 
   if(f===0){
     riga("Iscrizione completata", true);
-    riga("Il primo ordine", false);
+    riga("Il primo ordine", ha(p.id,"primo_ordine"), null, null, null, "primo_ordine");
     riga("Il tuo obiettivo scritto", !!(p.dichiarato && (p.dichiarato.euroMese || p.dichiarato.perche)),
          "quanto vuoi guadagnare, e perché", "apri-obiettivo", "Scrivilo adesso");
   }
@@ -588,16 +595,19 @@ function criteri(p, f){
   if(f===1){
     const mai = vpMaiRaggiunti(p.id);
     riga(`Arrivare a ${SOGLIE.vpAttivazione} VP in un mese`, mai>=SOGLIE.vpAttivazione,
-         `sei a ${mai}, ne mancano ${Math.max(0,SOGLIE.vpAttivazione-mai)}`);
-    riga("Il primo cliente che compra", ha(p.id,"primo_cliente"));
+         `sei a ${mai}, ne mancano ${Math.max(0,SOGLIE.vpAttivazione-mai)}`,
+         "apri-vp", "Aggiorna i VP");
+    riga("Il primo cliente che compra", ha(p.id,"primo_cliente"), null, null, null, "primo_cliente");
   }
 
   if(f===2){
     const c = SOGLIE.ptb, qualificate = lineeCon(p.id, c.vpLinea);
-    riga(`${c.linee} prime linee tue`, figli.length>=c.linee, `ne hai ${figli.length}`);
+    riga(`${c.linee} prime linee tue`, figli.length>=c.linee, `ne hai ${figli.length}`,
+         "apri-invita", "Invita una persona");
     riga(`Ognuna a ${c.vpLinea} VP questo mese`, qualificate>=c.linee,
          `${qualificate} su ${c.linee} ci sono arrivate`);
-    riga(`${c.vpPersonali} VP personali tuoi questo mese`, vpM>=c.vpPersonali, `sei a ${vpM}`);
+    riga(`${c.vpPersonali} VP personali tuoi questo mese`, vpM>=c.vpPersonali, `sei a ${vpM}`,
+         "apri-vp", "Aggiorna i VP");
     riga("Segnare il Path to Bronze quando arriva", false);
   }
 
@@ -607,10 +617,12 @@ function criteri(p, f){
     const livello = f===3 ? "9%" : "15%";
     const qualificate = lineeCon(p.id, c.vpLinea);
     riga(`${num(c.vpGruppo)} VP di gruppo questo mese (livello ${livello})`, gruppo>=c.vpGruppo, `siete a ${num(gruppo)}`);
-    riga(`${c.linee} linee frontali`, figli.length>=c.linee, `ne hai ${figli.length}`);
+    riga(`${c.linee} linee frontali`, figli.length>=c.linee, `ne hai ${figli.length}`,
+         "apri-invita", "Invita una persona");
     riga(`Ognuna a ${c.vpLinea} VP questo mese`, qualificate>=c.linee,
          `${qualificate} su ${c.linee} ci sono arrivate`);
-    riga(`${c.vpPersonali} VP personali tuoi questo mese`, vpM>=c.vpPersonali, `sei a ${vpM}`);
+    riga(`${c.vpPersonali} VP personali tuoi questo mese`, vpM>=c.vpPersonali, `sei a ${vpM}`,
+         "apri-vp", "Aggiorna i VP");
     riga(`Segnare ${nome} quando arriva`, false);
   }
 
@@ -920,13 +932,23 @@ function vistaOggi(){
       </div>
       <h2 style="margin-top:6px">Fase ${f} · ${esc(fase.nome)}</h2>
       <p class="small">${esc(fase.traguardo)}</p>
-      <ul class="micro" style="margin-top:10px">
-        ${lista.map(m=>`<li class="${m.fatto?"ok":""}">
-          <span class="m">${m.fatto?"✓":"○"}</span>
-          <span>${esc(m.txt)}${m.nota?`<small>${esc(m.nota)}</small>`:``}${
-            m.azione?`<br><button class="btn small" style="margin-top:6px" data-act="${m.azione}">${
-              esc(m.bottone||"Fallo adesso")}</button>`:``}</span></li>`).join("")}
-      </ul>
+      <div style="margin-top:6px">
+        ${lista.map(m=>{
+          /* Quello che si dichiara si spunta qui, senza passare da Registra. Quello che si
+             misura non si spunta -- sarebbe una bugia che l'app non puo' salvare -- e mostra
+             invece il pulsante che porta dove quel numero si aggiorna. */
+          const dentro = `<span class="grow">${esc(m.txt)}${m.nota?`<small>${esc(m.nota)}</small>`:``}${
+            m.azione?`<br><button class="btn small" style="margin-top:8px" data-act="${m.azione}">${
+              esc(m.bottone||"Fallo adesso")}</button>`:``}</span>`;
+          return m.tipo
+            ? `<label class="chk ${m.fatto?"ok":""}">
+                 <input type="checkbox" ${m.fatto?"checked":""} data-fatto="${m.tipo}" data-id="${p.id}">
+                 ${dentro}</label>`
+            : `<div class="chk ${m.fatto?"ok":""}">
+                 <span class="mstat ${m.fatto?"ok":""}">${m.fatto?"✓":"○"}</span>
+                 ${dentro}</div>`;
+        }).join("")}
+      </div>
       ${pronto
         ? `<button class="btn primary wide" style="margin-top:14px" data-act="fatto" data-t="${chiave}">
              Ho raggiunto ${esc(fase.nome)}</button>`
