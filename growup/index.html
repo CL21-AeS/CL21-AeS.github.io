@@ -234,15 +234,26 @@ const GRADINI = [
     struttura:["10.000 VP di gruppo nel mese",
                "distribuiti su almeno 2 linee commerciali"] }
 ];
+/* IL PEZZO CHE MANCA ALLE SIMULAZIONI.
+   Le cifre dei gradini comprendono coupon, bonus da tabella e incentivi, ma -- lo dice il
+   documento 00 -- **escludono il guadagno dalla vendita al dettaglio**. Confrontare la cifra
+   che uno vuole con una simulazione incompleta lo manda un gradino piu' su del necessario:
+   chi vuole 200 € si vedeva proporre la Bronze Foundation, quando il Path to Bronze piu' i
+   suoi clienti ci arriva gia'. Il margine qui sotto e' l'esempio ufficiale del documento 08
+   (10 clienti abituali da 50 € al mese = 500 € di fatturato, circa 80 € netti). */
+const CLIENTI = { quanti:10, spesa:50, margine:80 };
+function totaleDi(g){ return g.euro + CLIENTI.margine; }
+
 const NOTA_CIFRE = "Simulazione dal Calcolatore dei Guadagni Amway: ha valore didattico e di "
   + "riferimento, non è una promessa né una garanzia di reddito. I numeri veri stanno nel tuo "
   + "ufficio virtuale Amway.";
 
-/* Il primo gradino che arriva alla cifra chiesta. Oltre l'ultimo, si punta all'ultimo. */
+/* Il primo gradino che arriva alla cifra chiesta, contando anche il margine sui clienti.
+   Oltre l'ultimo, si punta all'ultimo. */
 function gradinoPer(euro){
   const e = Number(euro)||0;
   if(e<=0) return null;
-  return GRADINI.find(g => g.euro >= e) || GRADINI[GRADINI.length-1];
+  return GRADINI.find(g => totaleDi(g) >= e) || GRADINI[GRADINI.length-1];
 }
 function fatturatoDi(vp){ return Math.round(vp * VP_EURO); }
 /* 1187.08 -> "1.187,08": il punto separa le migliaia, la virgola i centesimi. */
@@ -371,6 +382,22 @@ function vpMese(id, m){
 }
 /* vpDi = i VP del mese in corso: e' il numero su cui si misurano le qualifiche. */
 function vpDi(id){ return vpMese(id, meseOra()); }
+/* Lo storico: un valore per mese, l'ultimo scritto in quel mese. I mesi chiusi non si
+   toccano piu' -- restano li' a dire cosa e' stato fatto, e il mese in corso riparte da zero. */
+function storicoVp(id){
+  const per = {};
+  for(const e of eventiDi(id)){
+    if(e.tipo!=="vp") continue;
+    const m = mese(e.at);
+    if(!m) continue;
+    if(!per[m] || e.at > per[m].at) per[m] = { at:e.at, vp:Number(e.valore)||0 };
+  }
+  return Object.keys(per).sort().reverse().map(m => ({ mese:m, vp:per[m].vp }));
+}
+function nomeMese(m){
+  const [a,b] = String(m).split("-");
+  return new Date(Number(a), Number(b)-1, 1).toLocaleDateString("it-IT",{month:"long",year:"numeric"});
+}
 
 /* Il massimo mai raggiunto in un mese: serve al traguardo d'attivazione, che si prende una volta. */
 function vpMaiRaggiunti(id){
@@ -524,34 +551,45 @@ function segnaliDi(id){
   if(pres >= 3) out.push({ k:"presentazioni", misurato:false, txt:`${pres} presentazioni segnate` });
   return out;
 }
-/* Tre gruppi e uno solo per persona, in quest'ordine di priorita':
-   chi ha bisogno adesso viene prima di chi va bene, sempre. */
-function valuta(id){
+/* ---- Chi si sta muovendo: due parametri, scelti apposta ----
+   1. AVANZA DI PASSO: ha chiuso una fase di recente, o gliene manca una voce sola.
+      E' il solo modo onesto di dire "si sta muovendo": misura il cammino, non lo sforzo.
+   2. TIENE AGGIORNATA L'APP: aperture e fatti segnati di sua iniziativa.
+      Attenzione a cosa significa: misura l'uso dell'app, non il lavoro. Chi lavora e non
+      segna non compare qui, e non va chiamato fermo -- va chiesto.
+   Volutamente NON ci sono i VP ne' le persone portate: sono gia' il traguardo, e chi e'
+   arrivato resterebbe in cima per sempre soffocando chi sta salendo adesso. */
+const MOVIMENTO = { giorniPasso: 30, giorniUso: 14 };
+
+function movimento(id){
   const p = S.persone[id]; if(!p) return null;
-  const f = faseDi(id), s = semaforo(id), vp = vpDi(id);
-  const figli = figliDi(id), attivi = attivatiSotto(id);
-  const daLeader = (figli.length >= 2 && attivi >= 1) || !!inPipeline(id);
-  const motivi = [];
+  const motivi = []; let punti = 0;
 
-  if(s.k === "n" || s.k === "r") motivi.push(s.txt);
-  if(f === 1 && vp > 0 && vp < SOGLIE.vpAttivazione && s.k !== "v")
-    motivi.push(`è a ${vp} VP e si è fermata`);
-  if(f === 1 && ha(id,"primo_cliente") === false && vp >= SOGLIE.vpAttivazione)
-    motivi.push("ha i VP, le manca solo il primo cliente");
-  if(f === 2 && figli.length > 0 && attivi < 3 && s.k !== "v")
-    motivi.push(`ha ${plur(figli.length,"persona","persone")}, ${attivi} partite su 3`);
-  if(f === 2 && figli.length === 0 && giorniTra(inizioFase(p), OGGI()) <= FASI[2].finestra)
-    motivi.push("attivata, non ha ancora portato nessuno");
-  if(motivi.length) return { gruppo:"seguire", motivi, stella:daLeader };
+  const chiuse = strada(p).filter(x => giorniTra(x.quando, OGGI()) <= MOVIMENTO.giorniPasso);
+  if(chiuse.length){
+    punti += 3 * chiuse.length;
+    const u = chiuse[chiuse.length-1], g = giorniTra(u.quando, OGGI());
+    motivi.push(`ha chiuso ${FASI[u.fase].nome} ${g<=0?"oggi":`${plur(g,"giorno","giorni")} fa`}`);
+  }
 
-  if(daLeader) return { gruppo:"crescere", motivi:segnaliDi(id).map(x=>x.txt), stella:true };
-  return { gruppo:"tempi", motivi:[s.txt], stella:false };
+  const manca = mancanti(p).filter(x => !x.fatto && !/^Segnare /.test(x.txt));
+  if(manca.length === 1){ punti += 2; motivi.push(`manca una voce sola: ${manca[0].txt.toLowerCase()}`); }
+
+  const ap = (S.aperture[id]||[]).filter(d => giorniTra(d, OGGI()) <= MOVIMENTO.giorniUso).length;
+  if(ap >= 2){ punti += Math.min(3, ap-1);
+    motivi.push(`ha aperto l'app ${ap} volte in ${MOVIMENTO.giorniUso} giorni`); }
+
+  const suoi = eventiDi(id).filter(e => e.by===id && giorniTra(e.at, OGGI()) <= MOVIMENTO.giorniUso).length;
+  if(suoi >= 2){ punti += 1; motivi.push(`ha segnato ${suoi} cose da solo`); }
+
+  return punti > 0 ? { punti, motivi } : null;
 }
 
-function inPipeline(id){
-  const s = segnaliDi(id);
-  if(s.some(x=>x.k==="duplicazione") && s.length >= 2) return s;
-  return s.length >= SOGLIE.segnaliPerPipeline ? s : null;
+/* Il riassunto: il ramo intero, i primi cinque che si muovono. */
+function chiSiMuove(){
+  if(!S.me) return [];
+  return discendenti(S.me).map(x => ({ x, m:movimento(x.id) }))
+    .filter(o => o.m).sort((a,b) => b.m.punti - a.m.punti).slice(0,5);
 }
 
 /* L'obiettivo dichiarato, tradotto in struttura da costruire.
@@ -565,7 +603,7 @@ function obiettivo(p){
   const g = gradinoPer(euroMese);
   const mesi = Number(d.mesi)||null;
   return { euroMese, mesi, gradino:g, perche:d.perche||null,
-           oltre: euroMese > GRADINI[GRADINI.length-1].euro,
+           oltre: euroMese > totaleDi(GRADINI[GRADINI.length-1]),
            preso: false };
 }
 
@@ -723,9 +761,9 @@ function render(){
   else{
     switch(vista){
       case "oggi":     app.innerHTML = vistaOggi(); break;
+      case "obiettivo":app.innerHTML = vistaObiettivo(); break;
       case "percorso": app.innerHTML = vistaPercorso(); break;
       case "persone":  app.innerHTML = vistaPersone(); break;
-      case "valuta":   app.innerHTML = vistaValuta(); break;
       case "dati":     app.innerHTML = vistaDati(); break;
       default:         app.innerHTML = vistaOggi();
     }
@@ -741,15 +779,15 @@ function disegnaTabs(){
   const t = document.getElementById("tabs");
   if(!S.me){ t.style.display="none"; return; }
   t.style.display="flex";
+  /* Quattro voci, una per cosa: cosa faccio adesso, dove voglio arrivare, la scala intera,
+     le mie persone. *Persone* nasce con la prima persona (o subito, per il capofila).
+     *Dati* non e' una linguetta: ci si arriva dal fondo di Oggi, si apre due volte l'anno. */
   const voci = [
-    { k:"oggi", i:"◉", l:"Oggi" },
-    { k:"percorso", i:"↗", l:"Percorso" }
+    { k:"oggi",      i:"◉", l:"Oggi" },
+    { k:"obiettivo", i:"◎", l:"Obiettivo" },
+    { k:"percorso",  i:"↗", l:"Percorso" }
   ];
-  if(hoPersone() || sonoLeader()){
-    voci.push({ k:"persone", i:"◍", l:"Persone" });
-    voci.push({ k:"valuta",  i:"◈", l:"Chi seguire" });
-  }
-  voci.push({ k:"dati", i:"≡", l:"Dati" });
+  if(hoPersone() || sonoLeader()) voci.push({ k:"persone", i:"◍", l:"Persone" });
   t.innerHTML = voci.map(v =>
     `<button class="${vista===v.k?"on":""}" data-tab="${v.k}"><b>${v.i}</b>${esc(v.l)}</button>`
   ).join("");
@@ -880,38 +918,7 @@ function vistaOggi(){
     </div>
   </div>
 
-  ${(() => {
-    /* L'obiettivo, tradotto in struttura. La cifra dice a quale gradino si punta; il gradino
-       dice cosa c'e' da costruire. Le cifre sono simulazioni ufficiali e viaggiano sempre con
-       la loro nota: proiezioni sulla rete di una persona non se ne fanno. */
-    const o = obiettivo(p);
-    if(!o) return "";
-    const g = o.gradino, arrivato = faseDi(p.id) > g.fase || ha(p.id, g.k);
-    return `
-    <div class="card tight">
-      <span class="tag">Il tuo obiettivo</span>
-      <h2 style="margin:6px 0 2px">${num(o.euroMese)} € al mese${
-        o.mesi?` <span class="faint">entro ${plur(o.mesi,"mese","mesi")}</span>`:``}</h2>
-      ${o.perche?`<p class="small faint">${esc(o.perche)}</p>`:``}
-      <p class="small" style="margin-top:8px">Il gradino che ci arriva:
-        <b>${esc(g.nome)}</b>${g.livello?` — livello ${g.livello}`:``}${
-        arrivato?` · <span class="pill v">preso</span>`:``}</p>
-      ${o.oltre?`<p class="small">La tua cifra sta oltre l'Argento, che è l'ultimo gradino di
-        questo percorso: si punta lì, e da lì in avanti se ne parla con il tuo sponsor.</p>`:``}
 
-      <span class="tag" style="display:block;margin-top:14px">Cosa devi costruire</span>
-      <ul class="micro">
-        ${g.struttura.map(x=>`<li><span class="m">▸</span><span>${esc(x)}</span></li>`).join("")}
-        ${g.vpGruppo?`<li><span class="m">≈</span><span>${num(fatturatoDi(g.vpGruppo))} € di fatturato
-          del gruppo nel mese<small>${num(g.vpGruppo)} VP × ${String(VP_EURO).replace(".", ",")} €</small></span></li>`:``}
-      </ul>
-
-      <p class="small faint" style="margin-top:12px">Riferimento ${esc(g.nome)}:
-        ${euroIt(g.euro)} € al mese, in media ${esc(g.media)} dall'iscrizione.
-        ${esc(NOTA_CIFRE)}</p>
-      <button class="btn small" style="margin-top:10px" data-act="apri-obiettivo">Cambia l'obiettivo</button>
-    </div>`;
-  })()}
 
   ${(() => {
     /* SOLO il passo in cui si e'. Il percorso intero sta nella scheda Percorso: qui una cosa
@@ -962,11 +969,33 @@ function vistaOggi(){
     ${daSeguire.map(o=>rigaPersona(o.x)).join("")}
   </div>`:``}
 
-  ${p.dichiarato && p.dichiarato.perche ? `
-  <div class="card tight">
-    <span class="tag">Il tuo perché</span>
-    <p style="margin:6px 0 0">${esc(p.dichiarato.perche)}</p>
-  </div>`:``}
+  ${(() => {
+    /* I VP SONO UN DATO MENSILE. Il primo del mese si riparte da zero: non e' un errore
+       dell'app ed e' la cosa che confonde di piu'. Percio' il mese in corso sta qui, sempre
+       aggiornabile, e i mesi chiusi restano sotto -- archiviati, non cancellati. */
+    const storia = storicoVp(p.id);
+    const corrente = storia.find(x => x.mese === meseOra());
+    const passati = storia.filter(x => x.mese !== meseOra()).slice(0,6);
+    return `
+    <div class="card tight">
+      <div class="spread">
+        <span class="tag">I tuoi VP</span>
+        <span class="pill">${esc(nomeMese(meseOra()))}</span>
+      </div>
+      <h2 style="margin:6px 0 2px">${num(vpDi(p.id))} VP${
+        corrente?``:` <span class="faint">— ancora niente questo mese</span>`}</h2>
+      <p class="small faint">I VP si contano mese per mese: il primo del mese si riparte da zero,
+      e il mese chiuso resta qui sotto. Aggiornali quando vuoi, anche più volte.</p>
+      <button class="btn wide" style="margin-top:10px" data-act="apri-vp">Aggiorna i VP di ${
+        esc(nomeMese(meseOra()).split(" ")[0])}</button>
+      ${passati.length?`
+        <span class="tag" style="display:block;margin-top:16px">Mesi archiviati</span>
+        <ul class="micro">
+          ${passati.map(x=>`<li><span class="m">·</span><span>${esc(nomeMese(x.mese))}<small>${
+            num(x.vp)} VP</small></span></li>`).join("")}
+        </ul>`:``}
+    </div>`;
+  })()}
 
   ${az.azione!=="invita" ? `
   <div class="sec">
@@ -977,7 +1006,79 @@ function vistaOggi(){
 
   ${salvaKo?`<div class="card warn"><b>Questo browser non salva.</b>
     <p class="small">Se sei in navigazione privata quello che segni sparisce alla chiusura.</p></div>`:``}
+
+  <div class="sec" style="text-align:center">
+    <button class="btn ghost small" data-tab="dati">Dati e impostazioni</button>
+  </div>
   `;
+}
+
+/* --- Obiettivo: dove vuole arrivare, e cosa deve costruire per arrivarci. --- */
+function vistaObiettivo(){
+  const p = io();
+  const o = obiettivo(p);
+  if(!o) return `
+    <h1>Il tuo obiettivo</h1>
+    <p class="small">Da due numeri — quanto vuoi guadagnare al mese e tra quanto tempo — l'app
+    ricava il traguardo a cui puntare e la struttura da costruire per arrivarci.</p>
+    <div class="card stack">
+      <h2>Non l'hai ancora scritto</h2>
+      <p class="small">Ci vuole un minuto, e si cambia quando cambia.</p>
+      <button class="btn primary wide" data-act="apri-obiettivo">Scrivi il tuo obiettivo</button>
+    </div>`;
+
+  /* La cifra dice a quale gradino si punta; il gradino dice cosa c'e' da costruire.
+     Le cifre sono simulazioni ufficiali e viaggiano sempre con la loro nota:
+     proiezioni sulla rete di una singola persona non se ne fanno mai. */
+  const g = o.gradino, arrivato = faseDi(p.id) > g.fase || ha(p.id, g.k);
+  return `
+  <h1>Il tuo obiettivo</h1>
+  <div class="card tight">
+    <h2 style="margin:0 0 2px">${num(o.euroMese)} € al mese${
+      o.mesi?` <span class="faint">entro ${plur(o.mesi,"mese","mesi")}</span>`:``}</h2>
+    <p class="small">Il gradino che ci arriva:
+      <b>${esc(g.nome)}</b>${g.livello?` — livello ${g.livello}`:``}${
+      arrivato?` · <span class="pill v">preso</span>`:``}</p>
+    ${o.oltre?`<p class="small">La tua cifra sta oltre l'Argento, che è l'ultimo gradino di questo
+      percorso: si punta lì, e da lì in avanti se ne parla con il tuo sponsor.</p>`:``}
+    <button class="btn small" style="margin-top:10px" data-act="apri-obiettivo">Cambia l'obiettivo</button>
+  </div>
+
+  <div class="card">
+    <span class="tag">La struttura da costruire</span>
+    <ul class="micro" style="margin-top:8px">
+      ${g.struttura.map(x=>`<li><span class="m">▸</span><span>${esc(x)}</span></li>`).join("")}
+      <li><span class="m">▸</span><span>Una base di clienti: circa ${CLIENTI.quanti} abituali
+        da ${CLIENTI.spesa} € al mese<small>≈ ${CLIENTI.margine} € netti di margine, che i bonus
+        del gradino non comprendono</small></span></li>
+    </ul>
+    ${g.vpGruppo?`
+    <span class="tag" style="display:block;margin-top:16px">Il fatturato che serve</span>
+    <div class="kpi" style="margin-top:8px">
+      <div><b>${num(g.vpGruppo)}</b><span>VP di gruppo</span></div>
+      <div><b>${num(fatturatoDi(g.vpGruppo))} €</b><span>di fatturato</span></div>
+    </div>
+    <p class="small faint" style="margin-top:8px">Nel mese, tutto insieme.
+      ${num(g.vpGruppo)} VP × ${String(VP_EURO).replace(".", ",")} € a VP.</p>`:``}
+  </div>
+
+  <div class="card tight">
+    <span class="tag">Il riferimento economico</span>
+    <p class="small" style="margin-top:6px"><b>${euroIt(g.euro)} €</b> al mese fra coupon, bonus e
+    incentivi, più circa <b>${CLIENTI.margine} €</b> di margine con ${CLIENTI.quanti} clienti
+    abituali da ${CLIENTI.spesa} € — in tutto circa <b>${euroIt(totaleDi(g))} €</b>.</p>
+    <p class="small">In media ${esc(g.media)} dall'iscrizione, per chi ci lavora con metodo.</p>
+    <p class="small faint">${esc(NOTA_CIFRE)}</p>
+  </div>
+
+  ${o.perche?`
+  <div class="card tight">
+    <span class="tag">Il tuo perché</span>
+    <p style="margin:6px 0 0">${esc(o.perche)}</p>
+  </div>`:``}
+
+  <p class="small faint" style="margin-top:16px">Quello che devi fare <b>adesso</b> per arrivarci
+  sta in <b>Oggi</b>. Tutta la scala, fino all'Argento, sta in <b>Percorso</b>.</p>`;
 }
 
 /* --- Percorso: si vede il futuro, si è guidati sul presente. --- */
@@ -1046,7 +1147,7 @@ function ordinaPersone(a,b){
 function nodoAlbero(x, prof){
   const figli = figliDi(x.id).sort(ordinaPersone);
   const sotto = discendenti(x.id).length;
-  const s = semaforo(x.id), f = faseDi(x.id), pipe = inPipeline(x.id);
+  const s = semaforo(x.id), f = faseDi(x.id), mv = movimento(x.id);
   const chiuso = chiusi.has(x.id);
   const leva = figli.length
     ? `<button class="tw" data-toggle="${x.id}" aria-label="apri o chiudi">${chiuso?"▶":"▼"}</button>`
@@ -1056,7 +1157,7 @@ function nodoAlbero(x, prof){
       <button class="person" data-persona="${x.id}">
         <span class="dot ${s.k}"></span>
         <span class="grow">
-          <b>${esc(x.nome)}</b>${pipe?` <span class="pill s">★</span>`:``}
+          <b>${esc(x.nome)}</b>${mv&&mv.punti>=4?` <span class="pill s">★</span>`:``}
           ${sotto?` <span class="sotto">${sotto} sotto</span>`:``}
           <br><small>Giorno ${giorniTra(x.creato,OGGI())} · Fase ${f} · ${vpDi(x.id)} VP</small>
           <br><small class="faint">${esc(s.txt)}</small>
@@ -1076,11 +1177,11 @@ function rigaPersona(x, mostraSponsor){
   const s = semaforo(x.id);
   const f = faseDi(x.id);
   const g = giorniTra(x.creato, OGGI());
-  const pipe = inPipeline(x.id);
+  const mv = movimento(x.id);
   return `<button class="person" data-persona="${x.id}">
     <span class="dot ${s.k}"></span>
     <span class="grow">
-      <b>${esc(x.nome)}</b>${pipe?` <span class="pill s">★</span>`:``}
+      <b>${esc(x.nome)}</b>${mv&&mv.punti>=4?` <span class="pill s">★</span>`:``}
       <br><small>Giorno ${g} · Fase ${f} ${esc(FASI[f].breve)} · ${vpDi(x.id)} VP</small>
       <br><small class="faint">${esc(s.txt)}${mostraSponsor&&x.sponsor&&S.persone[x.sponsor]?` · sponsor ${esc(S.persone[x.sponsor].nome.split(" ")[0])}`:""}</small>
     </span>
@@ -1123,10 +1224,41 @@ function vistaPersone(){
     ${daSeguire?`<p class="small" style="margin:10px 0 0">${plur(daSeguire,"persona","persone")}
       non aggiorna da più di ${SOGLIE.gialloGiorni} giorni.</p>`:``}
   </div>
-  <div class="card">
-    ${tutti.length ? alberoDi(S.me)
-      : `<div class="empty"><b>Ancora nessuno</b>Invita la prima persona: appena entra la vedi qui,
-         senza doverla inserire.</div>`}
+  ${(() => {
+    /* CHI SI MUOVE. Due parametri soli (vedi movimento()): chi avanza di passo e chi tiene
+       aggiornata l'app. Lo vede chiunque abbia persone sotto, non solo il capofila: a lui
+       serve per sapere chi chiamare, e non e' una classifica di merito -- e' una lista di
+       nomi da cercare. Chi non compare non e' fermo: e' uno che non ha segnato niente. */
+    const mossi = chiSiMuove();
+    if(!tutti.length) return "";
+    return `
+    <div class="sec">
+      <span class="tag">Chi si sta muovendo</span>
+      <div class="card">
+        ${mossi.length ? mossi.map(o=>`
+          <button class="person" data-persona="${o.x.id}">
+            <span class="dot ${semaforo(o.x.id).k}"></span>
+            <span class="grow">
+              <b>${esc(o.x.nome)}</b> <span class="pill s">★</span>
+              <br><small class="faint">${esc(o.m.motivi.join(" · "))}</small>
+            </span>
+            <span class="chev">›</span></button>`).join("")
+        : `<div class="empty"><b>Ancora nessuno</b>Qui compaiono le persone che chiudono un passo
+           o che tengono aggiornata l'app. Nessuno l'ha fatto negli ultimi giorni.</div>`}
+      </div>
+      <p class="small faint" style="margin-top:8px">Si muove = ha chiuso un passo di recente, o
+      gliene manca una voce sola, o sta segnando quello che fa. Non conta i VP né le persone
+      portate: quelli sono il traguardo, non il movimento.</p>
+    </div>`;
+  })()}
+
+  <div class="sec">
+    <span class="tag">Tutto il tuo ramo</span>
+    <div class="card">
+      ${tutti.length ? alberoDi(S.me)
+        : `<div class="empty"><b>Ancora nessuno</b>Invita la prima persona: appena entra la vedi qui,
+           senza doverla inserire.</div>`}
+    </div>
   </div>
   <div class="stack">
     <button class="btn primary wide" data-act="apri-invita">Invita una persona</button>
@@ -1141,57 +1273,6 @@ function vistaPersone(){
 }
 
 /* --- Chi seguire: la valutazione delle persone del gruppo. --- */
-function rigaValutata(x, v){
-  return `<button class="person" data-persona="${x.id}">
-    <span class="dot ${semaforo(x.id).k}"></span>
-    <span class="grow">
-      <b>${esc(x.nome)}</b>${v.stella?` <span class="pill s">★</span>`:``}
-      <br><small>Giorno ${giorniTra(x.creato,OGGI())} · Fase ${faseDi(x.id)} ${esc(FASI[faseDi(x.id)].breve)}</small>
-      <br><small class="faint">${esc(v.motivi.filter(Boolean).join(" · ") || "—")}</small>
-    </span>
-    <span class="chev">›</span></button>`;
-}
-
-function vistaValuta(){
-  const tutti = discendenti(S.me);
-  const gruppi = { seguire:[], crescere:[], tempi:[] };
-  tutti.forEach(x => { const v = valuta(x.id); if(v) gruppi[v.gruppo].push({x, v}); });
-  const ord = a => a.sort((p,q)=>PESO[semaforo(p.x.id).k]-PESO[semaforo(q.x.id).k]);
-  ord(gruppi.seguire); ord(gruppi.tempi);
-  gruppi.crescere.sort((p,q)=>q.v.motivi.length-p.v.motivi.length);
-
-  const blocco = (titolo, spiega, lista, vuoto) => `
-    <div class="sec">
-      <span class="tag">${titolo}</span>
-      <p class="small" style="margin:2px 0 8px">${spiega}</p>
-      <div class="card">${lista.length
-        ? lista.map(o=>rigaValutata(o.x,o.v)).join("")
-        : `<div class="empty">${vuoto}</div>`}</div>
-    </div>`;
-
-  return `
-  <h1>Chi seguire</h1>
-  <p class="small">${tutti.length
-    ? `${plur(tutti.length,"persona","persone")} nel tuo ramo, divise per quello che serve loro adesso.`
-    : "Quando avrai persone nel gruppo, qui trovi chi ha bisogno di te."}</p>
-
-  ${blocco("Da seguire adesso",
-    "Si sono fermate, o sono a un passo da un traguardo. Una telefonata cambia qualcosa.",
-    gruppi.seguire, "Nessuno è fermo. È una buona notizia.")}
-
-  ${blocco("Da far crescere",
-    "Portano persone e le fanno partire. Su queste vale il tuo tempo migliore.",
-    gruppi.crescere, "Nessuno, per ora. Sono pochi per definizione.")}
-
-  ${blocco("Ai loro tempi",
-    "Si muovono, ma senza costruire. Vanno lasciate andare al loro passo: inseguirle non le accelera.",
-    gruppi.tempi, "Nessuno qui.")}
-
-  <p class="small faint" style="margin-top:16px">I gruppi si rifanno da soli a ogni apertura,
-  su quello che le persone segnano. Nessuno sa in quale gruppo è: lo vedi solo tu.</p>`;
-}
-
-/* --- Dati: copia, invito, sincronizzazione --- */
 function vistaDati(){
   const p = io();
   return `
@@ -1374,7 +1455,7 @@ function contenutoFoglio(){
     const p = S.persone[foglio.dati.id];
     if(!p) return { titolo:"—", body:"" };
     const f = faseDi(p.id), s = semaforo(p.id), r = ritmoDi(p);
-    const sg = segnaliDi(p.id), pipe = inPipeline(p.id);
+    const sg = segnaliDi(p.id), mv = movimento(p.id);
     const figli = figliDi(p.id);
     const mio = p.sponsor===S.me || sonoLeader();
     const suaAzione = prossimaAzione(p);
@@ -1385,7 +1466,7 @@ function contenutoFoglio(){
       <div class="row wrap" style="gap:6px">
         <span class="pill ${s.k}">${({v:"🟢",g:"🟡",r:"🔴",n:"⚪"})[s.k]} ${esc(s.txt)}</span>
         ${r?`<span class="pill">${esc(r.txt)}</span>`:``}
-        ${pipe?`<span class="pill s">★ pipeline</span>`:``}
+        ${mv&&mv.punti>=4?`<span class="pill s">★ si sta muovendo</span>`:``}
       </div>
 
       <div class="card">
@@ -1429,7 +1510,7 @@ function contenutoFoglio(){
         </div>`;
       })()}
 
-      ${sg.length?`<div class="card tight"><span class="tag">${pipe?"Perché è in pipeline":"Segnali"}</span>
+      ${sg.length?`<div class="card tight"><span class="tag">Segnali</span>
         <ul class="steps" style="margin-top:8px">${sg.map(x=>`<li>
           <span class="mark">${x.misurato?"◆":"◇"}</span>
           <span class="grow">${esc(x.txt)}
