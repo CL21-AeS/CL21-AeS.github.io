@@ -1749,7 +1749,10 @@ document.addEventListener("click", async ev => {
 
   if(a==="reset"){
     if(!confirm("Cancella tutti i dati da questo telefono. Sicuro?")) return;
-    localStorage.removeItem(CHIAVE); S = vuoto(); vista="oggi"; foglio=null; return render();
+    /* Via anche la chiave del vecchio nome: se resta, `carica()` la ritravasa al prossimo
+       avvio e i dati "cancellati" tornano da soli. */
+    localStorage.removeItem(CHIAVE); localStorage.removeItem(CHIAVE_VECCHIA);
+    S = vuoto(); vista="oggi"; foglio=null; return render();
   }
 });
 
