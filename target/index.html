@@ -684,8 +684,9 @@
     tre mettono fuori target: sette «sì con riserva» non sono la stessa cosa di sei sì pieni e un
     rifiuto. Le riserve si sciolgono parlando, un no secco no.</p>
     <p class="small muted">Tre risposte sono <strong>knock-out</strong> e valgono più del punteggio:
-    non cambierei niente, zero tempo, «ho bisogno di un risultato immediato». La quarta — chi metterebbe
-    meno di 55 € — non è un no alla persona ma un «non ora».</p>
+    non cambierei niente, zero tempo, «ho bisogno di un risultato immediato». L'avvio economico invece
+    <strong>non esclude nessuno</strong>: chi metterebbe meno di 55 € prende zero punti come ogni altro
+    no secco, e te lo ritrovi segnalato fra i punti da affrontare.</p>
   </div>
 </section>
 
@@ -888,7 +889,7 @@ var Q = [
     tema: 'L\'avvio',
     t: 'Quanto saresti disposto a investire per iniziare una tua attività?',
     o: [
-      { t: 'Meno di 55 €', p: 0, s: 'meno di quanto serve', ko: 'avvio' },
+      { t: 'Meno di 55 €', p: 0, s: 'meno di quanto serve' },
       { t: 'Da 55 € a 150 €', p: 2, s: 'fino a 150 €' },
       { t: 'Oltre 150 €', p: 4, s: 'oltre 150 €' }
     ]
@@ -904,7 +905,7 @@ var SCOPERTI = [
   'Vuole fare a modo suo. Qui il valore sono la squadra e il metodo: chi va per conto proprio brucia la lista e si ferma. Verifica quanto è disposto a farsi affiancare, prima di aprire il piano.',
   'Chiuso o riservato sul contatto con le persone. Non è squalificante di per sé — si impara — ma serve accertarsi che sia disposto a imparare, non solo a evitare.',
   'Le opinioni intorno a lui lo condizionano. Chiarisci presto la posizione di partner e famiglia: se una persona vicina lo frena, si ferma dopo poche settimane.',
-  'Avvio: oggi metterebbe meno di quanto serve per partire. Non è un giudizio sulla persona, è il momento: la strada è farlo partire da cliente e riparlarne fra qualche mese. Non insistere.'
+  'Oggi metterebbe meno di quanto serve per partire. Non è un giudizio sulla persona, è il momento — e spesso è una cifra detta al buio, senza sapere cosa riceve in cambio. Affrontalo prima del piano: se il resto regge, spiegagli com\'è fatta la partenza; se la cifra resta un problema, fallo partire da cliente e riparlane più avanti.'
 ];
 
 /* ─── UTILITÀ ─────────────────────────────────────────────────────────────── */
@@ -1066,10 +1067,6 @@ function valuta(a) {
     azione = 'Non dare il piano. Manca una condizione di base (' + ko.join(', ') +
       '): un piano qui non convince, e se convince porta dentro una persona che si ferma in poche settimane. ' +
       'Chiudi con onestà — «guarda, per come me l\'hai raccontata questa cosa non fa per te» — e, se i prodotti gli possono servire, proponigli di restare come cliente. Il rapporto resta intatto, e fra un anno la situazione può essere diversa.';
-  } else if (ko.indexOf('avvio') > -1) {
-    band = 'care';
-    titolo = 'Non ora — solo per l\'avvio economico';
-    azione = 'Non è un no alla persona: oggi la cifra di partenza non c\'è. Fallo partire come cliente, tienilo vicino e riparlane fra qualche mese. Se il resto del punteggio è alto, vale la pena ricontattarlo: è la persona giusta nel momento sbagliato.';
   } else if (livello === 3) {
     band = 'go';
     titolo = 'In target — dagli il piano';
