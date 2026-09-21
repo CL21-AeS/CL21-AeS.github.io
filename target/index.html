@@ -16,33 +16,33 @@
      contatto non vede mai: nessuno dei due usi si pesta i piedi.
      ─────────────────────────────────────────────────────────────────────── */
   :root {
-    --ground: #F4EEE7;
+    --ground: #EDF1FC;
     --surface: #FFFFFF;
-    --surface-2: #FBF7F2;
-    --ink: #2E3742;
-    --ink-2: #6A7381;
-    --ink-3: #8C867F;
-    --taupe: #A9968C;
-    --rule: #E7DFD8;
-    --rule-soft: #EFE9E3;
-    --accent: #2E3742;
-    --accent-ink: #FBF8F5;
-    --accent-wash: #F3F0EC;
-    --mark: #9E2B2B;
-    --mark-caldo: #C2542F;   /* la seconda tinta del mattone, per i riempimenti */
-    --mark-wash: #FDF2F0;
-    --good: #1F6A4C;
-    --warn: #8A6410;
-    --crit: #9E2B2B;
-    --off: #8C867F;
-    --focus: #9E2B2B;
+    --surface-2: #F5F8FF;
+    --ink: #14205C;
+    --ink-2: #55618F;
+    --ink-3: #808AAE;
+    --taupe: #98A0BF;
+    --rule: #D8DFF3;
+    --rule-soft: #E6EBF9;
+    --accent: #1F3BC4;
+    --accent-ink: #FFFFFF;
+    --accent-wash: #E7ECFD;
+    --mark: #F0533B;
+    --mark-caldo: #FF7A52;   /* la seconda tinta del corallo, per i riempimenti */
+    --mark-wash: #FFF0EC;
+    --good: #0E9C6E;
+    --warn: #E08A00;
+    --crit: #E03B3B;
+    --off: #808AAE;
+    --focus: #1F3BC4;
     --luce: rgba(255, 255, 255, .9);
-    --go-wash: #E4F0E8;
-    --care-wash: #F6EEDB;
-    --alone-1: rgba(158, 43, 43, .07);
-    --alone-2: rgba(184, 134, 59, .08);
-    --shadow: 0 1px 2px rgba(46, 55, 66, .04), 0 2px 6px rgba(46, 55, 66, .04), 0 14px 32px rgba(46, 55, 66, .09);
-    --shadow-alto: 0 2px 4px rgba(46, 55, 66, .05), 0 18px 40px rgba(46, 55, 66, .13);
+    --go-wash: #DFF5EC;
+    --care-wash: #FDF0DA;
+    --alone-1: rgba(31, 59, 196, .12);
+    --alone-2: rgba(240, 83, 59, .12);
+    --shadow: 0 1px 2px rgba(20, 32, 92, .05), 0 2px 6px rgba(20, 32, 92, .05), 0 14px 32px rgba(20, 32, 92, .10);
+    --shadow-alto: 0 2px 4px rgba(20, 32, 92, .06), 0 18px 40px rgba(20, 32, 92, .15);
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
     --serif: "Fraunces", Georgia, "Times New Roman", serif;
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
@@ -53,30 +53,29 @@
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --ground: #1A2028; --surface: #232B35; --surface-2: #29323D;
-      --ink: #F1EBE4; --ink-2: #A3AEBA; --ink-3: #8A94A0; --taupe: #9AA3AE;
-      --rule: #37414D; --rule-soft: #2E3743;
-      --accent: #C9645C; --accent-ink: #1C232B; --accent-wash: #2B3440;
-      --mark: #D97A72; --mark-caldo: #E0A15C; --mark-wash: #33302F;
-      --good: #5FB88C; --warn: #D6A354; --crit: #E08A80; --off: #8A94A0; --focus: #D97A72;
+      --ground: #0E1426; --surface: #172041; --surface-2: #1E2950;
+      --ink: #E9EDFB; --ink-2: #A6B2D6; --ink-3: #8C99BF; --taupe: #98A3C6;
+      --rule: #2D3A66; --rule-soft: #253159;
+      --accent: #5B7BFF; --accent-ink: #0B1022; --accent-wash: #1C2750;
+      --mark: #FF7A60; --mark-caldo: #FFA084; --mark-wash: #2E2138;
+      --good: #4FD1A0; --warn: #F0B457; --crit: #FF8080; --off: #8C99BF; --focus: #5B7BFF;
       --luce: rgba(255, 255, 255, .07);
-    --go-wash: #22362D; --care-wash: #37301F;
-      --go-wash: #22362D; --care-wash: #37301F;
-      --luce: rgba(255, 255, 255, .07);
-    --alone-1: rgba(201, 100, 92, .16); --alone-2: rgba(224, 161, 92, .10);
+      --go-wash: #123329; --care-wash: #33290F;
+      --alone-1: rgba(91, 123, 255, .20); --alone-2: rgba(255, 122, 96, .14);
       --shadow: 0 1px 2px rgba(0,0,0,.3), 0 14px 34px rgba(0,0,0,.45);
       --shadow-alto: 0 2px 6px rgba(0,0,0,.35), 0 22px 48px rgba(0,0,0,.55);
       color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
-    --ground: #1A2028; --surface: #232B35; --surface-2: #29323D;
-    --ink: #F1EBE4; --ink-2: #A3AEBA; --ink-3: #8A94A0; --taupe: #9AA3AE;
-    --rule: #37414D; --rule-soft: #2E3743;
-    --accent: #C9645C; --accent-ink: #1C232B; --accent-wash: #2B3440;
-    --mark: #D97A72; --mark-caldo: #E0A15C; --mark-wash: #33302F;
-    --good: #5FB88C; --warn: #D6A354; --crit: #E08A80; --off: #8A94A0; --focus: #D97A72;
-    --alone-1: rgba(201, 100, 92, .16); --alone-2: rgba(224, 161, 92, .10);
+    --ground: #0E1426; --surface: #172041; --surface-2: #1E2950;
+    --ink: #E9EDFB; --ink-2: #A6B2D6; --ink-3: #8C99BF; --taupe: #98A3C6;
+    --rule: #2D3A66; --rule-soft: #253159;
+    --accent: #5B7BFF; --accent-ink: #0B1022; --accent-wash: #1C2750;
+    --mark: #FF7A60; --mark-caldo: #FFA084; --mark-wash: #2E2138;
+    --good: #4FD1A0; --warn: #F0B457; --crit: #FF8080; --off: #8C99BF; --focus: #5B7BFF;
+    --go-wash: #123329; --care-wash: #33290F;
+    --alone-1: rgba(91, 123, 255, .20); --alone-2: rgba(255, 122, 96, .14);
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 14px 34px rgba(0,0,0,.45);
     --shadow-alto: 0 2px 6px rgba(0,0,0,.35), 0 22px 48px rgba(0,0,0,.55);
     color-scheme: dark;
@@ -242,7 +241,15 @@
   .opt.sel .lett span { display: none; }
 
   /* ── Elenco schede ─────────────────────────────────────────────────── */
+  /* Gli attrezzi dell'archivio: ricerca e ordinamento, affiancati se c'è spazio. */
+  .cerca { display: flex; gap: 10px; flex-wrap: wrap; }
+  .cerca .field { flex: 1 1 190px; min-width: 0; }
+  .cerca .field.stretto { flex: 0 1 200px; }
   .rows { display: flex; flex-direction: column; }
+  .row mark {
+    background: var(--mark-wash); color: var(--mark); font-weight: 700;
+    border-radius: 3px; padding: 0 1px;
+  }
   .row {
     display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
     padding: 14px 10px; border: 0; border-bottom: 1px solid var(--rule-soft);
@@ -533,7 +540,25 @@
   <div class="card stack">
     <h2>Le tue schede</h2>
     <p class="small muted" id="a-vuoto" hidden>Ancora niente. Prepara il primo invito dalla home.</p>
+    <div class="cerca" id="a-strumenti" hidden>
+      <div class="field">
+        <label class="small muted" for="a-cerca">Cerca</label>
+        <input type="text" id="a-cerca" placeholder="Un nome o un codice"
+               autocomplete="off" spellcheck="false" autocapitalize="off">
+      </div>
+      <div class="field stretto">
+        <label class="small muted" for="a-ordina">Ordina</label>
+        <select id="a-ordina">
+          <option value="recenti">Dai più recenti</option>
+          <option value="vecchi">Dai meno recenti</option>
+          <option value="nome">Nome, dalla A alla Z</option>
+        </select>
+      </div>
+    </div>
+    <p class="tiny" id="a-conta" hidden></p>
     <div class="rows" id="a-rows"></div>
+    <p class="small muted" id="a-niente" hidden>Nessun nome corrisponde.
+    <button class="linkish" id="a-azzera">Azzera la ricerca</button></p>
   </div>
   <div class="card stack">
     <h2>La tua copia</h2>
@@ -1444,25 +1469,79 @@ function apriInvito(scheda) {
 }
 
 /* ─── MODALITÀ PARTNER: ARCHIVIO ──────────────────────────────────────────── */
+/* Senza accenti e senza maiuscole: «Nicolò» si trova scrivendo «nicolo», e la
+   lunghezza resta la stessa del testo originale, così gli indici combaciano e
+   l'evidenziazione cade sulle lettere giuste. */
+function piatto(t) {
+  var s = String(t == null ? '' : t).toLowerCase();
+  return s.normalize ? s.normalize('NFD').replace(/[̀-ͯ]/g, '') : s;
+}
+function evidenzia(testo, cerca) {
+  var t = String(testo == null ? '' : testo);
+  if (!cerca) return esc(t);
+  var i = piatto(t).indexOf(piatto(cerca));
+  if (i < 0) return esc(t);
+  return esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + cerca.length)) + '</mark>' +
+         esc(t.slice(i + cerca.length));
+}
+
 function apriArchivio() {
   var box = el('a-rows');
   box.innerHTML = '';
-  el('a-vuoto').hidden = memoria.schede.length > 0;
-  memoria.schede.forEach(function (s) {
+  var tutte = memoria.schede || [];
+  el('a-vuoto').hidden = tutte.length > 0;
+  /* Con una scheda sola cercare e ordinare non serve a niente. */
+  el('a-strumenti').hidden = tutte.length < 2;
+
+  if (memoria.profilo && memoria.profilo.ordine) el('a-ordina').value = memoria.profilo.ordine;
+  var ordine = el('a-ordina').value || 'recenti';
+  var cerca = tutte.length < 2 ? '' : (el('a-cerca').value || '').trim();
+
+  /* L'archivio è già dal più recente: gli altri ordini partono da lì. */
+  var lista = tutte.slice();
+  if (ordine === 'vecchi') lista.reverse();
+  else if (ordine === 'nome') lista.sort(function (a, b) {
+    return piatto(a.nome) < piatto(b.nome) ? -1 : piatto(a.nome) > piatto(b.nome) ? 1 : 0;
+  });
+
+  if (cerca) {
+    var q = piatto(cerca);
+    lista = lista.filter(function (s) {
+      return piatto(s.nome).indexOf(q) > -1 || piatto(s.id).indexOf(q) > -1;
+    });
+  }
+
+  lista.forEach(function (s) {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'row';
     var f = s.risposte ? fascia(s.risposte) : etichettaInvito(s);
     b.innerHTML = '<span class="segno ' + f.pill + '"></span>' +
-      '<span class="grow"><span class="nm">' + esc(s.nome) + '</span><br>' +
-      '<span class="sub">' + dataIt(s.creato) + ' · codice ' + esc(s.id) + '</span></span>' +
+      '<span class="grow"><span class="nm">' + evidenzia(s.nome, cerca) + '</span><br>' +
+      '<span class="sub">' + dataIt(s.creato) + ' · codice ' + evidenzia(s.id, cerca) + '</span></span>' +
       '<span class="pill ' + f.pill + '">' + esc(f.testo) + '</span>';
     b.onclick = function () { apriScheda(s.id); };
     box.appendChild(b);
   });
+
+  el('a-niente').hidden = !(cerca && lista.length === 0);
+  el('a-conta').hidden = !cerca;
+  if (cerca) {
+    el('a-conta').textContent = lista.length === 1
+      ? '1 scheda su ' + tutte.length
+      : lista.length + ' schede su ' + tutte.length;
+  }
   mostra('s-archivio');
 }
 el('s-back').onclick = apriArchivio;
+el('a-cerca').oninput = function () { if (!el('s-archivio').hidden) apriArchivio(); };
+el('a-ordina').onchange = function () {
+  if (!memoria.profilo) memoria.profilo = { nome: '', tel: '', base: '' };
+  memoria.profilo.ordine = el('a-ordina').value;
+  salva();
+  apriArchivio();
+};
+el('a-azzera').onclick = function () { el('a-cerca').value = ''; apriArchivio(); el('a-cerca').focus(); };
 
 /* ─── MODALITÀ PARTNER: SCHEDA ────────────────────────────────────────────── */
 function apriScheda(id) {
