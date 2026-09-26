@@ -1449,7 +1449,7 @@ function nodoOrg(x, liv, max){
       <b>${io_?"Tu · ":""}${esc(x.nome)}</b>
       <small>Step ${f+1} · ${esc(FASI[f].nome)}</small>
       <span class="vpp ${vp>=soglia?"ok":"no"}">${num(vp)} / ${soglia} VP</span>
-      ${nascosti?`<span class="altri">+${sotto} sotto</span>`:``}
+      ${nascosti?`<span class="altri">+${sotto} in gruppo</span>`:``}
     </${io_?"div":"button"}>`;
   const sub = figli.length && liv < max ? `<ul>${figli.map(k => nodoOrg(k, liv+1, max)).join("")}</ul>` : ``;
   return `<li>${card}${sub}</li>`;
