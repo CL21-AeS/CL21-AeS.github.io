@@ -1591,7 +1591,11 @@ function contenutoFoglio(){
   }
 
   if(t==="nuovo"){
-    return { titolo:"Ho sponsorizzato qualcuno", body:`
+    const sp = foglio.dati.sponsor && S.persone[foglio.dati.sponsor] ? foglio.dati.sponsor : S.me;
+    const altro = sp !== S.me, n1 = S.persone[sp].nome.split(" ")[0];
+    return { titolo: altro ? `Aggiungi al gruppo di ${esc(n1)}` : "Ho sponsorizzato qualcuno", body:`
+      ${altro?`<p class="small"><b>Sponsor: ${esc(S.persone[sp].nome)}.</b> La persona entra nel suo gruppo
+      e compare anche nel tuo.</p>`:``}
       <p class="small">Inseriscila anche se non è sicura di partire: sapere quante persone
       non partono è il motivo per cui questa app esiste.</p>
       <label class="field"><span>Nome</span>
@@ -1604,14 +1608,22 @@ function contenutoFoglio(){
   }
 
   if(t==="invita"){
-    const link = linkSponsor(S.me);
-    return { titolo:"Invita una persona", body:`
-      <p class="small">Un link solo, sempre lo stesso, per chiunque tu sponsorizzi.
-      Chi lo apre si iscrive da sé e ti compare in <b>Le mie persone</b>: non devi inserirlo.
-      Le ultime sei lettere sono il tuo codice: è quello che vi collega.</p>
-      <label class="field"><span>Il tuo link</span><textarea id="linkBox" readonly>${esc(link)}</textarea></label>
+    /* Si puo' invitare per se' o per una persona del proprio gruppo: il link porta il codice
+       dello sponsor, ed e' quel codice che decide sotto chi entra la persona nuova. */
+    const sp = foglio.dati.sponsor && S.persone[foglio.dati.sponsor] ? foglio.dati.sponsor : S.me;
+    const altro = sp !== S.me, chi = S.persone[sp], n1 = chi.nome.split(" ")[0];
+    const link = linkSponsor(sp);
+    return { titolo: altro ? `Invita nel gruppo di ${esc(n1)}` : "Invita una persona", body:`
+      ${altro
+        ? `<p class="small">Chi apre questo link si iscrive da sé ed entra con <b>${esc(chi.nome)}</b>
+           come sponsor. Compare nel gruppo di ${esc(n1)} e anche nel tuo.
+           Le ultime sei lettere sono il codice di ${esc(n1)}: è quello che li collega.</p>`
+        : `<p class="small">Un link solo, sempre lo stesso, per chiunque tu sponsorizzi.
+           Chi lo apre si iscrive da sé e ti compare nel <b>tuo gruppo</b>: non devi inserirlo.
+           Le ultime sei lettere sono il tuo codice: è quello che vi collega.</p>`}
+      <label class="field"><span>${altro?`Il link di ${esc(n1)}`:"Il tuo link"}</span><textarea id="linkBox" readonly>${esc(link)}</textarea></label>
       <div class="stack" style="margin-top:12px">
-        <button class="btn primary wide" data-act="copia-mio-link">Copia il link</button>
+        <button class="btn primary wide" data-act="copia-link-sponsor" data-id="${sp}">Copia il link</button>
         <a class="btn wide" href="https://wa.me/?text=${encodeURIComponent("Ciao! Questo è il percorso di cui ti parlavo: "+link)}"
            target="_blank" rel="noopener">Mandalo su WhatsApp</a>
       </div>
@@ -1710,6 +1722,16 @@ function contenutoFoglio(){
         </span></li>`).join(""):`<li><span class="mark">–</span><span class="grow small">Niente ancora</span></li>`}
         </ul></div>
 
+      ${p.id!==S.me ? `
+      <div class="sec">
+        <span class="tag">Sponsorizza nel gruppo di ${esc(p.nome.split(" ")[0])}</span>
+        <p class="small" style="margin:4px 0 10px">Chi entra da qui ha ${esc(p.nome.split(" ")[0])} come sponsor.</p>
+        <div class="stack">
+          <button class="btn wide" data-act="apri-invita" data-id="${p.id}">Manda il link di ${esc(p.nome.split(" ")[0])}</button>
+          <button class="btn wide" data-act="apri-nuovo" data-id="${p.id}">Aggiungi una persona a mano</button>
+        </div>
+      </div>`:``}
+
       ${mio && p.id!==S.me && p.id!==S.leader ? `
       <div class="sec" style="margin-top:26px">
         <button class="btn wide tolgo" data-act="togli-persona" data-id="${p.id}">
@@ -1717,7 +1739,7 @@ function contenutoFoglio(){
       </div>`:``}`,
       foot: mio ? `<div class="row">
         <button class="btn grow" data-act="apri-registra" data-id="${p.id}">Registra un fatto</button>
-        <button class="btn primary grow" data-act="apri-invito" data-id="${p.id}">Link</button>
+        <button class="btn primary grow" data-act="apri-invito" data-id="${p.id}">Il suo accesso</button>
       </div>` : "" };
   }
 
@@ -1910,9 +1932,12 @@ function creaPersona(nome, sponsor, data){
   S.persone[id] = { id, nome:nome.trim(), sponsor:sponsor||null,
     creato: iso(new Date(data||OGGI())), dichiarato:null, updatedAt: iso(OGGI()) };
   const quando = iso(new Date(data||OGGI()));
-  S.eventi.push({ id:uid(), persona:id, tipo:"iscrizione", valore:null, at:quando, by:sponsor||id });
+  /* `by` e' chi l'ha fatto: quando la inserisce il capofila sotto un'altra persona, e'
+     il capofila -- non lo sponsor, che altrimenti risulterebbe aver lavorato da solo. */
+  const chi = S.me || sponsor || id;
+  S.eventi.push({ id:uid(), persona:id, tipo:"iscrizione", valore:null, at:quando, by:chi });
   if(sponsor) S.eventi.push({ id:uid(), persona:sponsor, tipo:"sponsorizzazione",
-                              valore:nome.trim(), at:quando, by:sponsor });
+                              valore:nome.trim(), at:quando, by:chi });
   salva();
   return id;
 }
@@ -2020,8 +2045,8 @@ document.addEventListener("click", async ev => {
 
   if(a==="apri-vp")       return apriFoglio("vp", { id: id||S.me });
   if(a==="apri-registra") return apriFoglio("registra", { id: id||S.me });
-  if(a==="apri-nuovo")    return apriFoglio("nuovo");
-  if(a==="apri-invita")   return apriFoglio("invita");
+  if(a==="apri-nuovo")    return apriFoglio("nuovo",  { sponsor: id || S.me });
+  if(a==="apri-invita")   return apriFoglio("invita", { sponsor: id || S.me });
   if(a==="apri-invito")   return apriFoglio("invito", { id });
   if(a==="apri-importa")  return apriFoglio("importa");
 
@@ -2053,9 +2078,11 @@ document.addEventListener("click", async ev => {
     const nome = (document.getElementById("nvNome").value||"").trim();
     const data = document.getElementById("nvData").value;
     if(!nome) return toast("Serve il nome");
-    const nid = creaPersona(nome, S.me, data);
+    const sp = foglio.dati.sponsor && S.persone[foglio.dati.sponsor] ? foglio.dati.sponsor : S.me;
+    const nid = creaPersona(nome, sp, data);
     const tel = (document.getElementById("nvTel").value||"").trim();
     if(tel){ S.persone[nid].tel = tel; S.persone[nid].updatedAt = iso(OGGI()); salva(); }
+    programmaSync();
     return apriFoglio("invito", { id:nid });
   }
 
@@ -2094,6 +2121,7 @@ document.addEventListener("click", async ev => {
 
   if(a==="copia-link") return copia(linkInvito(S.persone[id]));
   if(a==="copia-mio-link") return copia(linkSponsor(S.me));
+  if(a==="copia-link-sponsor") return copia(linkSponsor(id && S.persone[id] ? id : S.me));
 
   if(a==="esporta"){
     scarica(`growup-${giorno(OGGI())}.json`, JSON.stringify(pacchetto()));
