@@ -872,58 +872,28 @@ function vistaIngresso(){
 
 /* --- Oggi: la schermata più importante. Una sola azione. --- */
 function vistaOggi(){
+  /* LA PRIMA SCHERMATA. Quattro cose, in quest'ordine, e niente altro:
+     cosa faccio adesso · a che punto sono · cosa manca a questo passo · chi ha bisogno di me.
+     Tutto il resto ha una sua linguetta. Ogni blocco aggiunto qui toglie forza al primo. */
   const p = io();
   const f = faseDi(p.id);
   const fase = FASI[f];
   const az = prossimaAzione(p);
-  const vp = vpDi(p.id);
   const g = giorniTra(p.creato, OGGI());
-  const r = ritmoDi(p);
   const figli = figliDi(p.id);
-
-  let barra = "";
-  if(f===1){
-    const mai = vpMaiRaggiunti(p.id);
-    const pct = Math.min(100, Math.round(mai/SOGLIE.vpAttivazione*100));
-    barra = `<div class="bar" style="margin:12px 0 6px"><i style="width:${pct}%"></i></div>
-             <div class="small">${mai} / ${SOGLIE.vpAttivazione} VP${
-               vp!==mai ? ` · ${vp} questo mese` : ""}</div>`;
-  }
-
+  const o = obiettivo(p);
   const daSeguire = figli.map(x=>({x, s:semaforo(x.id)}))
-                         .filter(o=>o.s.k!=="v" || vpDi(o.x.id)<SOGLIE.vpAttivazione);
+                         .filter(x=>x.s.k!=="v" || vpDi(x.x.id)<SOGLIE.vpAttivazione);
 
-  return `
-  <div class="spread" style="margin:6px 0 2px">
-    <h1>Ciao ${esc(p.nome.split(" ")[0])} 👋</h1>
-    ${sonoLeader()?`<span class="pill">leader</span>`:``}
-  </div>
-  <p class="small">Giorno ${g} · Fase ${f} · ${esc(fase.nome)}
-    ${r?` · <span class="${r.k==="lento"?"":""}">${esc(r.txt)}</span>`:""}</p>
+  const bottone = az.azione==="vp"
+      ? `<button class="btn primary wide" data-act="apri-vp">Aggiorna i VP</button>`
+    : az.azione==="invita"
+      ? `<button class="btn primary wide" data-act="apri-invita">Invita una persona</button>`
+    : az.azione
+      ? `<button class="btn primary wide" data-act="fatto" data-t="${az.azione}">L'ho fatto</button>`
+      : ``;
 
-  <div class="card">
-    <span class="tag">La prossima cosa</span>
-    <h2 style="margin-top:6px">${esc(az.titolo)}</h2>
-    ${az.perche?`<p class="small">${esc(az.perche)}</p>`:``}
-    ${barra}
-    <div class="row wrap" style="margin-top:12px">
-      ${az.azione==="vp"
-        ? `<button class="btn primary grow" data-act="apri-vp">Aggiorna i VP del mese</button>`
-        : az.azione==="invita"
-          ? `<button class="btn primary grow" data-act="apri-invita">Invita una persona</button>`
-          : az.azione
-          ? `<button class="btn primary grow" data-act="fatto" data-t="${az.azione}">L'ho fatto</button>`
-          : ``}
-      <button class="btn" data-act="apri-registra">Registra altro</button>
-    </div>
-  </div>
-
-
-
-  ${(() => {
-    /* SOLO il passo in cui si e'. Il percorso intero sta nella scheda Percorso: qui una cosa
-       alla volta, e il passo dopo non si mostra finche' questo non e' chiuso. Mostrare il
-       traguardo lontano a chi e' appena entrato era l'errore: guardava la cima, non il gradino. */
+  const passo = (() => {
     if(scalaFinita(p.id)) return "";
     const tutte = mancanti(p);
     const lista = tutte.filter(x => !/^Segnare /.test(x.txt));
@@ -937,13 +907,10 @@ function vistaOggi(){
         <span class="tag">Questo passo</span>
         <span class="pill">${presi} su ${lista.length}</span>
       </div>
-      <h2 style="margin-top:6px">Fase ${f} · ${esc(fase.nome)}</h2>
-      <p class="small">${esc(fase.traguardo)}</p>
-      <div style="margin-top:6px">
+      <div style="margin-top:4px">
         ${lista.map(m=>{
-          /* Quello che si dichiara si spunta qui, senza passare da Registra. Quello che si
-             misura non si spunta -- sarebbe una bugia che l'app non puo' salvare -- e mostra
-             invece il pulsante che porta dove quel numero si aggiorna. */
+          /* Quello che si dichiara si spunta qui. Quello che si misura no -- sarebbe una
+             dichiarazione che l'app non puo' salvare -- e porta il pulsante che lo aggiorna. */
           const dentro = `<span class="grow">${esc(m.txt)}${m.nota?`<small>${esc(m.nota)}</small>`:``}${
             m.azione?`<br><button class="btn small" style="margin-top:8px" data-act="${m.azione}">${
               esc(m.bottone||"Fallo adesso")}</button>`:``}</span>`;
@@ -956,59 +923,66 @@ function vistaOggi(){
                  ${dentro}</div>`;
         }).join("")}
       </div>
-      ${pronto
-        ? `<button class="btn primary wide" style="margin-top:14px" data-act="fatto" data-t="${chiave}">
-             Ho raggiunto ${esc(fase.nome)}</button>`
-        : `<p class="small faint" style="margin-top:10px">Il passo dopo si apre quando questo è chiuso.</p>`}
+      ${pronto?`<button class="btn primary wide" style="margin-top:14px" data-act="fatto"
+        data-t="${chiave}">Ho raggiunto ${esc(fase.nome)}</button>`:``}
     </div>`;
-  })()}
+  })();
+
+  return `
+  <div class="spread" style="margin:6px 0 10px">
+    <h1>Ciao ${esc(p.nome.split(" ")[0])}</h1>
+    <span class="pill">Fase ${f} · ${esc(fase.breve)}</span>
+  </div>
+
+  <div class="card">
+    <span class="tag">La prossima cosa</span>
+    <h2 style="margin:6px 0 0;font-size:20px">${esc(az.titolo)}</h2>
+    ${az.perche?`<p class="small" style="margin-top:4px">${esc(az.perche)}</p>`:``}
+    ${bottone?`<div style="margin-top:14px">${bottone}</div>`:``}
+  </div>
+
+  <div class="kpi">
+    <div><b>${num(vpDi(p.id))}</b><span>VP di ${esc(nomeMese(meseOra()).split(" ")[0])}</span></div>
+    <div><b>${g}</b><span>giorni dall'inizio</span></div>
+    ${figli.length
+      ? `<div><b>${figli.length}</b><span>${figli.length===1?"persona":"persone"}</span></div>`
+      : `<div><b>${f}</b><span>di 5 passi</span></div>`}
+  </div>
+
+  ${passo}
+
+  ${o?`
+  <button class="card person" data-tab="obiettivo" style="width:100%;text-align:left">
+    <span class="grow"><span class="tag">Il tuo obiettivo</span>
+      <br><b>${num(o.euroMese)} € al mese</b>
+      <br><small class="faint">${esc(o.gradino.nome)}${
+        o.gradino.livello?` · ${o.gradino.livello}`:``} — vedi cosa costruire</small></span>
+    <span class="chev">›</span>
+  </button>`:`
+  <button class="card person" data-act="apri-obiettivo" style="width:100%;text-align:left">
+    <span class="grow"><span class="tag">Il tuo obiettivo</span>
+      <br><b>Non l'hai ancora scritto</b>
+      <br><small class="faint">Due numeri, e l'app ti dice cosa costruire</small></span>
+    <span class="chev">›</span>
+  </button>`}
 
   ${daSeguire.length ? `
   <div class="sec">
     <span class="tag">Chi ha bisogno di te</span>
-    ${daSeguire.map(o=>rigaPersona(o.x)).join("")}
+    <div class="card">${daSeguire.map(x=>rigaPersona(x.x)).join("")}</div>
   </div>`:``}
-
-  ${(() => {
-    /* I VP SONO UN DATO MENSILE. Il primo del mese si riparte da zero: non e' un errore
-       dell'app ed e' la cosa che confonde di piu'. Percio' il mese in corso sta qui, sempre
-       aggiornabile, e i mesi chiusi restano sotto -- archiviati, non cancellati. */
-    const storia = storicoVp(p.id);
-    const corrente = storia.find(x => x.mese === meseOra());
-    const passati = storia.filter(x => x.mese !== meseOra()).slice(0,6);
-    return `
-    <div class="card tight">
-      <div class="spread">
-        <span class="tag">I tuoi VP</span>
-        <span class="pill">${esc(nomeMese(meseOra()))}</span>
-      </div>
-      <h2 style="margin:6px 0 2px">${num(vpDi(p.id))} VP${
-        corrente?``:` <span class="faint">— ancora niente questo mese</span>`}</h2>
-      <p class="small faint">I VP si contano mese per mese: il primo del mese si riparte da zero,
-      e il mese chiuso resta qui sotto. Aggiornali quando vuoi, anche più volte.</p>
-      <button class="btn wide" style="margin-top:10px" data-act="apri-vp">Aggiorna i VP di ${
-        esc(nomeMese(meseOra()).split(" ")[0])}</button>
-      ${passati.length?`
-        <span class="tag" style="display:block;margin-top:16px">Mesi archiviati</span>
-        <ul class="micro">
-          ${passati.map(x=>`<li><span class="m">·</span><span>${esc(nomeMese(x.mese))}<small>${
-            num(x.vp)} VP</small></span></li>`).join("")}
-        </ul>`:``}
-    </div>`;
-  })()}
 
   ${az.azione!=="invita" ? `
   <div class="sec">
     <button class="btn wide ghost" data-act="apri-invita">Invita una persona</button>
-    <p class="small faint" style="margin-top:8px;text-align:center">Il tuo link: chi lo apre
-    entra nel tuo gruppo e comincia il suo percorso.</p>
   </div>`:``}
 
   ${salvaKo?`<div class="card warn"><b>Questo browser non salva.</b>
     <p class="small">Se sei in navigazione privata quello che segni sparisce alla chiusura.</p></div>`:``}
 
-  <div class="sec" style="text-align:center">
-    <button class="btn ghost small" data-tab="dati">Dati e impostazioni</button>
+  <div class="sec row" style="justify-content:center;gap:16px">
+    <button class="btn ghost small" data-act="apri-registra">Registra un fatto</button>
+    <button class="btn ghost small" data-tab="dati">Dati</button>
   </div>
   `;
 }
@@ -1355,11 +1329,19 @@ function contenutoFoglio(){
 
   if(t==="vp"){
     const p = S.persone[foglio.dati.id] || io();
+    const passati = storicoVp(p.id).filter(x => x.mese !== meseOra()).slice(0,6);
     return { titolo:"Aggiorna i VP", body:`
       <p class="small">Scrivi i VP che hai fatto <b>in questo mese</b>. Le qualifiche si contano
-      mese per mese, quindi il primo del mese si riparte da zero.</p>
-      <label class="field"><span>VP di ${new Date().toLocaleDateString("it-IT",{month:"long",year:"numeric"})}</span>
-        <input id="vpVal" type="number" inputmode="numeric" value="${vpDi(p.id)}"></label>`,
+      mese per mese, quindi il primo del mese si riparte da zero e il mese chiuso resta archiviato
+      qui sotto.</p>
+      <label class="field"><span>VP di ${esc(nomeMese(meseOra()))}</span>
+        <input id="vpVal" type="number" inputmode="numeric" value="${vpDi(p.id)}"></label>
+      ${passati.length?`
+        <span class="tag" style="display:block;margin-top:18px">Mesi archiviati</span>
+        <ul class="micro">
+          ${passati.map(x=>`<li><span class="m">·</span><span>${esc(nomeMese(x.mese))}<small>${
+            num(x.vp)} VP</small></span></li>`).join("")}
+        </ul>`:``}`,
       foot:`<button class="btn primary wide" data-act="salva-vp" data-id="${p.id}">Salva</button>` };
   }
 
