@@ -292,33 +292,87 @@ button.voce, label.voce{cursor:pointer}
 .indietro{display:inline-block;background:none;border:0;color:var(--ink2);font:inherit;font-size:14px;
   padding:16px 0 0;cursor:pointer;min-height:44px}
 
-/* organigramma: dall'alto in basso, si scorre di lato */
-.org{overflow-x:auto;padding:10px 2px 6px;margin:0 -8px;-webkit-overflow-scrolling:touch}
-.org ul{display:flex;justify-content:center;padding:22px 0 0;margin:0;position:relative}
-.org > ul{padding-top:0;min-width:max-content;margin:0 auto}
-.org li{list-style:none;position:relative;padding:22px 6px 0;display:flex;flex-direction:column;align-items:center}
-.org > ul > li{padding-top:0}
-.org li::before,.org li::after{content:"";position:absolute;top:0;right:50%;width:50%;height:22px;
-  border-top:1px solid var(--line)}
-.org li::after{right:auto;left:50%;border-left:1px solid var(--line)}
-.org li:only-child::before,.org li:only-child::after{display:none}
-.org li:only-child{padding-top:0}
-.org li:first-child::before,.org li:last-child::after{border:0 none}
-.org li:last-child::before{border-right:1px solid var(--line);border-radius:0 8px 0 0}
-.org li:first-child::after{border-radius:8px 0 0 0}
-.org ul ul::before{content:"";position:absolute;top:0;left:50%;border-left:1px solid var(--line);width:0;height:22px}
-.nodo-org{display:flex;flex-direction:column;align-items:center;gap:5px;width:168px;padding:16px 10px 14px;
-  background:var(--card);border:1px solid var(--line);border-radius:16px;font:inherit;color:inherit;
-  box-shadow:0 2px 10px rgba(20,30,50,.05)}
-button.nodo-org{cursor:pointer}
-.nodo-org .avatar{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;background:var(--bg);
-  font-weight:800;font-size:15px}
-.nodo-org b{font-size:15px;line-height:1.2;margin-top:6px}
-.nodo-org small{font-size:12px;color:var(--ink2)}
-.vpp{display:inline-block;margin-top:6px;padding:5px 10px;border-radius:8px;font-size:13px;font-weight:600}
+/* ---- il mio gruppo: linee, zoom, ricerca ---- */
+.vpp{display:inline-block;padding:5px 10px;border-radius:8px;font-size:13px;font-weight:600}
 .vpp.ok{background:var(--verde-soft);color:var(--verde)}
 .vpp.no{background:var(--oro-soft);color:var(--oro-testo)}
-.nodo-org .altri{font-size:11px;font-weight:800;color:var(--ink2);background:var(--bg);border-radius:99px;padding:2px 9px;margin-top:2px}
+.g-cerca{position:relative;margin-top:16px}
+.g-cerca input{width:100%;min-height:48px;border:1px solid var(--line);border-radius:12px;background:var(--card);
+  color:var(--ink);font:inherit;font-size:16px;padding:0 14px 0 42px}
+.g-cerca svg{position:absolute;left:13px;top:50%;width:19px;height:19px;transform:translateY(-50%);color:var(--ink3)}
+.g-filtri{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
+.g-filtri::-webkit-scrollbar{display:none}
+.g-chip{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 13px;border-radius:99px;
+  border:1px solid var(--line);background:var(--card);font:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--ink2)}
+.g-chip b{font-variant-numeric:tabular-nums;color:var(--ink)}
+.g-chip.on{background:var(--navy);border-color:var(--navy);color:var(--navy-ink)}
+.g-chip.on b{color:var(--navy-ink)}
+.g-sintesi{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 10px}
+.g-sintesi h2{font-size:21px;font-weight:800;letter-spacing:-.02em}
+.g-sintesi > span{font-size:13px;color:var(--ink2)}
+.g-ptb{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:12px 14px;font-size:14px;color:var(--ink2);margin-bottom:10px}
+.g-ptb b{color:var(--ink)}
+.g-pall{display:flex;gap:5px;flex:none}
+.g-pall i{width:12px;height:12px;border-radius:50%;background:var(--line)}
+.g-pall i.ok{background:var(--verde)}
+.g-linee{display:flex;flex-direction:column;gap:10px}
+.g-linea{display:grid;grid-template-columns:auto 1fr auto;gap:2px 12px;align-items:center;width:100%;text-align:left;font:inherit;
+  color:inherit;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;cursor:pointer}
+.g-av{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--bg);font-weight:800;font-size:14px;flex:none}
+.g-linea .g-av{grid-row:span 2}
+.g-nm{font-weight:800;font-size:16px}
+.g-st{font-size:13px;color:var(--ink2)}
+.g-chev{grid-row:span 2;color:var(--ink3);font-size:22px}
+.g-corpo{grid-column:1 / -1;margin-top:10px}
+.g-vl{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink2)}
+.g-barra{flex:1;height:7px;border-radius:99px;background:var(--line);overflow:hidden}
+.g-barra i{display:block;height:100%;background:var(--oro);border-radius:99px}
+.g-barra i.ok{background:var(--verde)}
+.g-vl strong{font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.g-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.g-tag{display:inline-flex;align-items:center;padding:4px 9px;border-radius:8px;font-size:12px;font-weight:600;background:var(--bg);color:var(--ink2)}
+.g-tag.ok{background:var(--verde-soft);color:var(--verde)}
+.g-tag.no{background:var(--oro-soft);color:var(--oro-testo)}
+.g-tag.fermo{background:var(--rosso-soft);color:var(--rosso)}
+.g-tag.hl{box-shadow:inset 0 0 0 2px var(--navy);color:var(--ink)}
+.g-briciole{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:20px 0 10px;font-size:14px}
+.g-briciole button{background:none;border:0;padding:6px 4px;min-height:40px;cursor:pointer;color:var(--ink2);font:inherit;font-weight:600}
+.g-briciole button:last-of-type{color:var(--ink);font-weight:800}
+.g-briciole span{color:var(--ink3)}
+.g-radice{display:flex;gap:14px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
+.g-radice .g-av{width:56px;height:56px;font-size:17px}
+.g-info{flex:1;min-width:0}
+.g-info h3{font-size:19px;font-weight:800}
+.g-azioni{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.g-figli{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 10px;padding-top:24px}
+.g-figli::before{content:"";position:absolute;top:0;left:50%;height:12px;border-left:1.5px solid var(--line)}
+.g-figli::after{content:"";position:absolute;top:12px;left:16.6%;right:16.6%;border-top:1.5px solid var(--line)}
+.g-figli.uno{grid-template-columns:150px;justify-content:center}
+.g-figli.uno::before{height:24px}
+.g-figli.uno::after{display:none}
+.g-figli.due{grid-template-columns:repeat(2,150px);justify-content:center}
+.g-figli.due::after{left:calc(50% - 80px);right:calc(50% - 80px)}
+.g-figli > .g-nodo:nth-child(-n+3)::before{content:"";position:absolute;top:-12px;left:50%;height:12px;border-left:1.5px solid var(--line)}
+.g-figli.uno > .g-nodo::before{display:none}
+.g-nodo{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;min-width:0;padding:12px 6px 10px;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;cursor:pointer;font:inherit;color:inherit}
+.g-nodo .g-av{width:38px;height:38px;font-size:13px}
+.g-nodo b{font-size:13px;line-height:1.2;text-align:center;overflow-wrap:anywhere}
+.g-nodo .vpp{margin-top:2px;font-size:12px;font-weight:700;padding:3px 8px}
+.g-piu{font-size:11px;font-weight:800;color:var(--ink2);background:var(--bg);border-radius:99px;padding:2px 8px;text-align:center}
+.g-dot{position:absolute;top:9px;right:9px;width:9px;height:9px;border-radius:50%;background:var(--rosso)}
+.g-nodo.spento{opacity:.3}
+.g-nodo.trovato{border-color:var(--navy);box-shadow:0 0 0 2px var(--navy)}
+.g-diretti{display:flex;justify-content:space-between;font-size:13px;color:var(--ink2);margin:14px 2px 0}
+.g-legenda{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink2);margin-top:8px}
+.g-legenda i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.g-legenda i.ok{background:var(--verde)} .g-legenda i.no{background:var(--oro)} .g-legenda i.fermo{background:var(--rosso)}
+.g-vuoto{text-align:center;color:var(--ink2);font-size:14px;padding:20px 8px;background:var(--card);border:1px dashed var(--line);border-radius:14px}
+
+:root{ --rosso-soft:#fbe9e8; }
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){ --rosso-soft:#3a1a1a; } }
+:root[data-theme="dark"]{ --rosso-soft:#3a1a1a; }
 
 @media (max-width:380px){
   .titolo{font-size:30px}
@@ -956,9 +1010,7 @@ function render(){
   }
   disegnaTabs();
   disegnaFoglio();
-  /* L'organigramma e' piu' largo del telefono: si apre centrato su chi sta in cima. */
-  try{ document.querySelectorAll(".org").forEach(o => { o.scrollLeft = (o.scrollWidth - o.clientWidth) / 2; }); }
-  catch(e){}
+
   window.scrollTo(0,y);
   const sb2 = document.querySelector(".sheet-body");
   if(sb2) sb2.scrollTop = sy;
@@ -1434,32 +1486,132 @@ function vistaCammino(){
   <div class="piede"><button data-tab="dati">Dati e impostazioni</button></div>`;
 }
 
-/* ---- L'organigramma ----
-   Dall'alto in basso, e al massimo `max` livelli sotto la radice: oltre, il nodo dice
-   quanti ne ha sotto e si apre la sua scheda, che mostra il suo ramo. Senza limite,
-   con quaranta persone diventa una striscia da scorrere di lato per metri. */
-function nodoOrg(x, liv, max){
-  const figli = figliDi(x.id).sort(perNascita);
-  const io_ = x.id === S.me;
-  const f = faseDi(x.id), vp = vpDi(x.id), soglia = SOGLIE.vpAttivazione;
-  const sotto = discendenti(x.id).length;
-  const nascosti = figli.length && liv >= max;
-  const card = `<${io_?"div":"button"} class="nodo-org" ${io_?"":`data-persona="${x.id}"`}>
-      <span class="avatar">${esc(iniziali(x.nome))}</span>
-      <b>${io_?"Tu · ":""}${esc(x.nome)}</b>
-      <small>Step ${f+1} · ${esc(FASI[f].nome)}</small>
-      <span class="vpp ${vp>=soglia?"ok":"no"}">${num(vp)} / ${soglia} VP</span>
-      ${nascosti?`<span class="altri">+${sotto} in gruppo</span>`:``}
-    </${io_?"div":"button"}>`;
-  const sub = figli.length && liv < max ? `<ul>${figli.map(k => nodoOrg(k, liv+1, max)).join("")}</ul>` : ``;
-  return `<li>${card}${sub}</li>`;
-}
-function organigramma(radiceId, max){
-  const r = S.persone[radiceId];
-  return r ? `<div class="org"><ul>${nodoOrg(r, 0, max)}</ul></div>` : ``;
+/* ---- Schermata 2: il mio gruppo ----
+   Una card per ogni prima linea (le qualifiche si ragionano per linee), e toccandone una si
+   entra nel suo gruppo: un livello alla volta, in griglia che va a capo, con il percorso
+   Tu › Sara › Andrea per tornare su. Sopra, ricerca per nome e filtri. Cosi' la rete si vede
+   tutta anche con centinaia di persone, senza un albero largo metri da scorrere di lato. */
+let gRadice = null;      // null = le mie linee; un id = il gruppo di quella persona
+let gFiltro = "tutti";
+let gCerca = "";
+let gTrovato = null;     // la persona da evidenziare dopo una ricerca
+
+const G_FILTRI = [
+  { k:"tutti", l:"Tutti",                        f: () => true },
+  { k:"sotto", l:"Sotto 100 VP",                 f: x => vpDi(x.id) < SOGLIE.vpAttivazione },
+  { k:"nuovi", l:"Entrati questo mese",          f: x => mese(x.creato) === meseMostrato() },
+  { k:"fermi", l:`Non aggiornano da ${SOGLIE.gialloGiorni} giorni`, f: x => semaforo(x.id).k === "r" }
+];
+function gPassa(x){ return G_FILTRI.find(f => f.k === gFiltro).f(x); }
+function gFermo(id){ return semaforo(id).k === "r"; }
+function corto(n){ const w = String(n||"").trim().split(/\s+/); return w.length > 1 ? `${w[0]} ${w[w.length-1][0]}.` : w[0]; }
+function stradaFino(id){ const out = []; for(let x = id; x && S.persone[x]; x = S.persone[x].sponsor){ out.unshift(x); if(x === S.me) break; } return out; }
+
+function gFiltriHtml(){
+  const base = discendenti(gRadice || S.me);
+  return `<div class="g-filtri" role="group" aria-label="Filtri">${G_FILTRI.map(f => {
+    const n = f.k === "tutti" ? base.length : base.filter(f.f).length;
+    return `<button class="g-chip ${gFiltro===f.k?"on":""}" data-gfiltro="${f.k}" aria-pressed="${gFiltro===f.k}">${esc(f.l)} <b>${n}</b></button>`;
+  }).join("")}</div>`;
 }
 
-/* ---- Schermata 2: il mio gruppo ---- */
+function gLinee(){
+  const f = faseDi(S.me), c = lineePer(f);
+  const linee = figliDi(S.me).sort(perNascita);
+  const soglia = c.vpLinea > 1 ? c.vpLinea : 1;
+  const ok = linee.filter(x => vpLinea(x.id) >= soglia).length;
+  const traguardo = FASI[Math.max(2, Math.min(5, f))].nome;
+  const flt = G_FILTRI.find(q => q.k === gFiltro);
+  return `
+  <div class="g-sintesi"><h2>Le tue linee</h2>
+    <button class="btn-chiaro" data-act="apri-nuovo"><span aria-hidden="true">＋</span> Aggiungi</button></div>
+  ${linee.length ? `
+  <div class="g-ptb"><span class="g-pall">${linee.map(x => `<i class="${vpLinea(x.id)>=soglia?"ok":""}"></i>`).join("")}</span>
+    <span><b>${ok} ${ok===1?"linea":"linee"} su ${linee.length}</b> ${soglia>1?`${ok===1?"è":"sono"} a ${num(soglia)} VP questo mese`:`${ok===1?"è attiva":"sono attive"}`}.
+    Per ${esc(traguardo)} ne servono ${c.linee}.</span></div>
+  <div class="g-linee">${linee.map(x => {
+    const ramo = [x, ...discendenti(x.id)], v = vpLinea(x.id), fx = faseDi(x.id);
+    const a100 = ramo.filter(r => vpDi(r.id) >= SOGLIE.vpAttivazione).length;
+    const fermi = ramo.filter(r => gFermo(r.id)).length;
+    const match = gFiltro === "tutti" ? null : ramo.filter(gPassa).length;
+    return `<button class="g-linea" data-gzoom="${x.id}">
+      <span class="g-av">${esc(iniziali(x.nome))}</span>
+      <span class="g-nm">${esc(x.nome)}</span>
+      <span class="g-chev" aria-hidden="true">›</span>
+      <span class="g-st">Step ${fx+1} · ${esc(FASI[fx].nome)}</span>
+      <span class="g-corpo">
+        <span class="g-vl"><span>VP della linea</span><span class="g-barra"><i class="${v>=soglia?"ok":""}" style="width:${Math.min(100, soglia>1 ? v/soglia*100 : (v>0?100:0))}%"></i></span><strong>${num(v)} VP</strong></span>
+        <span class="g-meta">
+          <span class="g-tag">${ramo.length} ${ramo.length===1?"persona":"persone"}</span>
+          <span class="g-tag ok">${a100} a 100 VP</span>
+          ${fermi?`<span class="g-tag fermo">${fermi} non ${fermi===1?"aggiorna":"aggiornano"}</span>`:``}
+          ${match!==null?`<span class="g-tag hl">${esc(flt.l)}: ${match}</span>`:``}
+        </span>
+      </span>
+    </button>`; }).join("")}</div>`
+  : `<div class="g-vuoto"><b>Ancora nessuno</b><br>Invita la prima persona: appena entra dal tuo link la vedi qui, senza doverla inserire.</div>`}`;
+}
+
+function gNodo(x){
+  const sotto = discendenti(x.id).length, vp = vpDi(x.id);
+  const cls = ["g-nodo", gFiltro!=="tutti" && !gPassa(x) ? "spento" : "", gTrovato===x.id ? "trovato" : ""].join(" ");
+  return `<button class="${cls}" ${figliDi(x.id).length ? `data-gzoom="${x.id}"` : `data-persona="${x.id}"`} aria-label="${esc(x.nome)}, ${vp} VP">
+      ${gFermo(x.id) ? `<span class="g-dot" title="${esc(semaforo(x.id).txt)}"></span>` : ``}
+      <span class="g-av">${esc(iniziali(x.nome))}</span>
+      <b>${esc(corto(x.nome))}</b>
+      <span class="vpp ${vp>=SOGLIE.vpAttivazione?"ok":"no"}">${num(vp)} VP</span>
+      ${sotto ? `<span class="g-piu">+${sotto} in gruppo</span>` : ``}
+    </button>`;
+}
+
+function gZoom(){
+  const x = S.persone[gRadice];
+  if(!x){ gRadice = null; return gLinee(); }
+  const n1 = x.nome.split(" ")[0], figli = figliDi(x.id).sort(perNascita), ramo = discendenti(x.id);
+  const fermi = ramo.filter(r => gFermo(r.id)).length, fx = faseDi(x.id), vp = vpDi(x.id);
+  const bric = stradaFino(x.id).map((id, i) => `${i?`<span aria-hidden="true">›</span>`:``}<button ${id===S.me?`data-ghome`:`data-gzoom="${id}"`}>${id===S.me?"Tu":esc(S.persone[id].nome.split(" ")[0])}</button>`).join("");
+  return `
+  <nav class="g-briciole" aria-label="Dove sei nel gruppo">${bric}</nav>
+  <div class="g-radice">
+    <span class="g-av">${esc(iniziali(x.nome))}</span>
+    <div class="g-info">
+      <h3>${esc(x.nome)}</h3>
+      <div class="g-st">Step ${fx+1} · ${esc(FASI[fx].nome)}</div>
+      <div class="g-meta">
+        <span class="g-tag ${vp>=SOGLIE.vpAttivazione?"ok":"no"}">${num(vp)} VP suoi</span>
+        <span class="g-tag">linea ${num(vpLinea(x.id))} VP</span>
+        <span class="g-tag">${ramo.length} in gruppo</span>
+        ${fermi?`<span class="g-tag fermo">${fermi} non ${fermi===1?"aggiorna":"aggiornano"}</span>`:``}
+      </div>
+      <div class="g-azioni">
+        <button class="btn-chiaro" data-persona="${x.id}">Apri la scheda</button>
+        <button class="btn-chiaro" data-act="apri-nuovo" data-id="${x.id}"><span aria-hidden="true">＋</span> Aggiungi</button>
+      </div>
+    </div>
+  </div>
+  ${figli.length
+    ? `<div class="g-figli ${figli.length===1?"uno":figli.length===2?"due":""}">${figli.map(gNodo).join("")}</div>
+       <div class="g-diretti"><span>${figli.length} ${figli.length===1?"persona diretta":"persone dirette"}</span><span>${ramo.length} in tutto il gruppo</span></div>
+       <div class="g-legenda"><span><i class="ok"></i>a 100 VP</span><span><i class="no"></i>sotto 100</span><span><i class="fermo"></i>non aggiorna</span></div>`
+    : `<div class="g-vuoto">${esc(n1)} non ha ancora un gruppo.</div>`}
+  <p class="nota-lista">Un livello alla volta: tocca una persona per entrare nel suo gruppo, il percorso in alto ti riporta su. Chi non ha ancora un gruppo apre la sua scheda.</p>`;
+}
+
+function gRisultati(){
+  const q = gCerca.toLowerCase();
+  const hit = discendenti(S.me).filter(x => String(x.nome).toLowerCase().includes(q)).slice(0, 15);
+  return `<div class="g-sintesi"><h2>Risultati</h2><span>${hit.length} ${hit.length===1?"persona":"persone"}</span></div>
+  <div class="lista" style="margin-top:0">${hit.length ? hit.map(x => {
+    const sp = S.persone[x.sponsor];
+    return `<button class="voce" data-gtrova="${x.id}">
+      <span class="av-mini">${esc(iniziali(x.nome))}</span>
+      <span class="grow"><b>${esc(x.nome)}</b><small>Step ${faseDi(x.id)+1} · ${num(vpDi(x.id))} VP · sponsor ${x.sponsor===S.me?"tu":esc(sp?sp.nome:"—")}</small></span>
+      <span class="chev" aria-hidden="true">›</span></button>`; }).join("")
+    : `<div class="g-vuoto">Nessuno con questo nome nel tuo gruppo.</div>`}</div>`;
+}
+
+function gCorpo(){ return gCerca.length >= 2 ? gRisultati() : gRadice ? gZoom() : gLinee(); }
+
 function vistaGruppo(){
   const p = io(), f = faseDi(p.id), tutti = discendenti(p.id);
   const mossi = chiSiMuove();
@@ -1467,19 +1619,17 @@ function vistaGruppo(){
   <span class="eyebrow">Il mio gruppo</span>
   <h1 class="titolo">Cresciamo insieme.</h1>
   <p class="sotto-titolo">${tutti.length
-    ? "Ogni persona ha il suo percorso. Apri una scheda per vedere i progressi."
+    ? "Una card per ogni tua linea. Tocca una linea per entrare nel suo gruppo."
     : "Qui compaiono le persone che entrano dal tuo link: non devi inserirle tu."}</p>
   ${kpiHtml(p, f)}
-  <div class="lista" style="margin-top:12px">
-    <div class="testa-lista" style="align-items:flex-start">
-      <div><h2 style="font-size:21px;font-weight:800;letter-spacing:-.02em">La tua struttura</h2>
-        <p class="small" style="margin:2px 0 0;color:var(--ink2)">${tutti.length} Partner · tutti i livelli</p></div>
-      <button class="btn-chiaro" data-act="apri-nuovo"><span aria-hidden="true">＋</span> Aggiungi persona</button>
-    </div>
-    ${organigramma(p.id, 3)}
-    <p class="nota-lista">Tocca una persona per aprire la sua scheda. Puoi aggiungere anche chi non utilizza l'app.</p>
+  ${tutti.length ? `
+  <div class="g-cerca">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input id="gCerca" type="search" placeholder="Cerca una persona" autocomplete="off" value="${esc(gCerca)}" aria-label="Cerca una persona nel tuo gruppo">
   </div>
-  ${mossi.length ? `
+  <div id="gFiltri">${gFiltriHtml()}</div>`:``}
+  <div id="gCorpo">${gCorpo()}</div>
+  ${mossi.length && !gRadice && gCerca.length < 2 ? `
   <div class="sez"><h2>Chi si sta muovendo</h2><span>ultimi giorni</span></div>
   <div class="lista">${mossi.map(o => `
     <button class="voce" data-persona="${o.x.id}">
@@ -1491,6 +1641,7 @@ function vistaGruppo(){
   ${S.sync.url?``:`<div class="card warn"><b>Manca il collegamento al foglio.</b>
     <p class="small">Senza, chi apre il tuo link non ti compare qui da solo.</p></div>`}`;
 }
+
 
 /* ---- 7. Fogli ancorati in basso ---- */
 
@@ -1712,8 +1863,9 @@ function contenutoFoglio(){
           <br><small class="faint">${x.misurato?"misurato dall'app":"dichiarato"}</small></span></li>`).join("")}</ul>
       </div>`:``}
 
-      ${figli.length?`<div class="sec"><span class="tag">Il suo ramo</span>
-        ${organigramma(p.id, 2)}</div>`:``}
+      ${figli.length?`<div class="sec">
+        <button class="btn wide" data-gvai="${p.id}">Guarda il suo gruppo · ${plur(discendenti(p.id).length,"persona","persone")}</button>
+      </div>`:``}
 
       <div class="sec"><span class="tag">Ultimi fatti</span>
         <ul class="steps" style="margin-top:8px">
@@ -1959,7 +2111,26 @@ async function copia(testo){
 
 document.addEventListener("click", async ev => {
   const tab = ev.target.closest("[data-tab]");
-  if(tab){ vista = tab.dataset.tab; apertoId=null; render(); window.scrollTo(0,0); return; }
+  if(tab){
+    /* Il pulsante della rete riporta sempre alle proprie linee, anche da dentro un gruppo. */
+    if(tab.dataset.tab === "gruppo"){ gRadice = null; gCerca = ""; gTrovato = null; }
+    vista = tab.dataset.tab; apertoId=null; render(); window.scrollTo(0,0); return;
+  }
+
+  const gz = ev.target.closest("[data-gfiltro],[data-gzoom],[data-ghome],[data-gtrova],[data-gvai]");
+  if(gz){
+    const d = gz.dataset;
+    const vaiAlCorpo = () => { const c = document.getElementById("gCorpo"); if(c && c.scrollIntoView) c.scrollIntoView({ block:"start" }); };
+    if(d.gfiltro){ gFiltro = d.gfiltro; return render(); }
+    if(d.ghome !== undefined){ gRadice = null; gTrovato = null; render(); return vaiAlCorpo(); }
+    if(d.gzoom){ gRadice = d.gzoom; gTrovato = null; render(); return vaiAlCorpo(); }
+    if(d.gvai){ foglio = null; vista = "gruppo"; gRadice = d.gvai; gCerca = ""; gTrovato = null; render(); return vaiAlCorpo(); }
+    if(d.gtrova){
+      const x = S.persone[d.gtrova]; if(!x) return;
+      gRadice = figliDi(x.id).length ? x.id : (x.sponsor === S.me ? null : x.sponsor);
+      gTrovato = x.id; gCerca = ""; render(); return vaiAlCorpo();
+    }
+  }
 
 
   const pb = ev.target.closest("[data-persona]");
@@ -2171,6 +2342,13 @@ document.addEventListener("click", async ev => {
     localStorage.removeItem(CHIAVE); localStorage.removeItem(CHIAVE_VECCHIA);
     S = vuoto(); vista="oggi"; foglio=null; return render();
   }
+});
+
+document.addEventListener("input", ev => {
+  if(!ev.target || ev.target.id !== "gCerca") return;
+  gCerca = ev.target.value.trim();
+  const c = document.getElementById("gCorpo");
+  if(c) c.innerHTML = gCorpo();
 });
 
 document.addEventListener("change", ev => {
