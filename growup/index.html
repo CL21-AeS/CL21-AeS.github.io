@@ -551,6 +551,24 @@ let foglio = null;        // foglio ancorato in basso
 let meseVista = null;
 function meseMostrato(){ return meseVista || meseOra(); }
 function inArchivio(){ return !!meseVista && meseVista !== meseOra(); }
+/* ---- Il mese chiuso com'era ----
+   Guardando un mese passato l'app si rimette alla sua ultima ora: conta solo i fatti fino a
+   quel momento (step, traguardi, primo ordine, aperture) e solo le persone gia' entrate.
+   Chi e' stato tolto DOPO quel mese allora c'era, e ricompare. Quello che non ha data non si
+   ricostruisce: lo sponsor e il nome sono quelli di oggi. */
+function taglio(){
+  if(!inArchivio()) return null;
+  const [a,b] = meseVista.split("-").map(Number);
+  return new Date(Date.UTC(a, b, 1) - 1).toISOString();      // l'ultimo millesimo del mese
+}
+function oggiVista(){ const t = taglio(); return t ? new Date(t) : OGGI(); }
+function cera(p){
+  if(!p) return false;
+  const t = taglio();
+  if(!t) return !S.cancellati[p.id];
+  if((p.creato||"") > t) return false;
+  return !S.cancellati[p.id] || S.cancellati[p.id] > t;
+}
 
 function vuoto(){
   return { me:null, leader:null, persone:{}, eventi:[], aperture:{}, cancellati:{},
@@ -639,7 +657,8 @@ function aggiungiEvento(personaId, tipo, valore, autore){
     at: iso(OGGI()), by: autore || S.me || personaId
   });
 }
-function eventiDi(id){ return S.eventi.filter(e => e.persona===id && !S.cancellati[e.id]); }
+function eventiDi(id){ const t = taglio();
+  return S.eventi.filter(e => e.persona===id && !S.cancellati[e.id] && (!t || (e.at||"") <= t)); }
 function primoEvento(id, tipo){
   return eventiDi(id).filter(e=>e.tipo===tipo).sort((a,b)=>a.at<b.at?-1:1)[0] || null;
 }
@@ -690,7 +709,7 @@ function vpLinea(id){
 function lineeCon(id, soglia){ return figliDi(id).filter(x=>vpLinea(x.id) >= soglia).length; }
 function contaEventi(id, tipo){ return eventiDi(id).filter(e=>e.tipo===tipo).length; }
 function figliDi(id){
-  return Object.values(S.persone).filter(p => p.sponsor===id && !S.cancellati[p.id]);
+  return Object.values(S.persone).filter(p => p.sponsor===id && cera(p));
 }
 function discendenti(id, out){
   out = out || [];
@@ -755,6 +774,7 @@ function inizioFase(p){ return inizioFasi(p)[faseDi(p.id)] || p.creato; }
 /* Il ritmo della fase APERTA: in linea o in ritardo. Mai "veloce":
    una fase in corso non si può ancora dire chiusa in fretta. */
 function ritmoDi(p){
+  if(inArchivio()) return null;           // il ritmo e' di oggi: su un mese chiuso non si misura
   const f = FASI[faseDi(p.id)];
   if(!f.finestra) return null;
   const g = giorniTra(inizioFase(p), OGGI());
@@ -783,6 +803,7 @@ function ultimoTocco(id){
 }
 /* Il semaforo misura l'attività REGISTRATA NELL'APP. Mai scritto "fermo". */
 function semaforo(id){
+  if(inArchivio()) return { k:"n", g:0, txt:"mese chiuso" };
   const t = ultimoTocco(id);
   const p = S.persone[id];
   if(!t){
@@ -849,7 +870,7 @@ const MOVIMENTO = { giorniPasso: 30, giorniUso: 14 };
    Una persona inserita a mano esiste subito nella rete, ma finche' non apre il suo link di
    accesso i suoi dati li segna lo sponsor. L'app lo sa da un fatto solo: le aperture. Chi
    non ha mai aperto l'app "non la usa"; alla prima apertura lo diventa, e lo si dice. */
-function usaApp(id){ return (S.aperture[id]||[]).length > 0; }
+function usaApp(id){ const t = taglio(); return (S.aperture[id]||[]).some(d => !t || String(d) <= t); }
 
 /* ---- Correggere i dati di una persona ----
    Si correggono solo le persone del proprio gruppo che NON usano l'app: chi la usa i suoi
@@ -857,7 +878,7 @@ function usaApp(id){ return (S.aperture[id]||[]).length > 0; }
    Lo sponsor nuovo si sceglie fra se' e il proprio gruppo, mai fra i discendenti della
    persona stessa: finirebbe sotto di se' e il ramo si chiuderebbe ad anello. */
 function puoModificare(p){
-  if(!p || !S.me || p.id===S.me || p.id===S.leader || usaApp(p.id)) return false;
+  if(!p || !S.me || inArchivio() || p.id===S.me || p.id===S.leader || usaApp(p.id)) return false;
   return sonoLeader() || discendenti(S.me).some(x => x.id===p.id);
 }
 function sponsorPossibili(p){
@@ -879,6 +900,9 @@ function applicaSpostamenti(){
 }
 function primaApertura(id){ const a = (S.aperture[id]||[]).slice().sort(); return a[0] || null; }
 function statoAccesso(id){
+  if(inArchivio()) return usaApp(id)
+    ? { k:"si", titolo:"Usava l'app", txt:`La usava dal ${dataIt(primaApertura(id))}.` }
+    : { k:"no", titolo:"Non usava ancora l'app", txt:"In quel mese i suoi dati li segnava lo sponsor." };
   if(!usaApp(id)) return { k:"no", titolo:"Non ha ancora aperto l'app",
     txt:"Finché non apre il suo link di accesso, i suoi VP e i suoi passi li segni tu." };
   const s = semaforo(id), dal = dataIt(primaApertura(id));
@@ -888,6 +912,7 @@ function statoAccesso(id){
 }
 
 function movimento(id){
+  if(inArchivio()) return null;
   const p = S.persone[id]; if(!p) return null;
   const motivi = []; let punti = 0;
 
@@ -1359,7 +1384,7 @@ function testata(){
         aria-label="Mese da guardare"></label>
     <button class="btn-scuro" data-act="apri-invita"><span aria-hidden="true">＋</span> Invita un Partner</button>
   </div>
-  ${inArchivio()?`<div class="avviso">Stai guardando <b>${esc(nomeMese(m))}</b>: sono i numeri di fine mese e non si modificano.
+  ${inArchivio()?`<div class="avviso">Stai guardando <b>${esc(nomeMese(m))}</b> com'era a fine mese: non si modifica.
     <button data-act="mese-corrente">Torna a ${esc(nomeMese(meseOra()).split(" ")[0])}</button></div>`:``}`;
 }
 
@@ -1662,7 +1687,7 @@ function azioneHtml(p, f){
   if(inArchivio()) return `<div class="azione">
     <span class="eyebrow">Archivio</span>
     <h2>${esc(nomeMese(meseMostrato()))}</h2>
-    <p>Stai guardando un mese chiuso: i numeri sono quelli di fine mese e non si modificano.</p>
+    <p>Com'era a fine mese: i VP, le persone che c'erano e le tappe raggiunte fino ad allora. Non si modifica.</p>
     <button class="btn-oro" data-act="mese-corrente">Torna a ${esc(nomeMese(meseOra()).split(" ")[0])}</button>
   </div>`;
   /* Il riquadro blu e' il traguardo: la tappa aperta, i suoi requisiti con i numeri di adesso
@@ -1778,7 +1803,9 @@ function stradaFino(id){ const out = []; for(let x = id; x && S.persone[x]; x = 
 
 function gFiltriHtml(){
   const base = discendenti(gRadice || S.me);
-  return `<div class="g-filtri" role="group" aria-label="Filtri">${G_FILTRI.map(f => {
+  /* "non aggiornano" su un mese chiuso non vuol dire niente: il filtro sparisce */
+  if(inArchivio() && gFiltro === "fermi") gFiltro = "tutti";
+  return `<div class="g-filtri" role="group" aria-label="Filtri">${G_FILTRI.filter(f => !(inArchivio() && f.k==="fermi")).map(f => {
     const n = f.k === "tutti" ? base.length : base.filter(f.f).length;
     return `<button class="g-chip ${gFiltro===f.k?"on":""}" data-gfiltro="${f.k}" aria-pressed="${gFiltro===f.k}">${esc(f.l)} <b>${n}</b></button>`;
   }).join("")}</div>`;
@@ -2213,7 +2240,7 @@ function contenutoFoglio(){
         return `<div class="card tight accesso ${a.k}">
           <b>${esc(a.titolo)}</b>
           <p class="small" style="margin:4px 0 0">${esc(a.txt)}</p>
-          ${a.k!=="si" && mio ? `<div class="row wrap" style="margin-top:12px">
+          ${a.k!=="si" && mio && !inArchivio() ? `<div class="row wrap" style="margin-top:12px">
             <button class="btn primary grow" data-act="apri-vp" data-id="${p.id}">Aggiorna i suoi VP</button>
             ${a.k==="no" ? `<button class="btn grow" data-act="apri-invito" data-id="${p.id}">Rimanda il suo accesso</button>` : ``}
           </div>` : ``}
@@ -2235,7 +2262,7 @@ function contenutoFoglio(){
 
       <div class="card tight" style="margin-top:12px">
         <div class="kpi">
-          <div><b>${giorniTra(p.creato,OGGI())}</b><span>giorni</span></div>
+          <div><b>${giorniTra(p.creato,oggiVista())}</b><span>giorni</span></div>
           <div><b>${vpDi(p.id)}</b><span>VP</span></div>
           <div><b>${figli.length}</b><span>persone</span></div>
         </div>
@@ -2280,7 +2307,7 @@ function contenutoFoglio(){
         </span></li>`).join(""):`<li><span class="mark">–</span><span class="grow small">Niente ancora</span></li>`}
         </ul></div>
 
-      ${p.id!==S.me ? `
+      ${p.id!==S.me && !inArchivio() ? `
       <div class="sec">
         <span class="tag">Sponsorizza nel gruppo di ${esc(p.nome.split(" ")[0])}</span>
         <p class="small" style="margin:4px 0 10px">Chi entra da qui ha ${esc(p.nome.split(" ")[0])} come sponsor.</p>
@@ -2290,14 +2317,14 @@ function contenutoFoglio(){
         </div>
       </div>`:``}
 
-      ${mio && p.id!==S.me && p.id!==S.leader ? `
+      ${mio && !inArchivio() && p.id!==S.me && p.id!==S.leader ? `
       <div class="sec" style="margin-top:26px">
         <button class="btn wide tolgo" data-act="togli-persona" data-id="${p.id}">
           Togli ${esc(p.nome.split(" ")[0])} dal gruppo</button>
       </div>`:``}`,
       /* "Il suo accesso" serve solo a chi e' stato inserito a mano e non e' mai entrato:
          a chi usa gia' l'app, riaprirlo gli farebbe riscrivere obiettivi e telefono. */
-      foot: mio ? `<div class="row">
+      foot: mio && !inArchivio() ? `<div class="row">
         <button class="btn grow" data-act="apri-registra" data-id="${p.id}">Registra un fatto</button>
 
       </div>` : "" };
