@@ -812,6 +812,33 @@ const MOVIMENTO = { giorniPasso: 30, giorniUso: 14 };
    accesso i suoi dati li segna lo sponsor. L'app lo sa da un fatto solo: le aperture. Chi
    non ha mai aperto l'app "non la usa"; alla prima apertura lo diventa, e lo si dice. */
 function usaApp(id){ return (S.aperture[id]||[]).length > 0; }
+
+/* ---- Correggere i dati di una persona ----
+   Si correggono solo le persone del proprio gruppo che NON usano l'app: chi la usa i suoi
+   dati li tiene da se', e una correzione dall'alto gli cambierebbe il nome sotto il naso.
+   Lo sponsor nuovo si sceglie fra se' e il proprio gruppo, mai fra i discendenti della
+   persona stessa: finirebbe sotto di se' e il ramo si chiuderebbe ad anello. */
+function puoModificare(p){
+  if(!p || !S.me || p.id===S.me || p.id===S.leader || usaApp(p.id)) return false;
+  return sonoLeader() || discendenti(S.me).some(x => x.id===p.id);
+}
+function sponsorPossibili(p){
+  const vietati = new Set([p.id].concat(discendenti(p.id).map(x=>x.id)));
+  const base = sonoLeader() && S.leader ? S.leader : S.me;
+  return [S.persone[base]].concat(discendenti(base))
+    .filter(x => x && !vietati.has(x.id) && !S.cancellati[x.id]);
+}
+/* Lo spostamento si scrive come fatto sul VECCHIO sponsor: il suo telefono non riceve piu'
+   la scheda (non e' piu' nel suo ramo), ma riceve i suoi fatti, e da quello capisce che la
+   persona e' andata altrove. Valore: "persona>sponsorNuovo". */
+function applicaSpostamenti(){
+  for(const e of S.eventi){
+    if(e.tipo!=="spostamento" || S.cancellati[e.id] || !e.valore) continue;
+    const [pid, nuovo] = String(e.valore).split(">");
+    const x = S.persone[pid];
+    if(x && nuovo && (x.updatedAt||"") < e.at) S.persone[pid] = Object.assign({}, x, { sponsor:nuovo, updatedAt:e.at });
+  }
+}
 function primaApertura(id){ const a = (S.aperture[id]||[]).slice().sort(); return a[0] || null; }
 function statoAccesso(id){
   if(!usaApp(id)) return { k:"no", titolo:"Non ha ancora aperto l'app",
@@ -847,7 +874,7 @@ function movimento(id){
     motivi.unshift(`ha aperto l'app per la prima volta ${g<=0?"oggi":g===1?"ieri":`${g} giorni fa`}`);
   }
 
-  const suoi = eventiDi(id).filter(e => e.by===id && giorniTra(e.at, OGGI()) <= MOVIMENTO.giorniUso).length;
+  const suoi = eventiDi(id).filter(e => e.by===id && e.tipo!=="spostamento" && giorniTra(e.at, OGGI()) <= MOVIMENTO.giorniUso).length;
   if(suoi >= 2){ punti += 1; motivi.push(`ha segnato ${suoi} cose da solo`); }
 
   return punti > 0 ? { punti, motivi } : null;
@@ -1878,6 +1905,27 @@ function contenutoFoglio(){
         e poi rigenera il link.</p></div>`}` };
   }
 
+  if(t==="modifica"){
+    const p = S.persone[foglio.dati.id];
+    if(!p) return { titolo:"—", body:"" };
+    const opz = sponsorPossibili(p).map(x =>
+      `<option value="${x.id}" ${x.id===p.sponsor?"selected":""}>${esc(x.nome)}${x.id===S.me?" (tu)":""}</option>`).join("");
+    return { titolo:`Modifica ${esc(p.nome.split(" ")[0])}`, body:`
+      <p class="small">Puoi correggere i suoi dati finché non apre l'app. Da quando la usa,
+      i suoi dati li tiene lei.</p>
+      <label class="field"><span>Nome</span>
+        <input id="mdNome" type="text" autocomplete="off" value="${esc(p.nome)}"></label>
+      <label class="field"><span>Numero</span>
+        <input id="mdTel" type="tel" inputmode="tel" placeholder="+39 333 1234567" value="${esc(p.tel||"")}"></label>
+      <label class="field"><span>Data della sponsorizzazione</span>
+        <input id="mdData" type="date" value="${giorno(p.creato)}"></label>
+      <label class="field"><span>Sponsor</span>
+        <select id="mdSp">${opz}</select></label>
+      ${figliDi(p.id).length?`<p class="small faint" style="margin-top:8px">Se cambi sponsor,
+        ${figliDi(p.id).length===1?"la sua persona si sposta":"le sue "+figliDi(p.id).length+" persone si spostano"} insieme.</p>`:``}`,
+      foot:`<button class="btn primary wide" data-act="salva-modifica" data-id="${p.id}">Salva</button>` };
+  }
+
   if(t==="invito"){
     const p = S.persone[foglio.dati.id];
     const link = linkInvito(p);
@@ -1942,6 +1990,7 @@ function contenutoFoglio(){
         </div>
         <p class="small" style="margin:10px 0 0">Step ${f+1} · ${esc(FASI[f].nome)} ·
         entrata il ${dataIt(p.creato)}${p.sponsor&&S.persone[p.sponsor]?` · sponsor ${esc(S.persone[p.sponsor].nome)}`:``}</p>
+        ${puoModificare(p)?`<button class="btn wide" style="margin-top:12px" data-act="apri-modifica" data-id="${p.id}">Modifica i suoi dati</button>`:``}
       </div>
 
       ${(() => {
@@ -2019,6 +2068,11 @@ function etichettaEvento(e){
     foundation:"Bronze Foundation", pct15:"15%", pct18:"18%", pct21:"21%", platino:"Platino"
   };
   if(e.tipo==="vp") return `VP a ${e.valore}`;
+  if(e.tipo==="spostamento"){
+    const [pid, nuovo] = String(e.valore||"").split(">");
+    const chi = S.persone[pid], dove = S.persone[nuovo];
+    return `Spostamento: ${chi?chi.nome:"una persona"} ${dove?`nel gruppo di ${dove.nome}`:"in un altro gruppo"}`;
+  }
   return m[e.tipo] || e.tipo;
 }
 
@@ -2074,6 +2128,7 @@ function unisci(altro){
     S.aperture[id] = Array.from(set).sort().slice(-60);
   }
   if(!S.leader && altro.leader) S.leader = altro.leader;
+  applicaSpostamenti();
   salva();
 }
 function pacchetto(){
@@ -2329,8 +2384,12 @@ document.addEventListener("click", async ev => {
       return toast("Eri già dentro: ecco il tuo percorso");
     }
     const g = n => Number((document.getElementById(n).value||"").trim())||null;
-    S.persone[inv.i] = { id:inv.i, nome:inv.n, sponsor:inv.s, creato:iso(new Date(inv.d)),
-      tel:(document.getElementById("s1").value||"").trim()||null,
+    /* Se lo sponsor ha corretto la scheda dopo aver mandato il link, vale il foglio, non il
+       link: nome, sponsor, data e numero restano quelli corretti. */
+    const fo = (gia && gia.persone && gia.persone[inv.i]) || S.persone[inv.i] || null;
+    S.persone[inv.i] = { id:inv.i, nome:fo&&fo.nome||inv.n, sponsor:fo?fo.sponsor:inv.s,
+      creato:fo&&fo.creato||iso(new Date(inv.d)),
+      tel:(document.getElementById("s1").value||"").trim()||(fo&&fo.tel)||null,
       dichiarato:{ euroMese:g("d1"), mesi:g("d2"),
                    perche:(document.getElementById("d4").value||"").trim()||null },
       updatedAt: iso(OGGI()) };
@@ -2347,6 +2406,7 @@ document.addEventListener("click", async ev => {
   if(a==="apri-nuovo")    return apriFoglio("nuovo",  { sponsor: id || S.me });
   if(a==="apri-invita")   return apriFoglio("invita", { sponsor: id || S.me });
   if(a==="apri-invito")   return apriFoglio("invito", { id });
+  if(a==="apri-modifica") return apriFoglio("modifica", { id });
   if(a==="apri-importa")  return apriFoglio("importa");
 
   if(a==="salva-vp"){
@@ -2372,6 +2432,44 @@ document.addEventListener("click", async ev => {
   }
 
   if(a==="conta"){ aggiungiEvento(id, b.dataset.t); salva(); programmaSync(); render(); return toast("Segnato"); }
+
+  if(a==="salva-modifica"){
+    const p = S.persone[id];
+    if(!puoModificare(p)) return toast("Ora usa l'app: i suoi dati li cambia lei");
+    const nome = (document.getElementById("mdNome").value||"").trim();
+    const tel  = (document.getElementById("mdTel").value||"").trim() || null;
+    const data = document.getElementById("mdData").value;
+    const sp   = document.getElementById("mdSp").value;
+    if(!nome) return toast("Serve il nome");
+    if(!data || valida(data)===null) return toast("Data non valida");
+    if(!sponsorPossibili(p).some(x => x.id===sp)) return toast("Sponsor non valido");
+
+    const ora = iso(OGGI());
+    const nuovaData = giorno(data) !== giorno(p.creato);
+    const nuovoSp = sp !== p.sponsor;
+    const creato = nuovaData ? iso(new Date(data)) : p.creato;
+    if(nome===p.nome && tel===(p.tel||null) && !nuovaData && !nuovoSp){ chiudiFoglio(); return toast("Niente da cambiare"); }
+
+    /* I fatti non si riscrivono: quelli vecchi si chiudono con la pietra, e si segnano
+       quelli giusti. Cambia la data -> nuova "iscrizione"; cambia lo sponsor o la data ->
+       la "sponsorizzazione" passa a chi l'ha fatta davvero, nel giorno giusto. */
+    if(nuovaData){
+      for(const e of eventiDi(p.id)) if(e.tipo==="iscrizione") S.cancellati[e.id] = ora;
+      S.eventi.push({ id:uid(), persona:p.id, tipo:"iscrizione", valore:null, at:creato, by:S.me });
+    }
+    if(nuovaData || nuovoSp){
+      const vecchia = p.sponsor ? eventiDi(p.sponsor).find(e => e.tipo==="sponsorizzazione" &&
+        (e.at===p.creato || e.valore===p.nome)) : null;
+      if(vecchia) S.cancellati[vecchia.id] = ora;
+      S.eventi.push({ id:uid(), persona:sp, tipo:"sponsorizzazione", valore:nome, at:creato, by:S.me });
+    }
+    if(nuovoSp && p.sponsor)
+      S.eventi.push({ id:uid(), persona:p.sponsor, tipo:"spostamento", valore:`${p.id}>${sp}`, at:ora, by:S.me });
+
+    S.persone[p.id] = Object.assign({}, p, { nome, tel, creato, sponsor:sp, updatedAt:ora });
+    salva(); programmaSync(); chiudiFoglio();
+    return toast(nuovoSp ? `${nome.split(" ")[0]} ora è nel gruppo di ${S.persone[sp].nome.split(" ")[0]}` : "Dati aggiornati");
+  }
 
   if(a==="salva-nuovo"){
     const nome = (document.getElementById("nvNome").value||"").trim();
