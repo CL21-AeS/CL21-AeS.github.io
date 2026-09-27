@@ -1524,7 +1524,7 @@ function gLinee(){
   const flt = G_FILTRI.find(q => q.k === gFiltro);
   return `
   <div class="g-sintesi"><h2>Le tue linee</h2>
-    <button class="btn-chiaro" data-act="apri-nuovo"><span aria-hidden="true">＋</span> Aggiungi</button></div>
+    <button class="btn-chiaro" data-act="apri-nuovo"><span aria-hidden="true">＋</span> Aggiungi a mano</button></div>
   ${linee.length ? `
   <div class="g-ptb"><span class="g-pall">${linee.map(x => `<i class="${vpLinea(x.id)>=soglia?"ok":""}"></i>`).join("")}</span>
     <span><b>${ok} ${ok===1?"linea":"linee"} su ${linee.length}</b> ${soglia>1?`${ok===1?"è":"sono"} a ${num(soglia)} VP questo mese`:`${ok===1?"è attiva":"sono attive"}`}.
@@ -1549,7 +1549,8 @@ function gLinee(){
         </span>
       </span>
     </button>`; }).join("")}</div>`
-  : `<div class="g-vuoto"><b>Ancora nessuno</b><br>Invita la prima persona: appena entra dal tuo link la vedi qui, senza doverla inserire.</div>`}`;
+  : `<div class="g-vuoto"><b>Ancora nessuno</b><br>Invita la prima persona: appena entra dal tuo link la vedi qui,
+     senza doverla inserire. Se non userà l'app, aggiungila a mano.</div>`}`;
 }
 
 function gNodo(x){
@@ -1585,7 +1586,7 @@ function gZoom(){
       </div>
       <div class="g-azioni">
         <button class="btn-chiaro" data-persona="${x.id}">Apri la scheda</button>
-        <button class="btn-chiaro" data-act="apri-nuovo" data-id="${x.id}"><span aria-hidden="true">＋</span> Aggiungi</button>
+        <button class="btn-chiaro" data-act="apri-nuovo" data-id="${x.id}"><span aria-hidden="true">＋</span> Aggiungi a mano</button>
       </div>
     </div>
   </div>
@@ -1777,6 +1778,7 @@ function contenutoFoglio(){
         <button class="btn primary wide" data-act="copia-link-sponsor" data-id="${sp}">Copia il link</button>
         <a class="btn wide" href="https://wa.me/?text=${encodeURIComponent("Ciao! Questo è il percorso di cui ti parlavo: "+link)}"
            target="_blank" rel="noopener">Mandalo su WhatsApp</a>
+        <button class="btn wide ghost" data-act="apri-nuovo" data-id="${sp}">Non userà l'app? Aggiungila a mano</button>
       </div>
       ${S.sync.url?``:`<div class="card warn" style="margin-top:14px"><b>Attenzione</b>
         <p class="small">Non hai ancora collegato il foglio, quindi il link non lo contiene:
