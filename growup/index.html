@@ -1276,8 +1276,8 @@ function vistaDati(){
   </div>
   <div class="card stack">
     <h2>Il tuo obiettivo</h2>
-    <p class="small">Quanto vuoi guadagnare, in quanti giorni i primi 100 VP, con quante persone
-    parlare, e il tuo perché. È quello che l'app confronta coi fatti.</p>
+    <p class="small">Quanto vuoi guadagnare al mese, tra quanti mesi, e il tuo perché.
+    Dalla cifra l'app ricava il gradino a cui puntare e la struttura da costruire per arrivarci.</p>
     <button class="btn wide" data-act="apri-obiettivo">Scrivi o cambia l'obiettivo</button>
   </div>
   <div class="card stack">
@@ -2035,8 +2035,8 @@ function contenutoFoglio(){
     const p = io();
     const d = p.dichiarato || {};
     return { titolo:"Il tuo obiettivo", body:`
-      <p class="small">Da questi due numeri l'app calcola il gradino a cui puntare e la struttura
-      da costruire per arrivarci. Cambiali quando cambiano.</p>
+      <p class="small">Tre risposte: quanto, entro quando, e perché. Dalla cifra l'app ricava il gradino
+      a cui puntare e la struttura da costruire per arrivarci. Cambiale quando cambiano.</p>
       <div class="stack" style="margin-top:12px">
         <label class="field"><span>Quanto vuoi guadagnare al mese, per iniziare?</span>
           <input id="o1" type="number" inputmode="numeric" placeholder="es. 300" value="${d.euroMese||""}"></label>
