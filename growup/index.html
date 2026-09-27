@@ -241,6 +241,7 @@ button.box{cursor:pointer}
 .tappa .badge{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:13px;
   font-weight:800;background:var(--bg);color:var(--ink)}
 .tappa.fatta .badge{background:var(--verde-soft);color:var(--verde);font-size:17px}
+.tappa.fatta.saltata .badge{background:var(--line);color:var(--ink2)}
 .tappa.ora{background:var(--oro-soft)}
 .tappa.ora::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--oro)}
 .tappa.ora .badge{background:var(--oro);color:var(--oro-ink)}
@@ -706,6 +707,7 @@ function haBuilder(id){ return ha(id,"builder") || ha(id,"pct15"); }
 function haArgento(id){ return ha(id,"argento") || ha(id,"pct21") || ha(id,"platino"); }
 
 function faseDi(id){
+  if(haArgento(id))          return 5;   // arrivato (anche saltando le tappe in mezzo)
   if(haBuilder(id))          return 5;   // verso Argento
   if(ha(id,"foundation"))    return 4;   // verso Bronze Builder
   if(ha(id,"path_to_bronze")) return 3;  // verso Bronze Foundation
@@ -731,7 +733,7 @@ function inizioFasi(p){
   if(soglia && cli) d[2] = soglia.at > cli ? soglia.at : cli;
   d[3] = primo("path_to_bronze");
   d[4] = primo("foundation");
-  d[5] = primo("builder") || primo("pct15");
+  d[5] = primo("builder") || primo("pct15") || primo("argento") || primo("pct21") || primo("platino");
   /* una fase raggiunta implica le precedenti: riempie i buchi guardando indietro */
   for(let i=1;i<d.length;i++) if(d[i] && !d[i-1]) d[i-1] = d[i];
   /* e le date devono salire: chi segna un traguardo e solo dopo aggiorna i VP avrebbe
@@ -996,9 +998,9 @@ function criteri(p, f){
 
 /* La strada gia' fatta: le fasi chiuse, quando e in quanti giorni. */
 function strada(p){
-  const d = inizioFasi(p), f = faseDi(p.id), out = [];
+  const d = inizioFasi(p), f = faseDi(p.id), out = [], salt = saltate(p.id);
   for(let i=0;i<f;i++){
-    if(!d[i] || !d[i+1]) continue;
+    if(!d[i] || !d[i+1] || salt.has(i)) continue;
     out.push({ fase:i, nome:FASI[i].nome, quando:d[i+1],
                giorni:giorniTra(d[i], d[i+1]), finestra:FASI[i].finestra });
   }
@@ -1400,13 +1402,14 @@ function kpiHtml(p, f){
 
 /* ---- Le 6 tappe ---- */
 function tappeHtml(p, f){
-  const o = obiettivo(p), fine = scalaFinita(p.id);
+  const o = obiettivo(p), fine = scalaFinita(p.id), salt = saltate(p.id);
   return `<div class="tappe">${FASI.map(x => {
     const stato = (fine || x.n < f) ? "fatta" : x.n === f ? "ora" : "poi";
-    return `<div class="tappa ${stato}">
-      <span class="badge">${stato==="fatta" ? "✓" : String(x.n+1).padStart(2,"0")}</span>
+    const sx = stato==="fatta" && salt.has(x.n);
+    return `<div class="tappa ${stato}${sx?" saltata":""}">
+      <span class="badge">${sx ? "»" : stato==="fatta" ? "✓" : String(x.n+1).padStart(2,"0")}</span>
       <b>${esc(x.nome)}</b>
-      <small>${stato==="fatta" ? "Completato" : stato==="ora" ? "In corso" : esc(x.traguardo)}</small>
+      <small>${sx ? "Saltata" : stato==="fatta" ? "Completato" : stato==="ora" ? "In corso" : esc(x.traguardo)}</small>
       ${o && o.gradino.fase===x.n && stato!=="fatta" ? `<em class="mira">◎ il tuo obiettivo</em>` : ``}
     </div>`; }).join("")}</div>`;
 }
@@ -1504,6 +1507,34 @@ function scadenzaMese(){
   return { quando, giorni:g, txt: g<=0 ? `Oggi è l'ultimo giorno del mese: conta quello che arriva entro stasera.`
     : `Tutto nello stesso mese: hai tempo fino al ${quando} (${plur(g,"giorno","giorni")}).` };
 }
+/* I requisiti di una tappa n (2..5) con i numeri del mese: servono al piano della tappa aperta
+   e per capire se il partner ha gia' i numeri di una tappa PIU' ALTA. */
+function sogliaTappa(n){ return n===2 ? SOGLIE.ptb : n===3 ? SOGLIE.foundation : n===4 ? SOGLIE.builder : SOGLIE.argento; }
+function requisitiTappa(p, n){
+  const c = sogliaTappa(n), T = c.vpLinea || 1, vp = vpDi(p.id), gruppo = vpGruppo(p.id);
+  const ok = figliDi(p.id).filter(x => vpLinea(x.id) >= T).length;
+  const R = [{ l: c.vpLinea ? `Linee a ${num(T)} VP` : "Linee con volume", v:`${Math.min(ok,c.linee)} di ${c.linee}`, fatto: ok >= c.linee }];
+  if(c.vpPersonali) R.push({ l:"I tuoi VP", v:`${num(vp)} di ${num(c.vpPersonali)}`, fatto: vp >= c.vpPersonali });
+  if(c.vpGruppo)    R.push({ l:"Gruppo", v:`${num(gruppo)} di ${num(c.vpGruppo)}`, fatto: gruppo >= c.vpGruppo });
+  return R;
+}
+/* ---- Saltare una tappa ----
+   Succede davvero: si prende il 9% senza la struttura della Foundation, e il mese in cui arriva
+   la struttura si e' gia' al Builder (o all'Argento). Non c'e' un pulsante per saltare: il salto
+   compare SOLO quando i numeri della tappa piu' alta ci sono tutti, nel mese in corso.
+   Si propone la tappa piu' alta raggiunta; quelle in mezzo restano segnate come "saltate". */
+function saltoPossibile(p){
+  if(!p || inArchivio() || scalaFinita(p.id)) return null;
+  const f = faseDi(p.id);
+  if(f < 2) return null;
+  for(let n = 5; n > f; n--) if(requisitiTappa(p, n).every(r => r.fatto)) return n;
+  return null;
+}
+function saltate(id){
+  const k = new Set(eventiDi(id).filter(e => e.tipo==="tappa_saltata").map(e => e.valore));
+  return new Set([2,3,4,5].filter(n => k.has(chiaveTappa(n))));
+}
+
 function pianoTappa(p){
   const f = faseDi(p.id), out = { f, nome:FASI[f].nome, requisiti:[], passi:[], fatti:[], scadenza:null,
     chiave:chiaveTappa(f), pronto:false };
@@ -1551,11 +1582,11 @@ function pianoTappa(p){
   const nuove = Math.max(0, serve - candidati.length);
   const soglia = c.vpLinea ? `${num(T)} VP` : "volume";
 
-  out.requisiti.push({ l: c.vpLinea ? `Linee a ${num(T)} VP` : "Linee con volume",
-    v:`${Math.min(ok.length,L)} di ${L}`, fatto: ok.length >= L });
-  if(P) out.requisiti.push({ l:"I tuoi VP", v:`${num(vp)} di ${num(P)}`, fatto: vp >= P });
-  if(G) out.requisiti.push({ l:"Gruppo", v:`${num(gruppo)} di ${num(G)}`, fatto: gruppo >= G });
+  out.requisiti = requisitiTappa(p, f);
   out.scadenza = scadenzaMese().txt;
+  const sl = saltoPossibile(p);
+  if(sl) out.salto = { n:sl, nome:FASI[sl].nome, chiave:chiaveTappa(sl), requisiti:requisitiTappa(p, sl),
+    saltate: FASI.slice(f, sl).map(x => x.nome) };
 
   /* chi, dentro una linea, ha gia' volume: e' da li' che si cresce piu' in fretta */
   const dentro = id => [S.persone[id], ...discendenti(id)].filter(r => vpDi(r.id) > 0)
@@ -1629,6 +1660,15 @@ function azioneHtml(p, f){
      e il primo passo. Toccandolo si apre il piano intero (foglio "piano"). */
   if(!scalaFinita(p.id)){
     const pn = pianoTappa(p), primo = pn.passi[0];
+    if(pn.salto){ const z = pn.salto;
+      return `<button class="azione traguardo" data-act="apri-piano">
+      <span class="eyebrow">Hai i numeri di una tappa più alta</span>
+      <h2>${esc(z.nome)}</h2>
+      <span class="req">${z.requisiti.map(r => `<span class="ok">✓ ${esc(r.l)}: <b>${esc(r.v)}</b></span>`).join("")}</span>
+      <span class="primo"><i>»</i><span>Questo mese hai tutto quello che serve per ${esc(z.nome)}.
+        ${z.saltate.length===1?`La tappa ${esc(z.saltate[0])} resterà segnata come saltata.`:`Le tappe ${esc(z.saltate.join(" e "))} resteranno segnate come saltate.`}</span></span>
+      <span class="btn-oro">Vedi e segna <span aria-hidden="true">›</span></span>
+    </button>`; }
     return `<button class="azione traguardo" data-act="apri-piano">
       <span class="eyebrow">Il tuo traguardo · Step ${f+1} di ${FASI.length}</span>
       <h2>${esc(pn.nome)}</h2>
@@ -1640,6 +1680,12 @@ function azioneHtml(p, f){
       <span class="btn-oro">${pn.pronto?"Segna il traguardo":"Come arrivarci prima"} <span aria-hidden="true">›</span></span>
     </button>`;
   }
+  if(scalaFinita(p.id)) return `<div class="azione">
+    <span class="eyebrow">Traguardo raggiunto · Step ${FASI.length} di ${FASI.length}</span>
+    <h2>Argento</h2>
+    <p>Adesso il lavoro è portarci le tue persone: una linea alla volta.</p>
+    <button class="btn-oro" data-tab="gruppo">Apri il mio gruppo <span aria-hidden="true">›</span></button>
+  </div>`;
   const az = prossimaAzione(p);
   const chi = az.persona ? S.persone[az.persona] : null;
   const av = chi ? iniziali(chi.nome) : az.azione==="vp" ? "VP" : az.azione==="invita" ? "+" : az.azione ? "✓" : "→";
@@ -2074,6 +2120,18 @@ function contenutoFoglio(){
       ${x.persona ? `<button class="btn small" data-persona="${x.persona}">Apri la scheda di ${esc(nome1(S.persone[x.persona]))}</button>` : ``}
       ${x.act ? `<button class="btn small" data-act="${x.act}"${x.t?` data-t="${x.t}"`:``}>${esc(x.bottone||"Apri")}</button>` : ``}
     </div></li>`;
+    if(pn.salto){ const z = pn.salto;
+      return { titolo:`Verso ${esc(z.nome)}`, body:`
+      <div class="card tight"><b>Questo mese hai i requisiti di ${esc(z.nome)}.</b>
+        <p class="small" style="margin:4px 0 10px">Stavi lavorando su ${esc(pn.nome)}, ma i numeri sono già quelli di
+        ${esc(z.nome)}. Quando la qualifica arriva davvero, segnala qui:
+        ${z.saltate.length===1?`${esc(z.saltate[0])} resterà segnata come saltata`:`${esc(z.saltate.join(" e "))} resteranno segnate come saltate`},
+        non come fatte.</p>
+        <ul class="gia">${z.requisiti.map(r=>`<li>${esc(r.l)}: ${esc(r.v)}</li>`).join("")}</ul>
+        <button class="btn-oro" style="margin-top:12px" data-act="salta" data-t="${z.n}">Ho raggiunto ${esc(z.nome)}</button></div>
+      <p class="small faint" style="margin-top:16px">Il salto compare solo quando tutti i numeri della tappa più alta ci sono,
+      nel mese in corso. Se la qualifica non è ancora arrivata, non segnare niente: il riquadro resta finché i numeri restano.</p>` };
+    }
     return { titolo:`Verso ${esc(pn.nome)}`, body:`
       ${pn.scadenza?`<p class="small">${esc(pn.scadenza)}</p>`:``}
       ${pn.pronto && pn.chiave ? `<div class="card tight"><b>Questo mese hai tutti i requisiti.</b>
@@ -2245,9 +2303,11 @@ function etichettaEvento(e){
     iscrizione:"Sponsorizzata", primo_ordine:"Primo ordine", primo_cliente:"Primo cliente",
     conversazione:"Ha parlato con una persona", presentazione:"Presentazione",
     sponsorizzazione:"Ha sponsorizzato", path_to_bronze:"Path to Bronze",
-    foundation:"Bronze Foundation", pct15:"15%", pct18:"18%", pct21:"21%", platino:"Platino"
+    foundation:"Bronze Foundation", builder:"Bronze Builder", argento:"Argento", pct15:"15%", pct18:"18%", pct21:"21%", platino:"Platino"
   };
   if(e.tipo==="vp") return `VP a ${e.valore}`;
+  if(e.tipo==="tappa_saltata"){ const n = [2,3,4,5].find(k => chiaveTappa(k)===e.valore);
+    return `Tappa saltata: ${n ? FASI[n].nome : e.valore}`; }
   if(e.tipo==="spostamento"){
     const [pid, nuovo] = String(e.valore||"").split(">");
     const chi = S.persone[pid], dove = S.persone[nuovo];
@@ -2598,6 +2658,14 @@ document.addEventListener("click", async ev => {
 
   /* Il primo ordine non si spunta e basta: si dice anche di quanti VP era.
      Chiederlo dopo, in un secondo passaggio, era un giro a vuoto. */
+  if(a==="salta"){
+    const p = io(), n = Number(b.dataset.t), f = faseDi(p.id);
+    if(saltoPossibile(p) !== n) return toast("I numeri non ci sono più: ricontrolla i VP");
+    for(let j = f; j < n; j++){ const k = chiaveTappa(j); if(k && !ha(p.id, k)) aggiungiEvento(p.id, "tappa_saltata", k); }
+    aggiungiEvento(p.id, chiaveTappa(n));
+    salva(); programmaSync(); chiudiTuttiFogli(); render();
+    return toast(`${FASI[n].nome}: segnato`);
+  }
   if(a==="fatto" && b.dataset.t==="primo_ordine") return apriFoglio("primo-ordine", { id:S.me });
   if(a==="fatto"){ aggiungiEvento(S.me, b.dataset.t); salva(); programmaSync();
     if(foglio && foglio.tipo==="piano") chiudiTuttiFogli();
