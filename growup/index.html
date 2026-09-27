@@ -335,6 +335,10 @@ button.voce, label.voce{cursor:pointer}
 .g-tag.ok{background:var(--verde-soft);color:var(--verde)}
 .g-tag.no{background:var(--oro-soft);color:var(--oro-testo)}
 .g-tag.fermo{background:var(--rosso-soft);color:var(--rosso)}
+.g-tag.mano, .g-piu.mano{background:transparent;box-shadow:inset 0 0 0 1px var(--ink3);color:var(--ink2)}
+.accesso{border-left:4px solid var(--verde)}
+.accesso.no{border-left-color:var(--ink3);background:var(--bg)}
+.accesso.fermo{border-left-color:var(--rosso)}
 .g-tag.hl{box-shadow:inset 0 0 0 2px var(--navy);color:var(--ink)}
 .g-briciole{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:20px 0 10px;font-size:14px}
 .g-briciole button{background:none;border:0;padding:6px 4px;min-height:40px;cursor:pointer;color:var(--ink2);font:inherit;font-weight:600}
@@ -802,6 +806,21 @@ function segnaliDi(id){
    arrivato resterebbe in cima per sempre soffocando chi sta salendo adesso. */
 const MOVIMENTO = { giorniPasso: 30, giorniUso: 14 };
 
+/* ---- Usa l'app o no ----
+   Una persona inserita a mano esiste subito nella rete, ma finche' non apre il suo link di
+   accesso i suoi dati li segna lo sponsor. L'app lo sa da un fatto solo: le aperture. Chi
+   non ha mai aperto l'app "non la usa"; alla prima apertura lo diventa, e lo si dice. */
+function usaApp(id){ return (S.aperture[id]||[]).length > 0; }
+function primaApertura(id){ const a = (S.aperture[id]||[]).slice().sort(); return a[0] || null; }
+function statoAccesso(id){
+  if(!usaApp(id)) return { k:"no", titolo:"Non ha ancora aperto l'app",
+    txt:"Finché non apre il suo link di accesso, i suoi VP e i suoi passi li segni tu." };
+  const s = semaforo(id), dal = dataIt(primaApertura(id));
+  if(s.k === "r") return { k:"fermo", titolo:"Usa l'app, ma non aggiorna",
+    txt:`La usa dal ${dal}, ma ${s.txt}. Chiedi come va: se lavora senza segnare, i dati aggiornali tu.` };
+  return { k:"si", titolo:"Usa l'app", txt:`La usa dal ${dal} e aggiorna da sé: ${s.txt}.` };
+}
+
 function movimento(id){
   const p = S.persone[id]; if(!p) return null;
   const motivi = []; let punti = 0;
@@ -820,6 +839,12 @@ function movimento(id){
   const ap = (S.aperture[id]||[]).filter(d => giorniTra(d, OGGI()) <= MOVIMENTO.giorniUso).length;
   if(ap >= 2){ punti += Math.min(3, ap-1);
     motivi.push(`ha aperto l'app ${ap} volte in ${MOVIMENTO.giorniUso} giorni`); }
+
+  const pa = primaApertura(id);
+  if(pa && giorniTra(pa, OGGI()) <= MOVIMENTO.giorniUso){
+    const g = giorniTra(pa, OGGI()); punti += 3;
+    motivi.unshift(`ha aperto l'app per la prima volta ${g<=0?"oggi":g===1?"ieri":`${g} giorni fa`}`);
+  }
 
   const suoi = eventiDi(id).filter(e => e.by===id && giorniTra(e.at, OGGI()) <= MOVIMENTO.giorniUso).length;
   if(suoi >= 2){ punti += 1; motivi.push(`ha segnato ${suoi} cose da solo`); }
@@ -1498,6 +1523,7 @@ let gTrovato = null;     // la persona da evidenziare dopo una ricerca
 
 const G_FILTRI = [
   { k:"tutti", l:"Tutti",                        f: () => true },
+  { k:"mano",  l:"Non usano l'app",              f: x => !usaApp(x.id) },
   { k:"sotto", l:"Sotto 100 VP",                 f: x => vpDi(x.id) < SOGLIE.vpAttivazione },
   { k:"nuovi", l:"Entrati questo mese",          f: x => mese(x.creato) === meseMostrato() },
   { k:"fermi", l:`Non aggiornano da ${SOGLIE.gialloGiorni} giorni`, f: x => semaforo(x.id).k === "r" }
@@ -1544,6 +1570,8 @@ function gLinee(){
         <span class="g-meta">
           <span class="g-tag">${ramo.length} ${ramo.length===1?"persona":"persone"}</span>
           <span class="g-tag ok">${a100} a 100 VP</span>
+          ${(() => { const n = ramo.filter(r => !usaApp(r.id)).length;
+            return n ? `<span class="g-tag mano">${n} non ${n===1?"usa":"usano"} l'app</span>` : ``; })()}
           ${fermi?`<span class="g-tag fermo">${fermi} non ${fermi===1?"aggiorna":"aggiornano"}</span>`:``}
           ${match!==null?`<span class="g-tag hl">${esc(flt.l)}: ${match}</span>`:``}
         </span>
@@ -1557,10 +1585,11 @@ function gNodo(x){
   const sotto = discendenti(x.id).length, vp = vpDi(x.id);
   const cls = ["g-nodo", gFiltro!=="tutti" && !gPassa(x) ? "spento" : "", gTrovato===x.id ? "trovato" : ""].join(" ");
   return `<button class="${cls}" ${figliDi(x.id).length ? `data-gzoom="${x.id}"` : `data-persona="${x.id}"`} aria-label="${esc(x.nome)}, ${vp} VP">
-      ${gFermo(x.id) ? `<span class="g-dot" title="${esc(semaforo(x.id).txt)}"></span>` : ``}
+      ${usaApp(x.id) && gFermo(x.id) ? `<span class="g-dot" title="${esc(semaforo(x.id).txt)}"></span>` : ``}
       <span class="g-av">${esc(iniziali(x.nome))}</span>
       <b>${esc(corto(x.nome))}</b>
       <span class="vpp ${vp>=SOGLIE.vpAttivazione?"ok":"no"}">${num(vp)} VP</span>
+      ${usaApp(x.id) ? `` : `<span class="g-piu mano">non usa l'app</span>`}
       ${sotto ? `<span class="g-piu">+${sotto} in gruppo</span>` : ``}
     </button>`;
 }
@@ -1593,7 +1622,7 @@ function gZoom(){
   ${figli.length
     ? `<div class="g-figli ${figli.length===1?"uno":figli.length===2?"due":""}">${figli.map(gNodo).join("")}</div>
        <div class="g-diretti"><span>${figli.length} ${figli.length===1?"persona diretta":"persone dirette"}</span><span>${ramo.length} in tutto il gruppo</span></div>
-       <div class="g-legenda"><span><i class="ok"></i>a 100 VP</span><span><i class="no"></i>sotto 100</span><span><i class="fermo"></i>non aggiorna</span></div>`
+       <div class="g-legenda"><span><i class="ok"></i>a 100 VP</span><span><i class="no"></i>sotto 100</span><span><i class="fermo"></i>usa l'app ma non aggiorna</span></div>`
     : `<div class="g-vuoto">${esc(n1)} non ha ancora un gruppo.</div>`}
   <p class="nota-lista">Un livello alla volta: tocca una persona per entrare nel suo gruppo, il percorso in alto ti riporta su. Chi non ha ancora un gruppo apre la sua scheda.</p>`;
 }
@@ -1611,7 +1640,47 @@ function gRisultati(){
     : `<div class="g-vuoto">Nessuno con questo nome nel tuo gruppo.</div>`}</div>`;
 }
 
-function gCorpo(){ return gCerca.length >= 2 ? gRisultati() : gRadice ? gZoom() : gLinee(); }
+/* Un filtro attivo mostra UNA LISTA: chi corrisponde adesso, a qualunque livello, dentro il
+   gruppo che si sta guardando. Prima il filtro lasciava le card e ci aggiungeva un conteggio,
+   cosi' "Sotto 100 VP" mostrava anche prime linee sopra 100: non filtrava niente. */
+function gListaFiltro(){
+  const flt = G_FILTRI.find(q => q.k === gFiltro);
+  const scopo = gRadice && S.persone[gRadice] ? gRadice : S.me;
+  const dove = scopo === S.me ? "in tutto il tuo gruppo" : `nel gruppo di ${S.persone[scopo].nome.split(" ")[0]}`;
+  const ordine = {
+    sotto: (a,b) => vpDi(b.id) - vpDi(a.id),                       // i piu' vicini ai 100 per primi
+    nuovi: (a,b) => (b.creato||"") < (a.creato||"") ? -1 : 1,        // i piu' recenti per primi
+    mano:  (a,b) => (a.creato||"") < (b.creato||"") ? -1 : 1,        // da piu' tempo in attesa
+    fermi: (a,b) => semaforo(b.id).g - semaforo(a.id).g              // i piu' fermi per primi
+  }[gFiltro] || perNascita;
+  const lista = discendenti(scopo).filter(gPassa).sort(ordine);
+  const coda = x => {
+    if(gFiltro === "sotto"){ const m = SOGLIE.vpAttivazione - vpDi(x.id); return `<span class="num">mancano ${num(m)}</span>`; }
+    if(gFiltro === "nuovi") return `<span class="g-st">${esc(dataIt(x.creato))}</span>`;
+    if(gFiltro === "mano")  return `<span class="g-st">da ${plur(giorniTra(x.creato, OGGI()),"giorno","giorni")}</span>`;
+    if(gFiltro === "fermi") return `<span class="g-st">${esc(semaforo(x.id).txt)}</span>`;
+    return `<span class="chev" aria-hidden="true">›</span>`;
+  };
+  return `
+  <div class="g-sintesi"><h2>${esc(flt.l)}</h2>
+    <button class="btn-chiaro" data-gfiltro="tutti">Mostra tutti</button></div>
+  <p class="small" style="margin:-4px 0 10px;color:var(--ink2)">${plur(lista.length,"persona","persone")} ${esc(dove)}, ${
+    esc(nomeMese(meseMostrato()).split(" ")[0])}.</p>
+  <div class="lista" style="margin-top:0">${lista.length ? lista.map(x => {
+    const sp = S.persone[x.sponsor];
+    return `<button class="voce" data-persona="${x.id}">
+      <span class="av-mini">${esc(iniziali(x.nome))}</span>
+      <span class="grow"><b>${esc(x.nome)}</b><small>Step ${faseDi(x.id)+1} · ${num(vpDi(x.id))} VP · sponsor ${
+        x.sponsor===S.me ? "tu" : esc(sp ? sp.nome : "—")}</small></span>
+      ${coda(x)}</button>`; }).join("")
+    : `<div class="g-vuoto">Nessuno ${esc(dove)}.</div>`}</div>`;
+}
+
+function gCorpo(){
+  if(gCerca.length >= 2) return gRisultati();
+  if(gFiltro !== "tutti") return gListaFiltro();
+  return gRadice ? gZoom() : gLinee();
+}
 
 function vistaGruppo(){
   const p = io(), f = faseDi(p.id), tutti = discendenti(p.id);
@@ -1630,7 +1699,7 @@ function vistaGruppo(){
   </div>
   <div id="gFiltri">${gFiltriHtml()}</div>`:``}
   <div id="gCorpo">${gCorpo()}</div>
-  ${mossi.length && !gRadice && gCerca.length < 2 ? `
+  ${mossi.length && !gRadice && gCerca.length < 2 && gFiltro === "tutti" ? `
   <div class="sez"><h2>Chi si sta muovendo</h2><span>ultimi giorni</span></div>
   <div class="lista">${mossi.map(o => `
     <button class="voce" data-persona="${o.x.id}">
@@ -1817,6 +1886,18 @@ function contenutoFoglio(){
         ${mv&&mv.punti>=4?`<span class="pill s">★ si sta muovendo</span>`:``}
       </div>
 
+      ${(() => {
+        const a = statoAccesso(p.id);
+        return `<div class="card tight accesso ${a.k}">
+          <b>${esc(a.titolo)}</b>
+          <p class="small" style="margin:4px 0 0">${esc(a.txt)}</p>
+          ${a.k!=="si" && mio ? `<div class="row wrap" style="margin-top:12px">
+            <button class="btn primary grow" data-act="apri-vp" data-id="${p.id}">Aggiorna i suoi VP</button>
+            ${a.k==="no" ? `<button class="btn grow" data-act="apri-invito" data-id="${p.id}">Rimanda il suo accesso</button>` : ``}
+          </div>` : ``}
+        </div>`;
+      })()}
+
       <div class="card">
         <span class="tag">La sua prossima cosa</span>
         <h2 style="margin-top:6px">${esc(suaAzione.titolo)}</h2>
@@ -1895,8 +1976,7 @@ function contenutoFoglio(){
          a chi usa gia' l'app, riaprirlo gli farebbe riscrivere obiettivi e telefono. */
       foot: mio ? `<div class="row">
         <button class="btn grow" data-act="apri-registra" data-id="${p.id}">Registra un fatto</button>
-        ${(S.aperture[p.id]||[]).length ? `` :
-          `<button class="btn primary grow" data-act="apri-invito" data-id="${p.id}">Il suo accesso</button>`}
+
       </div>` : "" };
   }
 
@@ -2008,7 +2088,12 @@ async function sincronizza(opzioni){
     });
     const out = await res.json();
     if(!out || out.errore) throw new Error(out && out.errore ? out.errore : "risposta vuota");
+    const primaNo = S.me ? discendenti(S.me).filter(x => !usaApp(x.id)).map(x => x.id) : [];
     if(out.dati) unisci(out.dati);
+    const entrati = primaNo.filter(id => usaApp(id)).map(id => S.persone[id].nome.split(" ")[0]);
+    if(entrati.length) toast(entrati.length===1
+      ? `${entrati[0]} ha aperto l'app per la prima volta`
+      : `Hanno aperto l'app: ${entrati.join(", ")}`);
     S.sync.ultimo = iso(OGGI()); salva();
     if(!zitto) toast("Fatto");
   }catch(e){
