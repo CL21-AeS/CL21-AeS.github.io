@@ -281,6 +281,33 @@ button.voce, label.voce{cursor:pointer}
   margin-top:20px;padding-top:16px;font-size:14px;color:#c4cfdf}
 .azione .dritta svg{width:24px;height:24px;flex:none;color:#c4cfdf}
 
+.azione.traguardo{display:block;width:100%;text-align:left;border:0;font:inherit;cursor:pointer}
+.azione.traguardo h2{margin:10px 0 14px}
+.azione .req{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.azione .req span{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);font-size:13px;color:#d3dbe8}
+.azione .req span.ok{background:rgba(95,191,159,.18);border-color:rgba(95,191,159,.45);color:#e6f6ef}
+.azione .req b{color:#fff}
+.azione .scad{font-size:14px;margin:-4px 0 16px}
+.azione .primo{display:flex;gap:12px;align-items:flex-start;border-top:1px solid rgba(255,255,255,.15);
+  padding-top:16px;margin:0 0 18px;font-size:15px;color:#e8edf5}
+.azione .primo i{font-style:normal;flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  background:var(--oro);color:var(--oro-ink);font-weight:800;font-size:14px}
+.piano{list-style:none;margin:14px 0 0;padding:0}
+.piano>li{display:flex;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
+.piano>li:first-child{border-top:0}
+.piano .n{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;
+  background:var(--navy);color:var(--navy-ink);font-weight:800;font-size:14px}
+.piano b{display:block;font-size:16px;line-height:1.3}
+.piano small{display:block;margin-top:3px}
+.piano .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.piano .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;
+  padding:6px 12px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;min-height:36px}
+.piano .chip em{font-style:normal;color:var(--ink3);font-weight:500;margin-left:4px}
+.piano .btn{margin-top:10px}
+.gia{list-style:none;margin:6px 0 0;padding:0}
+.gia li{display:flex;gap:10px;padding:6px 0;font-size:14px;color:var(--ink2)}
+.gia li::before{content:"✓";color:var(--verde);font-weight:800}
 .link-card{display:flex;align-items:center;gap:12px;margin-top:14px}
 .link-card .grow{flex:1}
 .link-card b{display:block;font-size:18px;margin-top:4px}
@@ -1461,6 +1488,124 @@ function checklistHtml(p, f){
   </div>`;
 }
 
+/* ---- Il piano per il traguardo ----
+   Dice COSA fare per chiudere la tappa aperta nel modo piu' corto, con i numeri di adesso.
+   La regola per le linee: servono N linee a tot VP. Si tengono quelle gia' arrivate, poi si
+   scelgono le piu' vicine alla soglia (meno VP mancano, prima ci arrivano). Se le piu'
+   vicine sono tutte a zero, non ha senso indicarne una a caso: si dice quante sceglierne
+   e fra chi. Se le linee non bastano, mancano persone nuove. Il volume di gruppo si conta
+   DOPO aver portato le linee alla soglia: e' quello che manca ancora oltre alle linee.
+   Nessuna previsione di tempo o di guadagno: solo cosa manca, da chi, e entro quando. */
+/* In UTC come mese() e giorno(): con l'ora locale, in Italia la mezzanotte del 30 diventerebbe il 29. */
+function fineMese(){ const d = OGGI(); return new Date(Date.UTC(d.getFullYear(), d.getMonth()+1, 0)); }
+function scadenzaMese(){
+  const fm = fineMese(), g = giorniTra(OGGI(), fm);
+  const quando = fm.getUTCDate() + " " + nomeMese(mese(fm)).split(" ")[0].toLowerCase();
+  return { quando, giorni:g, txt: g<=0 ? `Oggi è l'ultimo giorno del mese: conta quello che arriva entro stasera.`
+    : `Tutto nello stesso mese: hai tempo fino al ${quando} (${plur(g,"giorno","giorni")}).` };
+}
+function pianoTappa(p){
+  const f = faseDi(p.id), out = { f, nome:FASI[f].nome, requisiti:[], passi:[], fatti:[], scadenza:null,
+    chiave:chiaveTappa(f), pronto:false };
+  const vp = vpDi(p.id), figli = figliDi(p.id);
+  if(scalaFinita(p.id)) return out;
+
+  if(p.id===S.leader && !figli.length)
+    out.passi.push({ txt:"Invita la prima persona", nota:"Mandale il tuo link: quando entra, la vedi comparire qui.",
+      act:"apri-invita", bottone:"Invita un Partner" });
+
+  if(f===0){
+    const ordine = ha(p.id,"primo_ordine");
+    const scritto = !!(p.dichiarato && (p.dichiarato.euroMese || p.dichiarato.perche));
+    out.requisiti.push({ l:"Primo ordine", v: ordine?"fatto":"da fare", fatto:ordine });
+    out.requisiti.push({ l:"Obiettivo", v: scritto?"scritto":"da scrivere", fatto:scritto });
+    if(!ordine) out.passi.push({ txt:"Fai il tuo primo ordine", nota:"È il gesto che trasforma l'iscrizione in un inizio.",
+      act:"fatto", t:"primo_ordine", bottone:"L'ho fatto" }); else out.fatti.push("Il primo ordine");
+    if(!scritto) out.passi.push({ txt:"Scrivi il tuo obiettivo", nota:"Quanto vuoi guadagnare al mese, entro quando, e perché.",
+      act:"apri-obiettivo", bottone:"Scrivilo" }); else out.fatti.push("Il tuo obiettivo scritto");
+    out.pronto = ordine && scritto;
+    return out;
+  }
+
+  if(f===1){
+    const mai = vpMaiRaggiunti(p.id), T = SOGLIE.vpAttivazione;
+    out.requisiti.push({ l:"I tuoi VP", v:`${num(mai)} di ${T}`, fatto:mai>=T });
+    out.passi.push({ txt:`Arriva a ${T} VP in un mese`,
+      nota: vp ? `Questo mese sei a ${num(vp)}: ne mancano ${num(Math.max(0,T-vp))}. Contano i tuoi ordini e quelli dei tuoi clienti.`
+               : `Ne servono ${T} nello stesso mese. Contano i tuoi ordini e quelli dei tuoi clienti.`,
+      act:"apri-vp", bottone:"Aggiorna i VP" });
+    out.scadenza = scadenzaMese().txt;
+    return out;
+  }
+
+  const c = f===2 ? SOGLIE.ptb : f===3 ? SOGLIE.foundation : f===4 ? SOGLIE.builder : SOGLIE.argento;
+  const T = c.vpLinea || 1, L = c.linee, P = c.vpPersonali || 0, G = c.vpGruppo || 0;
+  const gruppo = vpGruppo(p.id);
+  const linee = figli.map(x => ({ x, v:vpLinea(x.id) })).sort((a,b) => b.v - a.v);
+  const ok = linee.filter(l => l.v >= T);
+  const serve = Math.max(0, L - ok.length);
+  const candidati = linee.filter(l => l.v < T);
+  const scelti = candidati.slice(0, serve);
+  const avviate = scelti.filter(l => l.v > 0);
+  const daZero = scelti.length - avviate.length;
+  const nuove = Math.max(0, serve - candidati.length);
+  const soglia = c.vpLinea ? `${num(T)} VP` : "volume";
+
+  out.requisiti.push({ l: c.vpLinea ? `Linee a ${num(T)} VP` : "Linee con volume",
+    v:`${Math.min(ok.length,L)} di ${L}`, fatto: ok.length >= L });
+  if(P) out.requisiti.push({ l:"I tuoi VP", v:`${num(vp)} di ${num(P)}`, fatto: vp >= P });
+  if(G) out.requisiti.push({ l:"Gruppo", v:`${num(gruppo)} di ${num(G)}`, fatto: gruppo >= G });
+  out.scadenza = scadenzaMese().txt;
+
+  /* chi, dentro una linea, ha gia' volume: e' da li' che si cresce piu' in fretta */
+  const dentro = id => [S.persone[id], ...discendenti(id)].filter(r => vpDi(r.id) > 0)
+    .sort((a,b) => vpDi(b.id) - vpDi(a.id)).slice(0,3).map(r => `${nome1(r)} ${num(vpDi(r.id))}`);
+
+  /* linee avviate e VP tuoi insieme, in ordine di quanto manca: prima il passo piu' corto */
+  const vicini = [];
+  for(const l of avviate){
+    const d = dentro(l.x.id), manca = T - l.v;
+    vicini.push({ manca, persona:l.x.id,
+      txt: c.vpLinea ? `Aiuta la linea di ${nome1(l.x)} ad arrivare a ${num(T)} VP` : `Fai partire la linea di ${nome1(l.x)}`,
+      nota: `È a ${num(l.v)} VP: ne mancano ${num(manca)}.${d.length>1?` Nella linea: ${d.join(" · ")}.`:``}` });
+  }
+  if(P && vp < P) vicini.push({ manca:P-vp, txt:`Arriva ai tuoi ${num(P)} VP personali`,
+    nota:`Questo mese sei a ${num(vp)}: ne mancano ${num(P-vp)}.`, act:"apri-vp", bottone:"Aggiorna i VP" });
+  vicini.sort((a,b) => a.manca - b.manca).forEach(x => out.passi.push(x));
+  if(daZero){
+    const pool = candidati.filter(l => l.v === 0);
+    if(pool.length === daZero){
+      for(const l of pool) out.passi.push({ persona:l.x.id,
+        txt:`Fai partire la linea di ${nome1(l.x)} verso i ${soglia}`, nota:"Questo mese è ancora a zero." });
+    } else {
+      out.passi.push({ persone: pool.map(l => l.x.id),
+        txt: daZero===1 ? `Scegli un'altra linea da portare a ${soglia}` : `Scegli altre ${daZero} linee da portare a ${soglia}`,
+        nota:`Sono tutte a zero questo mese: parti da chi è più pronto a ordinare o a portare un cliente.` });
+    }
+  }
+  if(nuove) out.passi.push({ act:"apri-invita", bottone:"Invita un Partner",
+    txt: nuove===1 ? `Sponsorizza una nuova persona e aiutala ad arrivare a ${soglia}`
+                   : `Sponsorizza ${nuove} nuove persone e aiutale ad arrivare a ${soglia}`,
+    nota:`Per ${FASI[f].nome} servono ${L} linee tue: ne hai ${linee.length}.` });
+
+  if(G){
+    /* il gruppo dopo aver chiuso le linee scelte e i tuoi VP: quello che resta e' volume in piu' */
+    const dopo = gruppo + scelti.reduce((t,l) => t + (T - l.v), 0) + nuove*T + Math.max(0, P - vp);
+    if(dopo < G){
+      const forti = linee.filter(l => l.v > 0).slice(0,3).map(l => `${nome1(l.x)} ${num(l.v)}`);
+      out.passi.push({ txt:`Fai crescere il gruppo di altri ${num(G - dopo)} VP`,
+        nota:`Anche con le linee a posto sareste a ${num(dopo)} su ${num(G)}. Servono da qualunque persona del gruppo.${
+          forti.length?` Dove c'è già volume: ${forti.join(" · ")}.`:``}` });
+    }
+  }
+
+  for(const l of ok.slice(0, L)) out.fatti.push(c.vpLinea ? `La linea di ${nome1(l.x)} è a ${num(l.v)} VP` : `La linea di ${nome1(l.x)} ha volume`);
+  if(P && vp >= P) out.fatti.push(`I tuoi ${num(vp)} VP personali`);
+  if(G && gruppo >= G) out.fatti.push(`Il gruppo a ${num(gruppo)} VP`);
+  out.pronto = out.requisiti.every(r => r.fatto);
+  return out;
+}
+
 /* ---- La prossima piccola azione ---- */
 function dritta(p, f){
   if(scalaFinita(p.id)) return "";
@@ -1480,6 +1625,21 @@ function azioneHtml(p, f){
     <p>Stai guardando un mese chiuso: i numeri sono quelli di fine mese e non si modificano.</p>
     <button class="btn-oro" data-act="mese-corrente">Torna a ${esc(nomeMese(meseOra()).split(" ")[0])}</button>
   </div>`;
+  /* Il riquadro blu e' il traguardo: la tappa aperta, i suoi requisiti con i numeri di adesso
+     e il primo passo. Toccandolo si apre il piano intero (foglio "piano"). */
+  if(!scalaFinita(p.id)){
+    const pn = pianoTappa(p), primo = pn.passi[0];
+    return `<button class="azione traguardo" data-act="apri-piano">
+      <span class="eyebrow">Il tuo traguardo · Step ${f+1} di ${FASI.length}</span>
+      <h2>${esc(pn.nome)}</h2>
+      ${pn.requisiti.length?`<span class="req">${pn.requisiti.map(r =>
+        `<span class="${r.fatto?"ok":""}">${r.fatto?"✓ ":""}${esc(r.l)}: <b>${esc(r.v)}</b></span>`).join("")}</span>`:``}
+      ${pn.scadenza && !pn.pronto?`<p class="scad">${esc(pn.scadenza)}</p>`:``}
+      ${pn.pronto ? `<span class="primo"><i>✓</i><span>Questo mese hai tutti i requisiti. Quando la qualifica arriva, segnala.</span></span>`
+        : primo ? `<span class="primo"><i>1</i><span><b>Il primo passo:</b> ${esc(primo.txt)}</span></span>` : ``}
+      <span class="btn-oro">${pn.pronto?"Segna il traguardo":"Come arrivarci prima"} <span aria-hidden="true">›</span></span>
+    </button>`;
+  }
   const az = prossimaAzione(p);
   const chi = az.persona ? S.persone[az.persona] : null;
   const av = chi ? iniziali(chi.nome) : az.azione==="vp" ? "VP" : az.azione==="invita" ? "+" : az.azione ? "✓" : "→";
@@ -1903,6 +2063,26 @@ function contenutoFoglio(){
         <p class="small">Non hai ancora collegato il foglio, quindi il link non lo contiene:
         chi si iscrive resterà sul suo telefono e non ti comparirà. Collegalo in <b>Dati</b>
         e poi rigenera il link.</p></div>`}` };
+  }
+
+  if(t==="piano"){
+    const p = io(); if(!p) return { titolo:"—", body:"" };
+    const pn = pianoTappa(p);
+    const passo = (x, i) => `<li><span class="n">${i+1}</span><div class="grow">
+      <b>${esc(x.txt)}</b>${x.nota?`<small>${esc(x.nota)}</small>`:``}
+      ${x.persone ? `<div class="chips">${x.persone.map(id => `<button class="chip" data-persona="${id}">${esc(S.persone[id].nome)}<em>${num(vpLinea(id))} VP</em></button>`).join("")}</div>` : ``}
+      ${x.persona ? `<button class="btn small" data-persona="${x.persona}">Apri la scheda di ${esc(nome1(S.persone[x.persona]))}</button>` : ``}
+      ${x.act ? `<button class="btn small" data-act="${x.act}"${x.t?` data-t="${x.t}"`:``}>${esc(x.bottone||"Apri")}</button>` : ``}
+    </div></li>`;
+    return { titolo:`Verso ${esc(pn.nome)}`, body:`
+      ${pn.scadenza?`<p class="small">${esc(pn.scadenza)}</p>`:``}
+      ${pn.pronto && pn.chiave ? `<div class="card tight"><b>Questo mese hai tutti i requisiti.</b>
+        <p class="small" style="margin:4px 0 12px">Quando la qualifica arriva davvero, segnala qui: lo step si chiude e si apre il prossimo.</p>
+        <button class="btn-oro" data-act="fatto" data-t="${pn.chiave}">Ho raggiunto ${esc(pn.nome)}</button></div>` : ``}
+      ${pn.passi.length ? `<span class="tag">I passi, dal più vicino</span><ol class="piano">${pn.passi.map(passo).join("")}</ol>` : ``}
+      ${pn.fatti.length ? `<div class="sec"><span class="tag">Già a posto</span><ul class="gia">${pn.fatti.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>` : ``}
+      <p class="small faint" style="margin-top:16px">Il piano usa i VP segnati nell'app. Chi non aggiorna, per l'app è fermo:
+      aggiorna tu i suoi VP dalla sua scheda.</p>` };
   }
 
   if(t==="modifica"){
@@ -2407,6 +2587,7 @@ document.addEventListener("click", async ev => {
   if(a==="apri-invita")   return apriFoglio("invita", { sponsor: id || S.me });
   if(a==="apri-invito")   return apriFoglio("invito", { id });
   if(a==="apri-modifica") return apriFoglio("modifica", { id });
+  if(a==="apri-piano")    return apriFoglio("piano");
   if(a==="apri-importa")  return apriFoglio("importa");
 
   if(a==="salva-vp"){
@@ -2418,7 +2599,9 @@ document.addEventListener("click", async ev => {
   /* Il primo ordine non si spunta e basta: si dice anche di quanti VP era.
      Chiederlo dopo, in un secondo passaggio, era un giro a vuoto. */
   if(a==="fatto" && b.dataset.t==="primo_ordine") return apriFoglio("primo-ordine", { id:S.me });
-  if(a==="fatto"){ aggiungiEvento(S.me, b.dataset.t); salva(); programmaSync(); toast("Bene."); return render(); }
+  if(a==="fatto"){ aggiungiEvento(S.me, b.dataset.t); salva(); programmaSync();
+    if(foglio && foglio.tipo==="piano") chiudiTuttiFogli();
+    toast("Bene."); return render(); }
 
   if(a==="salva-primo-ordine"){
     const grezzo = (document.getElementById("poVp").value||"").trim();
