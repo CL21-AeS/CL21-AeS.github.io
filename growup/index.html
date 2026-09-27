@@ -1893,7 +1893,7 @@ function gZoom(){
       <div class="g-st">Step ${fx+1} · ${esc(FASI[fx].nome)}</div>
       <div class="g-meta">
         <span class="g-tag ${vp>=SOGLIE.vpAttivazione?"ok":"no"}">${num(vp)} VP suoi</span>
-        <span class="g-tag">linea ${num(vpLinea(x.id))} VP</span>
+        <span class="g-tag">${num(vpLinea(x.id))} VP totali</span>
         <span class="g-tag">${ramo.length} in gruppo</span>
         ${fermi?`<span class="g-tag fermo">${fermi} non ${fermi===1?"aggiorna":"aggiornano"}</span>`:``}
       </div>
