@@ -292,6 +292,7 @@ button.voce, label.voce{cursor:pointer}
 .indietro{display:inline-block;background:none;border:0;color:var(--ink2);font:inherit;font-size:14px;
   padding:16px 0 0;cursor:pointer;min-height:44px}
 
+.sheet-head .indietro-f{margin-left:-6px;margin-right:2px;font-size:28px;line-height:1}
 /* ---- il mio gruppo: linee, zoom, ricerca ---- */
 .vpp{display:inline-block;padding:5px 10px;border-radius:8px;font-size:13px;font-weight:600}
 .vpp.ok{background:var(--verde-soft);color:var(--verde)}
@@ -1715,8 +1716,28 @@ function vistaGruppo(){
 
 /* ---- 7. Fogli ancorati in basso ---- */
 
-function apriFoglio(tipo, dati){ foglio = { tipo, dati:dati||{} }; render(); }
-function chiudiFoglio(){ foglio = null; render(); }
+/* I foglietti si impilano. Dalla scheda di una persona si apre "Registra": salvando si torna
+   alla scheda, non al gruppo. Chiudere (o salvare) torna indietro di UN passo; la × in alto
+   e il tocco fuori chiudono tutto. Ognuno ricorda dove era stato scorso. */
+let pilaFogli = [];
+function apriFoglio(tipo, dati){
+  if(foglio){
+    const sb = document.querySelector(".sheet-body");
+    foglio.scroll = sb ? sb.scrollTop : 0;
+    pilaFogli.push(foglio);
+  }
+  foglio = { tipo, dati:dati||{} }; render();
+  const sb2 = document.querySelector(".sheet-body"); if(sb2) sb2.scrollTop = 0;
+}
+/* Al posto di quello aperto, senza impilare: per i passaggi che non hanno senso ripercorrere
+   (dal modulo "aggiungi" si passa al suo link di accesso, e tornando non si rivede il modulo). */
+function sostituisciFoglio(tipo, dati){ foglio = { tipo, dati:dati||{} }; render(); }
+function chiudiFoglio(){
+  foglio = pilaFogli.pop() || null;
+  render();
+  if(foglio && foglio.scroll != null){ const sb = document.querySelector(".sheet-body"); if(sb) sb.scrollTop = foglio.scroll; }
+}
+function chiudiTuttiFogli(){ foglio = null; pilaFogli = []; }
 
 function disegnaFoglio(){
   document.querySelectorAll(".sheet").forEach(n=>n.remove());
@@ -1724,12 +1745,14 @@ function disegnaFoglio(){
   const box = document.createElement("div");
   box.className="sheet";
   box.innerHTML = `<div class="sheet-box">
-    <div class="sheet-head"><h2>${esc(contenutoFoglio().titolo)}</h2>
-      <button class="x" data-act="chiudi">×</button></div>
+    <div class="sheet-head">${pilaFogli.length
+        ? `<button class="x indietro-f" data-act="chiudi" aria-label="Indietro">‹</button>` : ``}
+      <h2>${esc(contenutoFoglio().titolo)}</h2>
+      <button class="x" data-act="chiudi-tutto" aria-label="Chiudi">×</button></div>
     <div class="sheet-body">${contenutoFoglio().body}</div>
     ${contenutoFoglio().foot?`<div class="sheet-foot">${contenutoFoglio().foot}</div>`:``}
   </div>`;
-  box.addEventListener("click", e => { if(e.target===box) chiudiFoglio(); });
+  box.addEventListener("click", e => { if(e.target===box){ chiudiTuttiFogli(); render(); } });
   document.body.appendChild(box);
 }
 
@@ -2211,7 +2234,7 @@ document.addEventListener("click", async ev => {
     if(d.gfiltro){ gFiltro = d.gfiltro; return render(); }
     if(d.ghome !== undefined){ gRadice = null; gTrovato = null; render(); return vaiAlCorpo(); }
     if(d.gzoom){ gRadice = d.gzoom; gTrovato = null; render(); return vaiAlCorpo(); }
-    if(d.gvai){ foglio = null; vista = "gruppo"; gRadice = d.gvai; gCerca = ""; gTrovato = null; render(); return vaiAlCorpo(); }
+    if(d.gvai){ chiudiTuttiFogli(); vista = "gruppo"; gRadice = d.gvai; gCerca = ""; gTrovato = null; render(); return vaiAlCorpo(); }
     if(d.gtrova){
       const x = S.persone[d.gtrova]; if(!x) return;
       gRadice = figliDi(x.id).length ? x.id : (x.sponsor === S.me ? null : x.sponsor);
@@ -2228,6 +2251,7 @@ document.addEventListener("click", async ev => {
   const a = b.dataset.act, id = b.dataset.id;
 
   if(a==="chiudi") return chiudiFoglio();
+  if(a==="chiudi-tutto"){ chiudiTuttiFogli(); return render(); }
 
   if(a==="crea-leader"){
     const nome = (document.getElementById("leadName").value||"").trim();
@@ -2358,7 +2382,7 @@ document.addEventListener("click", async ev => {
     const tel = (document.getElementById("nvTel").value||"").trim();
     if(tel){ S.persone[nid].tel = tel; S.persone[nid].updatedAt = iso(OGGI()); salva(); }
     programmaSync();
-    return apriFoglio("invito", { id:nid });
+    return sostituisciFoglio("invito", { id:nid });
   }
 
   if(a==="togli-persona"){
@@ -2427,7 +2451,7 @@ document.addEventListener("click", async ev => {
     /* Via anche la chiave del vecchio nome: se resta, `carica()` la ritravasa al prossimo
        avvio e i dati "cancellati" tornano da soli. */
     localStorage.removeItem(CHIAVE); localStorage.removeItem(CHIAVE_VECCHIA);
-    S = vuoto(); vista="oggi"; foglio=null; return render();
+    S = vuoto(); vista="oggi"; chiudiTuttiFogli(); return render();
   }
 });
 
