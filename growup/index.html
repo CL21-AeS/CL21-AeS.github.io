@@ -706,13 +706,21 @@ function haDuplicato(id){ return figliDi(id).some(f => vpMaiRaggiunti(f.id) >= S
 function haBuilder(id){ return ha(id,"builder") || ha(id,"pct15"); }
 function haArgento(id){ return ha(id,"argento") || ha(id,"pct21") || ha(id,"platino"); }
 
+/* Il primo ordine si da' per fatto anche quando nessuno l'ha spuntato ma ci sono VP segnati:
+   chi ha dei VP un ordine l'ha fatto. Succede sempre quando lo sponsor aggiorna i VP di una
+   persona nuova dalla sua scheda. */
+function vpPrimoPositivo(id){
+  return eventiDi(id).filter(e => e.tipo==="vp" && Number(e.valore) > 0).sort((a,b)=>a.at<b.at?-1:1)[0] || null;
+}
+function haPrimoOrdine(id){ return ha(id,"primo_ordine") || !!vpPrimoPositivo(id); }
+
 function faseDi(id){
   if(haArgento(id))          return 5;   // arrivato (anche saltando le tappe in mezzo)
   if(haBuilder(id))          return 5;   // verso Argento
   if(ha(id,"foundation"))    return 4;   // verso Bronze Builder
   if(ha(id,"path_to_bronze")) return 3;  // verso Bronze Foundation
   if(attivato(id))           return 2;   // verso Path to Bronze
-  if(ha(id,"primo_ordine"))  return 1;   // verso l'attivazione
+  if(haPrimoOrdine(id))      return 1;   // verso l'attivazione
   return 0;                              // verso il primo ordine
 }
 /* Chi ha chiuso anche l'ultimo: la scala e' finita. */
@@ -726,7 +734,7 @@ function attivatiSotto(id){ return figliDi(id).filter(x=>attivato(x.id)).length;
 function inizioFasi(p){
   const primo = t => { const x = primoEvento(p.id,t); return x?x.at:null; };
   const d = [p.creato, null, null, null, null, null];
-  d[1] = primo("primo_ordine");
+  d[1] = primo("primo_ordine") || (vpPrimoPositivo(p.id) || {}).at || null;
   const soglia = eventiDi(p.id).filter(x=>x.tipo==="vp" && Number(x.valore)>=SOGLIE.vpAttivazione)
                    .sort((a,b)=>a.at<b.at?-1:1)[0];
   const cli = primo("primo_cliente");
@@ -949,7 +957,7 @@ function criteri(p, f){
 
   if(f===0){
     riga("Iscrizione completata", true);
-    riga("Il primo ordine", ha(p.id,"primo_ordine"), null, null, null, "primo_ordine");
+    riga("Il primo ordine", haPrimoOrdine(p.id), null, null, null, "primo_ordine");
     riga("Il tuo obiettivo scritto", !!(p.dichiarato && (p.dichiarato.euroMese || p.dichiarato.perche)),
          "quanto vuoi guadagnare, e perché", "apri-obiettivo", "Scrivilo adesso");
   }
@@ -1425,7 +1433,7 @@ function righePasso(p, f){
   if(scalaFinita(p.id)) return R;
   const vp = vpDi(p.id);
   if(f===0){
-    R.push({ txt:"Il tuo primo ordine", fatto:ha(p.id,"primo_ordine"), tipo:"primo_ordine" });
+    R.push({ txt:"Il tuo primo ordine", fatto:haPrimoOrdine(p.id), tipo:"primo_ordine" });
     const scritto = !!(p.dichiarato && (p.dichiarato.euroMese || p.dichiarato.perche));
     R.push({ txt:"Il tuo obiettivo scritto", fatto:scritto, azione:"apri-obiettivo", bottone:"Scrivilo" });
   }
@@ -1546,7 +1554,7 @@ function pianoTappa(p){
       act:"apri-invita", bottone:"Invita un Partner" });
 
   if(f===0){
-    const ordine = ha(p.id,"primo_ordine");
+    const ordine = haPrimoOrdine(p.id);
     const scritto = !!(p.dichiarato && (p.dichiarato.euroMese || p.dichiarato.perche));
     out.requisiti.push({ l:"Primo ordine", v: ordine?"fatto":"da fare", fatto:ordine });
     out.requisiti.push({ l:"Obiettivo", v: scritto?"scritto":"da scrivere", fatto:scritto });
