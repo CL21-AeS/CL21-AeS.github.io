@@ -397,7 +397,12 @@ button.voce, label.voce{cursor:pointer}
 .g-piu{font-size:11px;font-weight:800;color:var(--ink2);background:var(--bg);border-radius:99px;padding:2px 8px;text-align:center}
 .g-dot{position:absolute;top:9px;right:9px;width:9px;height:9px;border-radius:50%;background:var(--rosso)}
 .g-nodo.spento{opacity:.3}
-.g-nodo.trovato{border-color:var(--navy);box-shadow:0 0 0 2px var(--navy)}
+.g-nodo.trovato,.g-linea.trovato{border-color:var(--navy);box-shadow:0 0 0 2px var(--navy)}
+.dove{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;margin:12px 0 4px}
+.dove .small{color:var(--ink2);line-height:1.8}
+.dove-n{background:none;border:0;padding:0;font:inherit;font-size:13px;font-weight:700;color:var(--ink);
+  text-decoration:underline;cursor:pointer}
+.voce small.dove-l{color:var(--ink);font-weight:600}
 .g-diretti{display:flex;justify-content:space-between;font-size:13px;color:var(--ink2);margin:14px 2px 0}
 .g-legenda{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink2);margin-top:8px}
 .g-legenda i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
@@ -1799,6 +1804,15 @@ const G_FILTRI = [
 function gPassa(x){ return G_FILTRI.find(f => f.k === gFiltro).f(x); }
 function gFermo(id){ return semaforo(id).k === "r"; }
 function corto(n){ const w = String(n||"").trim().split(/\s+/); return w.length > 1 ? `${w[0]} ${w[w.length-1][0]}.` : w[0]; }
+/* "Linea di Mario › Sara": dove sta una persona, a parole, senza aprire niente.
+   Le catene lunghe si accorciano nel mezzo: contano la linea (il primo) e lo sponsor (l'ultimo). */
+function lineaTesto(id){
+  const c = stradaFino(id);
+  if(c[0] !== S.me || c.length < 2) return "";
+  const su = c.slice(1, -1).map(x => nome1(S.persone[x]));
+  if(!su.length) return "Tua prima linea";
+  return "Linea di " + (su.length <= 3 ? su.join(" › ") : `${su[0]} › … › ${su[su.length-1]}`);
+}
 function stradaFino(id){ const out = []; for(let x = id; x && S.persone[x]; x = S.persone[x].sponsor){ out.unshift(x); if(x === S.me) break; } return out; }
 
 function gFiltriHtml(){
@@ -1830,7 +1844,7 @@ function gLinee(){
     const a100 = ramo.filter(r => vpDi(r.id) >= SOGLIE.vpAttivazione).length;
     const fermi = ramo.filter(r => gFermo(r.id)).length;
     const match = gFiltro === "tutti" ? null : ramo.filter(gPassa).length;
-    return `<button class="g-linea" data-gzoom="${x.id}">
+    return `<button class="g-linea${gTrovato===x.id?" trovato":""}" data-gzoom="${x.id}">
       <span class="g-av">${esc(iniziali(x.nome))}</span>
       <span class="g-nm">${esc(x.nome)}</span>
       <span class="g-chev" aria-hidden="true">›</span>
@@ -1974,7 +1988,7 @@ function vistaGruppo(){
   <div class="lista">${mossi.map(o => `
     <button class="voce" data-persona="${o.x.id}">
       <span class="av-mini">${esc(iniziali(o.x.nome))}</span>
-      <span class="grow"><b>${esc(o.x.nome)}</b><small>${esc(o.m.motivi.slice(0,2).join(" · "))}</small></span>
+      <span class="grow"><b>${esc(o.x.nome)}</b>${lineaTesto(o.x.id)?`<small class="dove-l">${esc(lineaTesto(o.x.id))}</small>`:``}<small>${esc(o.m.motivi.slice(0,2).join(" · "))}</small></span>
       <span class="chev" aria-hidden="true">›</span></button>`).join("")}</div>
   <p class="small faint" style="margin-top:8px">Chi ha chiuso una tappa di recente, o gliene manca una voce
   sola, o sta segnando quello che fa. Chi non compare non è fermo: non ha segnato niente.</p>`:``}
@@ -2234,6 +2248,18 @@ function contenutoFoglio(){
         ${r?`<span class="pill">${esc(r.txt)}</span>`:``}
         ${mv&&mv.punti>=4?`<span class="pill s">★ si sta muovendo</span>`:``}
       </div>
+      ${(() => {
+        /* Dove sta: la catena da te a lei, ogni nome apre la sua scheda; e un tocco per vederla
+           nella struttura, al suo livello, evidenziata. */
+        const c = stradaFino(p.id);
+        if(p.id === S.me || c[0] !== S.me || c.length < 2) return "";
+        return `<div class="dove">
+          <span class="small">${c.map((x, i) => i === 0 ? `Tu`
+            : x === p.id ? `<b>${esc(nome1(p))}</b>`
+            : `<button class="dove-n" data-persona="${x}">${esc(nome1(S.persone[x]))}</button>`).join(` <span class="faint">›</span> `)}</span>
+          <button class="btn small" data-gdove="${p.id}">Vedilo nella struttura</button>
+        </div>`;
+      })()}
 
       ${(() => {
         const a = statoAccesso(p.id);
@@ -2562,6 +2588,17 @@ document.addEventListener("click", async ev => {
     vista = tab.dataset.tab; apertoId=null; render(); window.scrollTo(0,0); return;
   }
 
+  const gd = ev.target.closest("[data-gdove]");
+  if(gd){
+    /* la struttura al livello dove la persona compare come riquadro: il gruppo del suo sponsor
+       (o le tue linee, se e' una tua prima linea), con lei evidenziata */
+    const x = S.persone[gd.dataset.gdove]; if(!x) return;
+    chiudiTuttiFogli(); vista = "gruppo"; gCerca = ""; gFiltro = "tutti";
+    gRadice = x.sponsor === S.me ? null : x.sponsor; gTrovato = x.id; render();
+    const el = document.querySelector(".trovato");
+    if(el && el.scrollIntoView) el.scrollIntoView({ block:"center" });
+    return;
+  }
   const gz = ev.target.closest("[data-gfiltro],[data-gzoom],[data-ghome],[data-gtrova],[data-gvai]");
   if(gz){
     const d = gz.dataset;
