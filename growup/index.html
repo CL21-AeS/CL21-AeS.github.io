@@ -65,6 +65,7 @@ input,select,textarea{
   border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%;min-height:46px;
 }
 textarea{min-height:90px;resize:vertical}
+input::placeholder,textarea::placeholder{color:var(--ink3);opacity:.7}
 label.field{display:block;margin:12px 0 0}
 label.field>span{display:block;font-size:13px;color:var(--ink2);margin-bottom:5px}
 .bar{height:10px;border-radius:99px;background:var(--line);overflow:hidden}
@@ -2021,7 +2022,7 @@ function contenutoFoglio(){
       mese per mese, quindi il primo del mese si riparte da zero e il mese chiuso resta archiviato
       qui sotto.</p>
       <label class="field"><span>VP di ${esc(nomeMese(meseOra()))}</span>
-        <input id="vpVal" type="number" inputmode="numeric" value="${vpMese(p.id, meseOra())}"></label>
+        <input id="vpVal" type="number" inputmode="numeric" placeholder="${vpMese(p.id, meseOra())}"></label>
       ${passati.length?`
         <span class="tag" style="display:block;margin-top:18px">Mesi archiviati</span>
         <ul class="micro">
@@ -2663,7 +2664,10 @@ document.addEventListener("click", async ev => {
   if(a==="apri-importa")  return apriFoglio("importa");
 
   if(a==="salva-vp"){
-    const v = Number((document.getElementById("vpVal").value||"").trim());
+    /* Il campo parte vuoto (il numero attuale e' solo scritto in grigio): vuoto non vuol dire zero. */
+    const grezzo = (document.getElementById("vpVal").value||"").trim();
+    if(grezzo==="") return toast("Scrivi quanti VP");
+    const v = Number(grezzo);
     if(isNaN(v)||v<0) return toast("Numero non valido");
     aggiungiEvento(id, "vp", v); salva(); programmaSync(); chiudiFoglio(); return toast("Segnato");
   }
