@@ -2054,8 +2054,6 @@ function contenutoFoglio(){
     return { titolo:"Registra", body:`
       <p class="small">Solo fatti. Le sensazioni non stanno qui.</p>
       <div class="stack" style="margin-top:12px">
-        <button class="btn wide" data-act="conta" data-t="conversazione" data-id="${p.id}">
-          Ho parlato con una persona <small>(${contaEventi(p.id,"conversazione")})</small></button>
         <button class="btn wide" data-act="apri-vp" data-id="${p.id}">VP di questo mese (${vpDi(p.id)})</button>
       </div>
       <div class="sec"><span class="tag">Traguardi</span>
@@ -2065,11 +2063,17 @@ function contenutoFoglio(){
         const f = faseDi(p.id);
         const visibili = FATTI.filter(x => x.fase <= f || primoEvento(p.id,x.t));
         const nascosti = FATTI.length - visibili.length;
+        /* Il primo ordine puo' essere dedotto dai VP; una tappa puo' essere stata saltata:
+           in tutti e due i casi la casella non e' un fatto da togliere, e non si tocca. */
+        const salt = saltate(p.id);
         return visibili.map(x=>{
           const e = primoEvento(p.id,x.t);
-          return `<label class="chk"><input type="checkbox" ${e?"checked":""}
+          const dedotto = !e && x.t==="primo_ordine" && vpPrimoPositivo(p.id);
+          const saltata = !e && salt.has(x.fase);
+          const nota = e ? dataIt(e.at) : dedotto ? `dai VP segnati il ${dataIt(dedotto.at)}` : saltata ? "saltata" : "";
+          return `<label class="chk"><input type="checkbox" ${e||dedotto?"checked":""} ${dedotto||saltata?"disabled":""}
             data-fatto="${x.t}" data-id="${p.id}">
-            <span class="grow">${esc(x.label)}${e?`<br><small class="faint">${dataIt(e.at)}</small>`:``}</span></label>`;
+            <span class="grow">${esc(x.label)}${nota?`<br><small class="faint">${esc(nota)}</small>`:``}</span></label>`;
         }).join("") + (nascosti?`<p class="small faint" style="margin-top:12px">
           Gli altri traguardi compaiono quando è il loro turno.</p>`:``);
       })()}</div>` };
