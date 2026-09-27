@@ -283,7 +283,7 @@ button.voce, label.voce{cursor:pointer}
   margin-top:20px;padding-top:16px;font-size:14px;color:#c4cfdf}
 .azione .dritta svg{width:24px;height:24px;flex:none;color:#c4cfdf}
 
-.azione.traguardo{display:block;width:100%;text-align:left;border:0;font:inherit;cursor:pointer}
+.azione.traguardo{display:block}
 .azione.traguardo h2{margin:10px 0 14px}
 .azione .req{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
 .azione .req span{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;
@@ -1670,15 +1670,15 @@ function azioneHtml(p, f){
   if(!scalaFinita(p.id)){
     const pn = pianoTappa(p), primo = pn.passi[0];
     if(pn.salto){ const z = pn.salto;
-      return `<button class="azione traguardo" data-act="apri-piano">
+      return `<div class="azione traguardo">
       <span class="eyebrow">Hai i numeri di una tappa più alta</span>
       <h2>${esc(z.nome)}</h2>
       <span class="req">${z.requisiti.map(r => `<span class="ok">✓ ${esc(r.l)}: <b>${esc(r.v)}</b></span>`).join("")}</span>
       <span class="primo"><i>»</i><span>Questo mese hai tutto quello che serve per ${esc(z.nome)}.
         ${z.saltate.length===1?`La tappa ${esc(z.saltate[0])} resterà segnata come saltata.`:`Le tappe ${esc(z.saltate.join(" e "))} resteranno segnate come saltate.`}</span></span>
-      <span class="btn-oro">Vedi e segna <span aria-hidden="true">›</span></span>
-    </button>`; }
-    return `<button class="azione traguardo" data-act="apri-piano">
+      <button class="btn-oro" data-act="apri-piano">Vedi e segna <span aria-hidden="true">›</span></button>
+    </div>`; }
+    return `<div class="azione traguardo">
       <span class="eyebrow">Il tuo traguardo · Step ${f+1} di ${FASI.length}</span>
       <h2>${esc(pn.nome)}</h2>
       ${pn.requisiti.length?`<span class="req">${pn.requisiti.map(r =>
@@ -1686,8 +1686,8 @@ function azioneHtml(p, f){
       ${pn.scadenza && !pn.pronto?`<p class="scad">${esc(pn.scadenza)}</p>`:``}
       ${pn.pronto ? `<span class="primo"><i>✓</i><span>Questo mese hai tutti i requisiti. Quando la qualifica arriva, segnala.</span></span>`
         : primo ? `<span class="primo"><i>1</i><span><b>Il primo passo:</b> ${esc(primo.txt)}</span></span>` : ``}
-      <span class="btn-oro">${pn.pronto?"Segna il traguardo":"Come arrivarci prima"} <span aria-hidden="true">›</span></span>
-    </button>`;
+      <button class="btn-oro" data-act="apri-piano">${pn.pronto?"Segna il traguardo":"Come arrivarci prima"} <span aria-hidden="true">›</span></button>
+    </div>`;
   }
   if(scalaFinita(p.id)) return `<div class="azione">
     <span class="eyebrow">Traguardo raggiunto · Step ${FASI.length} di ${FASI.length}</span>
