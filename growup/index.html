@@ -776,15 +776,12 @@ function inizioFasi(p){
 }
 function inizioFase(p){ return inizioFasi(p)[faseDi(p.id)] || p.creato; }
 
-/* Il ritmo della fase APERTA: in linea o in ritardo. Mai "veloce":
-   una fase in corso non si può ancora dire chiusa in fretta. */
+/* Da quanto si e' nello step aperto. Solo il conto dei giorni, senza "in linea" o "in ritardo":
+   quanto ci mette una persona non lo giudica un'app (scelta del 28 settembre 2026). */
 function ritmoDi(p){
-  if(inArchivio()) return null;           // il ritmo e' di oggi: su un mese chiuso non si misura
-  const f = FASI[faseDi(p.id)];
-  if(!f.finestra) return null;
-  const g = giorniTra(inizioFase(p), OGGI());
-  if(g <= f.finestra) return { k:"linea", txt:`in linea (giorno ${g} su ${f.finestra})`, g, finestra:f.finestra };
-  return { k:"lento", txt:`in ritardo di ${g-f.finestra} giorni`, g, finestra:f.finestra };
+  if(inArchivio() || scalaFinita(p.id)) return null;   // su un mese chiuso non si misura
+  const g = Math.max(0, giorniTra(inizioFase(p), OGGI()));
+  return { k:"neutro", g, txt: g===0 ? "da oggi in questo step" : `da ${plur(g,"giorno","giorni")} in questo step` };
 }
 
 /* La velocità: solo fasi effettivamente CHIUSE, e chiuse in meno di metà finestra. */
