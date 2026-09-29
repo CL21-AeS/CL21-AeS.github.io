@@ -1818,6 +1818,7 @@ function cambiaBlocco(s, bloccare) {
 
 /* ─── MODALITÀ PARTNER: LEGGI UN CODICE ───────────────────────────────────── */
 var inSospeso = null;   /* risposte decodificate in attesa di un nome */
+var inSospesoId = null; /* e il codice dell'invito da cui vengono, se il messaggio lo porta */
 
 function datiScheda(scheda) {
   /* Quello che va nel foglio: gli otto punteggi, l'esito, l'identificativo
@@ -1849,12 +1850,22 @@ function registra(risposte, id) {
   if (nuova) registra_evento('scheda', datiScheda(scheda));
   return scheda;
 }
-function chiediDiChiSono(risposte) {
+function chiediDiChiSono(risposte, id) {
   inSospeso = risposte;
+  inSospesoId = id || null;
   el('l-nome').value = '';
   var box = el('l-attesa');
   box.innerHTML = '';
-  var attesa = memoria.schede.filter(function (x) { return !x.risposte; });
+  /* Se la risposta porta il codice del suo invito, quell'invito esiste già —
+     preparato da un altro telefono o browser. Agganciarla a un altro invito in
+     attesa segnerebbe come usato il link sbagliato: in quel caso l'elenco non
+     si mostra, e la scheda nuova tiene il codice originale, così nel foglio
+     resta la stessa scheda e non conta due volte. */
+  var attesa = inSospesoId ? [] : memoria.schede.filter(function (x) { return !x.risposte; });
+  var etichetta = document.querySelector('label[for="l-nome"]');
+  if (etichetta) etichetta.textContent = inSospesoId
+    ? 'Nome e cognome del contatto:'
+    : 'Oppure è una persona che non trovi in elenco:';
   attesa.forEach(function (x) {
     var b = document.createElement('button');
     b.type = 'button';
@@ -1868,7 +1879,9 @@ function chiediDiChiSono(risposte) {
     };
     box.appendChild(b);
   });
-  el('l-spiega').textContent = attesa.length
+  el('l-spiega').textContent = inSospesoId
+    ? 'Queste risposte sono dell\'invito ' + inSospesoId + ', che hai preparato da un altro telefono o browser. Scrivi di chi sono e salvale qui: restano legate allo stesso invito.'
+    : attesa.length
     ? 'Le risposte ci sono, ma non riesco a capire di chi sono. Scegli l\'invito a cui agganciarle:'
     : 'Le risposte ci sono, ma in questo archivio non c\'è nessun invito in attesa — capita se l\'hai preparato da un altro telefono o browser. Di chi sono?';
   el('l-assoc').hidden = false;
@@ -1880,22 +1893,26 @@ el('l-go').onclick = function () {
   el('l-err').hidden = true;
   var scheda = registra(d.risposte, d.id);
   if (scheda) { apriScheda(scheda.id); return; }
-  chiediDiChiSono(d.risposte);
+  chiediDiChiSono(d.risposte, d.id);
 };
 el('l-salva').onclick = function () {
   if (!inSospeso) return;
   var nome = (el('l-nome').value || '').trim() || 'Senza nome';
-  /* se il nome è già in archivio senza risposte, agganciamo lì invece di duplicare */
-  var esistente = memoria.schede.filter(function (x) {
+  /* Con il codice dell'invito originale la scheda nuova prende quello: è la
+     stessa risposta letta da un altro dispositivo, non un invito in più.
+     Senza codice, se il nome è già in archivio senza risposte, agganciamo lì
+     invece di duplicare. */
+  var esistente = inSospesoId ? null : memoria.schede.filter(function (x) {
     return !x.risposte && x.nome.toLowerCase() === nome.toLowerCase();
   })[0];
-  var scheda = esistente || { id: nuovoId(), nome: nome, creato: oggi(), risposte: null, nota: '' };
+  var scheda = esistente || { id: inSospesoId || nuovoId(), nome: nome, creato: oggi(), risposte: null, nota: '' };
   scheda.risposte = inSospeso;
   scheda.letto = oggi();
   if (!esistente) memoria.schede.unshift(scheda);
   salva();
   registra_evento('scheda', datiScheda(scheda));
   inSospeso = null;
+  inSospesoId = null;
   el('l-assoc').hidden = true;
   apriScheda(scheda.id);
 };
@@ -2181,7 +2198,7 @@ function importaRisultato(codice) {
     return;
   }
   var agganciata = registra(letto.risposte, letto.id);
-  if (agganciata) { apriScheda(agganciata.id); } else { chiediDiChiSono(letto.risposte); }
+  if (agganciata) { apriScheda(agganciata.id); } else { chiediDiChiSono(letto.risposte, letto.id); }
 }
 window.addEventListener('hashchange', function () {
   var p = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
