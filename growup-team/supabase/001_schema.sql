@@ -2,6 +2,11 @@
 -- Growup Team — schema (Fase 1)
 -- Si lancia una volta sola nell'SQL editor di Supabase, prima di 002 e 003.
 -- I nomi sono in italiano come nel brief; l'albero sta tutto in partners.sponsor_id.
+--
+-- ACCESSO SENZA EMAIL. Ogni partner ha una CHIAVE segreta che viaggia in un link
+-- (…/growup-team/#chiave=…) mandato su WhatsApp o Telegram. Ogni telefono entra in
+-- Supabase con un accesso anonimo e, presentando la chiave, viene collegato al profilo
+-- (tabella accessi). Nel database c'è solo l'impronta della chiave, mai la chiave.
 -- ============================================================
 
 -- ---- Amministrazione: requisiti delle tappe e impostazioni ----
@@ -17,7 +22,7 @@ create table public.stage_requirements (
   linee                int,                  -- linee frontali richieste
   vp_linea             numeric,              -- VP minimi per ciascuna di quelle linee
   linee_obiettivo      int,                  -- obiettivo CL21 (Argento: 3 linee attive)
-  clienti              int,
+  clienti              int,                  -- i PRIMI N clienti in totale, non nel mese
   giorni_scadenza      int,                  -- solo il primo ordine: 30 giorni dall'iscrizione
   linee_nuove_dal      date,                 -- Path to Bronze: contano le prime linee iscritte da questa data
   pagamenti_max        int,                  -- Foundation e Builder: 12 pagamenti...
@@ -56,15 +61,28 @@ begin
 end;
 $$;
 
--- ---- Partner: un nodo per persona, un solo sponsor ----
+-- Chiave d'accesso: 32 caratteri esadecimali da gen_random_uuid (casualità crittografica).
+create or replace function public.nuova_chiave_segreta()
+returns text
+language sql
+volatile
+as $$ select replace(gen_random_uuid()::text, '-', '') $$;
+
+create or replace function public.impronta(p_chiave text)
+returns text
+language sql
+immutable
+as $$ select encode(sha256(convert_to(lower(btrim(p_chiave)), 'UTF8')), 'hex') $$;
+
+-- ---- Partner: un nodo per persona (o per coppia), un solo sponsor ----
 
 create table public.partners (
   id                       uuid primary key default gen_random_uuid(),
-  user_id                  uuid unique references auth.users(id) on delete set null,
   nome                     text not null check (length(btrim(nome)) between 1 and 80),
-  email                    text,
+  email                    text,               -- facoltativa, non serve per entrare
   sponsor_id               uuid references public.partners(id),
   codice_invito            text not null unique default public.nuovo_codice(),
+  chiave_hash              text unique,        -- impronta della chiave d'accesso
   stato                    text not null default 'attivo'
                              check (stato in ('attivo','gestito','preso_in_carico')),
   gestore_id               uuid references public.partners(id),
@@ -80,7 +98,16 @@ create table public.partners (
   check (sponsor_id is null or sponsor_id <> id)
 );
 create index partners_sponsor_idx on public.partners (sponsor_id);
-create unique index partners_email_idx on public.partners (lower(email)) where email is not null;
+
+-- ---- Accessi: quali telefoni (utenti anonimi di Supabase) entrano in quale profilo ----
+-- Più telefoni per lo stesso profilo: Stefano e Alessia, o lo stesso partner su telefono e computer.
+
+create table public.accessi (
+  user_id      uuid primary key references auth.users(id) on delete cascade,
+  partner_id   uuid not null references public.partners(id) on delete cascade,
+  creato_il    timestamptz not null default now()
+);
+create index accessi_partner_idx on public.accessi (partner_id);
 
 -- ---- Attività: i contatti sono numeri, mai anagrafiche ----
 
@@ -98,21 +125,28 @@ create table public.activities (
 );
 create index activities_partner_data_idx on public.activities (partner_id, data);
 
--- ---- Obiettivi settimanali: un record per partner e settimana (lunedì) ----
+-- ---- Obiettivi: contatti e piani a settimana (lunedì), fatturato a mese ----
 
 create table public.goals (
   partner_id          uuid not null references public.partners(id) on delete cascade,
   settimana           date not null check (extract(isodow from settimana) = 1),
   obiettivo_contatti  int not null default 0 check (obiettivo_contatti between 0 and 1000),
   obiettivo_piani     int not null default 0 check (obiettivo_piani between 0 and 1000),
-  obiettivo_vp        numeric(10,2) not null default 0 check (obiettivo_vp between 0 and 100000),
   aggiornato_il       timestamptz not null default now(),
   primary key (partner_id, settimana)
 );
 
+create table public.monthly_goals (
+  partner_id     uuid not null references public.partners(id) on delete cascade,
+  mese           date not null check (extract(day from mese) = 1),
+  obiettivo_vp   numeric(10,2) not null default 0 check (obiettivo_vp between 0 and 100000),
+  aggiornato_il  timestamptz not null default now(),
+  primary key (partner_id, mese)
+);
+
 -- ============================================================
--- Funzioni di supporto (security definer: leggono partners senza passare dalla RLS,
--- così le policy non si richiamano a vicenda)
+-- Funzioni di supporto (security definer: leggono partners e accessi senza passare
+-- dalla RLS, così le policy non si richiamano a vicenda)
 -- ============================================================
 
 create or replace function public.my_partner_id()
@@ -122,7 +156,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select id from public.partners where user_id = auth.uid()
+  select partner_id from public.accessi where user_id = auth.uid()
 $$;
 
 -- true se target sono io o sta sotto di me, a qualsiasi profondità.
@@ -144,7 +178,17 @@ as $$
   select exists (select 1 from su where su.id = public.my_partner_id())
 $$;
 
--- Prima del login: il nome (solo il primo) di chi ha mandato il link.
+create or replace function public.sono_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((select is_admin from public.partners where id = public.my_partner_id()), false)
+$$;
+
+-- Prima di entrare: il nome di chi ha mandato il link d'invito.
 create or replace function public.sponsor_da_codice(p_codice text)
 returns text
 language sql
@@ -152,56 +196,55 @@ stable
 security definer
 set search_path = public
 as $$
-  select split_part(btrim(nome), ' ', 1)
-  from public.partners
-  where codice_invito = upper(btrim(p_codice))
+  select btrim(nome) from public.partners where codice_invito = upper(btrim(p_codice))
 $$;
 
--- Dopo il login: il mio profilo. Se esiste un profilo senza account con la mia email
--- (Stefano e Alessia all'avvio, i partner gestiti in Fase 3) lo prendo in possesso:
--- trovo già tutto il mio storico, senza duplicati.
+-- Il mio profilo, se questo telefono è già collegato.
 create or replace function public.collega_profilo()
-returns public.partners
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select to_jsonb(p) - 'chiave_hash' from public.partners p where p.id = public.my_partner_id()
+$$;
+
+-- Entrare con la chiave del link personale: collega questo telefono al profilo.
+-- Vale anche per i profili creati da altri (Stefano e Alessia all'avvio, i partner
+-- gestiti in Fase 3): chi entra con la chiave ne prende possesso e diventa Attivo,
+-- con tutto il suo storico, senza duplicati.
+create or replace function public.entra_con_chiave(p_chiave text)
+returns jsonb
 language plpgsql
 volatile
 security definer
 set search_path = public
 as $$
 declare
-  uid  uuid := auth.uid();
-  mail text;
-  p    public.partners;
+  uid uuid := auth.uid();
+  p   public.partners;
 begin
   if uid is null then
     raise exception 'non_autenticato';
   end if;
-
-  select * into p from public.partners where user_id = uid;
-  if found then
-    return p;
+  select * into p from public.partners where chiave_hash = public.impronta(p_chiave);
+  if not found then
+    raise exception 'chiave_non_valida';
   end if;
 
-  select email into mail from auth.users where id = uid;
-  if mail is null then
-    return null;
-  end if;
+  insert into public.accessi (user_id, partner_id) values (uid, p.id)
+  on conflict (user_id) do update set partner_id = excluded.partner_id, creato_il = now();
 
-  update public.partners
-     set user_id = uid,
-         stato = 'attivo',
-         gestore_id = null
-   where user_id is null
-     and lower(email) = lower(mail)
-  returning * into p;
-
-  if found then
-    return p;
+  if p.stato <> 'attivo' then
+    update public.partners set stato = 'attivo', gestore_id = null where id = p.id returning * into p;
   end if;
-  return null;
+  return to_jsonb(p) - 'chiave_hash';
 end;
 $$;
 
--- Primo accesso dal link dello sponsor: crea il mio profilo agganciato a lui.
+-- Primo accesso dal link dello sponsor: crea il profilo agganciato a lui e
+-- restituisce, UNA volta sola, la chiave del link personale.
 create or replace function public.join_with_code(
   p_codice             text,
   p_nome               text,
@@ -210,7 +253,7 @@ create or replace function public.join_with_code(
   p_qualifica_mese     date default null,
   p_pagamenti          int  default 0
 )
-returns public.partners
+returns jsonb
 language plpgsql
 volatile
 security definer
@@ -218,15 +261,14 @@ set search_path = public
 as $$
 declare
   uid     uuid := auth.uid();
-  mail    text;
   sponsor uuid;
-  nuovi   date;
+  chiave  text := public.nuova_chiave_segreta();
   p       public.partners;
 begin
   if uid is null then
     raise exception 'non_autenticato';
   end if;
-  if exists (select 1 from public.partners where user_id = uid) then
+  if exists (select 1 from public.accessi where user_id = uid) then
     raise exception 'profilo_esistente';
   end if;
 
@@ -239,22 +281,69 @@ begin
     raise exception 'data_futura';
   end if;
   if p_qualifica is not null
-     and not exists (select 1 from public.stage_requirements where chiave = p_qualifica) then
+     and not exists (select 1 from public.stage_requirements s where s.chiave = p_qualifica) then
     raise exception 'qualifica_non_valida';
   end if;
 
-  select email into mail from auth.users where id = uid;
-
-  insert into public.partners (user_id, nome, email, sponsor_id, stato, data_iscrizione,
+  insert into public.partners (nome, sponsor_id, stato, chiave_hash, data_iscrizione,
                                qualifica_iniziale, qualifica_iniziale_mese, pagamenti_iniziali,
                                privacy_accettata_il, ultimo_aggiornamento)
-  values (uid, btrim(p_nome), mail, sponsor, 'attivo', p_data_iscrizione,
+  values (btrim(p_nome), sponsor, 'attivo', public.impronta(chiave), p_data_iscrizione,
           p_qualifica, date_trunc('month', p_qualifica_mese)::date, coalesce(p_pagamenti, 0),
           now(), now())
   returning * into p;
 
   update public.partners set creato_da = p.id where id = p.id returning * into p;
-  return p;
+  insert into public.accessi (user_id, partner_id) values (uid, p.id);
+
+  return jsonb_build_object('profilo', to_jsonb(p) - 'chiave_hash', 'chiave', chiave);
+end;
+$$;
+
+-- Cambiare la propria chiave (link finito in mani sbagliate): il vecchio link smette
+-- di funzionare e gli altri telefoni collegati vengono scollegati. Questo resta dentro.
+create or replace function public.cambia_chiave()
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  uid    uuid := auth.uid();
+  pid    uuid := public.my_partner_id();
+  chiave text := public.nuova_chiave_segreta();
+begin
+  if pid is null then
+    raise exception 'non_autenticato';
+  end if;
+  update public.partners set chiave_hash = public.impronta(chiave) where id = pid;
+  delete from public.accessi where partner_id = pid and user_id <> uid;
+  return chiave;
+end;
+$$;
+
+-- Chiave persa: un admin (o l'SQL editor) ne genera una nuova per quel partner e
+-- scollega tutti i suoi telefoni. Il nuovo link si manda su WhatsApp o Telegram.
+create or replace function public.nuova_chiave_per(p_partner uuid)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  chiave text := public.nuova_chiave_segreta();
+begin
+  if auth.uid() is not null and not public.sono_admin() then
+    raise exception 'non_autorizzato';
+  end if;
+  update public.partners set chiave_hash = public.impronta(chiave) where id = p_partner;
+  if not found then
+    raise exception 'partner_inesistente';
+  end if;
+  delete from public.accessi where partner_id = p_partner;
+  return chiave;
 end;
 $$;
 
@@ -322,3 +411,21 @@ $$;
 create trigger goals_prima
 before insert or update on public.goals
 for each row execute function public.obiettivi_prima();
+
+create or replace function public.obiettivi_mese_prima()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.aggiornato_il := now();
+  if tg_op = 'UPDATE' then
+    new.partner_id := old.partner_id;
+    new.mese := old.mese;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger monthly_goals_prima
+before insert or update on public.monthly_goals
+for each row execute function public.obiettivi_mese_prima();

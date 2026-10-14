@@ -14,7 +14,7 @@ values
    null, null, 'Almeno 50 VP personali entro 30 giorni dall''iscrizione, per non pagare i 40 € di iscrizione'),
   (2, 'primi_clienti', 'Primi clienti',           null,   0, null, null, null, null,
    3, null, null, null, null,
-   null, null, '3 clienti'),
+   null, null, 'I primi 3 clienti, in totale e non nello stesso mese: chi si iscrive il 29 non ha il tempo di farli in due giorni'),
   (3, 'path_to_bronze','Path to Bronze',          null, 100, null, 3, 100, null,
    null, null, date '2026-06-01', null, null,
    150, '100 VP personali + 3 linee da 100 VP', '3 nuove prime linee da almeno 100 VP ciascuna, più 100 VP personali'),
@@ -39,21 +39,29 @@ insert into public.settings (chiave, valore, nota) values
    'VP di gruppo nel mese perché una linea frontale conti come attiva'),
   ('giorni_presa_in_carico',  '14',
    'Giorni senza aggiornamenti dopo cui compare "Prendi in carico" (Fase 3)'),
-  ('obiettivi_proposti',      '{"contatti": 10, "piani": 3, "vp": 25}',
-   'Obiettivi settimanali proposti a chi non ne ha ancora scelti'),
+  ('obiettivi_proposti',      '{"contatti": 10, "piani": 3, "vp_mese": 100}',
+   'Proposti a chi non ne ha ancora scelti: contatti e piani a settimana, VP al mese (se la tappa ne chiede di più, si propone quella)'),
   ('fonte_guadagni',          '"Simulatore di reddito ufficiale Amway, ottobre 2026"',
    'Citata accanto a ogni cifra'),
   ('avviso_guadagni',         '"Cifre indicative: i risultati dipendono dall''impegno di ciascuno e non sono garantiti."',
    'Mostrato sotto ogni cifra');
 
 -- ------------------------------------------------------------
--- LA RADICE: Stefano e Alessia.
--- Sostituire le due email con quelle vere PRIMA di lanciare questo blocco.
--- I profili nascono senza account: al primo accesso con quella email
--- l'app li collega da sola (funzione collega_profilo).
--- Se Alessia deve stare sotto Stefano invece che accanto, mettere il suo
--- sponsor_id dopo l'inserimento (vedi LEGGIMI.md).
+-- LA RADICE: Stefano e Alessia, un solo profilo e un solo codice d'invito.
+-- Questo blocco stampa due link:
+--   link_personale  → la vostra chiave: apritelo su entrambi i telefoni e tenetelo
+--                     per voi (per esempio nei "Messaggi salvati" di Telegram)
+--   link_invito     → da mandare ai vostri partner diretti
+-- La chiave si vede SOLO adesso: nel database resta solo la sua impronta.
+-- Se la perdete: select public.nuova_chiave_per(id) from public.partners where is_admin;
 -- ------------------------------------------------------------
-insert into public.partners (nome, email, is_admin, stato) values
-  ('Stefano', 'EMAIL_DI_STEFANO@esempio.it', true, 'gestito'),
-  ('Alessia', 'EMAIL_DI_ALESSIA@esempio.it', true, 'gestito');
+with nuova as (
+  select public.nuova_chiave_segreta() as k
+), radice as (
+  insert into public.partners (nome, is_admin, stato, chiave_hash)
+  select 'Stefano e Alessia', true, 'gestito', public.impronta(k) from nuova
+  returning codice_invito
+)
+select 'https://cl21-aes.github.io/growup-team/#chiave=' || nuova.k as link_personale,
+       'https://cl21-aes.github.io/growup-team/#' || radice.codice_invito as link_invito
+from nuova, radice;
