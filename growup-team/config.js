@@ -4,6 +4,6 @@
    ogni tabella ha la Row Level Security attiva (supabase/002_rls.sql).
    MAI la chiave service_role o qualsiasi altra chiave segreta: il repository è pubblico. */
 window.GROWUP_CONFIG = {
-  supabaseUrl: "",
-  supabaseKey: ""
+  supabaseUrl: "https://mxpuvmggexjyieylmfss.supabase.co",
+  supabaseKey: "sb_publishable_4OGHTbJBMGDoonaKsDp_HQ_b3eCkAfo"
 };

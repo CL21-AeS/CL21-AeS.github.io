@@ -73,12 +73,14 @@ create or replace function public.nuova_chiave_segreta()
 returns text
 language sql
 volatile
+set search_path = public
 as $$ select replace(gen_random_uuid()::text, '-', '') $$;
 
 create or replace function public.impronta(p_chiave text)
 returns text
 language sql
 immutable
+set search_path = public
 as $$ select encode(sha256(convert_to(lower(btrim(p_chiave)), 'UTF8')), 'hex') $$;
 
 -- ---- Partner: un nodo per persona (o per coppia), un solo sponsor ----
@@ -404,6 +406,7 @@ for each row execute function public.attivita_dopo();
 create or replace function public.obiettivi_prima()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.aggiornato_il := now();
@@ -422,6 +425,7 @@ for each row execute function public.obiettivi_prima();
 create or replace function public.obiettivi_mese_prima()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.aggiornato_il := now();
@@ -491,6 +495,11 @@ revoke execute on function public.my_partner_id(), public.is_in_downline(uuid), 
   public.join_with_code(text, text, date, text, date, int),
   public.cambia_chiave(), public.nuova_chiave_per(uuid),
   public.sponsor_da_codice(text), public.nuovo_codice(), public.nuova_chiave_segreta(), public.impronta(text)
+  from public, anon, authenticated;
+
+-- le funzioni dei trigger girano da sole: nessuno le chiama a mano
+revoke execute on function public.attivita_prima(), public.attivita_dopo(),
+  public.obiettivi_prima(), public.obiettivi_mese_prima()
   from public, anon, authenticated;
 
 grant execute on function public.sponsor_da_codice(text) to anon, authenticated;
