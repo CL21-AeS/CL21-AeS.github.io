@@ -60,9 +60,11 @@ grant execute on function public.cambia_chiave(), public.nuova_chiave_per(uuid) 
 
 -- ---- 2. Controlli dei permessi ----
 
-begin;
+create schema if not exists growup_test;
+grant usage on schema growup_test to anon, authenticated;
 
-create function pg_temp.come(uid uuid) returns void language plpgsql as $$
+-- diventare un telefono (uid) o un visitatore senza accesso (null)
+create or replace function growup_test.come(uid uuid) returns void language plpgsql as $$
 begin
   execute 'reset role';
   if uid is null then
@@ -76,12 +78,12 @@ begin
   end if;
 end $$;
 
-create function pg_temp.ok(cond boolean, msg text) returns void language plpgsql as $$
+create or replace function growup_test.ok(cond boolean, msg text) returns void language plpgsql as $$
 begin
   if cond is distinct from true then raise exception 'CONTROLLO FALLITO: %', msg; end if;
 end $$;
 
-create function pg_temp.deve_fallire(q text, msg text) returns void language plpgsql as $$
+create or replace function growup_test.deve_fallire(q text, msg text) returns void language plpgsql as $$
 begin
   begin
     execute q;
@@ -91,189 +93,189 @@ begin
   raise exception 'CONTROLLO FALLITO (doveva essere rifiutato): %', msg;
 end $$;
 
--- conta le righe toccate da un update/delete (0 = la RLS l'ha nascosto)
-create function pg_temp.righe(q text) returns int language plpgsql as $$
+-- righe toccate da un update/delete (0 = la RLS l'ha nascosto)
+create or replace function growup_test.righe(q text) returns int language plpgsql as $$
 declare n int;
 begin
   execute q; get diagnostics n = row_count; return n;
 end $$;
 
--- ---- Preparazione (come amministratore del database) ----
-insert into auth.users (id, aud, role) select
-  ('00000000-0000-0000-0000-0000000000a' || i)::uuid, 'authenticated', 'authenticated'
-from generate_series(1, 7) i;
+grant execute on all functions in schema growup_test to anon, authenticated;
 
-insert into public.partners (nome, codice_invito, is_admin, stato)
-values ('Radice Test', 'RRRR22', true, 'gestito');
+do $test$
+declare
+  u1 constant uuid := '00000000-0000-0000-0000-0000000000a1';  -- R, telefono di Stefano
+  u2 constant uuid := '00000000-0000-0000-0000-0000000000a2';  -- A
+  u3 constant uuid := '00000000-0000-0000-0000-0000000000a3';  -- B
+  u4 constant uuid := '00000000-0000-0000-0000-0000000000a4';  -- C
+  u5 constant uuid := '00000000-0000-0000-0000-0000000000a5';  -- A, secondo dispositivo
+  u6 constant uuid := '00000000-0000-0000-0000-0000000000a6';  -- R, telefono di Alessia
+  u7 constant uuid := '00000000-0000-0000-0000-0000000000a7';  -- telefono nuovo, poi D
+  r uuid; a uuid; b uuid; c uuid; d uuid;
+  k_r text; k_a text; k_a2 text; k_d text;
+begin
+  begin  -- tutto quello che succede qui dentro viene annullato alla fine
 
-create temp table ids (k text primary key, id uuid, chiave text);
-grant select, insert, update on ids to anon, authenticated;
-insert into ids select 'R', id, null from public.partners where codice_invito = 'RRRR22';
--- la chiave della radice, come la stampa 003_seed.sql
-update ids set chiave = public.nuova_chiave_per(id) where k = 'R';
-select pg_temp.ok(length((select chiave from ids where k='R')) = 32, 'chiave di 32 caratteri');
-select pg_temp.ok((select chiave_hash from public.partners where codice_invito='RRRR22') <> (select chiave from ids where k='R'),
-                  'nel database c''è solo l''impronta');
+  -- ---- Preparazione (come amministratore del database) ----
+  insert into auth.users (id, aud, role)
+  select ('00000000-0000-0000-0000-0000000000a' || i)::uuid, 'authenticated', 'authenticated'
+  from generate_series(1, 7) i;
 
--- ---- Prima di entrare ----
-select pg_temp.come(null);
-select pg_temp.ok(public.sponsor_da_codice('rrrr22') = 'Radice Test', 'il link d''invito mostra il nome dello sponsor');
-select pg_temp.deve_fallire('select id from public.partners', 'anon non legge i partner');
-select pg_temp.deve_fallire('select id from public.activities', 'anon non legge le attività');
-select pg_temp.deve_fallire($q$select public.entra_con_chiave('x')$q$, 'anon non entra senza sessione');
+  insert into public.partners (nome, codice_invito, is_admin, stato)
+  values ('Radice Test', 'RRRR22', true, 'gestito') returning id into r;
+  k_r := public.nuova_chiave_per(r);
+  perform growup_test.ok(length(k_r) = 32, 'chiave di 32 caratteri');
+  perform growup_test.ok((select chiave_hash from public.partners where id = r) <> k_r, 'nel database c''è solo l''impronta');
 
--- ---- Un telefono anonimo non collegato non vede niente ----
-select pg_temp.come('00000000-0000-0000-0000-0000000000a7');
-select pg_temp.ok(public.collega_profilo() is null, 'telefono nuovo: nessun profilo');
-select pg_temp.ok((select count(*) from public.partners) = 0, 'telefono non collegato non vede partner');
-select pg_temp.deve_fallire($q$select public.entra_con_chiave('00000000000000000000000000000000')$q$, 'chiave sbagliata');
+  -- ---- Prima di entrare ----
+  perform growup_test.come(null);
+  perform growup_test.ok(public.sponsor_da_codice('rrrr22') = 'Radice Test', 'il link d''invito mostra il nome dello sponsor');
+  perform growup_test.deve_fallire('select id from public.partners', 'anon non legge i partner');
+  perform growup_test.deve_fallire('select id from public.activities', 'anon non legge le attività');
+  perform growup_test.deve_fallire($q$select public.entra_con_chiave('x')$q$, 'anon non entra senza sessione');
 
--- ---- La radice entra con la sua chiave, da due telefoni (Stefano e Alessia) ----
-select pg_temp.come('00000000-0000-0000-0000-0000000000a1');
-select pg_temp.ok((public.entra_con_chiave((select chiave from ids where k='R')))->>'stato' = 'attivo', 'la radice entra e diventa attiva');
-select pg_temp.ok(not (public.collega_profilo() ? 'chiave_hash'), 'il profilo non espone l''impronta');
-select pg_temp.deve_fallire('select chiave_hash from public.partners', 'chiave_hash non leggibile');
-select pg_temp.come('00000000-0000-0000-0000-0000000000a6');
-select pg_temp.ok((public.entra_con_chiave(upper((select chiave from ids where k='R'))))->>'nome' = 'Radice Test', 'secondo telefono sullo stesso profilo');
+  -- ---- Un telefono anonimo non collegato non vede niente ----
+  perform growup_test.come(u7);
+  perform growup_test.ok(public.collega_profilo() is null, 'telefono nuovo: nessun profilo');
+  perform growup_test.ok((select count(*) from public.partners) = 0, 'telefono non collegato non vede partner');
+  perform growup_test.deve_fallire($q$select public.entra_con_chiave('00000000000000000000000000000000')$q$, 'chiave sbagliata');
 
--- ---- Iscrizioni dai link d'invito ----
-select pg_temp.come('00000000-0000-0000-0000-0000000000a2');
-select pg_temp.deve_fallire($q$select public.join_with_code('ZZZZ99','A',null)$q$, 'codice inesistente');
-select pg_temp.deve_fallire($q$select public.join_with_code('RRRR22','A', current_date + 5)$q$, 'data di iscrizione nel futuro');
-insert into ids select 'R2', null, (public.join_with_code('RRRR22', 'Anna Test', date '2026-07-01'))->>'chiave';
-insert into ids select 'A', (public.collega_profilo()->>'id')::uuid, null;
-select pg_temp.ok((public.collega_profilo()->>'sponsor_id')::uuid = (select id from ids where k='R'), 'A agganciata a R');
-select pg_temp.deve_fallire($q$select public.join_with_code('RRRR22','A',null)$q$, 'secondo profilo dallo stesso telefono');
-reset role;
-update public.partners set codice_invito = 'AAAA22' where id = (select id from ids where k='A');
+  -- ---- La radice entra con la sua chiave, da due telefoni (Stefano e Alessia) ----
+  perform growup_test.come(u1);
+  perform growup_test.ok(public.entra_con_chiave(k_r)->>'stato' = 'attivo', 'la radice entra e diventa attiva');
+  perform growup_test.ok(not (public.collega_profilo() ? 'chiave_hash'), 'il profilo non espone l''impronta');
+  perform growup_test.deve_fallire('select chiave_hash from public.partners', 'chiave_hash non leggibile');
+  perform growup_test.come(u6);
+  perform growup_test.ok(public.entra_con_chiave(upper(k_r))->>'nome' = 'Radice Test', 'secondo telefono sullo stesso profilo');
 
-select pg_temp.come('00000000-0000-0000-0000-0000000000a3');
-insert into ids select 'B', ((public.join_with_code('aaaa22', 'Bruno Test', null, 'path_to_bronze'))->'profilo'->>'id')::uuid, null;
-select pg_temp.come('00000000-0000-0000-0000-0000000000a4');
-insert into ids select 'C', ((public.join_with_code('RRRR22', 'Carla Test', null))->'profilo'->>'id')::uuid, null;
-reset role;
-select pg_temp.ok((select sponsor_id from public.partners where id = (select id from ids where k='B'))
-                  = (select id from ids where k='A'), 'B agganciato ad A');
+  -- ---- Iscrizioni dai link d'invito ----
+  perform growup_test.come(u2);
+  perform growup_test.deve_fallire($q$select public.join_with_code('ZZZZ99','A',null)$q$, 'codice inesistente');
+  perform growup_test.deve_fallire($q$select public.join_with_code('RRRR22','A', current_date + 5)$q$, 'data di iscrizione nel futuro');
+  k_a := public.join_with_code('RRRR22', 'Anna Test', date '2026-07-01')->>'chiave';
+  a := (public.collega_profilo()->>'id')::uuid;
+  perform growup_test.ok((public.collega_profilo()->>'sponsor_id')::uuid = r, 'A agganciata a R');
+  perform growup_test.deve_fallire($q$select public.join_with_code('RRRR22','A',null)$q$, 'secondo profilo dallo stesso telefono');
+  execute 'reset role';
+  update public.partners set codice_invito = 'AAAA22' where id = a;
 
--- ---- Visibilità: io e la mia downline, mai sopra né di lato ----
-select pg_temp.come('00000000-0000-0000-0000-0000000000a2');  -- A
-select pg_temp.ok((select count(*) from public.partners) = 2, 'A vede solo sé e B');
-select pg_temp.ok(not exists (select 1 from public.partners where id in (select id from ids where k in ('R','C'))),
-                  'A non vede lo sponsor né la collega C');
-select pg_temp.deve_fallire('select * from public.accessi', 'accessi non leggibili');
-select pg_temp.come('00000000-0000-0000-0000-0000000000a3');  -- B
-select pg_temp.ok((select count(*) from public.partners) = 1, 'B vede solo sé');
-select pg_temp.come('00000000-0000-0000-0000-0000000000a6');  -- R dal secondo telefono
-select pg_temp.ok((select count(*) from public.partners) = 4, 'R vede tutta la downline a qualsiasi profondità');
+  perform growup_test.come(u3);
+  b := (public.join_with_code('aaaa22', 'Bruno Test', null, 'path_to_bronze')->'profilo'->>'id')::uuid;
+  perform growup_test.come(u4);
+  c := (public.join_with_code('RRRR22', 'Carla Test', null)->'profilo'->>'id')::uuid;
+  execute 'reset role';
+  perform growup_test.ok((select sponsor_id from public.partners where id = b) = a, 'B agganciato ad A');
 
--- ---- Attività ----
-select pg_temp.come('00000000-0000-0000-0000-0000000000a2');  -- A
-insert into public.activities (partner_id, tipo) select id, 'contatto' from ids where k='A';
-insert into public.activities (partner_id, tipo, vp) select id, 'ordine', 60 from ids where k='A';
-select pg_temp.ok((select inserito_da from public.activities where tipo='contatto') = (select id from ids where k='A'),
-                  'inserito_da registrato dal server');
-select pg_temp.deve_fallire($q$insert into public.activities (partner_id, tipo) select id, 'contatto' from ids where k='B'$q$,
-                  'A non scrive attività di B (B è attivo)');
-select pg_temp.deve_fallire($q$insert into public.activities (partner_id, tipo, inserito_da) select id, 'contatto', id from ids where k='A'$q$,
-                  'inserito_da non si sceglie dal telefono');
-select pg_temp.deve_fallire($q$insert into public.activities (partner_id, tipo) select id, 'ordine' from ids where k='A'$q$,
-                  'un ordine senza VP');
-select pg_temp.ok((select ultimo_aggiornamento from public.partners where id = (select id from ids where k='A')) is not null,
-                  'ultimo_aggiornamento si muove quando A scrive');
+  -- ---- Visibilità: io e la mia downline, mai sopra né di lato ----
+  perform growup_test.come(u2);  -- A
+  perform growup_test.ok((select count(*) from public.partners) = 2, 'A vede solo sé e B');
+  perform growup_test.ok(not exists (select 1 from public.partners where id in (r, c)), 'A non vede lo sponsor né la collega C');
+  perform growup_test.deve_fallire('select * from public.accessi', 'accessi non leggibili');
+  perform growup_test.come(u3);  -- B
+  perform growup_test.ok((select count(*) from public.partners) = 1, 'B vede solo sé');
+  perform growup_test.come(u6);  -- R dal secondo telefono
+  perform growup_test.ok((select count(*) from public.partners) = 4, 'R vede tutta la downline a qualsiasi profondità');
 
-select pg_temp.come('00000000-0000-0000-0000-0000000000a3');  -- B
-insert into public.activities (partner_id, tipo) select id, 'piano' from ids where k='B';
-select pg_temp.ok((select count(*) from public.activities) = 1, 'B non vede le attività di A');
-select pg_temp.ok(pg_temp.righe('delete from public.activities where tipo = ''contatto''') = 0, 'B non cancella le attività di A');
+  -- ---- Attività ----
+  perform growup_test.come(u2);  -- A
+  insert into public.activities (partner_id, tipo) values (a, 'contatto');
+  insert into public.activities (partner_id, tipo, vp) values (a, 'ordine', 60);
+  perform growup_test.ok((select inserito_da from public.activities where tipo = 'contatto') = a, 'inserito_da registrato dal server');
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'contatto')$q$, b),
+                                   'A non scrive attività di B (B è attivo)');
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, inserito_da) values (%L, 'contatto', %L)$q$, a, a),
+                                   'inserito_da non si sceglie dal telefono');
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'ordine')$q$, a), 'un ordine senza VP');
+  perform growup_test.ok((select ultimo_aggiornamento from public.partners where id = a) is not null, 'ultimo_aggiornamento si muove quando A scrive');
 
-select pg_temp.come('00000000-0000-0000-0000-0000000000a4');  -- C
-select pg_temp.ok((select count(*) from public.activities) = 0, 'C non vede le attività della collega A');
+  perform growup_test.come(u3);  -- B
+  insert into public.activities (partner_id, tipo) values (b, 'piano');
+  perform growup_test.ok((select count(*) from public.activities) = 1, 'B non vede le attività di A');
+  perform growup_test.ok(growup_test.righe($q$delete from public.activities where tipo = 'contatto'$q$) = 0, 'B non cancella le attività di A');
 
-select pg_temp.come('00000000-0000-0000-0000-0000000000a2');  -- A
-select pg_temp.ok((select count(*) from public.activities) = 3, 'A vede le sue e quelle di B');
-select pg_temp.ok(pg_temp.righe('update public.activities set quantita = 5 where tipo = ''piano''') = 0,
-                  'A non modifica i dati di B (B è attivo)');
-select pg_temp.ok(pg_temp.righe('delete from public.activities where tipo = ''contatto''') = 1, 'A cancella una sua attività');
+  perform growup_test.come(u4);  -- C
+  perform growup_test.ok((select count(*) from public.activities) = 0, 'C non vede le attività della collega A');
 
--- ---- Obiettivi: settimana per contatti e piani, mese per i VP ----
-insert into public.goals (partner_id, settimana, obiettivo_contatti, obiettivo_piani)
-select id, date '2026-10-12', 10, 3 from ids where k='A';
-insert into public.goals (partner_id, settimana, obiettivo_contatti, obiettivo_piani)
-select id, date '2026-10-12', 12, 3 from ids where k='A'
-on conflict (partner_id, settimana) do update
-  set partner_id = excluded.partner_id, settimana = excluded.settimana,
-      obiettivo_contatti = excluded.obiettivo_contatti, obiettivo_piani = excluded.obiettivo_piani;
-select pg_temp.ok((select obiettivo_contatti from public.goals) = 12, 'A modifica i suoi obiettivi (upsert)');
-insert into public.monthly_goals (partner_id, mese, obiettivo_vp) select id, date '2026-10-01', 100 from ids where k='A'
-on conflict (partner_id, mese) do update set partner_id = excluded.partner_id, mese = excluded.mese, obiettivo_vp = excluded.obiettivo_vp;
-select pg_temp.ok((select obiettivo_vp from public.monthly_goals) = 100, 'obiettivo VP del mese');
-select pg_temp.deve_fallire($q$insert into public.goals (partner_id, settimana) select id, date '2026-10-13' from ids where k='A'$q$,
-                  'la settimana parte di lunedì');
-select pg_temp.deve_fallire($q$insert into public.monthly_goals (partner_id, mese) select id, date '2026-10-13' from ids where k='A'$q$,
-                  'il mese parte dal giorno 1');
-select pg_temp.deve_fallire($q$insert into public.goals (partner_id, settimana) select id, date '2026-10-12' from ids where k='B'$q$,
-                  'A non scrive gli obiettivi di B');
-select pg_temp.come('00000000-0000-0000-0000-0000000000a3');  -- B
-select pg_temp.ok((select count(*) from public.goals) + (select count(*) from public.monthly_goals) = 0, 'B non vede gli obiettivi di A');
+  perform growup_test.come(u2);  -- A
+  perform growup_test.ok((select count(*) from public.activities) = 3, 'A vede le sue e quelle di B');
+  perform growup_test.ok(growup_test.righe($q$update public.activities set quantita = 5 where tipo = 'piano'$q$) = 0,
+                         'A non modifica i dati di B (B è attivo)');
+  perform growup_test.ok(growup_test.righe($q$delete from public.activities where tipo = 'contatto'$q$) = 1, 'A cancella una sua attività');
 
--- ---- Profilo: campi protetti ----
-select pg_temp.come('00000000-0000-0000-0000-0000000000a2');  -- A
-select pg_temp.deve_fallire($q$update public.partners set sponsor_id = null where id = public.my_partner_id()$q$, 'A non cambia sponsor');
-select pg_temp.deve_fallire($q$update public.partners set is_admin = true where id = public.my_partner_id()$q$, 'A non si fa admin');
-select pg_temp.deve_fallire($q$update public.partners set stato = 'gestito' where id = public.my_partner_id()$q$, 'A non cambia stato');
-select pg_temp.deve_fallire($q$update public.partners set chiave_hash = 'x' where id = public.my_partner_id()$q$, 'A non scrive l''impronta');
-select pg_temp.deve_fallire($q$insert into public.partners (nome) values ('Fantasma')$q$, 'nessun profilo fuori da join_with_code');
-select pg_temp.deve_fallire($q$insert into public.accessi (user_id, partner_id) select auth.uid(), id from ids where k='R'$q$,
-                  'nessuno si collega da solo a un altro profilo');
-select pg_temp.ok(pg_temp.righe('update public.partners set nome = ''Anna T.'' where id = public.my_partner_id()') = 1, 'A cambia il suo nome');
-select pg_temp.ok(pg_temp.righe('update public.partners set nome = ''X'' where id = (select id from ids where k=''B'')') = 0,
-                  'A non cambia il nome di B (attivo)');
+  -- ---- Obiettivi: settimana per contatti e piani, mese per i VP ----
+  insert into public.goals (partner_id, settimana, obiettivo_contatti, obiettivo_piani) values (a, date '2026-10-12', 10, 3);
+  insert into public.goals (partner_id, settimana, obiettivo_contatti, obiettivo_piani) values (a, date '2026-10-12', 12, 3)
+  on conflict (partner_id, settimana) do update
+    set partner_id = excluded.partner_id, settimana = excluded.settimana,
+        obiettivo_contatti = excluded.obiettivo_contatti, obiettivo_piani = excluded.obiettivo_piani;
+  perform growup_test.ok((select obiettivo_contatti from public.goals) = 12, 'A modifica i suoi obiettivi (upsert)');
+  insert into public.monthly_goals (partner_id, mese, obiettivo_vp) values (a, date '2026-10-01', 100)
+  on conflict (partner_id, mese) do update set partner_id = excluded.partner_id, mese = excluded.mese, obiettivo_vp = excluded.obiettivo_vp;
+  perform growup_test.ok((select obiettivo_vp from public.monthly_goals) = 100, 'obiettivo VP del mese');
+  perform growup_test.deve_fallire(format($q$insert into public.goals (partner_id, settimana) values (%L, date '2026-10-13')$q$, a), 'la settimana parte di lunedì');
+  perform growup_test.deve_fallire(format($q$insert into public.monthly_goals (partner_id, mese) values (%L, date '2026-10-13')$q$, a), 'il mese parte dal giorno 1');
+  perform growup_test.deve_fallire(format($q$insert into public.goals (partner_id, settimana) values (%L, date '2026-10-12')$q$, b), 'A non scrive gli obiettivi di B');
+  perform growup_test.come(u3);  -- B
+  perform growup_test.ok((select count(*) from public.goals) + (select count(*) from public.monthly_goals) = 0, 'B non vede gli obiettivi di A');
 
--- ---- Chiavi: cambio e recupero ----
--- A entra anche dal computer (u5) con la chiave ricevuta all'iscrizione
-select pg_temp.come('00000000-0000-0000-0000-0000000000a5');
-select pg_temp.ok((public.entra_con_chiave((select chiave from ids where k='R2')))->>'nome' = 'Anna T.', 'A entra dal secondo dispositivo');
--- poi la cambia: il computer resta dentro, il telefono (u2) viene scollegato, la vecchia chiave non vale più
-insert into ids select 'R2b', null, public.cambia_chiave();
-select pg_temp.come('00000000-0000-0000-0000-0000000000a2');
-select pg_temp.ok(public.collega_profilo() is null, 'cambio chiave: gli altri dispositivi sono scollegati');
-select pg_temp.deve_fallire($q$select public.entra_con_chiave((select chiave from ids where k='R2'))$q$, 'la vecchia chiave non vale più');
-select pg_temp.come('00000000-0000-0000-0000-0000000000a5');
-select pg_temp.ok(public.collega_profilo()->>'nome' = 'Anna T.', 'chi ha cambiato la chiave resta dentro');
--- solo un admin genera una chiave per un altro
-select pg_temp.deve_fallire($q$select public.nuova_chiave_per((select id from ids where k='B'))$q$, 'A non genera chiavi per B');
-select pg_temp.come('00000000-0000-0000-0000-0000000000a1');  -- R admin
-select pg_temp.ok(length(public.nuova_chiave_per((select id from ids where k='B'))) = 32, 'l''admin genera una chiave nuova per B');
-select pg_temp.come('00000000-0000-0000-0000-0000000000a3');  -- B
-select pg_temp.ok(public.collega_profilo() is null, 'chiave rigenerata: i vecchi dispositivi di B sono scollegati');
+  -- ---- Profilo: campi protetti ----
+  perform growup_test.come(u2);  -- A
+  perform growup_test.deve_fallire('update public.partners set sponsor_id = null where id = public.my_partner_id()', 'A non cambia sponsor');
+  perform growup_test.deve_fallire('update public.partners set is_admin = true where id = public.my_partner_id()', 'A non si fa admin');
+  perform growup_test.deve_fallire($q$update public.partners set stato = 'gestito' where id = public.my_partner_id()$q$, 'A non cambia stato');
+  perform growup_test.deve_fallire($q$update public.partners set chiave_hash = 'x' where id = public.my_partner_id()$q$, 'A non scrive l''impronta');
+  perform growup_test.deve_fallire($q$insert into public.partners (nome) values ('Fantasma')$q$, 'nessun profilo fuori da join_with_code');
+  perform growup_test.deve_fallire(format('insert into public.accessi (user_id, partner_id) values (auth.uid(), %L)', r),
+                                   'nessuno si collega da solo a un altro profilo');
+  perform growup_test.ok(growup_test.righe($q$update public.partners set nome = 'Anna T.' where id = public.my_partner_id()$q$) = 1, 'A cambia il suo nome');
+  perform growup_test.ok(growup_test.righe(format($q$update public.partners set nome = 'X' where id = %L$q$, b)) = 0, 'A non cambia il nome di B (attivo)');
 
--- ---- Amministrazione ----
-select pg_temp.come('00000000-0000-0000-0000-0000000000a5');  -- A
-select pg_temp.ok((select count(*) from public.stage_requirements) = 8, 'tutti leggono le 8 tappe');
-select pg_temp.ok(pg_temp.righe('update public.stage_requirements set vp_personali = 1') = 0, 'A non modifica i requisiti');
-select pg_temp.come('00000000-0000-0000-0000-0000000000a6');  -- R admin
-select pg_temp.ok(pg_temp.righe('update public.stage_requirements set descrizione = descrizione') = 8, 'l''admin modifica i requisiti');
+  -- ---- Chiavi: cambio e recupero ----
+  perform growup_test.come(u5);  -- A dal computer, con la chiave ricevuta all'iscrizione
+  perform growup_test.ok(public.entra_con_chiave(k_a)->>'nome' = 'Anna T.', 'A entra dal secondo dispositivo');
+  k_a2 := public.cambia_chiave();   -- il computer resta dentro, il telefono (u2) viene scollegato
+  perform growup_test.come(u2);
+  perform growup_test.ok(public.collega_profilo() is null, 'cambio chiave: gli altri dispositivi sono scollegati');
+  perform growup_test.deve_fallire(format('select public.entra_con_chiave(%L)', k_a), 'la vecchia chiave non vale più');
+  perform growup_test.ok(public.entra_con_chiave(k_a2)->>'nome' = 'Anna T.', 'la chiave nuova funziona');
+  perform growup_test.come(u5);
+  perform growup_test.ok(public.collega_profilo()->>'nome' = 'Anna T.', 'chi ha cambiato la chiave resta dentro');
+  perform growup_test.deve_fallire(format('select public.nuova_chiave_per(%L)', b), 'A non genera chiavi per B');
+  perform growup_test.come(u1);  -- R admin
+  perform growup_test.ok(length(public.nuova_chiave_per(b)) = 32, 'l''admin genera una chiave nuova per B');
+  perform growup_test.come(u3);  -- B
+  perform growup_test.ok(public.collega_profilo() is null, 'chiave rigenerata: i vecchi dispositivi di B sono scollegati');
 
--- ---- Prendere possesso di un profilo creato da altri, con la sua chiave ----
-reset role;
-insert into public.partners (nome, sponsor_id, stato, creato_da)
-select 'Dario Test', id, 'gestito', id from ids where k='A';
-insert into ids select 'D', id, public.nuova_chiave_per(id) from public.partners where nome = 'Dario Test';
-insert into public.activities (partner_id, tipo, inserito_da)
-select (select id from ids where k='D'), 'contatto', (select id from ids where k='A');
-select pg_temp.come('00000000-0000-0000-0000-0000000000a7');
-select pg_temp.ok((public.entra_con_chiave((select chiave from ids where k='D')))->>'stato' = 'attivo', 'D prende possesso e diventa attivo');
-select pg_temp.ok((select count(*) from public.activities) = 1, 'D ritrova il suo storico');
-select pg_temp.ok((select count(*) from public.partners) = 1, 'nessun duplicato');
+  -- ---- Amministrazione ----
+  perform growup_test.come(u5);  -- A
+  perform growup_test.ok((select count(*) from public.stage_requirements) = 8, 'tutti leggono le 8 tappe');
+  perform growup_test.ok(growup_test.righe('update public.stage_requirements set vp_personali = 1') = 0, 'A non modifica i requisiti');
+  perform growup_test.come(u6);  -- R admin
+  perform growup_test.ok(growup_test.righe('update public.stage_requirements set descrizione = descrizione') = 8, 'l''admin modifica i requisiti');
 
--- ---- Nessuna tabella senza RLS ----
-reset role;
-select pg_temp.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),
-                  'RLS attiva su tutte le tabelle');
+  -- ---- Prendere possesso di un profilo creato da altri, con la sua chiave ----
+  execute 'reset role';
+  insert into public.partners (nome, sponsor_id, stato, creato_da) values ('Dario Test', a, 'gestito', a) returning id into d;
+  k_d := public.nuova_chiave_per(d);
+  insert into public.activities (partner_id, tipo, inserito_da) values (d, 'contatto', a);
+  perform growup_test.come(u7);
+  perform growup_test.ok(public.entra_con_chiave(k_d)->>'stato' = 'attivo', 'D prende possesso e diventa attivo');
+  perform growup_test.ok((select count(*) from public.activities) = 1, 'D ritrova il suo storico');
+  perform growup_test.ok((select count(*) from public.partners) = 1, 'nessun duplicato');
 
-do $$ begin raise notice 'TUTTI I CONTROLLI SUPERATI'; end $$;
+  -- ---- Nessuna tabella senza RLS ----
+  execute 'reset role';
+  perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),
+                         'RLS attiva su tutte le tabelle');
 
-rollback;
+  raise exception 'FINE_CONTROLLI';   -- annulla tutti i dati di prova
+  exception when others then
+    if sqlerrm <> 'FINE_CONTROLLI' then raise; end if;
+  end;
+  raise notice 'TUTTI I CONTROLLI SUPERATI';
+end $test$;
+
+drop schema growup_test cascade;
 
 
 -- ---- 3. Il vostro profilo e i due link ----
