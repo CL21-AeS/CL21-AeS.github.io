@@ -54,6 +54,11 @@ revoke execute on function public.my_partner_id(), public.is_in_downline(uuid), 
   public.sponsor_da_codice(text), public.nuovo_codice(), public.nuova_chiave_segreta(), public.impronta(text)
   from public, anon, authenticated;
 
+-- le funzioni dei trigger girano da sole: nessuno le chiama a mano
+revoke execute on function public.attivita_prima(), public.attivita_dopo(),
+  public.obiettivi_prima(), public.obiettivi_mese_prima()
+  from public, anon, authenticated;
+
 grant execute on function public.sponsor_da_codice(text) to anon, authenticated;
 grant execute on function public.my_partner_id(), public.is_in_downline(uuid), public.sono_admin(),
   public.collega_profilo(), public.entra_con_chiave(text),
