@@ -1,0 +1,293 @@
+-- ============================================================
+-- Growup Team — ULTIMO PASSO (da lanciare nell'SQL Editor, una volta sola)
+-- Tabelle, regole e dati iniziali sono già stati installati da Claude.
+-- Questo file:
+--   1. aggiunge le due funzioni sulle chiavi (cambio chiave e chiave persa)
+--   2. esegue i controlli dei permessi (dentro una transazione annullata: non lascia dati)
+--   3. crea il profilo "Stefano e Alessia" e mostra i DUE LINK
+-- Se un controllo fallisce si ferma con "CONTROLLO FALLITO" e il profilo NON viene creato.
+-- Se tutto va bene, in Results compare una riga con link_personale e link_invito:
+-- copiali subito. Il link personale si vede solo ora.
+-- ============================================================
+
+-- ---- 1. Funzioni sulle chiavi ----
+
+create or replace function public.cambia_chiave()
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  uid    uuid := auth.uid();
+  pid    uuid := public.my_partner_id();
+  chiave text := public.nuova_chiave_segreta();
+begin
+  if pid is null then
+    raise exception 'non_autenticato';
+  end if;
+  update public.partners set chiave_hash = public.impronta(chiave) where id = pid;
+  delete from public.accessi where partner_id = pid and user_id <> uid;
+  return chiave;
+end;
+$$;
+
+create or replace function public.nuova_chiave_per(p_partner uuid)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  chiave text := public.nuova_chiave_segreta();
+begin
+  if auth.uid() is not null and not public.sono_admin() then
+    raise exception 'non_autorizzato';
+  end if;
+  update public.partners set chiave_hash = public.impronta(chiave) where id = p_partner;
+  if not found then
+    raise exception 'partner_inesistente';
+  end if;
+  delete from public.accessi where partner_id = p_partner;
+  return chiave;
+end;
+$$;
+
+revoke execute on function public.cambia_chiave(), public.nuova_chiave_per(uuid) from public, anon, authenticated;
+grant execute on function public.cambia_chiave(), public.nuova_chiave_per(uuid) to authenticated;
+
+-- ---- 2. Controlli dei permessi ----
+
+create schema if not exists growup_test;
+grant usage on schema growup_test to anon, authenticated;
+
+-- diventare un telefono (uid) o un visitatore senza accesso (null)
+create or replace function growup_test.come(uid uuid) returns void language plpgsql as $$
+begin
+  execute 'reset role';
+  if uid is null then
+    perform set_config('request.jwt.claim.sub', '', true);
+    perform set_config('request.jwt.claims', '', true);
+    execute 'set local role anon';
+  else
+    perform set_config('request.jwt.claim.sub', uid::text, true);
+    perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated', 'is_anonymous', true)::text, true);
+    execute 'set local role authenticated';
+  end if;
+end $$;
+
+create or replace function growup_test.ok(cond boolean, msg text) returns void language plpgsql as $$
+begin
+  if cond is distinct from true then raise exception 'CONTROLLO FALLITO: %', msg; end if;
+end $$;
+
+create or replace function growup_test.deve_fallire(q text, msg text) returns void language plpgsql as $$
+begin
+  begin
+    execute q;
+  exception when others then
+    return;
+  end;
+  raise exception 'CONTROLLO FALLITO (doveva essere rifiutato): %', msg;
+end $$;
+
+-- righe toccate da un update/delete (0 = la RLS l'ha nascosto)
+create or replace function growup_test.righe(q text) returns int language plpgsql as $$
+declare n int;
+begin
+  execute q; get diagnostics n = row_count; return n;
+end $$;
+
+grant execute on all functions in schema growup_test to anon, authenticated;
+
+do $test$
+declare
+  u1 constant uuid := '00000000-0000-0000-0000-0000000000a1';  -- R, telefono di Stefano
+  u2 constant uuid := '00000000-0000-0000-0000-0000000000a2';  -- A
+  u3 constant uuid := '00000000-0000-0000-0000-0000000000a3';  -- B
+  u4 constant uuid := '00000000-0000-0000-0000-0000000000a4';  -- C
+  u5 constant uuid := '00000000-0000-0000-0000-0000000000a5';  -- A, secondo dispositivo
+  u6 constant uuid := '00000000-0000-0000-0000-0000000000a6';  -- R, telefono di Alessia
+  u7 constant uuid := '00000000-0000-0000-0000-0000000000a7';  -- telefono nuovo, poi D
+  r uuid; a uuid; b uuid; c uuid; d uuid;
+  k_r text; k_a text; k_a2 text; k_d text;
+begin
+  begin  -- tutto quello che succede qui dentro viene annullato alla fine
+
+  -- ---- Preparazione (come amministratore del database) ----
+  insert into auth.users (id, aud, role)
+  select ('00000000-0000-0000-0000-0000000000a' || i)::uuid, 'authenticated', 'authenticated'
+  from generate_series(1, 7) i;
+
+  insert into public.partners (nome, codice_invito, is_admin, stato)
+  values ('Radice Test', 'RRRR22', true, 'gestito') returning id into r;
+  k_r := public.nuova_chiave_per(r);
+  perform growup_test.ok(length(k_r) = 32, 'chiave di 32 caratteri');
+  perform growup_test.ok((select chiave_hash from public.partners where id = r) <> k_r, 'nel database c''è solo l''impronta');
+
+  -- ---- Prima di entrare ----
+  perform growup_test.come(null);
+  perform growup_test.ok(public.sponsor_da_codice('rrrr22') = 'Radice Test', 'il link d''invito mostra il nome dello sponsor');
+  perform growup_test.deve_fallire('select id from public.partners', 'anon non legge i partner');
+  perform growup_test.deve_fallire('select id from public.activities', 'anon non legge le attività');
+  perform growup_test.deve_fallire($q$select public.entra_con_chiave('x')$q$, 'anon non entra senza sessione');
+
+  -- ---- Un telefono anonimo non collegato non vede niente ----
+  perform growup_test.come(u7);
+  perform growup_test.ok(public.collega_profilo() is null, 'telefono nuovo: nessun profilo');
+  perform growup_test.ok((select count(*) from public.partners) = 0, 'telefono non collegato non vede partner');
+  perform growup_test.deve_fallire($q$select public.entra_con_chiave('00000000000000000000000000000000')$q$, 'chiave sbagliata');
+
+  -- ---- La radice entra con la sua chiave, da due telefoni (Stefano e Alessia) ----
+  perform growup_test.come(u1);
+  perform growup_test.ok(public.entra_con_chiave(k_r)->>'stato' = 'attivo', 'la radice entra e diventa attiva');
+  perform growup_test.ok(not (public.collega_profilo() ? 'chiave_hash'), 'il profilo non espone l''impronta');
+  perform growup_test.deve_fallire('select chiave_hash from public.partners', 'chiave_hash non leggibile');
+  perform growup_test.come(u6);
+  perform growup_test.ok(public.entra_con_chiave(upper(k_r))->>'nome' = 'Radice Test', 'secondo telefono sullo stesso profilo');
+
+  -- ---- Iscrizioni dai link d'invito ----
+  perform growup_test.come(u2);
+  perform growup_test.deve_fallire($q$select public.join_with_code('ZZZZ99','A',null)$q$, 'codice inesistente');
+  perform growup_test.deve_fallire($q$select public.join_with_code('RRRR22','A', current_date + 5)$q$, 'data di iscrizione nel futuro');
+  k_a := public.join_with_code('RRRR22', 'Anna Test', date '2026-07-01')->>'chiave';
+  a := (public.collega_profilo()->>'id')::uuid;
+  perform growup_test.ok((public.collega_profilo()->>'sponsor_id')::uuid = r, 'A agganciata a R');
+  perform growup_test.deve_fallire($q$select public.join_with_code('RRRR22','A',null)$q$, 'secondo profilo dallo stesso telefono');
+  execute 'reset role';
+  update public.partners set codice_invito = 'AAAA22' where id = a;
+
+  perform growup_test.come(u3);
+  b := (public.join_with_code('aaaa22', 'Bruno Test', null, 'path_to_bronze')->'profilo'->>'id')::uuid;
+  perform growup_test.come(u4);
+  c := (public.join_with_code('RRRR22', 'Carla Test', null)->'profilo'->>'id')::uuid;
+  execute 'reset role';
+  perform growup_test.ok((select sponsor_id from public.partners where id = b) = a, 'B agganciato ad A');
+
+  -- ---- Visibilità: io e la mia downline, mai sopra né di lato ----
+  perform growup_test.come(u2);  -- A
+  perform growup_test.ok((select count(*) from public.partners) = 2, 'A vede solo sé e B');
+  perform growup_test.ok(not exists (select 1 from public.partners where id in (r, c)), 'A non vede lo sponsor né la collega C');
+  perform growup_test.deve_fallire('select * from public.accessi', 'accessi non leggibili');
+  perform growup_test.come(u3);  -- B
+  perform growup_test.ok((select count(*) from public.partners) = 1, 'B vede solo sé');
+  perform growup_test.come(u6);  -- R dal secondo telefono
+  perform growup_test.ok((select count(*) from public.partners) = 4, 'R vede tutta la downline a qualsiasi profondità');
+
+  -- ---- Attività ----
+  perform growup_test.come(u2);  -- A
+  insert into public.activities (partner_id, tipo) values (a, 'contatto');
+  insert into public.activities (partner_id, tipo, vp) values (a, 'ordine', 60);
+  perform growup_test.ok((select inserito_da from public.activities where tipo = 'contatto') = a, 'inserito_da registrato dal server');
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'contatto')$q$, b),
+                                   'A non scrive attività di B (B è attivo)');
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, inserito_da) values (%L, 'contatto', %L)$q$, a, a),
+                                   'inserito_da non si sceglie dal telefono');
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'ordine')$q$, a), 'un ordine senza VP');
+  perform growup_test.ok((select ultimo_aggiornamento from public.partners where id = a) is not null, 'ultimo_aggiornamento si muove quando A scrive');
+
+  perform growup_test.come(u3);  -- B
+  insert into public.activities (partner_id, tipo) values (b, 'piano');
+  perform growup_test.ok((select count(*) from public.activities) = 1, 'B non vede le attività di A');
+  perform growup_test.ok(growup_test.righe($q$delete from public.activities where tipo = 'contatto'$q$) = 0, 'B non cancella le attività di A');
+
+  perform growup_test.come(u4);  -- C
+  perform growup_test.ok((select count(*) from public.activities) = 0, 'C non vede le attività della collega A');
+
+  perform growup_test.come(u2);  -- A
+  perform growup_test.ok((select count(*) from public.activities) = 3, 'A vede le sue e quelle di B');
+  perform growup_test.ok(growup_test.righe($q$update public.activities set quantita = 5 where tipo = 'piano'$q$) = 0,
+                         'A non modifica i dati di B (B è attivo)');
+  perform growup_test.ok(growup_test.righe($q$delete from public.activities where tipo = 'contatto'$q$) = 1, 'A cancella una sua attività');
+
+  -- ---- Obiettivi: settimana per contatti e piani, mese per i VP ----
+  insert into public.goals (partner_id, settimana, obiettivo_contatti, obiettivo_piani) values (a, date '2026-10-12', 10, 3);
+  insert into public.goals (partner_id, settimana, obiettivo_contatti, obiettivo_piani) values (a, date '2026-10-12', 12, 3)
+  on conflict (partner_id, settimana) do update
+    set partner_id = excluded.partner_id, settimana = excluded.settimana,
+        obiettivo_contatti = excluded.obiettivo_contatti, obiettivo_piani = excluded.obiettivo_piani;
+  perform growup_test.ok((select obiettivo_contatti from public.goals) = 12, 'A modifica i suoi obiettivi (upsert)');
+  insert into public.monthly_goals (partner_id, mese, obiettivo_vp) values (a, date '2026-10-01', 100)
+  on conflict (partner_id, mese) do update set partner_id = excluded.partner_id, mese = excluded.mese, obiettivo_vp = excluded.obiettivo_vp;
+  perform growup_test.ok((select obiettivo_vp from public.monthly_goals) = 100, 'obiettivo VP del mese');
+  perform growup_test.deve_fallire(format($q$insert into public.goals (partner_id, settimana) values (%L, date '2026-10-13')$q$, a), 'la settimana parte di lunedì');
+  perform growup_test.deve_fallire(format($q$insert into public.monthly_goals (partner_id, mese) values (%L, date '2026-10-13')$q$, a), 'il mese parte dal giorno 1');
+  perform growup_test.deve_fallire(format($q$insert into public.goals (partner_id, settimana) values (%L, date '2026-10-12')$q$, b), 'A non scrive gli obiettivi di B');
+  perform growup_test.come(u3);  -- B
+  perform growup_test.ok((select count(*) from public.goals) + (select count(*) from public.monthly_goals) = 0, 'B non vede gli obiettivi di A');
+
+  -- ---- Profilo: campi protetti ----
+  perform growup_test.come(u2);  -- A
+  perform growup_test.deve_fallire('update public.partners set sponsor_id = null where id = public.my_partner_id()', 'A non cambia sponsor');
+  perform growup_test.deve_fallire('update public.partners set is_admin = true where id = public.my_partner_id()', 'A non si fa admin');
+  perform growup_test.deve_fallire($q$update public.partners set stato = 'gestito' where id = public.my_partner_id()$q$, 'A non cambia stato');
+  perform growup_test.deve_fallire($q$update public.partners set chiave_hash = 'x' where id = public.my_partner_id()$q$, 'A non scrive l''impronta');
+  perform growup_test.deve_fallire($q$insert into public.partners (nome) values ('Fantasma')$q$, 'nessun profilo fuori da join_with_code');
+  perform growup_test.deve_fallire(format('insert into public.accessi (user_id, partner_id) values (auth.uid(), %L)', r),
+                                   'nessuno si collega da solo a un altro profilo');
+  perform growup_test.ok(growup_test.righe($q$update public.partners set nome = 'Anna T.' where id = public.my_partner_id()$q$) = 1, 'A cambia il suo nome');
+  perform growup_test.ok(growup_test.righe(format($q$update public.partners set nome = 'X' where id = %L$q$, b)) = 0, 'A non cambia il nome di B (attivo)');
+
+  -- ---- Chiavi: cambio e recupero ----
+  perform growup_test.come(u5);  -- A dal computer, con la chiave ricevuta all'iscrizione
+  perform growup_test.ok(public.entra_con_chiave(k_a)->>'nome' = 'Anna T.', 'A entra dal secondo dispositivo');
+  k_a2 := public.cambia_chiave();   -- il computer resta dentro, il telefono (u2) viene scollegato
+  perform growup_test.come(u2);
+  perform growup_test.ok(public.collega_profilo() is null, 'cambio chiave: gli altri dispositivi sono scollegati');
+  perform growup_test.deve_fallire(format('select public.entra_con_chiave(%L)', k_a), 'la vecchia chiave non vale più');
+  perform growup_test.ok(public.entra_con_chiave(k_a2)->>'nome' = 'Anna T.', 'la chiave nuova funziona');
+  perform growup_test.come(u5);
+  perform growup_test.ok(public.collega_profilo()->>'nome' = 'Anna T.', 'chi ha cambiato la chiave resta dentro');
+  perform growup_test.deve_fallire(format('select public.nuova_chiave_per(%L)', b), 'A non genera chiavi per B');
+  perform growup_test.come(u1);  -- R admin
+  perform growup_test.ok(length(public.nuova_chiave_per(b)) = 32, 'l''admin genera una chiave nuova per B');
+  perform growup_test.come(u3);  -- B
+  perform growup_test.ok(public.collega_profilo() is null, 'chiave rigenerata: i vecchi dispositivi di B sono scollegati');
+
+  -- ---- Amministrazione ----
+  perform growup_test.come(u5);  -- A
+  perform growup_test.ok((select count(*) from public.stage_requirements) = 8, 'tutti leggono le 8 tappe');
+  perform growup_test.ok(growup_test.righe('update public.stage_requirements set vp_personali = 1') = 0, 'A non modifica i requisiti');
+  perform growup_test.come(u6);  -- R admin
+  perform growup_test.ok(growup_test.righe('update public.stage_requirements set descrizione = descrizione') = 8, 'l''admin modifica i requisiti');
+
+  -- ---- Prendere possesso di un profilo creato da altri, con la sua chiave ----
+  execute 'reset role';
+  insert into public.partners (nome, sponsor_id, stato, creato_da) values ('Dario Test', a, 'gestito', a) returning id into d;
+  k_d := public.nuova_chiave_per(d);
+  insert into public.activities (partner_id, tipo, inserito_da) values (d, 'contatto', a);
+  perform growup_test.come(u7);
+  perform growup_test.ok(public.entra_con_chiave(k_d)->>'stato' = 'attivo', 'D prende possesso e diventa attivo');
+  perform growup_test.ok((select count(*) from public.activities) = 1, 'D ritrova il suo storico');
+  perform growup_test.ok((select count(*) from public.partners) = 1, 'nessun duplicato');
+
+  -- ---- Nessuna tabella senza RLS ----
+  execute 'reset role';
+  perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),
+                         'RLS attiva su tutte le tabelle');
+
+  raise exception 'FINE_CONTROLLI';   -- annulla tutti i dati di prova
+  exception when others then
+    if sqlerrm <> 'FINE_CONTROLLI' then raise; end if;
+  end;
+  raise notice 'TUTTI I CONTROLLI SUPERATI';
+end $test$;
+
+drop schema growup_test cascade;
+
+
+-- ---- 3. Il vostro profilo e i due link ----
+
+with nuova as (
+  select public.nuova_chiave_segreta() as k
+), radice as (
+  insert into public.partners (nome, is_admin, stato, chiave_hash)
+  select 'Stefano e Alessia', true, 'gestito', public.impronta(k) from nuova
+  where not exists (select 1 from public.partners where is_admin)
+  returning codice_invito
+)
+select 'https://cl21-aes.github.io/growup-team/#chiave=' || nuova.k as link_personale,
+       'https://cl21-aes.github.io/growup-team/#' || radice.codice_invito as link_invito
+from nuova, radice;
