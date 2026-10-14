@@ -664,6 +664,7 @@
           how: e.how || "",
           react: e.react || "",
           reopen: !!e.reopen,
+          at: e.at || "",
         })) : [],
       })),
       settings: {
@@ -810,6 +811,25 @@
   const stageIndexOf = type => STAGES.findIndex(s => s.id === type);
   const byId = id => state.people.find(p => p.id === id);
   const lastTouch = p => p.events.reduce((m, e) => (e.date > m ? e.date : m), p.createdAt);
+
+  /* La cronologia dal più recente al più vecchio. La data del passo da sola non
+     basta: nello stesso giorno tutti i passi pareggiano, e restavano nell'ordine
+     di inserimento — il più vecchio in cima — mentre i giorni andavano dal più
+     nuovo. Fra due passi dello stesso giorno decide prima l'ora in cui sono stati
+     registrati (`at`), se c'è su entrambi; altrimenti l'ordine naturale del
+     percorso (lista → contatto → invito → piano → follow-up → chiusura); a parità
+     ancora, l'ultimo inserito va sopra. */
+  const RANGO = { lista: 0, contatto: 1, invito: 2, piano: 3, followup: 4, nota: 4.5, esito: 5 };
+  const rango = e => (e.reopen ? 6 : (e.type in RANGO ? RANGO[e.type] : 4.5));
+  function cronologia(p) {
+    return p.events.map((e, i) => ({ e, i })).sort((a, b) => {
+      if (a.e.date !== b.e.date) return a.e.date < b.e.date ? 1 : -1;
+      if (a.e.at && b.e.at && a.e.at !== b.e.at) return a.e.at < b.e.at ? 1 : -1;
+      const r = rango(b.e) - rango(a.e);
+      if (r) return r;
+      return b.i - a.i;
+    }).map(x => x.e);
+  }
 
   /* La fase raggiunta e l'esito vivono nella cronologia: dopo aver cancellato un
      evento vanno ricavati di nuovo da lì, altrimenti la persona resta a una fase
@@ -1398,7 +1418,7 @@
     const p = byId(openId);
     if (!p) { openId = null; layer.innerHTML = ""; return; }
 
-    const events = p.events.slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    const events = cronologia(p);
     const firstOf = t => p.events.filter(e => e.type === t).sort((a, b) => (a.date < b.date ? -1 : 1))[0];
 
     const path = STAGES.map((s, i) => {
@@ -1570,7 +1590,7 @@
           const np = {
             id: uid(), ...vals, reached: 0, outcome: null, nextDate: "", nextNote: "",
             createdAt: todayISO(), updatedAt: nowISO(),
-            events: [{ id: uid(), type: "lista", date: todayISO(), note: "", plan: "", outcome: "" }],
+            events: [{ id: uid(), type: "lista", date: todayISO(), note: "", plan: "", outcome: "", at: nowISO() }],
           };
           state.people.push(np);
           toast(`${name} è in lista`);
@@ -1612,7 +1632,7 @@ Zio Franco"></textarea>
           state.people.push({
             id: uid(), name, contact: contact || "", origine: origine || "", note: "",
             reached: 0, outcome: null, nextDate: "", nextNote: "", createdAt: todayISO(), updatedAt: nowISO(),
-            events: [{ id: uid(), type: "lista", date: todayISO(), note: "", plan: "", outcome: "" }],
+            events: [{ id: uid(), type: "lista", date: todayISO(), note: "", plan: "", outcome: "", at: nowISO() }],
           });
           n++;
         }
@@ -1724,6 +1744,7 @@ Zio Franco"></textarea>
           plan: F.plan ? g("s-plan") : "",
           outcome: F.outcome ? (box.querySelector('input[name="s-out"]:checked') || {}).value || "" : "",
           reopen: false,
+          at: nowISO(),
         };
         const per = byId(p.id);
         per.events.push(e);
@@ -2016,7 +2037,7 @@ Zio Franco"></textarea>
       case "reopen":
         if (p) {
           p.outcome = null;
-          p.events.push({ id: uid(), type: "nota", date: todayISO(), note: "Percorso riaperto", plan: "", outcome: "", reopen: true });
+          p.events.push({ id: uid(), type: "nota", date: todayISO(), note: "Percorso riaperto", plan: "", outcome: "", reopen: true, at: nowISO() });
           touch(p); save(); render(); toast("Percorso riaperto");
         }
         break;
