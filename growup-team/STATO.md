@@ -68,6 +68,10 @@ già applicate; attività pianificata `growup-chiusura-mese` attiva):
 - riquadro "Da confermare" nella pagina Gruppo: il punto di partenza dichiarato si conferma o si corregge
   (`conferma_partenza`, da sponsor o upline; colonne `partenza_confermata_il/_da`).
 
+**Inserisci in mezzo** (migrazione `008_inserisci_in_mezzo.sql` già applicata): nella scheda partner
+"Manca qualcuno sopra?" crea una persona senza app tra lo sponsor attuale e il partner (più eventuali "fratelli"
+spuntati), che si spostano sotto di lei con tutto il loro gruppo. Lo fa chi sta sopra quel punto della linea.
+
 ## Decisioni prese con Stefano
 
 - **Niente email**: si entra dal link d'invito dello sponsor (`#CODICE`) e poi dal link personale (`#chiave=…`),
