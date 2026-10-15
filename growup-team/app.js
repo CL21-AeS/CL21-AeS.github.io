@@ -48,7 +48,7 @@ function creaApi(){
     settings:     () => q(sb.from("settings").select("chiave,valore")),
     /* la settimana e il mese in corso per intero; ordini e clienti di sempre (servono alle tappe) */
     activities:   (pid, dal) => q(sb.from("activities").select("*").eq("partner_id", pid)
-                    .or(`data.gte.${dal},tipo.in.(ordine,cliente)`).order("inserito_il")),
+                    .or(`data.gte.${dal},tipo.in.(ordine,rettifica,cliente)`).order("inserito_il")),
     addActivity:  row => q(sb.from("activities").insert(row).select().single()),
     deleteActivity: id => q(sb.from("activities").delete().eq("id", id)),
     lastGoal:     (pid, finoA) => q(sb.from("goals").select("*").eq("partner_id", pid)
@@ -162,7 +162,9 @@ function perMese(lista, campo){
   for(const a of lista) out[meseDi(a.data)] = (out[meseDi(a.data)] || 0) + Number(a[campo] || 0);
   return out;
 }
-function vpMese(m){ return somma(attivita("ordine").filter(a => meseDi(a.data) === m), "vp"); }
+/* I VP: ordini più le correzioni fatte con "Aggiorna il totale del mese" (anche negative). */
+function movimentiVp(){ return st.att.filter(a => a.tipo === "ordine" || a.tipo === "rettifica"); }
+function vpMese(m){ return somma(movimentiVp().filter(a => meseDi(a.data) === m), "vp"); }
 function clientiMese(m){ return somma(attivita("cliente").filter(a => meseDi(a.data) === m), "quantita"); }
 function clientiTotali(){ return somma(attivita("cliente"), "quantita"); }
 
@@ -170,7 +172,7 @@ function finestraPrimoOrdine(tappa){
   const p = st.profilo;
   if(!p.data_iscrizione || !tappa.giorni_scadenza) return null;
   const fine = piuGiorni(p.data_iscrizione, tappa.giorni_scadenza);
-  const vp = somma(attivita("ordine").filter(a => a.data >= p.data_iscrizione && a.data <= fine), "vp");
+  const vp = somma(movimentiVp().filter(a => a.data >= p.data_iscrizione && a.data <= fine), "vp");
   return { fine, vp, restano: giorniTra(oggi(), fine) };
 }
 
@@ -181,7 +183,7 @@ function tappaFatta(t){
   if(t.chiave === "primo_ordine"){
     const f = finestraPrimoOrdine(t);
     if(f && f.vp >= t.vp_personali) return true;
-    return Object.values(perMese(attivita("ordine"), "vp")).some(v => v >= t.vp_personali);
+    return Object.values(perMese(movimentiVp(), "vp")).some(v => v >= t.vp_personali);
   }
   /* i PRIMI 3 clienti, in totale: chi si iscrive il 29 non ha il tempo di farli nel mese */
   if(t.chiave === "primi_clienti") return clientiTotali() >= (t.clienti || 0);
@@ -638,10 +640,11 @@ function vMese(){
       <h2 style="margin-top:2px">${nomeMese(m).replace(/^./, x => x.toUpperCase())}</h2></div>
       <button class="btn small ghost" data-act="obiettivo-mese">Obiettivo</button></div>
     <div style="margin-top:12px">${barra("VP fatturati", vpMese(m), st.goalMese.obiettivo_vp)}</div>
-    <div class="spread" style="margin-top:8px">
-      <span class="small">I VP del mese sono la somma dei tuoi ordini.</span>
-      <button class="btn small" data-act="ordine" style="white-space:nowrap">+ VP</button>
+    <div class="row" style="margin-top:10px;gap:8px">
+      <button class="btn small grow" data-act="ordine">+ Ordine</button>
+      <button class="btn small grow" data-act="totale-mese">Aggiorna il totale</button>
     </div>
+    <p class="small" style="margin:6px 0 0">Registra ogni ordine, oppure scrivi il totale del mese (per esempio dall'ufficio virtuale Amway).</p>
     <div class="spread" style="margin-top:12px">
       <span>Nuovi clienti nel mese <b class="num">${num(c)}</b></span>
       <button class="btn small" data-act="cliente" style="white-space:nowrap">+ Cliente</button>
@@ -650,13 +653,14 @@ function vMese(){
   </div>`;
 }
 
-const ETICHETTE = { contatto:"Contatto", piano:"Piano mostrato", ordine:"Ordine", cliente:"Nuovo cliente" };
+const ETICHETTE = { contatto:"Contatto", piano:"Piano mostrato", ordine:"Ordine", cliente:"Nuovo cliente", rettifica:"Totale del mese aggiornato" };
+function vpFirmati(v){ return (v > 0 ? "+" : "") + num(v); }
 function vOggi(){
   const l = st.att.filter(a => a.data === oggi()).slice().reverse();
   return `<div class="card">
     <div class="spread"><span class="eyebrow">Oggi</span><span class="small">${dataIt(oggi())}</span></div>
     ${l.length ? `<ul class="oggi">${l.map(a => `<li>
-      <span class="grow">${ETICHETTE[a.tipo]}${a.tipo === "ordine" ? ` · <b>${num(a.vp)} VP</b>` : a.quantita > 1 ? ` × ${a.quantita}` : ""}</span>
+      <span class="grow">${ETICHETTE[a.tipo]}${a.tipo === "ordine" ? ` · <b>${num(a.vp)} VP</b>` : a.tipo === "rettifica" ? ` · <b>${vpFirmati(a.vp)} VP</b>` : a.quantita > 1 ? ` × ${a.quantita}` : ""}</span>
       <span class="small">${a.inserito_il ? fmtOra.format(new Date(a.inserito_il)) : ""}</span>
       ${String(a.id).startsWith("tmp") ? "" : `<button class="x" data-act="elimina" data-id="${esc(a.id)}" aria-label="Elimina">×</button>`}</li>`).join("")}</ul>`
       : `<p class="muted" style="margin:8px 0 0">Ancora niente oggi. Un contatto, un piano, un ordine: si registra con un tocco qui sotto.</p>`}
@@ -732,6 +736,17 @@ function vSheet(){
       <label class="field"><span>Piani mostrati</span><input name="piani" type="number" inputmode="numeric" min="0" max="1000" value="${Number(st.goal.obiettivo_piani) || 0}"></label>
       ${piede}${err}
     </form>`;
+  if(s === "totale-mese"){
+    const m = meseDi(oggi());
+    return `<h2>VP di ${nomeMese(m).split(" ")[0]}</h2>
+    <p class="small">Scrivi il totale dei tuoi VP personali del mese, per esempio quello del tuo ufficio virtuale Amway.
+      L'app registra solo la differenza con quanto hai già inserito (${num(vpMese(m))} VP).</p>
+    <form data-form="totale-mese" novalidate>
+      <label class="field"><span>Totale VP del mese</span>
+        <input name="vp" type="text" inputmode="decimal" autocomplete="off" autofocus value="${num(vpMese(m))}"></label>
+      ${piede}${err}
+    </form>`;
+  }
   if(s === "obiettivo-mese") return `<h2>Obiettivo del mese</h2>
     <p class="small">VP fatturati in ${nomeMese(meseDi(oggi()))}. Il mese prossimo riparte da questo.</p>
     <form data-form="obiettivo-mese" novalidate>
@@ -794,7 +809,9 @@ async function registra(tipo, extra){
   const tmp = Object.assign({ id:"tmp" + Math.random().toString(36).slice(2), inserito_il:new Date().toISOString() }, riga);
   st.att.push(tmp); render();
   const promessa = api.addActivity(riga);
-  const msg = tipo === "ordine" ? `Ordine da ${num(riga.vp)} VP registrato` : `${ETICHETTE[tipo]} registrato`;
+  const msg = tipo === "ordine" ? `Ordine da ${num(riga.vp)} VP registrato`
+    : tipo === "rettifica" ? `Totale di ${nomeMese(meseDi(riga.data)).split(" ")[0]} aggiornato: ${num(vpMese(meseDi(riga.data)))} VP`
+    : `${ETICHETTE[tipo]} registrato`;
   toast(msg, async () => {
     try{
       const vero = await promessa;
@@ -835,6 +852,7 @@ const AZIONI = {
   ordine(){ st.errore = ""; st.sheet = "ordine"; render(); focusSheet(); },
   obiettivi(){ st.errore = ""; st.sheet = "obiettivi"; render(); },
   "obiettivo-mese"(){ st.errore = ""; st.sheet = "obiettivo-mese"; render(); },
+  "totale-mese"(){ st.errore = ""; st.sheet = "totale-mese"; render(); focusSheet(); },
   "vista-io"(){ st.vista = "io"; render(); window.scrollTo(0, 0); },
   "vista-gruppo"(){ st.vista = "gruppo"; render(); window.scrollTo(0, 0); },
   "mia-chiave"(){ st.sheet = "mia-chiave"; render(); },
@@ -861,7 +879,7 @@ const AZIONI = {
   async elimina(el){
     const id = el.dataset.id;
     const a = st.att.find(x => x.id === id);
-    if(!a || !confirm(`Eliminare "${ETICHETTE[a.tipo]}${a.tipo === "ordine" ? " " + num(a.vp) + " VP" : ""}"?`)) return;
+    if(!a || !confirm(`Eliminare "${ETICHETTE[a.tipo]}${a.vp != null ? " " + num(a.vp) + " VP" : ""}"?`)) return;
     try{ await api.deleteActivity(id); st.att = st.att.filter(x => x.id !== id); render(); toast("Eliminato"); }
     catch(e){ toast(messaggio(e)); }
   },
@@ -967,6 +985,14 @@ const MODULI = {
     const n = v => Math.max(0, Math.min(1000, Math.round(numIt(v) || 0)));
     try{ await salvaObiettivi(n(f.contatti.value), n(f.piani.value)); st.sheet = null; render(); toast("Obiettivi salvati"); }
     catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async "totale-mese"(f){
+    const totale = numIt(f.vp.value);
+    if(!(totale >= 0) || totale > 100000){ mostraErroreForm(f, "Scrivi il totale dei VP del mese (un numero, anche con la virgola)."); return; }
+    const diff = Math.round((totale - vpMese(meseDi(oggi()))) * 100) / 100;
+    st.sheet = null;
+    if(diff === 0){ render(); toast("Il totale era già questo"); return; }
+    await registra("rettifica", { vp:diff });
   },
   async "obiettivo-mese"(f){
     const vp = Math.max(0, Math.min(100000, Math.round((numIt(f.vp.value) || 0) * 100) / 100));
