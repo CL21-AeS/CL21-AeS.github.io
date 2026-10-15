@@ -125,14 +125,18 @@ create index accessi_partner_idx on public.accessi (partner_id);
 create table public.activities (
   id           uuid primary key default gen_random_uuid(),
   partner_id   uuid not null references public.partners(id) on delete cascade,
-  tipo         text not null check (tipo in ('contatto','piano','ordine','cliente')),
+  tipo         text not null check (tipo in ('contatto','piano','ordine','cliente','rettifica')),
   quantita     int not null default 1 check (quantita between 1 and 100),
-  vp           numeric(10,2) check (vp is null or (vp > 0 and vp <= 100000)),
+  vp           numeric(10,2),
   data         date not null default (now() at time zone 'Europe/Rome')::date
                  check (data >= date '2020-01-01'),
   inserito_da  uuid references public.partners(id) on delete set null,
   inserito_il  timestamptz not null default now(),
-  check ((tipo = 'ordine') = (vp is not null))
+  -- ordine: VP positivi; rettifica: "aggiorna il totale del mese", la differenza (anche negativa)
+  constraint activities_vp_check check (
+    (tipo = 'ordine' and vp is not null and vp > 0 and vp <= 100000) or
+    (tipo = 'rettifica' and vp is not null and vp <> 0 and vp between -100000 and 100000) or
+    (tipo not in ('ordine', 'rettifica') and vp is null))
 );
 create index activities_partner_data_idx on public.activities (partner_id, data);
 
