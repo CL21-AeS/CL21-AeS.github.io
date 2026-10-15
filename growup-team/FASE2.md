@@ -43,6 +43,7 @@ di altre linee (già garantito dalla RLS della Fase 1).
 3. **Imbuto ed elenco per urgenza** (pagina Gruppo)
    - Imbuto contatti → piani → VP delle ultime 4 settimane, con tassi di passaggio e collo di bottiglia.
    - Elenco ordinato per urgenza con le etichette Da chiamare, Invito, Follow-up, Lista nomi, In crescita.
+   - Fatto: soglie in `settings.soglie_etichette` (migrazione `010_etichette.sql`), regole in STATO.md.
 4. **Scheda partner e storico del gruppo**
    - Ultime 4 settimane di contatti, piani, VP; punto debole confrontato con la media del gruppo e con chi cresce;
      azioni suggerite.

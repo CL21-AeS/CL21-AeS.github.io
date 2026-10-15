@@ -46,11 +46,12 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 5. `supabase/007_fase2_gestiti.sql` — numeri inseriti dall'upline per chi non usa l'app, conferma del punto di partenza
 6. `supabase/008_inserisci_in_mezzo.sql` — inserire una persona mancante in mezzo alla linea
 7. `supabase/009_cancella_e_sposta.sql` — cancellare una persona (il suo gruppo sale) e cambiare sponsor (admin)
-8. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
-9. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
+8. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Da chiamare, Lista nomi, Invito, Follow-up)
+9. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
+10. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
 
-In alternativa ai punti 1-7: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
+In alternativa ai punti 1-8: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
 I file `004_*` e `005_*` servono solo al progetto già installato: il loro contenuto è già dentro 001-003.
 
 ## 3. Attivare l'accesso senza email
@@ -94,7 +95,8 @@ e mettile in `growup-team/config.js` (oppure mandale a Claude Code e lo fa lui).
 
 - **Requisiti delle tappe e guadagni**: tabella `stage_requirements` (Table editor). Cambiate i numeri lì:
   l'app li legge a ogni apertura. Le cifre vengono dal *Simulatore di reddito ufficiale Amway*.
-- **Impostazioni**: tabella `settings` (obiettivi proposti, soglia della linea attiva, fonte e avviso dei guadagni).
+- **Impostazioni**: tabella `settings` (obiettivi proposti, soglia della linea attiva, fonte e avviso dei guadagni,
+  `soglie_etichette` per le etichette del gruppo e il collo di bottiglia dell'imbuto).
 - **Un partner ha perso il suo link personale**: nell'SQL editor
 
   ```sql
