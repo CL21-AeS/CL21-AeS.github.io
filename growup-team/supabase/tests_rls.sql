@@ -65,7 +65,7 @@ declare
   u6 constant uuid := '00000000-0000-0000-0000-0000000000a6';  -- R, telefono di Alessia
   u7 constant uuid := '00000000-0000-0000-0000-0000000000a7';  -- telefono nuovo, poi D
   u8 constant uuid := '00000000-0000-0000-0000-0000000000a8';  -- E, aggiunta a mano, poi entra
-  r uuid; a uuid; b uuid; c uuid; d uuid; e uuid;
+  r uuid; a uuid; b uuid; c uuid; d uuid; e uuid; f uuid; x record; mese_prec date;
   k_r text; k_a text; k_a2 text; k_d text; k_e text;
 begin
   begin  -- tutto quello che succede qui dentro viene annullato alla fine
@@ -247,6 +247,62 @@ begin
   perform growup_test.ok(public.entra_con_chiave(k_e)->>'stato' = 'attivo', 'E apre il suo link e diventa attiva');
   perform growup_test.come(u5);
   perform growup_test.deve_fallire(format('select public.link_per_gestito(%L)', e), 'E è attiva: niente più link dal gestore');
+
+  -- ---- Fase 2: i calcoli del mese ----
+  -- R ha tre linee frontali: A (con B, D ed E sotto), C e F.
+  execute 'reset role';
+  insert into public.partners (nome, sponsor_id, stato) values ('Fabio Test', r, 'gestito') returning id into f;
+  insert into public.activities (partner_id, tipo, vp) values
+    (r, 'ordine', 120), (b, 'ordine', 150), (c, 'ordine', 100), (f, 'ordine', 110), (e, 'rettifica', 40);
+  -- personali: R 120, A 60, B 150, E 40, C 100, F 110, D 0
+  -- gruppo:    B 190, A 250, C 100, F 110, R 580
+  perform growup_test.come(u1);  -- R
+  perform growup_test.ok((select count(*) from public.riepilogo_mese(current_date)) = 7, 'R vede 7 righe nel riepilogo');
+  select * into x from public.riepilogo_mese(current_date) where partner_id = r;
+  perform growup_test.ok(x.vp_personali = 120 and x.vp_gruppo = 580, 'VP personali e di gruppo di R');
+  perform growup_test.ok(x.linee_attive = 3, 'R ha 3 linee attive (A 250, C 100, F 110)');
+  perform growup_test.ok(x.percentuale = 3, 'R: 580 VP di gruppo = 3%');
+  perform growup_test.ok(x.qualifica = 'path_to_bronze', 'R qualifica Path to Bronze nel mese');
+  perform growup_test.ok(x.chiuso = false, 'il mese in corso è dal vivo');
+  perform growup_test.come(u5);  -- A
+  perform growup_test.ok((select count(*) from public.riepilogo_mese(current_date)) = 4, 'A vede solo sé, B, D ed E');
+  perform growup_test.ok(not exists (select 1 from public.riepilogo_mese(current_date) where partner_id in (r, c, f)), 'A non vede sponsor né colleghi');
+  select * into x from public.riepilogo_mese(current_date) where partner_id = a;
+  perform growup_test.ok(x.vp_gruppo = 250 and x.linee_attive = 1 and x.percentuale = 3 and x.qualifica is null,
+                         'A: 250 di gruppo, 1 linea attiva, 3%, nessuna qualifica (manca la terza linea)');
+  perform growup_test.come(u4);  -- C
+  perform growup_test.ok((select count(*) from public.riepilogo_mese(current_date)) = 1, 'C vede solo sé');
+  perform growup_test.come(null);
+  perform growup_test.deve_fallire('select * from public.riepilogo_mese(current_date)', 'anon non vede i riepiloghi');
+
+  -- mesi chiusi: si registra nel mese in corso e, fino al giorno 5, nel precedente
+  perform growup_test.come(u5);  -- A
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, vp, data) values (%L, 'ordine', 10, current_date - 70)$q$, a),
+                                   'niente registrazioni in un mese chiuso');
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, data) values (%L, 'contatto', current_date + 3)$q$, a),
+                                   'niente registrazioni nel futuro');
+  mese_prec := (date_trunc('month', current_date) - interval '1 day')::date;
+  if extract(day from (now() at time zone 'Europe/Rome')) > 5 then
+    perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, vp, data) values (%L, 'rettifica', 10, %L)$q$, a, mese_prec),
+                                     'dopo il giorno 5 il mese precedente è chiuso');
+  else
+    insert into public.activities (partner_id, tipo, vp, data) values (a, 'rettifica', 10, mese_prec);
+  end if;
+  perform growup_test.ok(not public.mese_aperto(current_date - 70), 'mese_aperto: due mesi fa no');
+  perform growup_test.ok(public.mese_aperto(current_date), 'mese_aperto: oggi sì');
+
+  -- storico: chiusura del mese precedente
+  execute 'reset role';
+  perform growup_test.ok(public.chiudi_mese(mese_prec) >= 7, 'chiusura del mese precedente');
+  perform growup_test.come(u5);  -- A
+  perform growup_test.ok((select count(*) from public.riepilogo_mese(mese_prec) where chiuso) = 4, 'A legge il mese chiuso, solo il suo gruppo');
+  perform growup_test.ok((select count(*) from public.monthly_totals) = 4, 'A legge lo storico, solo il suo gruppo');
+  perform growup_test.deve_fallire(format($q$insert into public.monthly_totals (partner_id, mese) values (%L, date '2026-01-01')$q$, a),
+                                   'lo storico non si scrive dal telefono');
+  perform growup_test.deve_fallire('update public.monthly_totals set vp_gruppo = 99999', 'lo storico non si modifica');
+  perform growup_test.deve_fallire('select public.chiudi_mese(current_date)', 'la chiusura non si lancia dal telefono');
+  perform growup_test.ok((select count(*) from public.percent_levels) = 7, 'tutti leggono le soglie delle percentuali');
+  perform growup_test.ok(growup_test.righe('update public.percent_levels set vp_gruppo = 1') = 0, 'A non modifica le soglie');
 
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';

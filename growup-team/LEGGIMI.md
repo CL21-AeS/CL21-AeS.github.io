@@ -42,8 +42,13 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
    - `link_personale`: la vostra chiave. Apritelo su entrambi i telefoni e salvatelo nei vostri
      "Messaggi salvati". **Si vede solo adesso**: copiatelo subito.
    - `link_invito`: da mandare ai vostri partner diretti.
-4. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
+4. `supabase/006_fase2_calcoli.sql` — i calcoli del mese (VP di gruppo, linee, percentuali, storico)
+5. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
+6. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
+
+In alternativa ai punti 1-4: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
+I file `004_*` e `005_*` servono solo al progetto già installato: il loro contenuto è già dentro 001-003.
 
 ## 3. Attivare l'accesso senza email
 
