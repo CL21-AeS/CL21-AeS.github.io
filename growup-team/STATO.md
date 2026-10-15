@@ -42,6 +42,21 @@ Ultimo aggiornamento: 15 ottobre 2026. Da leggere all'inizio di ogni nuova sessi
   Migrazione `supabase/005_totale_mese.sql` già applicata. In Fase 2 lo sponsor userà lo stesso meccanismo
   per i VP di chi non usa l'app.
 
+**Fase 2 — piano approvato** (vedi `FASE2.md`). Profili di prova cancellati il 15 ottobre: nel database
+c'è solo "Stefano e Alessia", senza attività.
+
+**Fase 2, blocco 1 — calcoli e pagina Io** (migrazioni `006_fase2_calcoli.sql` e `006b_chiusura_pianificata.sql`
+già applicate; attività pianificata `growup-chiusura-mese` attiva):
+
+- soglie delle percentuali in `percent_levels` (3% = 200 … 21% = 10.000);
+- `riepilogo_mese(mese)`: VP personali e di gruppo, linee attive, percentuale e qualifica di me e della mia downline;
+- storico in `monthly_totals`, congelato da `chiudi_mese` il giorno 5 alle 23:30 UTC;
+- il database accetta registrazioni solo nel mese in corso e, fino al giorno 5, nel precedente (`mese_chiuso`);
+- pagina Io: requisiti veri di linee e VP di gruppo, "X% questo mese" separato dalla qualifica
+  ("9% raggiunto · Bronze Foundation 9% non qualificato: …"), linee frontali con i loro VP,
+  "Costruisci la terza linea", pagamenti Foundation/Builder contati dallo storico, Storico,
+  "Aggiorna il totale" anche per il mese precedente fino al giorno 5.
+
 ## Decisioni prese con Stefano
 
 - **Niente email**: si entra dal link d'invito dello sponsor (`#CODICE`) e poi dal link personale (`#chiave=…`),
@@ -56,7 +71,8 @@ Ultimo aggiornamento: 15 ottobre 2026. Da leggere all'inizio di ogni nuova sessi
 
 ## Prossimi passi
 
-1. **Collaudo dei ritocchi** dal telefono (ingresso, qualifiche, struttura, aggiunta manuale, link a chi è aggiunto),
+0. **Collaudo del blocco 1** della Fase 2, poi blocco 2 (vedi `FASE2.md`).
+1. (Fatto) **Collaudo dei ritocchi** dal telefono (ingresso, qualifiche, struttura, aggiunta manuale, link a chi è aggiunto),
    poi cancellare i profili di prova. Collaudo Fase 1 (fatto il 14-15 ottobre: ok) con due account:
    - Stefano e Alessia entrano con il link personale dai loro telefoni.
    - Un secondo telefono entra da `https://cl21-aes.github.io/growup-team/#ABCDEF`, compila l'ingresso,
