@@ -56,6 +56,10 @@ function creaApi(){
     saveGoal:     row => q(sb.from("goals").upsert(row, { onConflict:"partner_id,settimana" }).select().single()),
     lastMonthGoal: (pid, finoA) => q(sb.from("monthly_goals").select("*").eq("partner_id", pid)
                     .lte("mese", finoA).order("mese", { ascending:false }).limit(1)),
+    /* Fase 2: i numeri del mese di me e della mia downline (calcolati nel database) */
+    riepilogo:    mese => q(sb.rpc("riepilogo_mese", { p_mese:mese })),
+    storico:      pid => q(sb.from("monthly_totals").select("*").eq("partner_id", pid).order("mese")),
+    livelli:      () => q(sb.from("percent_levels").select("*").order("percentuale")),
     saveMonthGoal: row => q(sb.from("monthly_goals").upsert(row, { onConflict:"partner_id,mese" }).select().single())
   };
 }
@@ -75,6 +79,10 @@ const st = {
   invitoRiserva: null,    // l'invito lasciato per "entra con il tuo link": si può tornare indietro
   struttura: [],          // io e la mia downline
   linkGestito: null,      // { nome, chiave } da mandare a una persona aggiunta a mano
+  riep: [],               // numeri del mese in corso: io e la mia downline (riepilogo_mese)
+  riepPrec: [],           // lo stesso per il mese precedente, finché non è chiuso
+  storico: [],            // i miei mesi chiusi (monthly_totals)
+  livelli: [],            // soglie delle percentuali
   vista: "io",            // pagina della home: "io" (settimana, mese, percorso) o "gruppo" (struttura, inviti)
   sponsorNome: "",
   errore: "",
@@ -126,6 +134,7 @@ const MESSAGGI_ERRORE = {
   nome_mancante: "Scrivi il nome della persona.",
   non_gestito: "Questa persona usa già l'app: entra con il suo link personale.",
   non_autorizzato: "Non puoi farlo per questa persona.",
+  mese_chiuso: "Quel mese è già chiuso: si registrano il mese in corso e, fino al giorno 5, il mese precedente.",
   non_autenticato: "Sessione scaduta: apri di nuovo il tuo link personale."
 };
 function messaggio(e){
@@ -168,6 +177,46 @@ function vpMese(m){ return somma(movimentiVp().filter(a => meseDi(a.data) === m)
 function clientiMese(m){ return somma(attivita("cliente").filter(a => meseDi(a.data) === m), "quantita"); }
 function clientiTotali(){ return somma(attivita("cliente"), "quantita"); }
 
+/* ---- Fase 2: i numeri del gruppo ----
+   Il database calcola VP di gruppo e linee al caricamento (riepilogo_mese). I miei VP personali
+   li ricalcolo dal vivo, così un ordine appena registrato si vede subito anche nel gruppo. */
+function soglia(){ return Number(cfg("soglia_linea_attiva")) || 100; }
+function giornoChiusura(){ return Number(cfg("chiusura_mese_giorno")) || 5; }
+function mesePrecedente(){ return meseDi(piuGiorni(primoDelMese(), -1)); }
+function precedenteAperto(){ return Number(oggi().slice(8, 10)) <= giornoChiusura(); }
+function primaDataAperta(){ return precedenteAperto() ? mesePrecedente() + "-01" : primoDelMese(); }
+function rigaDi(righe, id){ return righe.find(r => r.partner_id === id); }
+function nomeDi(id){ const p = st.struttura.find(x => x.id === id); return p ? p.nome : ""; }
+/* { personali, gruppo, linee:[{ id, nome, vp }], attive, percentuale } per un mese (m) */
+function numeriMese(m){
+  const righe = m === meseDi(oggi()) ? st.riep : m === mesePrecedente() ? st.riepPrec : [];
+  const me = st.profilo.id, r = rigaDi(righe, me);
+  const personali = vpMese(m);
+  const gruppo = (r ? Number(r.vp_gruppo) - Number(r.vp_personali) : 0) + personali;
+  const linee = righe.filter(x => x.sponsor_id === me)
+    .map(x => ({ id:x.partner_id, nome:nomeDi(x.partner_id), vp:Number(x.vp_gruppo) }))
+    .sort((a, b) => b.vp - a.vp);
+  return { personali, gruppo, linee, attive: linee.filter(l => l.vp >= soglia()).length, percentuale: percentualeDa(gruppo) };
+}
+function percentualeDa(vpGruppo){
+  let pct = null;
+  for(const l of st.livelli) if(vpGruppo >= Number(l.vp_gruppo)) pct = l.percentuale;
+  return pct;
+}
+/* Requisiti di una tappa (dal Path to Bronze in su) nel mese m: cosa manca */
+function mancanze(t, n){
+  const out = [];
+  if(Number(t.vp_personali) > n.personali) out.push(`mancano ${num(t.vp_personali - n.personali)} VP personali`);
+  if(t.vp_gruppo && n.gruppo < t.vp_gruppo) out.push(`mancano ${num(t.vp_gruppo - n.gruppo)} VP di gruppo`);
+  if(t.linee){
+    const min = Number(t.vp_linea) || soglia(), ok = n.linee.filter(l => l.vp >= min).length;
+    if(ok < t.linee) out.push(t.linee - ok === 1 && t.linee === 3 ? "manca la terza linea"
+      : `mancano ${t.linee - ok} ${t.linee - ok === 1 ? "linea" : "linee"} da almeno ${num(min)} VP`);
+  }
+  return out;
+}
+function ordineDi(chiave){ const t = st.stages.find(s => s.chiave === chiave); return t ? t.ordine : 0; }
+
 function finestraPrimoOrdine(tappa){
   const p = st.profilo;
   if(!p.data_iscrizione || !tappa.giorni_scadenza) return null;
@@ -176,9 +225,7 @@ function finestraPrimoOrdine(tappa){
   return { fine, vp, restano: giorniTra(oggi(), fine) };
 }
 
-/* Una tappa è fatta se la qualifica dichiarata la comprende, oppure se i dati lo dicono.
-   In Fase 1 i dati bastano solo per le tappe personali (primo ordine, primi clienti):
-   dal Path to Bronze in su servono le linee, che arrivano con la Fase 2. */
+/* Una tappa è fatta se la qualifica dichiarata la comprende, oppure se i numeri lo dicono. */
 function tappaFatta(t){
   if(t.chiave === "primo_ordine"){
     const f = finestraPrimoOrdine(t);
@@ -187,7 +234,11 @@ function tappaFatta(t){
   }
   /* i PRIMI 3 clienti, in totale: chi si iscrive il 29 non ha il tempo di farli nel mese */
   if(t.chiave === "primi_clienti") return clientiTotali() >= (t.clienti || 0);
-  return false;
+  /* dal Path to Bronze in su: un mese chiuso con quella qualifica (o una più alta), oppure il mese
+     in corso o il precedente ancora aperto con tutti i requisiti soddisfatti */
+  if(st.storico.some(r => ordineDi(r.qualifica) >= t.ordine)) return true;
+  if(!mancanze(t, numeriMese(meseDi(oggi()))).length) return true;
+  return precedenteAperto() && st.riepPrec.length > 0 && !mancanze(t, numeriMese(mesePrecedente())).length;
 }
 
 function percorso(){
@@ -213,25 +264,33 @@ function requisiti(t){
     const c = clientiTotali();
     out.push({ ok: c >= t.clienti, txt: `I tuoi primi ${t.clienti} clienti`, val: `${num(Math.min(c, t.clienti))} / ${t.clienti}`, cliente:true });
   }
+  const n = numeriMese(m);
   if(Number(t.vp_personali) > 0){
-    const vp = vpMese(m);
-    out.push({ ok: vp >= t.vp_personali, txt: `${num(t.vp_personali)} VP personali nel mese`, val: `${num(vp)} / ${num(t.vp_personali)}` });
+    out.push({ ok: n.personali >= t.vp_personali, txt: `${num(t.vp_personali)} VP personali nel mese`, val: `${num(n.personali)} / ${num(t.vp_personali)}` });
   }
   if(t.linee){
-    let txt = t.vp_linea ? `${t.linee} linee frontali da almeno ${num(t.vp_linea)} VP` : `Almeno ${t.linee} linee`;
-    if(t.linee_nuove_dal) txt = `${t.linee} nuove prime linee (iscritte dal ${dataIt(t.linee_nuove_dal)}) da almeno ${num(t.vp_linea)} VP`;
-    out.push({ attesa:true, txt });
+    const min = Number(t.vp_linea) || soglia(), ok = n.linee.filter(l => l.vp >= min).length;
+    out.push({ ok: ok >= t.linee, txt: `${t.linee} linee frontali da almeno ${num(min)} VP di gruppo`, val: `${Math.min(ok, t.linee)} / ${t.linee}` });
   }
-  if(t.vp_gruppo) out.push({ attesa:true, txt: `${num(t.vp_gruppo)} VP di gruppo nel mese` });
+  if(t.vp_gruppo) out.push({ ok: n.gruppo >= t.vp_gruppo, txt: `${num(t.vp_gruppo)} VP di gruppo nel mese`, val: `${num(n.gruppo)} / ${num(t.vp_gruppo)}` });
   return out;
 }
 
+/* Foundation e Builder: dal primo mese qualificato, massimo 12 pagamenti entro 18 mesi.
+   Conta i pagamenti dichiarati all'ingresso più i mesi chiusi qualificati in quel programma. */
 function pagamenti(t){
   const p = st.profilo;
-  if(!t || !t.pagamenti_max || !p.qualifica_iniziale_mese) return "";
-  const passati = mesiTra(meseDi(p.qualifica_iniziale_mese), meseDi(oggi()));
-  const restano = Math.max(0, (t.mesi_finestra || 18) - passati);
-  return `Pagamenti ${p.pagamenti_iniziali || 0} di ${t.pagamenti_max}, restano ${restano} mesi su ${t.mesi_finestra || 18}`;
+  if(!t || !t.pagamenti_max) return "";
+  const famiglia = t.chiave.split("_")[0];                    // foundation | builder
+  const qualificati = st.storico.filter(r => String(r.qualifica || "").startsWith(famiglia)).map(r => meseDi(r.mese));
+  const dichiarato = String(p.qualifica_iniziale || "").startsWith(famiglia) && p.qualifica_iniziale_mese;
+  const inizio = dichiarato ? meseDi(p.qualifica_iniziale_mese) : qualificati[0];
+  if(!inizio) return "";
+  const finestra = t.mesi_finestra || 18;
+  const contati = qualificati.filter(m => (dichiarato ? m > inizio : m >= inizio) && mesiTra(inizio, m) < finestra).length;
+  const fatti = Math.min(t.pagamenti_max, (dichiarato ? Number(p.pagamenti_iniziali) || 0 : 0) + contati);
+  const restano = Math.max(0, finestra - mesiTra(inizio, meseDi(oggi())));
+  return `Pagamenti ${fatti} di ${t.pagamenti_max}, restano ${restano} mesi su ${finestra}`;
 }
 
 function notaGuadagni(){
@@ -262,6 +321,7 @@ async function caricaTutto(){
   for(const r of settings || []) st.settings[r.chiave] = r.valore;
   st.att = att || [];
   try{ await caricaStruttura(); }catch(e){ st.struttura = []; }
+  await caricaNumeri();
 
   /* nuova settimana / nuovo mese: si riparte dall'ultimo obiettivo scelto */
   const g = (goals || [])[0];
@@ -282,10 +342,23 @@ async function caricaTutto(){
 }
 function obiettiviSett(){ return { obiettivo_contatti:st.goal.obiettivo_contatti, obiettivo_piani:st.goal.obiettivo_piani }; }
 
+/* Numeri del gruppo, storico e soglie: se qualcosa non risponde l'app va avanti con i numeri personali. */
+async function caricaNumeri(){
+  const pid = st.profilo.id;
+  const [riep, prec, storico, livelli] = await Promise.all([
+    api.riepilogo(primoDelMese()).catch(() => []),
+    precedenteAperto() ? api.riepilogo(mesePrecedente() + "-01").catch(() => []) : Promise.resolve([]),
+    api.storico(pid).catch(() => []),
+    api.livelli().catch(() => [])
+  ]);
+  st.riep = riep || []; st.riepPrec = prec || []; st.storico = storico || []; st.livelli = livelli || [];
+}
+
 async function aggiornaAttivita(){
   if(st.fase !== "home" || !st.profilo) return;
   try{
     st.att = await api.activities(st.profilo.id, [settimana(), primoDelMese()].sort()[0]) || [];
+    await caricaNumeri();
     render();
   }catch(e){}
 }
@@ -588,11 +661,28 @@ function vTappa(){
     if(f && f.restano >= 0) scadenza = `<p class="pill g" style="margin:8px 0 0">${f.restano === 0 ? "Ultimo giorno" : `Mancano ${plur(f.restano, "giorno", "giorni")}`} per non pagare i 40 € di iscrizione</p>`;
     else if(!st.profilo.data_iscrizione) scadenza = `<p class="small">Aggiungi la data di iscrizione per vedere il conto alla rovescia dei 30 giorni.</p>`;
   }
-  const attesa = req.some(r => r.attesa);
   const nelMese = Number(attuale.vp_personali) > 0 && attuale.chiave !== "primo_ordine";
+  const n = numeriMese(meseDi(oggi()));
+  const conLinee = attuale.ordine >= 3;
+  /* percentuale e qualifica sono due cose distinte */
+  const manca = conLinee ? mancanze(attuale, n) : [];
+  const pinMax = Math.max(Number(st.profilo.percentuale_iniziale) || 0, ...st.storico.map(r => Number(r.percentuale) || 0));
+  const distinti = conLinee && n.percentuale && attuale.percentuale && n.percentuale >= attuale.percentuale && manca.length
+    ? `<p class="avviso">${n.percentuale}% raggiunto · ${esc(attuale.nome)} non qualificato: ${esc(manca.join(", "))}.</p>` : "";
+  const ordinale = ["la prima", "la seconda", "la terza"][n.attive];
+  const terza = conLinee && n.attive < 3
+    ? `<div class="spinta"><b>Costruisci ${ordinale} linea.</b> Hai ${n.attive === 1 ? "1 linea attiva" : `${n.attive} linee attive`} su 3:
+        un nuovo partner frontale da accompagnare nel Path to Bronze.
+        <button class="btn small" data-act="vista-gruppo" style="margin-top:8px">Invita un nuovo partner</button></div>` : "";
+  const linee = conLinee && n.linee.length
+    ? `<ul class="linee">${n.linee.map(l => `<li><span class="grow">${esc(l.nome)}</span>
+        <span class="num ${l.vp >= soglia() ? "" : "faint"}">${num(l.vp)} VP</span></li>`).join("")}</ul>
+       <p class="nota" style="margin-top:4px">Le tue linee frontali questo mese, con i VP di tutto il loro gruppo. Attiva da ${num(soglia())} VP.</p>` : "";
   return `<div class="card">
     <div class="spread"><span class="eyebrow">Tappa ${indice + 1} di ${st.stages.length}</span>
-      <span class="row" style="gap:6px">${st.profilo.percentuale_iniziale ? `<span class="pill s">${st.profilo.percentuale_iniziale}% raggiunto</span>` : ""}
+      <span class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end">
+      ${n.percentuale ? `<span class="pill s">${n.percentuale}% questo mese</span>` : ""}
+      ${pinMax && pinMax > (n.percentuale || 0) ? `<span class="pill">${pinMax}% raggiunto</span>` : ""}
       ${raggiunta ? `<span class="pill v">✓ ${esc(raggiunta.nome)}</span>` : ""}</span></div>
     <h2 style="margin-top:4px">${esc(attuale.nome)}</h2>
     ${attuale.guadagno_mese ? `<p class="small" style="margin:2px 0 0">Circa ${euro(attuale.guadagno_mese)} al mese* con ${esc(attuale.struttura_calcolo || "")}</p>` : ""}
@@ -601,7 +691,9 @@ function vTappa(){
       <span class="mark">${r.ok ? "✓" : r.attesa ? "·" : "○"}</span>
       <span class="grow">${esc(r.txt)}${r.cliente ? ` <button class="btn link small" data-act="cliente" style="min-height:0">+ Cliente</button>` : ""}</span>
       ${r.val ? `<span class="num">${esc(r.val)}</span>` : ""}</li>`).join("")}</ul>
-    ${attesa ? `<p class="nota">I punti grigi (linee e VP di gruppo) si calcolano da soli quando il tuo gruppo usa Growup Team.</p>` : ""}
+    ${distinti}
+    ${linee}
+    ${terza}
     ${pag ? `<p class="small" style="margin-top:8px">${esc(raggiunta.nome)}: ${esc(pag)}</p>` : ""}
     ${nelMese ? `<p class="nota">Tutti i requisiti valgono nello stesso mese di calendario (${nomeMese(meseDi(oggi()))}).</p>` : ""}
     ${attuale.guadagno_mese ? `<p class="nota">* ${notaGuadagni()}</p>` : ""}
@@ -638,19 +730,50 @@ function vMese(){
   return `<div class="card">
     <div class="spread"><div><span class="eyebrow">Il mio mese</span>
       <h2 style="margin-top:2px">${nomeMese(m).replace(/^./, x => x.toUpperCase())}</h2></div>
-      <button class="btn small ghost" data-act="obiettivo-mese">Obiettivo</button></div>
+      <span class="row" style="gap:6px"><button class="btn small ghost" data-act="storico">Storico</button>
+      <button class="btn small ghost" data-act="obiettivo-mese">Obiettivo</button></span></div>
     <div style="margin-top:12px">${barra("VP fatturati", vpMese(m), st.goalMese.obiettivo_vp)}</div>
     <div class="row" style="margin-top:10px;gap:8px">
       <button class="btn small grow" data-act="ordine">+ Ordine</button>
       <button class="btn small grow" data-act="totale-mese">Aggiorna il totale</button>
     </div>
-    <p class="small" style="margin:6px 0 0">Registra ogni ordine, oppure scrivi il totale del mese (per esempio dall'ufficio virtuale Amway).</p>
+    <p class="small" style="margin:6px 0 0">Registra ogni ordine, oppure scrivi il totale del mese (per esempio dall'ufficio virtuale Amway).
+      ${precedenteAperto() ? `Fino al ${giornoChiusura()} puoi ancora correggere ${nomeMese(mesePrecedente()).split(" ")[0]}.` : ""}</p>
+    ${(() => { const n = numeriMese(m); return n.gruppo > n.personali || n.linee.length
+      ? `<div class="spread" style="margin-top:12px"><span>VP di gruppo</span><b class="num">${num(n.gruppo)}</b></div>` : ""; })()}
     <div class="spread" style="margin-top:12px">
       <span>Nuovi clienti nel mese <b class="num">${num(c)}</b></span>
       <button class="btn small" data-act="cliente" style="white-space:nowrap">+ Cliente</button>
     </div>
     ${primiFatti ? "" : `<p class="small" style="margin:4px 0 0">I tuoi primi 3 clienti (anche in mesi diversi) completano la tappa «Primi clienti»: ${num(clientiTotali())} su 3.</p>`}
   </div>`;
+}
+
+/* Storico: i mesi chiusi (congelati il giorno 5) e quelli ancora aperti, dal più recente */
+function vStorico(){
+  const nome = chiave => { const t = st.stages.find(x => x.chiave === chiave); return t ? t.nome : ""; };
+  const righe = st.storico.map(r => ({ mese:meseDi(r.mese), personali:Number(r.vp_personali), gruppo:Number(r.vp_gruppo),
+    attive:r.linee_attive, pct:r.percentuale, qual:nome(r.qualifica), aperto:false }));
+  const aperti = [meseDi(oggi())].concat(precedenteAperto() && !righe.some(r => r.mese === mesePrecedente()) ? [mesePrecedente()] : []);
+  for(const m of aperti){
+    const n = numeriMese(m);
+    const q = st.stages.filter(t => t.ordine >= 3 && !mancanze(t, n).length).pop();
+    righe.push({ mese:m, personali:n.personali, gruppo:n.gruppo, attive:n.attive, pct:n.percentuale, qual:q ? q.nome : "", aperto:true });
+  }
+  righe.sort((a, b) => a.mese < b.mese ? 1 : -1);
+  return `<h2>Il mio storico</h2>
+    <p class="small">Ogni mese si chiude il giorno ${giornoChiusura()} del mese dopo: da lì i numeri restano quelli.</p>
+    <ul class="storico">${righe.map(r => `<li>
+      <div class="spread"><b>${nomeMese(r.mese).replace(/^./, c => c.toUpperCase())}</b>
+        <span class="pill ${r.aperto ? "g" : ""}">${r.aperto ? "in corso" : "chiuso"}</span></div>
+      <div class="dati">
+        <span>VP personali <b class="num">${num(r.personali)}</b></span>
+        <span>VP di gruppo <b class="num">${num(r.gruppo)}</b></span>
+        <span>Linee attive <b class="num">${r.attive}</b></span>
+        <span>Percentuale <b class="num">${r.pct ? r.pct + "%" : "–"}</b></span>
+      </div>
+      ${r.qual ? `<p class="small" style="margin:4px 0 0">Qualifica: <b>${esc(r.qual)}</b></p>` : ""}</li>`).join("")}</ul>
+    <button class="btn wide ghost" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
 }
 
 const ETICHETTE = { contatto:"Contatto", piano:"Piano mostrato", ordine:"Ordine", cliente:"Nuovo cliente", rettifica:"Totale del mese aggiornato" };
@@ -726,7 +849,7 @@ function vSheet(){
     <form data-form="ordine" novalidate>
       <label class="field"><span>VP dell'ordine</span>
         <input name="vp" type="text" inputmode="decimal" autocomplete="off" required autofocus placeholder="es. 60 o 62,5"></label>
-      <label class="field"><span>Data</span><input name="data" type="date" value="${oggi()}" max="${oggi()}"></label>
+      <label class="field"><span>Data</span><input name="data" type="date" value="${oggi()}" min="${primaDataAperta()}" max="${oggi()}"></label>
       ${piede}${err}
     </form>`;
   if(s === "obiettivi") return `<h2>Obiettivi della settimana</h2>
@@ -737,16 +860,22 @@ function vSheet(){
       ${piede}${err}
     </form>`;
   if(s === "totale-mese"){
-    const m = meseDi(oggi());
+    const m = st.meseTotale || meseDi(oggi());
+    const scelta = precedenteAperto() ? `<div class="scelte" style="margin-top:10px">
+        ${[meseDi(oggi()), mesePrecedente()].map(x => `<label><input type="radio" name="mese" value="${x}" ${x === m ? "checked" : ""} data-act="scegli-mese">
+          ${nomeMese(x).replace(/^./, c => c.toUpperCase())}${x === mesePrecedente() ? ` <span class="small">(si chiude il ${giornoChiusura()})</span>` : ""}</label>`).join("")}
+      </div>` : "";
     return `<h2>VP di ${nomeMese(m).split(" ")[0]}</h2>
     <p class="small">Scrivi il totale dei tuoi VP personali del mese, per esempio quello del tuo ufficio virtuale Amway.
       L'app registra solo la differenza con quanto hai già inserito (${num(vpMese(m))} VP).</p>
     <form data-form="totale-mese" novalidate>
+      ${scelta}
       <label class="field"><span>Totale VP del mese</span>
         <input name="vp" type="text" inputmode="decimal" autocomplete="off" autofocus value="${num(vpMese(m))}"></label>
       ${piede}${err}
     </form>`;
   }
+  if(s === "storico") return vStorico();
   if(s === "obiettivo-mese") return `<h2>Obiettivo del mese</h2>
     <p class="small">VP fatturati in ${nomeMese(meseDi(oggi()))}. Il mese prossimo riparte da questo.</p>
     <form data-form="obiettivo-mese" novalidate>
@@ -852,7 +981,9 @@ const AZIONI = {
   ordine(){ st.errore = ""; st.sheet = "ordine"; render(); focusSheet(); },
   obiettivi(){ st.errore = ""; st.sheet = "obiettivi"; render(); },
   "obiettivo-mese"(){ st.errore = ""; st.sheet = "obiettivo-mese"; render(); },
-  "totale-mese"(){ st.errore = ""; st.sheet = "totale-mese"; render(); focusSheet(); },
+  "totale-mese"(){ st.errore = ""; st.meseTotale = meseDi(oggi()); st.sheet = "totale-mese"; render(); focusSheet(); },
+  "scegli-mese"(el){ st.meseTotale = el.value; render(); },
+  storico(){ st.sheet = "storico"; render(); },
   "vista-io"(){ st.vista = "io"; render(); window.scrollTo(0, 0); },
   "vista-gruppo"(){ st.vista = "gruppo"; render(); window.scrollTo(0, 0); },
   "mia-chiave"(){ st.sheet = "mia-chiave"; render(); },
@@ -978,6 +1109,7 @@ const MODULI = {
     const data = f.data.value || oggi();
     if(!(vp > 0) || vp > 100000){ mostraErroreForm(f, "Scrivi i VP dell'ordine (un numero maggiore di zero)."); return; }
     if(data > oggi()){ mostraErroreForm(f, "La data non può essere nel futuro."); return; }
+    if(data < primaDataAperta()){ mostraErroreForm(f, MESSAGGI_ERRORE.mese_chiuso); return; }
     st.sheet = null;
     await registra("ordine", { vp:Math.round(vp * 100) / 100, data });
   },
@@ -989,10 +1121,12 @@ const MODULI = {
   async "totale-mese"(f){
     const totale = numIt(f.vp.value);
     if(!(totale >= 0) || totale > 100000){ mostraErroreForm(f, "Scrivi il totale dei VP del mese (un numero, anche con la virgola)."); return; }
-    const diff = Math.round((totale - vpMese(meseDi(oggi()))) * 100) / 100;
+    const m = st.meseTotale || meseDi(oggi());
+    const diff = Math.round((totale - vpMese(m)) * 100) / 100;
     st.sheet = null;
     if(diff === 0){ render(); toast("Il totale era già questo"); return; }
-    await registra("rettifica", { vp:diff });
+    /* nel mese precedente la correzione va all'ultimo giorno di quel mese */
+    await registra("rettifica", { vp:diff, data: m === meseDi(oggi()) ? oggi() : piuGiorni(primoDelMese(), -1) });
   },
   async "obiettivo-mese"(f){
     const vp = Math.max(0, Math.min(100000, Math.round((numIt(f.vp.value) || 0) * 100) / 100));
