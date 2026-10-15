@@ -46,6 +46,10 @@ function creaApi(){
     conferma:     args => q(sb.rpc("conferma_partenza", args)),
     inMezzo:      args => q(sb.rpc("inserisci_in_mezzo", args)),
     cancella:     pid => q(sb.rpc("cancella_partner", { p_partner:pid })),
+    /* ultime 4 settimane di me e della mia downline (la RLS restituisce solo quelle) */
+    attivitaGruppo: dal => q(sb.from("activities").select("partner_id,tipo,quantita,vp,data,inserito_il").gte("data", dal)),
+    obiettiviGruppo: dal => q(sb.from("goals").select("partner_id,settimana,obiettivo_contatti,obiettivo_piani").gte("settimana", dal)),
+    obiettiviMeseGruppo: dal => q(sb.from("monthly_goals").select("partner_id,mese,obiettivo_vp").gte("mese", dal)),
     cambiaSponsor: (pid, sp) => q(sb.rpc("cambia_sponsor", { p_partner:pid, p_sponsor:sp })),
     nuovaChiavePer: pid => q(sb.rpc("nuova_chiave_per", { p_partner:pid })),
     aggiungi:     args => q(sb.rpc("aggiungi_partner", args)),
@@ -86,6 +90,7 @@ const st = {
   struttura: [],          // io e la mia downline
   linkGestito: null,      // { nome, chiave } da mandare a una persona aggiunta a mano
   riep: [],               // numeri del mese in corso: io e la mia downline (riepilogo_mese)
+  gruppo4: { att:[], goals:[], mgoals:[] },  // ultime 4 settimane del gruppo: imbuto ed etichette
   riepPrec: [],           // lo stesso per il mese precedente, finché non è chiuso
   storico: [],            // i miei mesi chiusi (monthly_totals)
   livelli: [],            // soglie delle percentuali
@@ -367,6 +372,13 @@ async function caricaNumeri(){
     api.livelli().catch(() => [])
   ]);
   st.riep = riep || []; st.riepPrec = prec || []; st.storico = storico || []; st.livelli = livelli || [];
+  const dal = inizio4();
+  const [att, goals, mgoals] = await Promise.all([
+    api.attivitaGruppo(dal).catch(() => []),
+    api.obiettiviGruppo(lunedi(piuGiorni(dal, -7))).catch(() => []),
+    api.obiettiviMeseGruppo(meseDi(piuGiorni(dal, -31)) + "-01").catch(() => [])
+  ]);
+  st.gruppo4 = { att:att || [], goals:goals || [], mgoals:mgoals || [] };
 }
 
 async function aggiornaAttivita(){
@@ -625,6 +637,8 @@ function vHome(){
   </div>
   ${st.vista === "scheda" ? vScheda() : gruppo ? `
   ${vDaConfermare()}
+  ${vImbuto()}
+  ${vDaSeguire()}
   ${vStruttura()}
   ${vInvita()}` : `
   ${leggiLocale(CHIAVE_SALVATA) === "1" || !st.chiave ? "" : vSalvaChiave()}
@@ -857,6 +871,108 @@ function vDaConfermare(){
       così i numeri del gruppo restano affidabili.</p>
     <ul class="albero">${l.map(p => `<li><span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${esc(testoPartenza(p))}</span></span>
       <button class="btn small" data-act="conferma" data-id="${esc(p.id)}">Conferma</button></li>`).join("")}</ul>
+  </div>`;
+}
+
+/* ---- Blocco 3: imbuto del gruppo ed etichette (ultime 4 settimane) ---- */
+const SOGLIE_BASE = { giorni_da_chiamare:7, quota_contatti:0.5, piani_per_contatti:0.2, piani_min_followup:2,
+                      quota_vp_followup:0.5, ordini_per_piani:0.3 };
+function soglieEtichette(){ return Object.assign({}, SOGLIE_BASE, cfg("soglie_etichette") || {}); }
+function inizio4(){ return piuGiorni(oggi(), -27); }
+const ETICHETTE_GRUPPO = {
+  chiamare: { nome:"Da chiamare", cl:"r", ordine:1 },
+  lista:    { nome:"Lista nomi",  cl:"g", ordine:2 },
+  invito:   { nome:"Invito",      cl:"g", ordine:3 },
+  followup: { nome:"Follow-up",   cl:"g", ordine:4 },
+  crescita: { nome:"In crescita", cl:"v", ordine:5 }
+};
+/* I numeri di una persona nelle ultime 4 settimane */
+function numeri4(pid){
+  const l = st.gruppo4.att.filter(a => a.partner_id === pid);
+  const q = tipo => somma(l.filter(a => a.tipo === tipo), "quantita");
+  const ultima = l.reduce((m, a) => a.data > m ? a.data : m, "");
+  return { contatti:q("contatto"), piani:q("piano"), ordini:q("ordine"),
+           vp:somma(l.filter(a => a.tipo === "ordine" || a.tipo === "rettifica"), "vp"), ultima };
+}
+function obiettiviDi(pid){
+  const pr = proposta();
+  const g = st.gruppo4.goals.filter(x => x.partner_id === pid).sort((a, b) => a.settimana < b.settimana ? 1 : -1)[0];
+  const m = st.gruppo4.mgoals.filter(x => x.partner_id === pid).sort((a, b) => a.mese < b.mese ? 1 : -1)[0];
+  return { contatti: g ? Number(g.obiettivo_contatti) : pr.contatti, vp: m ? Number(m.obiettivo_vp) : Number(pr.vp_mese) || 100 };
+}
+/* L'etichetta dice chi ha bisogno di te adesso e che tipo di aiuto serve */
+function etichettaDi(p){
+  const s = soglieEtichette(), n = numeri4(p.id), o = obiettiviDi(p.id);
+  /* per chi usa l'app conta quando ha aggiornato lui; per chi è senza app, l'ultimo dato inserito */
+  const rif = p.stato === "gestito" ? (n.ultima || String(p.creato_il || "").slice(0, 10))
+                                    : String(p.ultimo_aggiornamento || p.creato_il || "").slice(0, 10);
+  const giorni = rif ? giorniTra(rif, oggi()) : 99;
+  const minContatti = Math.ceil(o.contatti * 4 * s.quota_contatti);
+  let k, perche;
+  if(giorni > s.giorni_da_chiamare){
+    k = "chiamare"; perche = p.stato === "gestito" ? `nessun dato inserito da ${plur(giorni, "giorno", "giorni")}` : `non aggiorna da ${plur(giorni, "giorno", "giorni")}`;
+  } else if(n.contatti < minContatti){
+    k = "lista"; perche = `${plur(n.contatti, "contatto", "contatti")} in 4 settimane (obiettivo ${o.contatti} a settimana)`;
+  } else if(n.piani < n.contatti * s.piani_per_contatti){
+    k = "invito"; perche = `${plur(n.contatti, "contatto", "contatti")}, ${plur(n.piani, "piano", "piani")}: pochi inviti vanno a buon fine`;
+  } else if(n.piani >= s.piani_min_followup && n.vp < o.vp * s.quota_vp_followup){
+    k = "followup"; perche = `${plur(n.piani, "piano", "piani")} mostrati, ${num(n.vp)} VP su ${num(o.vp)} di obiettivo`;
+  } else {
+    k = "crescita"; perche = `${plur(n.contatti, "contatto", "contatti")}, ${plur(n.piani, "piano", "piani")}, ${num(n.vp)} VP`;
+  }
+  return Object.assign({ k, perche, giorni, n }, ETICHETTE_GRUPPO[k]);
+}
+function elencoUrgenza(){
+  return alberoSotto(st.profilo.id, 0).map(x => ({ p:x.p, e:etichettaDi(x.p) }))
+    .sort((a, b) => a.e.ordine - b.e.ordine || b.e.giorni - a.e.giorni || a.p.nome.localeCompare(b.p.nome));
+}
+function imbuto(){
+  const persone = alberoSotto(st.profilo.id, 0).map(x => x.p);
+  const t = { contatti:0, piani:0, ordini:0, vp:0 };
+  let obC = 0;
+  for(const p of persone){ const n = numeri4(p.id); t.contatti += n.contatti; t.piani += n.piani; t.ordini += n.ordini; t.vp += n.vp;
+    obC += obiettiviDi(p.id).contatti * 4; }
+  const s = soglieEtichette();
+  const r1 = t.contatti ? t.piani / t.contatti : 0, r2 = t.piani ? t.ordini / t.piani : 0;
+  let collo = null;
+  if(persone.length && t.contatti < obC * s.quota_contatti) collo = "contatti";
+  else if(t.contatti && r1 < s.piani_per_contatti) collo = "piani";
+  else if(t.piani && r2 < s.ordini_per_piani) collo = "ordini";
+  return Object.assign(t, { persone:persone.length, r1, r2, collo, obC });
+}
+function pct(x){ return Math.round(x * 100) + "%"; }
+function vImbuto(){
+  const f = imbuto();
+  if(!f.persone) return "";
+  const max = Math.max(f.contatti, 1);
+  const righe = [
+    { k:"contatti", nome:"Contatti", v:f.contatti, nota:`obiettivo del gruppo ${num(f.obC)}` },
+    { k:"piani", nome:"Piani", v:f.piani, nota: f.contatti ? `${pct(f.r1)} dei contatti` : "" },
+    { k:"ordini", nome:"Ordini", v:f.ordini, nota: f.piani ? `${pct(f.r2)} dei piani · ${num(f.vp)} VP` : `${num(f.vp)} VP` }
+  ];
+  const frasi = {
+    contatti: "Si fanno pochi contatti: lavorate sulla lista nomi e sulla motivazione.",
+    piani: `Pochi contatti diventano piani: ${f.contatti ? `1 piano ogni ${Math.max(1, Math.round(f.contatti / Math.max(f.piani, 1)))} contatti` : ""}. Allenate l'invito.`,
+    ordini: "I piani non diventano ordini: allenate il follow-up e la chiusura."
+  };
+  return `<div class="card">
+    <div class="spread"><span class="eyebrow">Imbuto del gruppo</span><span class="small">ultime 4 settimane</span></div>
+    <ul class="imbuto">${righe.map(r => `<li class="${f.collo === r.k ? "collo" : ""}" title="${esc(r.nome)}: ${num(r.v)}">
+      <div class="spread"><span>${r.nome}${f.collo === r.k ? ` <span class="pill g">collo di bottiglia</span>` : ""}</span><b class="num">${num(r.v)}</b></div>
+      <div class="barra-imbuto"><i style="width:${Math.max(r.v ? 3 : 0, Math.round(r.v / max * 100))}%"></i></div>
+      ${r.nota ? `<span class="small">${esc(r.nota)}</span>` : ""}</li>`).join("")}</ul>
+    ${f.collo ? `<p class="avviso">${esc(frasi[f.collo])}</p>` : f.contatti ? `<p class="small" style="margin:8px 0 0">Nessun collo di bottiglia evidente.</p>` : ""}
+    <p class="nota">Il tuo gruppo, te escluso: contatti, piani e ordini registrati da tutti, anche quelli inseriti per chi è senza app.</p>
+  </div>`;
+}
+function vDaSeguire(){
+  const l = elencoUrgenza();
+  if(!l.length) return "";
+  return `<div class="card">
+    <div class="spread"><span class="eyebrow">Chi seguire adesso</span><span class="small">ultime 4 settimane</span></div>
+    <ul class="albero seguire">${l.map(({ p, e }) => `<li>
+      <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}"><span>${esc(p.nome)}</span><span class="small">${esc(e.perche)}</span></button>
+      <span class="pill ${e.cl}">${e.nome}</span></li>`).join("")}</ul>
   </div>`;
 }
 
