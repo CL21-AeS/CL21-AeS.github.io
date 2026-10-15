@@ -57,6 +57,17 @@ già applicate; attività pianificata `growup-chiusura-mese` attiva):
   "Costruisci la terza linea", pagamenti Foundation/Builder contati dallo storico, Storico,
   "Aggiorna il totale" anche per il mese precedente fino al giorno 5.
 
+**Fase 2, blocco 2 — struttura, partner senza app, conferme** (migrazione `007_fase2_gestiti.sql` già applicata):
+
+- struttura: accanto a ogni nome VP del mese, VP di gruppo, linee attive e stato (attivo ≤ 7 giorni,
+  rallenta ≤ 14, fermo oltre; "senza app" per i gestiti); "!" per i punti di partenza da confermare;
+- scheda partner (si apre toccando un nome): numeri, linee frontali, punto di partenza;
+  per chi è senza app + Contatto, + Piano, + Ordine, Aggiorna il totale, + Cliente, con "inserito da";
+  per chi usa l'app, solo agli admin, "Nuovo link personale" (`nuova_chiave_per`);
+- `posso_gestire`: su un partner gestito scrivono chi l'ha aggiunto e tutta la sua upline;
+- riquadro "Da confermare" nella pagina Gruppo: il punto di partenza dichiarato si conferma o si corregge
+  (`conferma_partenza`, da sponsor o upline; colonne `partenza_confermata_il/_da`).
+
 ## Decisioni prese con Stefano
 
 - **Niente email**: si entra dal link d'invito dello sponsor (`#CODICE`) e poi dal link personale (`#chiave=…`),
@@ -71,7 +82,7 @@ già applicate; attività pianificata `growup-chiusura-mese` attiva):
 
 ## Prossimi passi
 
-0. **Collaudo del blocco 1** della Fase 2, poi blocco 2 (vedi `FASE2.md`).
+0. **Collaudo dei blocchi 1 e 2** della Fase 2, poi blocco 3: imbuto ed elenco per urgenza (vedi `FASE2.md`).
 1. (Fatto) **Collaudo dei ritocchi** dal telefono (ingresso, qualifiche, struttura, aggiunta manuale, link a chi è aggiunto),
    poi cancellare i profili di prova. Collaudo Fase 1 (fatto il 14-15 ottobre: ok) con due account:
    - Stefano e Alessia entrano con il link personale dai loro telefoni.
