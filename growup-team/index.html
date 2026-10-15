@@ -128,6 +128,15 @@ label.check input{width:22px;min-height:22px;height:22px;margin:1px 0 0;flex:non
 .storico li:first-child{border-top:0}
 .storico .dati{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:6px;font-size:14px;color:var(--ink2)}
 .storico .dati b{color:var(--ink)}
+.albero .nome{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:0;background:none;
+  color:var(--ink);font:inherit;text-align:left;padding:2px 0;cursor:pointer}
+.albero .nome:hover>span:first-child{color:var(--accent)}
+.pill.r{color:var(--rosso);border-color:color-mix(in srgb,var(--rosso) 35%,transparent)}
+.dati-scheda{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.dati-scheda>div{display:flex;flex-direction:column;padding:10px 12px;background:var(--bg);border-radius:10px}
+.dati-scheda b{font-size:18px}
+.griglia-azioni{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.griglia-azioni .btn:last-child:nth-child(odd){grid-column:1 / -1}
 .albero{list-style:none;margin:8px 0 0;padding:0}
 .albero li{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:15px}
 .albero li:first-child{border-top:0}

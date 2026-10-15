@@ -65,7 +65,7 @@ declare
   u6 constant uuid := '00000000-0000-0000-0000-0000000000a6';  -- R, telefono di Alessia
   u7 constant uuid := '00000000-0000-0000-0000-0000000000a7';  -- telefono nuovo, poi D
   u8 constant uuid := '00000000-0000-0000-0000-0000000000a8';  -- E, aggiunta a mano, poi entra
-  r uuid; a uuid; b uuid; c uuid; d uuid; e uuid; f uuid; x record; mese_prec date;
+  r uuid; a uuid; b uuid; c uuid; d uuid; e uuid; f uuid; g uuid; x record; mese_prec date;
   k_r text; k_a text; k_a2 text; k_d text; k_e text;
 begin
   begin  -- tutto quello che succede qui dentro viene annullato alla fine
@@ -303,6 +303,57 @@ begin
   perform growup_test.deve_fallire('select public.chiudi_mese(current_date)', 'la chiusura non si lancia dal telefono');
   perform growup_test.ok((select count(*) from public.percent_levels) = 7, 'tutti leggono le soglie delle percentuali');
   perform growup_test.ok(growup_test.righe('update public.percent_levels set vp_gruppo = 1') = 0, 'A non modifica le soglie');
+
+  -- ---- Fase 2, blocco 2: numeri per chi non usa l'app ----
+  perform growup_test.come(u5);  -- A aggiunge G sotto B
+  g := (public.aggiungi_partner('Gino Test', b)->>'id')::uuid;
+  execute 'reset role';
+  perform growup_test.ok((select partenza_confermata_il is not null and partenza_confermata_da = a from public.partners where id = g),
+                         'chi è aggiunto a mano ha il punto di partenza già confermato');
+  perform growup_test.come(u5);  -- A, gestore di G
+  insert into public.activities (partner_id, tipo) values (g, 'contatto');
+  insert into public.activities (partner_id, tipo, vp) values (g, 'rettifica', 80);
+  perform growup_test.ok((select inserito_da from public.activities where partner_id = g and tipo = 'contatto') = a,
+                         'il dato di G registra che l''ha inserito A');
+  insert into public.monthly_goals (partner_id, mese, obiettivo_vp) values (g, date_trunc('month', current_date)::date, 100);
+  perform growup_test.ok(growup_test.righe(format($q$delete from public.activities where partner_id = %L and tipo = 'contatto'$q$, g)) = 1,
+                         'A cancella un dato che ha inserito per G');
+  perform growup_test.come(u1);  -- R, upline di G
+  insert into public.activities (partner_id, tipo) values (g, 'piano');
+  perform growup_test.ok((select vp_personali from public.riepilogo_mese(current_date) where partner_id = g) = 80,
+                         'i VP inseriti per G contano nei numeri');
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'contatto')$q$, g),
+                                   'C non scrive per G (altra linea)');
+  perform growup_test.come(u5);  -- A
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'contatto')$q$, b),
+                                   'A non scrive per B (B usa l''app)');
+  perform growup_test.ok(growup_test.righe(format($q$update public.activities set quantita = 2 where partner_id = %L$q$, b)) = 0,
+                         'A non modifica i dati di B');
+  -- G prende possesso del profilo: da lì nessun upline scrive per lui
+  k_e := public.link_per_gestito(g);
+  execute 'reset role';
+  insert into auth.users (id, aud, role) values ('00000000-0000-0000-0000-0000000000b1', 'authenticated', 'authenticated');
+  perform growup_test.come('00000000-0000-0000-0000-0000000000b1');
+  perform public.entra_con_chiave(k_e);
+  perform growup_test.come(u5);  -- A
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'contatto')$q$, g),
+                                   'G ora usa l''app: A non scrive più per lui');
+
+  -- ---- Fase 2, blocco 2: conferma del punto di partenza ----
+  execute 'reset role';
+  perform growup_test.ok((select partenza_confermata_il is null from public.partners where id = c),
+                         'C ha dichiarato il pin 9%: punto di partenza da confermare');
+  perform growup_test.ok((select partenza_confermata_il is not null from public.partners where id = a),
+                         'A partiva da zero: niente da confermare');
+  perform growup_test.come(u4);  -- C
+  perform growup_test.deve_fallire(format('select public.conferma_partenza(%L, null, 9)', c), 'C non conferma sé stesso');
+  perform growup_test.come(u5);  -- A, altra linea
+  perform growup_test.deve_fallire(format('select public.conferma_partenza(%L, null, 9)', c), 'A non conferma C (altra linea)');
+  perform growup_test.come(u1);  -- R, sponsor di C: corregge 9% in 6%
+  perform growup_test.ok((public.conferma_partenza(c, null, 6)->>'percentuale_iniziale')::int = 6, 'R conferma C correggendo il pin');
+  execute 'reset role';
+  perform growup_test.ok((select partenza_confermata_da = r from public.partners where id = c), 'la conferma registra chi l''ha data');
 
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
