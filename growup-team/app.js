@@ -3,7 +3,8 @@
    Si entra senza email: con il link d'invito dello sponsor la prima volta, poi con il
    proprio LINK PERSONALE (…/#chiave=…), che si tiene su WhatsApp o Telegram.
    "La mia settimana" (contatti e piani), "Il mio mese" (VP e clienti),
-   + Contatto / + Piano / + Ordine, e il percorso base: visione Argento e tappa attuale.
+   + Contatto / + Piano / + Ordine, il percorso base (visione Argento e tappa attuale)
+   e "La mia struttura", dove si aggiungono a mano le persone che non usano l'app.
    I dati stanno in Supabase; la sicurezza sta nella RLS (supabase/002_rls.sql).
    ============================================================ */
 (function(){
@@ -16,7 +17,8 @@ const CHIAVE_LOCALE = "growup-team.chiave";
 const CHIAVE_SALVATA = "growup-team.chiave-salvata";
 const FORMA_CODICE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
 const FORMA_CHIAVE = /^[0-9a-f]{32}$/;
-const INIZIO_NUOVE_ISCRIZIONI = "2026-06-01";
+const PIN = [3, 6, 9, 12, 15, 18, 21];   // percentuali raggiungibili anche senza qualifica Bronze
+const TAPPE_DI_PERCORSO = ["primo_ordine", "primi_clienti"];   // tappe, non qualifiche: non si dichiarano
 const PROPOSTA_BASE = { contatti:10, piani:3, vp_mese:100 };
 
 /* ---- 1. Accesso ai dati: tutto passa da qui ----
@@ -35,8 +37,13 @@ function creaApi(){
     sponsorName:  codice => q(sb.rpc("sponsor_da_codice", { p_codice:codice })),
     collega:      () => q(sb.rpc("collega_profilo")),
     entra:        chiave => q(sb.rpc("entra_con_chiave", { p_chiave:chiave })),
-    join:         args => q(sb.rpc("join_with_code", args)),
+    join:         args => q(sb.rpc("iscrivi_con_codice", args)),
     cambiaChiave: () => q(sb.rpc("cambia_chiave")),
+    accettaPrivacy: pid => q(sb.from("partners").update({ privacy_accettata_il:new Date().toISOString() }).eq("id", pid)),
+    /* io e tutta la mia downline: la RLS restituisce solo quella */
+    struttura:    () => q(sb.from("partners").select("id,nome,sponsor_id,stato,gestore_id,creato_il").order("creato_il")),
+    aggiungi:     args => q(sb.rpc("aggiungi_partner", args)),
+    linkGestito:  pid => q(sb.rpc("link_per_gestito", { p_partner:pid })),
     stages:       () => q(sb.from("stage_requirements").select("*").order("ordine")),
     settings:     () => q(sb.from("settings").select("chiave,valore")),
     /* la settimana e il mese in corso per intero; ordini e clienti di sempre (servono alle tappe) */
@@ -65,6 +72,9 @@ const st = {
   goal: null,             // settimana: { obiettivo_contatti, obiettivo_piani, salvato }
   goalMese: null,         // mese: { obiettivo_vp, salvato }
   invito: null,           // codice dello sponsor dal link d'invito
+  invitoRiserva: null,    // l'invito lasciato per "entra con il tuo link": si può tornare indietro
+  struttura: [],          // io e la mia downline
+  linkGestito: null,      // { nome, chiave } da mandare a una persona aggiunta a mano
   sponsorNome: "",
   errore: "",
   occupato: false,
@@ -110,6 +120,11 @@ const MESSAGGI_ERRORE = {
   profilo_esistente: "Questo telefono è già collegato a un profilo: ricarica la pagina.",
   data_futura: "La data di iscrizione non può essere nel futuro.",
   qualifica_non_valida: "Qualifica non riconosciuta.",
+  percentuale_non_valida: "Percentuale non riconosciuta.",
+  posizione_non_valida: "Puoi aggiungere persone solo sotto di te o sotto qualcuno della tua struttura.",
+  nome_mancante: "Scrivi il nome della persona.",
+  non_gestito: "Questa persona usa già l'app: entra con il suo link personale.",
+  non_autorizzato: "Non puoi farlo per questa persona.",
   non_autenticato: "Sessione scaduta: apri di nuovo il tuo link personale."
 };
 function messaggio(e){
@@ -175,6 +190,8 @@ function tappaFatta(t){
 function percorso(){
   const S = st.stages;
   let fatte = st.profilo ? S.findIndex(s => s.chiave === st.profilo.qualifica_iniziale) : -1;
+  /* un pin senza qualifica Bronze: primo ordine e primi clienti sono alle spalle */
+  if(fatte < 0 && st.profilo && st.profilo.percentuale_iniziale) fatte = S.findIndex(s => s.chiave === "primi_clienti");
   while(fatte + 1 < S.length && tappaFatta(S[fatte + 1])) fatte++;
   return { raggiunta: fatte >= 0 ? S[fatte] : null, attuale: S[fatte + 1] || null, indice: fatte + 1 };
 }
@@ -241,6 +258,7 @@ async function caricaTutto(){
   st.settings = {};
   for(const r of settings || []) st.settings[r.chiave] = r.valore;
   st.att = att || [];
+  try{ await caricaStruttura(); }catch(e){ st.struttura = []; }
 
   /* nuova settimana / nuovo mese: si riparte dall'ultimo obiettivo scelto */
   const g = (goals || [])[0];
@@ -278,10 +296,13 @@ async function sessione(){
 
 async function vaiHome(profilo){
   st.profilo = profilo;
-  salvaLocale(CHIAVE_INVITO, null); st.invito = null;
+  salvaLocale(CHIAVE_INVITO, null); st.invito = null; st.invitoRiserva = null;
   await caricaTutto();
-  st.fase = "home";
+  /* chi è stato aggiunto a mano, la prima volta che entra, legge e accetta la privacy */
+  st.fase = profilo.privacy_accettata_il ? "home" : "privacy_primo";
 }
+
+async function caricaStruttura(){ st.struttura = await api.struttura() || []; }
 
 async function entraConChiave(k){
   st.fase = "avvio"; render();
@@ -338,7 +359,7 @@ let ultimoApp = "";
 function render(){
   const app = document.getElementById("app");
   const viste = { avvio:vAvvio, config:vConfig, benvenuto:vBenvenuto, chiave_errata:vChiaveErrata,
-                  ingresso:vIngresso, home:vHome, errore:vErrore };
+                  ingresso:vIngresso, privacy_primo:vPrivacyPrimo, home:vHome, errore:vErrore };
   const html = (viste[st.fase] || vAvvio)();
   if(html !== ultimoApp){ app.innerHTML = html; ultimoApp = html; }
   document.body.classList.toggle("con-azioni", st.fase === "home");
@@ -356,7 +377,7 @@ function vErrore(){
     <div class="row" style="margin-top:12px"><button class="btn primary" data-act="ricarica">Riprova</button></div></div>`;
 }
 
-function marchio(){ return `<div class="eyebrow">CumLaude21 · Growup Team</div>`; }
+function marchio(){ return `<div class="eyebrow">A&amp;S · Growup Team</div>`; }
 
 function formIncolla(){
   return `<form data-form="incolla" class="card" novalidate>
@@ -373,8 +394,9 @@ function vBenvenuto(){
     <p class="muted">Per entrare apri il tuo <b>link personale</b>: quello che ti sei salvato su WhatsApp o Telegram
       quando sei entrato la prima volta. Toccalo da lì, oppure copialo e incollalo qui sotto.</p>
     ${formIncolla()}
-    <p class="small"><b>Sei nuovo?</b> Chiedi al tuo sponsor il suo link d'invito.<br>
-      <b>Hai perso il link?</b> Chiedi a Stefano e Alessia: te ne mandano uno nuovo.</p>
+    ${st.invitoRiserva ? `<button class="btn ghost wide" data-act="torna-invito">‹ Torna all'invito${st.sponsorNome ? " di " + esc(st.sponsorNome) : ""}</button>`
+      : `<p class="small"><b>Sei nuovo?</b> Chiedi al tuo sponsor il suo link d'invito.</p>`}
+    <p class="small"><b>Hai perso il link?</b> Chiedi a Stefano e Alessia: te ne mandano uno nuovo.</p>
   </div>`;
 }
 
@@ -387,42 +409,86 @@ function vChiaveErrata(){
   </div>`;
 }
 
-function vIngresso(){
-  const opz = st.stages.map(s => `<option value="${esc(s.chiave)}">${esc(s.nome)}</option>`).join("");
-  return `<div>
-    ${marchio()}
-    <h1 style="margin-top:6px">Benvenuto in Growup</h1>
-    <p class="muted">${st.sponsorNome ? `Ti ha invitato <b>${esc(st.sponsorNome)}</b>. ` : ""}Due cose e sei dentro: servono per partire dal punto giusto del percorso.</p>
-    <form data-form="ingresso" class="card" novalidate>
-      <label class="field" style="margin-top:0"><span>Nome e cognome</span>
-        <input name="nome" autocomplete="name" required maxlength="80"></label>
-
-      <div class="field" style="margin-top:14px"><span class="small">Quando ti sei iscritto ad Amway?</span>
-        <div class="scelte">
-          <label><input type="radio" name="quando" value="dopo"> Dal 1° giugno 2026 in poi</label>
-          <label><input type="radio" name="quando" value="prima"> Prima del 1° giugno 2026</label>
-        </div></div>
-      <label class="field"><span>Data di iscrizione <i data-obbl>(obbligatoria)</i></span>
-        <input type="date" name="data" max="${oggi()}"></label>
-
-      <label class="field"><span>Qualifica più alta già raggiunta</span>
-        <select name="qualifica"><option value="">Nessuna, sto iniziando</option>${opz}</select></label>
+/* "Qualifica più alta raggiunta": Inizio, i pin (3%…21%) e le qualifiche Bronze/Argento.
+   Primo ordine e primi clienti sono tappe del percorso, non qualifiche: non si dichiarano. */
+function campiQualifica(obbligoData){
+  const qual = st.stages.filter(s => !TAPPE_DI_PERCORSO.includes(s.chiave))
+    .map(s => `<option value="${esc(s.chiave)}">${esc(s.nome)}</option>`).join("");
+  const pin = PIN.map(n => `<option value="pin:${n}">${n}%</option>`).join("");
+  return `
+      <label class="field"><span>Qualifica più alta raggiunta</span>
+        <select name="qualifica"><option value="">Inizio (nessuna qualifica)</option>
+          <optgroup label="Percentuale raggiunta">${pin}</optgroup>
+          <optgroup label="Qualifiche">${qual}</optgroup></select></label>
       <div data-mostra="pagamenti" hidden>
         <label class="field"><span>Mese della prima qualifica</span>
           <input type="month" name="mese" max="${meseDi(oggi())}"></label>
         <label class="field"><span>Pagamenti già ricevuti (su 12)</span>
           <input type="number" name="pagamenti" min="0" max="12" inputmode="numeric" value="0"></label>
       </div>
+      <label class="field"><span>Data di iscrizione ad Amway <i data-obbl>${obbligoData ? "(obbligatoria per chi inizia)" : "(facoltativa)"}</i></span>
+        <input type="date" name="data" max="${oggi()}"></label>
+      ${obbligoData ? `<p class="nota" style="margin-top:6px">Serve al conto alla rovescia dei 30 giorni per il primo ordine.</p>` : ""}`;
+}
+/* Dal modulo: { qualifica, percentuale, tappa, mese, pagamenti, data } */
+function leggiQualifica(f){
+  const v = f.qualifica.value || "";
+  const percentuale = v.startsWith("pin:") ? Number(v.slice(4)) : null;
+  const qualifica = v && !percentuale ? v : null;
+  const t = st.stages.find(s => s.chiave === qualifica);
+  const conPagamenti = !!(t && t.pagamenti_max);
+  return { qualifica, percentuale, tappa:t, data: f.data.value || null,
+    mese: conPagamenti && f.mese.value ? f.mese.value + "-01" : null,
+    pagamenti: conPagamenti ? Math.max(0, Math.min(12, Number(f.pagamenti.value) || 0)) : 0,
+    mancaMese: conPagamenti && !f.mese.value };
+}
+
+function vIngresso(){
+  return `<div>
+    ${marchio()}
+    <h1 style="margin-top:6px">Benvenuto in Growup</h1>
+    <p class="muted">${st.sponsorNome ? `Ti ha invitato <b>${esc(st.sponsorNome)}</b>. ` : ""}Due informazioni e iniziamo: servono per partire dal punto giusto del percorso.</p>
+    <form data-form="ingresso" class="card" novalidate>
+      <label class="field" style="margin-top:0"><span>Nome e cognome</span>
+        <input name="nome" autocomplete="name" required maxlength="80"></label>
+      ${campiQualifica(true)}
       <p class="nota">Il punto di partenza lo conferma poi il tuo sponsor, così i numeri del gruppo restano affidabili.</p>
 
       <label class="check"><input type="checkbox" name="privacy" required>
         <span>Ho letto l'<button type="button" class="btn link" data-act="privacy" style="min-height:0;padding:0">informativa privacy</button>
         e accetto che i miei numeri (contatti, piani, VP) siano visibili a me e alla mia upline.</span></label>
 
-      <button class="btn primary wide" style="margin-top:16px" ${st.occupato ? "disabled" : ""}>Entra</button>
+      <button class="btn primary wide" style="margin-top:16px" ${st.occupato ? "disabled" : ""}>Inizia</button>
       ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
     </form>
     <p class="small">Hai già un profilo? <button class="btn link" data-act="ho-gia">Entra con il tuo link personale</button></p>
+  </div>`;
+}
+
+function testoPrivacy(){
+  return `<div class="small stack" style="margin-top:10px">
+      <p><b>Cosa raccogliamo.</b> Nome, data di iscrizione, qualifica e i tuoi numeri: quanti contatti,
+        quanti piani, quanti VP, quanti clienti. Dei tuoi contatti e clienti registriamo <b>solo il numero</b>: nessun nome né telefono.
+        Non serve la tua email.</p>
+      <p><b>Chi li vede.</b> Tu e chi sta sopra di te nella tua organizzazione (la tua upline). Nessun altro.</p>
+      <p><b>A cosa servono.</b> A pianificare la tua settimana e a farti aiutare da chi ti segue.</p>
+      <p><b>Dove stanno.</b> In un database ospitato nell'Unione Europea (Supabase).</p>
+      <p><b>I tuoi diritti.</b> Puoi chiedere in qualsiasi momento di vedere, correggere o cancellare il tuo
+        profilo e tutti i tuoi dati: scrivi a Stefano e Alessia (A&amp;S).</p>
+    </div>`;
+}
+
+function vPrivacyPrimo(){
+  return `<div>
+    ${marchio()}
+    <h1 style="margin-top:6px">Ciao ${esc(nomeSaluto(st.profilo.nome))}</h1>
+    <p class="muted">Il tuo profilo è già pronto: l'ha preparato chi ti segue. Prima di iniziare, leggi come usiamo i tuoi dati.</p>
+    <form data-form="privacy-primo" class="card" novalidate>
+      ${testoPrivacy()}
+      <label class="check"><input type="checkbox" name="privacy" required>
+        <span>Ho letto e accetto che i miei numeri siano visibili a me e alla mia upline.</span></label>
+      <button class="btn primary wide" style="margin-top:16px">Inizia</button>
+    </form>
   </div>`;
 }
 
@@ -439,6 +505,7 @@ function vHome(){
   ${vSettimana()}
   ${vMese()}
   ${vOggi()}
+  ${vStruttura()}
   ${vInvita()}`;
 }
 
@@ -495,7 +562,8 @@ function vTappa(){
   const nelMese = Number(attuale.vp_personali) > 0 && attuale.chiave !== "primo_ordine";
   return `<div class="card">
     <div class="spread"><span class="eyebrow">Tappa ${indice + 1} di ${st.stages.length}</span>
-      ${raggiunta ? `<span class="pill v">✓ ${esc(raggiunta.nome)}</span>` : ""}</div>
+      <span class="row" style="gap:6px">${st.profilo.percentuale_iniziale ? `<span class="pill s">${st.profilo.percentuale_iniziale}% raggiunto</span>` : ""}
+      ${raggiunta ? `<span class="pill v">✓ ${esc(raggiunta.nome)}</span>` : ""}</span></div>
     <h2 style="margin-top:4px">${esc(attuale.nome)}</h2>
     ${attuale.guadagno_mese ? `<p class="small" style="margin:2px 0 0">Circa ${euro(attuale.guadagno_mese)} al mese* con ${esc(attuale.struttura_calcolo || "")}</p>` : ""}
     ${scadenza}
@@ -563,9 +631,32 @@ function vOggi(){
   </div>`;
 }
 
+/* ---- La mia struttura: albero di chi sta sotto di me ---- */
+function figli(id){ return st.struttura.filter(p => p.sponsor_id === id); }
+/* [{ p, livello }] in ordine di albero, me escluso */
+function alberoSotto(id, livello, out){
+  out = out || [];
+  for(const p of figli(id)){ out.push({ p, livello }); alberoSotto(p.id, livello + 1, out); }
+  return out;
+}
+function vStruttura(){
+  const righe = alberoSotto(st.profilo.id, 0);
+  return `<div class="card">
+    <div class="spread"><span class="eyebrow">La mia struttura</span>
+      <button class="btn small" data-act="aggiungi">+ Aggiungi persona</button></div>
+    ${righe.length ? `<ul class="albero">${righe.map(({ p, livello }) => `<li style="padding-left:${Math.min(livello, 6) * 18}px">
+      <span class="grow">${livello ? `<span class="faint">└ </span>` : ""}${esc(p.nome)}</span>
+      ${p.stato === "gestito"
+        ? `<span class="pill">senza app</span><button class="btn link small" data-act="manda-link" data-id="${esc(p.id)}">Manda il link</button>`
+        : `<span class="pill v">usa l'app</span>`}</li>`).join("")}</ul>`
+      : `<p class="muted" style="margin:8px 0 0">Ancora nessuno sotto di te. Invita chi usa il telefono con il link qui sotto,
+          oppure aggiungi a mano chi non usa l'app.</p>`}
+  </div>`;
+}
+
 function testoInvito(){
   return `Ciao! Ti mando Growup, l'app del nostro gruppo per pianificare la settimana e seguire il percorso fino ad Argento. `
-       + `Apri il link e sei dentro, non serve nessuna registrazione:`;
+       + `Apri il link e inizi subito, non serve nessuna registrazione:`;
 }
 function vInvita(){
   return `<div class="card">
@@ -635,17 +726,39 @@ function vSheet(){
     </div>
     <p class="nota">Crea un link nuovo se pensi che il tuo sia finito a qualcun altro: quello vecchio smette di funzionare
       e gli altri telefoni dovranno rientrare con il nuovo.</p>`;
-  if(s === "privacy") return `<h2>Informativa privacy (breve)</h2>
-    <div class="small stack" style="margin-top:10px">
-      <p><b>Cosa raccogliamo.</b> Nome, data di iscrizione, qualifica e i tuoi numeri: quanti contatti,
-        quanti piani, quanti VP, quanti clienti. Dei tuoi contatti e clienti registriamo <b>solo il numero</b>: nessun nome né telefono.
-        Non serve la tua email.</p>
-      <p><b>Chi li vede.</b> Tu e chi sta sopra di te nella tua organizzazione (la tua upline). Nessun altro.</p>
-      <p><b>A cosa servono.</b> A pianificare la tua settimana e a farti aiutare da chi ti segue.</p>
-      <p><b>Dove stanno.</b> In un database ospitato nell'Unione Europea (Supabase).</p>
-      <p><b>I tuoi diritti.</b> Puoi chiedere in qualsiasi momento di vedere, correggere o cancellare il tuo
-        profilo e tutti i tuoi dati: scrivi a Stefano e Alessia (CumLaude21).</p>
+  if(s === "aggiungi"){
+    const posti = [`<option value="${esc(st.profilo.id)}">Sotto di me</option>`]
+      .concat(alberoSotto(st.profilo.id, 1).map(({ p, livello }) =>
+        `<option value="${esc(p.id)}">${"— ".repeat(livello)}sotto ${esc(p.nome)}</option>`)).join("");
+    return `<h2>Aggiungi una persona</h2>
+    <p class="small">Per chi non usa l'app. Se un giorno vorrà usarla, le mandi il suo link e troverà già il suo profilo.</p>
+    <form data-form="aggiungi" novalidate>
+      <label class="field"><span>Nome e cognome</span><input name="nome" autocomplete="off" maxlength="80" required></label>
+      <label class="field"><span>Dove la metti nella struttura?</span><select name="sponsor">${posti}</select></label>
+      ${campiQualifica(false)}
+      <label class="check"><input type="checkbox" name="consenso" required>
+        <span>Ho il suo consenso (a voce o per messaggio) a inserire il suo nome e i suoi numeri nell'app.</span></label>
+      ${piede}${err}
+    </form>`;
+  }
+  if(s === "link-gestito"){
+    const g = st.linkGestito, link = base() + "#chiave=" + g.chiave;
+    const testo = `Ciao ${nomeSaluto(g.nome)}! Ti ho preparato il profilo su Growup, l'app del nostro gruppo. `
+      + `Apri questo link: è la tua chiave personale, salvala nella chat con te stesso e non inoltrarla.`;
+    return `<h2>Il link di ${esc(g.nome)}</h2>
+    <p class="small">Mandalo <b>a ${esc(nomeSaluto(g.nome))}</b>: aprendolo entra nell'app e trova il suo profilo già pronto.
+      Da quel momento i suoi dati li aggiorna lui.</p>
+    <div class="condividi">
+      <a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(testo + " " + link)}">WhatsApp</a>
+      <a class="btn tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(testo)}">Telegram</a>
+      <button class="btn" data-act="copia-gestito">Copia link</button>
     </div>
+    <div class="linkbox">${esc(link)}</div>
+    <p class="nota">Se crei un altro link per ${esc(nomeSaluto(g.nome))}, questo smette di funzionare.</p>
+    <button class="btn wide ghost" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
+  }
+  if(s === "privacy") return `<h2>Informativa privacy (breve)</h2>
+    ${testoPrivacy()}
     <button class="btn wide" style="margin-top:14px" data-act="chiudi">Ho capito</button>`;
   return "";
 }
@@ -702,7 +815,16 @@ const AZIONI = {
   "mia-chiave"(){ st.sheet = "mia-chiave"; render(); },
   privacy(){ st.sheet = "privacy"; render(); },
   chiudi(){ st.sheet = null; render(); },
-  "ho-gia"(){ salvaLocale(CHIAVE_INVITO, null); st.invito = null; st.fase = "benvenuto"; render(); },
+  "ho-gia"(){ st.invitoRiserva = st.invito; st.invito = null; st.fase = "benvenuto"; render(); },
+  "torna-invito"(){ st.invito = st.invitoRiserva; st.invitoRiserva = null; st.fase = "ingresso"; render(); },
+  aggiungi(){ st.errore = ""; st.sheet = "aggiungi"; render(); },
+  async "manda-link"(el){
+    const p = st.struttura.find(x => x.id === el.dataset.id);
+    if(!p) return;
+    try{ st.linkGestito = { nome:p.nome, chiave: await api.linkGestito(p.id) }; st.sheet = "link-gestito"; render(); }
+    catch(e){ toast(messaggio(e)); }
+  },
+  "copia-gestito"(){ copiaTesto(base() + "#chiave=" + st.linkGestito.chiave, "Link copiato"); },
   "chiave-salvata"(){ salvaLocale(CHIAVE_SALVATA, "1"); render(); toast("Perfetto: ora puoi entrare da qualsiasi telefono"); },
   async "conferma-obiettivi"(){
     try{
@@ -753,29 +875,51 @@ const MODULI = {
     if(l.chiave){ await entraConChiave(l.chiave); return; }
     await apriInvito(l.invito); render();
   },
+  async "privacy-primo"(f){
+    if(!f.privacy.checked){ mostraErroreForm(f, "Per iniziare serve accettare l'informativa privacy."); return; }
+    try{
+      await api.accettaPrivacy(st.profilo.id);
+      st.profilo.privacy_accettata_il = new Date().toISOString();
+      st.fase = "home"; render();
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async aggiungi(f){
+    const nome = f.nome.value.trim();
+    const q = leggiQualifica(f);
+    let err = "";
+    if(!nome) err = "Scrivi il nome della persona.";
+    else if(q.data && q.data > oggi()) err = "La data di iscrizione non può essere nel futuro.";
+    else if(q.mancaMese) err = "Indica il mese della prima qualifica.";
+    else if(!f.consenso.checked) err = "Serve il suo consenso per inserirla nell'app.";
+    if(err){ mostraErroreForm(f, err); return; }
+    const sotto = st.struttura.find(p => p.id === f.sponsor.value);
+    st.occupato = true;
+    try{
+      await api.aggiungi({ p_nome:nome, p_sponsor:f.sponsor.value, p_data_iscrizione:q.data, p_qualifica:q.qualifica,
+        p_percentuale:q.percentuale, p_qualifica_mese:q.mese, p_pagamenti:q.pagamenti });
+      await caricaStruttura();
+      st.sheet = null; render();
+      toast(`${nome} aggiunto ${sotto && sotto.id !== st.profilo.id ? "sotto " + sotto.nome : "sotto di te"}`);
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+    st.occupato = false;
+  },
   async ingresso(f){
     const nome = f.nome.value.trim();
-    const quando = (f.querySelector("input[name=quando]:checked") || {}).value;
-    const data = f.data.value || null;
-    const qual = f.qualifica.value || null;
-    const t = st.stages.find(s => s.chiave === qual);
+    const q = leggiQualifica(f);
+    const data = q.data, qual = q.qualifica, t = q.tappa;
     let err = "";
     if(!nome) err = "Scrivi il tuo nome.";
-    else if(!quando) err = "Dicci quando ti sei iscritto.";
-    else if(quando === "dopo" && !data) err = "Serve la data di iscrizione: fa partire il conto alla rovescia del primo ordine.";
-    else if(quando === "dopo" && data < INIZIO_NUOVE_ISCRIZIONI) err = "Hai scelto «dal 1° giugno 2026»: la data deve essere da quel giorno in poi.";
-    else if(quando === "prima" && data && data >= INIZIO_NUOVE_ISCRIZIONI) err = "Hai scelto «prima del 1° giugno 2026»: controlla la data.";
+    else if(!qual && !q.percentuale && !data) err = "Se stai iniziando serve la data di iscrizione: fa partire il conto alla rovescia del primo ordine.";
     else if(data && data > oggi()) err = "La data di iscrizione non può essere nel futuro.";
-    else if(t && t.pagamenti_max && !f.mese.value) err = "Indica il mese della prima qualifica.";
-    else if(!f.privacy.checked) err = "Per entrare serve accettare l'informativa privacy.";
+    else if(q.mancaMese) err = "Indica il mese della prima qualifica.";
+    else if(!f.privacy.checked) err = "Per iniziare serve accettare l'informativa privacy.";
     if(err){ mostraErroreForm(f, err); return; }
     st.occupato = true; f.querySelector("button.primary").disabled = true;
     try{
       await sessione();
       const r = await api.join({
         p_codice: st.invito, p_nome: nome, p_data_iscrizione: data, p_qualifica: qual,
-        p_qualifica_mese: t && t.pagamenti_max && f.mese.value ? f.mese.value + "-01" : null,
-        p_pagamenti: t && t.pagamenti_max ? Math.max(0, Math.min(12, Number(f.pagamenti.value) || 0)) : 0
+        p_qualifica_mese: q.mese, p_pagamenti: q.pagamenti, p_percentuale: q.percentuale
       });
       ricordaChiave(r.chiave);
       salvaLocale(CHIAVE_SALVATA, null);
@@ -831,14 +975,21 @@ document.addEventListener("submit", e => {
   if(fn) fn(f);
 });
 
+/* Qualifica scelta: mostra mese e pagamenti per Foundation e Builder; la data di iscrizione
+   è obbligatoria solo per chi inizia (nel modulo d'ingresso). */
 document.addEventListener("change", e => {
-  const f = e.target.closest("form[data-form=ingresso]");
-  if(!f) return;
-  const quando = (f.querySelector("input[name=quando]:checked") || {}).value;
-  const obbl = f.querySelector("[data-obbl]");
-  if(obbl) obbl.textContent = quando === "prima" ? "(facoltativa)" : "(obbligatoria)";
+  if(e.target.name !== "qualifica") return;
+  const f = e.target.form;
   const t = st.stages.find(s => s.chiave === f.qualifica.value);
   f.querySelector("[data-mostra=pagamenti]").hidden = !(t && t.pagamenti_max);
+  const obbl = f.querySelector("[data-obbl]");
+  if(obbl && f.dataset.form === "ingresso") obbl.textContent = f.qualifica.value ? "(facoltativa)" : "(obbligatoria per chi inizia)";
+});
+
+/* Appena si corregge un campo, l'errore del modulo sparisce. */
+document.addEventListener("input", e => {
+  const err = e.target.form && e.target.form.querySelector(".errore");
+  if(err) err.remove();
 });
 
 document.addEventListener("keydown", e => {

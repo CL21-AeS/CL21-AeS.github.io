@@ -97,9 +97,11 @@ create table public.partners (
   gestore_id               uuid references public.partners(id),
   data_iscrizione          date check (data_iscrizione between date '2000-01-01' and date '2100-01-01'),
   qualifica_iniziale       text references public.stage_requirements(chiave),
+  percentuale_iniziale     int check (percentuale_iniziale in (3, 6, 9, 12, 15, 18, 21)),  -- pin raggiunto anche senza qualifica Bronze
   qualifica_iniziale_mese  date,               -- primo giorno del mese della prima qualifica
   pagamenti_iniziali       int not null default 0 check (pagamenti_iniziali between 0 and 12),
   privacy_accettata_il     timestamptz,
+  consenso_confermato_il   timestamptz,        -- per chi è aggiunto a mano: lo sponsor conferma di avere il consenso
   is_admin                 boolean not null default false,
   ultimo_aggiornamento     timestamptz,
   creato_da                uuid references public.partners(id),
@@ -254,13 +256,14 @@ $$;
 
 -- Primo accesso dal link dello sponsor: crea il profilo agganciato a lui e
 -- restituisce, UNA volta sola, la chiave del link personale.
-create or replace function public.join_with_code(
+create or replace function public.iscrivi_con_codice(
   p_codice             text,
   p_nome               text,
   p_data_iscrizione    date,
   p_qualifica          text default null,
   p_qualifica_mese     date default null,
-  p_pagamenti          int  default 0
+  p_pagamenti          int  default 0,
+  p_percentuale        int  default null
 )
 returns jsonb
 language plpgsql
@@ -293,12 +296,15 @@ begin
      and not exists (select 1 from public.stage_requirements s where s.chiave = p_qualifica) then
     raise exception 'qualifica_non_valida';
   end if;
+  if p_percentuale is not null and p_percentuale not in (3, 6, 9, 12, 15, 18, 21) then
+    raise exception 'percentuale_non_valida';
+  end if;
 
   insert into public.partners (nome, sponsor_id, stato, chiave_hash, data_iscrizione,
-                               qualifica_iniziale, qualifica_iniziale_mese, pagamenti_iniziali,
+                               qualifica_iniziale, percentuale_iniziale, qualifica_iniziale_mese, pagamenti_iniziali,
                                privacy_accettata_il, ultimo_aggiornamento)
   values (btrim(p_nome), sponsor, 'attivo', public.impronta(chiave), p_data_iscrizione,
-          p_qualifica, date_trunc('month', p_qualifica_mese)::date, coalesce(p_pagamenti, 0),
+          p_qualifica, p_percentuale, date_trunc('month', p_qualifica_mese)::date, coalesce(p_pagamenti, 0),
           now(), now())
   returning * into p;
 
@@ -306,6 +312,89 @@ begin
   insert into public.accessi (user_id, partner_id) values (uid, p.id);
 
   return jsonb_build_object('profilo', to_jsonb(p) - 'chiave_hash', 'chiave', chiave);
+end;
+$$;
+
+-- Aggiungere a mano una persona che non usa l'app, sotto di me o sotto chiunque della mia
+-- downline. Diventa "gestita": chi la inserisce ne è il gestore. Chi la inserisce conferma
+-- di avere il suo consenso (a voce o per messaggio).
+create or replace function public.aggiungi_partner(
+  p_nome               text,
+  p_sponsor            uuid,
+  p_data_iscrizione    date default null,
+  p_qualifica          text default null,
+  p_percentuale        int  default null,
+  p_qualifica_mese     date default null,
+  p_pagamenti          int  default 0
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  io uuid := public.my_partner_id();
+  p  public.partners;
+begin
+  if io is null then
+    raise exception 'non_autenticato';
+  end if;
+  if p_sponsor is null or not public.is_in_downline(p_sponsor) then
+    raise exception 'posizione_non_valida';
+  end if;
+  if length(btrim(coalesce(p_nome, ''))) = 0 then
+    raise exception 'nome_mancante';
+  end if;
+  if p_data_iscrizione is not null and p_data_iscrizione > (now() at time zone 'Europe/Rome')::date then
+    raise exception 'data_futura';
+  end if;
+  if p_qualifica is not null
+     and not exists (select 1 from public.stage_requirements s where s.chiave = p_qualifica) then
+    raise exception 'qualifica_non_valida';
+  end if;
+  if p_percentuale is not null and p_percentuale not in (3, 6, 9, 12, 15, 18, 21) then
+    raise exception 'percentuale_non_valida';
+  end if;
+
+  insert into public.partners (nome, sponsor_id, stato, gestore_id, data_iscrizione,
+                               qualifica_iniziale, percentuale_iniziale, qualifica_iniziale_mese,
+                               pagamenti_iniziali, consenso_confermato_il, creato_da)
+  values (btrim(p_nome), p_sponsor, 'gestito', io, p_data_iscrizione,
+          p_qualifica, p_percentuale, date_trunc('month', p_qualifica_mese)::date,
+          coalesce(p_pagamenti, 0), now(), io)
+  returning * into p;
+  return to_jsonb(p) - 'chiave_hash';
+end;
+$$;
+
+-- Il link personale per una persona aggiunta a mano, da mandarle su WhatsApp o Telegram
+-- quando vuole iniziare a usare l'app: aprendolo prende possesso del suo profilo.
+-- Lo genera il suo gestore o chiunque le stia sopra. Solo per chi non ha mai usato l'app.
+create or replace function public.link_per_gestito(p_partner uuid)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  io     uuid := public.my_partner_id();
+  t      public.partners;
+  chiave text := public.nuova_chiave_segreta();
+begin
+  if io is null then
+    raise exception 'non_autenticato';
+  end if;
+  select * into t from public.partners where id = p_partner;
+  if not found or t.stato <> 'gestito' then
+    raise exception 'non_gestito';
+  end if;
+  if not (t.gestore_id = io or (t.id <> io and public.is_in_downline(t.id))) then
+    raise exception 'non_autorizzato';
+  end if;
+  update public.partners set chiave_hash = public.impronta(chiave) where id = p_partner;
+  return chiave;
 end;
 $$;
 
@@ -446,7 +535,7 @@ for each row execute function public.obiettivi_mese_prima();
 -- Il repository è pubblico e la chiave pubblica di Supabase sta nel codice:
 -- è sicura SOLO perché ogni tabella qui sotto ha la RLS attiva.
 -- Gli accessi anonimi di Supabase hanno il ruolo "authenticated": vedono qualcosa
--- solo dopo che entra_con_chiave o join_with_code li ha collegati a un profilo.
+-- solo dopo che entra_con_chiave o iscrivi_con_codice li ha collegati a un profilo.
 -- ============================================================
 
 alter table public.partners           enable row level security;
@@ -468,10 +557,10 @@ grant insert, update, delete on public.stage_requirements, public.settings to au
 -- Sul profilo si possono cambiare solo i campi propri: sponsor, stato, gestore,
 -- chiave, admin e codice d'invito non si toccano dal telefono.
 grant select (id, nome, email, sponsor_id, codice_invito, stato, gestore_id, data_iscrizione,
-              qualifica_iniziale, qualifica_iniziale_mese, pagamenti_iniziali, privacy_accettata_il,
-              is_admin, ultimo_aggiornamento, creato_da, creato_il)
+              qualifica_iniziale, percentuale_iniziale, qualifica_iniziale_mese, pagamenti_iniziali,
+              privacy_accettata_il, consenso_confermato_il, is_admin, ultimo_aggiornamento, creato_da, creato_il)
   on public.partners to authenticated;                      -- chiave_hash resta fuori
-grant update (nome, email, data_iscrizione, qualifica_iniziale, qualifica_iniziale_mese,
+grant update (nome, email, data_iscrizione, qualifica_iniziale, percentuale_iniziale, qualifica_iniziale_mese,
               pagamenti_iniziali, privacy_accettata_il)
   on public.partners to authenticated;
 
@@ -492,7 +581,8 @@ grant update (partner_id, mese, obiettivo_vp) on public.monthly_goals to authent
 
 revoke execute on function public.my_partner_id(), public.is_in_downline(uuid), public.sono_admin(),
   public.collega_profilo(), public.entra_con_chiave(text),
-  public.join_with_code(text, text, date, text, date, int),
+  public.iscrivi_con_codice(text, text, date, text, date, int, int),
+  public.aggiungi_partner(text, uuid, date, text, int, date, int), public.link_per_gestito(uuid),
   public.cambia_chiave(), public.nuova_chiave_per(uuid),
   public.sponsor_da_codice(text), public.nuovo_codice(), public.nuova_chiave_segreta(), public.impronta(text)
   from public, anon, authenticated;
@@ -505,7 +595,8 @@ revoke execute on function public.attivita_prima(), public.attivita_dopo(),
 grant execute on function public.sponsor_da_codice(text) to anon, authenticated;
 grant execute on function public.my_partner_id(), public.is_in_downline(uuid), public.sono_admin(),
   public.collega_profilo(), public.entra_con_chiave(text),
-  public.join_with_code(text, text, date, text, date, int),
+  public.iscrivi_con_codice(text, text, date, text, date, int, int),
+  public.aggiungi_partner(text, uuid, date, text, int, date, int), public.link_per_gestito(uuid),
   public.cambia_chiave(), public.nuova_chiave_per(uuid)
   to authenticated;
 
@@ -519,7 +610,7 @@ create policy partners_modifico_me on public.partners
   for update to authenticated
   using (id = public.my_partner_id())
   with check (id = public.my_partner_id());
--- Nessuna policy di insert/delete: il profilo nasce solo da join_with_code.
+-- Nessuna policy di insert/delete: il profilo nasce solo da iscrivi_con_codice.
 
 -- ---- activities: scrivo solo le mie; leggo le mie e quelle della mia downline ----
 
@@ -600,8 +691,8 @@ values
    3, null, null, null, null,
    null, null, 'I primi 3 clienti, in totale e non nello stesso mese: chi si iscrive il 29 non ha il tempo di farli in due giorni'),
   (3, 'path_to_bronze','Path to Bronze',          null, 100, null, 3, 100, null,
-   null, null, date '2026-06-01', null, null,
-   150, '100 VP personali + 3 linee da 100 VP', '3 nuove prime linee da almeno 100 VP ciascuna, più 100 VP personali'),
+   null, null, null, null, null,
+   150, '100 VP personali + 3 linee da 100 VP', '3 prime linee da almeno 100 VP ciascuna, più 100 VP personali'),
   (4, 'foundation_9',  'Bronze Foundation 9%',      9, 100, 1200, 3, 200, null,
    null, null, null, 12, 18,
    360, '100 VP personali + 3 linee da 400 VP', '1.200 VP di gruppo, 3 linee frontali da almeno 200 VP, 100 VP personali'),
