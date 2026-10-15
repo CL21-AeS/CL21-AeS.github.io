@@ -41,7 +41,10 @@ function creaApi(){
     cambiaChiave: () => q(sb.rpc("cambia_chiave")),
     accettaPrivacy: pid => q(sb.from("partners").update({ privacy_accettata_il:new Date().toISOString() }).eq("id", pid)),
     /* io e tutta la mia downline: la RLS restituisce solo quella */
-    struttura:    () => q(sb.from("partners").select("id,nome,sponsor_id,stato,gestore_id,creato_il").order("creato_il")),
+    struttura:    () => q(sb.from("partners").select("id,nome,sponsor_id,stato,gestore_id,creato_il,ultimo_aggiornamento,"
+                    + "qualifica_iniziale,percentuale_iniziale,qualifica_iniziale_mese,pagamenti_iniziali,partenza_confermata_il").order("creato_il")),
+    conferma:     args => q(sb.rpc("conferma_partenza", args)),
+    nuovaChiavePer: pid => q(sb.rpc("nuova_chiave_per", { p_partner:pid })),
     aggiungi:     args => q(sb.rpc("aggiungi_partner", args)),
     linkGestito:  pid => q(sb.rpc("link_per_gestito", { p_partner:pid })),
     stages:       () => q(sb.from("stage_requirements").select("*").order("ordine")),
@@ -83,7 +86,11 @@ const st = {
   riepPrec: [],           // lo stesso per il mese precedente, finché non è chiuso
   storico: [],            // i miei mesi chiusi (monthly_totals)
   livelli: [],            // soglie delle percentuali
-  vista: "io",            // pagina della home: "io" (settimana, mese, percorso) o "gruppo" (struttura, inviti)
+  vista: "io",            // pagina della home: "io", "gruppo" (struttura, inviti) o "scheda" (un partner)
+  schedaId: null,         // partner aperto nella scheda
+  attScheda: [],          // le sue attività (mese aperto)
+  target: null,           // per chi sto registrando: null = io; un id = partner senza app che gestisco
+  confermaId: null,       // partner di cui confermo il punto di partenza
   sponsorNome: "",
   errore: "",
   occupato: false,
@@ -173,7 +180,11 @@ function perMese(lista, campo){
 }
 /* I VP: ordini più le correzioni fatte con "Aggiorna il totale del mese" (anche negative). */
 function movimentiVp(){ return st.att.filter(a => a.tipo === "ordine" || a.tipo === "rettifica"); }
-function vpMese(m){ return somma(movimentiVp().filter(a => meseDi(a.data) === m), "vp"); }
+function vpMese(m, lista){
+  return somma((lista || st.att).filter(a => (a.tipo === "ordine" || a.tipo === "rettifica") && meseDi(a.data) === m), "vp");
+}
+/* Le attività su cui sto lavorando: le mie, o quelle del partner senza app aperto nella scheda */
+function lista(){ return st.target ? st.attScheda : st.att; }
 function clientiMese(m){ return somma(attivita("cliente").filter(a => meseDi(a.data) === m), "quantita"); }
 function clientiTotali(){ return somma(attivita("cliente"), "quantita"); }
 
@@ -488,24 +499,32 @@ function vChiaveErrata(){
 
 /* "Qualifica più alta raggiunta": Inizio, i pin (3%…21%) e le qualifiche Bronze/Argento.
    Primo ordine e primi clienti sono tappe del percorso, non qualifiche: non si dichiarano. */
-function campiQualifica(obbligoData){
+function campiQualifica(obbligoData, scelta){
+  scelta = scelta || {};
+  const sel = v => v === (scelta.valore || "") ? " selected" : "";
   const qual = st.stages.filter(s => !TAPPE_DI_PERCORSO.includes(s.chiave))
-    .map(s => `<option value="${esc(s.chiave)}">${esc(s.nome)}</option>`).join("");
-  const pin = PIN.map(n => `<option value="pin:${n}">${n}%</option>`).join("");
+    .map(s => `<option value="${esc(s.chiave)}"${sel(s.chiave)}>${esc(s.nome)}</option>`).join("");
+  const pin = PIN.map(n => `<option value="pin:${n}"${sel("pin:" + n)}>${n}%</option>`).join("");
+  const tappa = st.stages.find(s => s.chiave === scelta.valore);
   return `
       <label class="field"><span>Qualifica più alta raggiunta</span>
-        <select name="qualifica"><option value="">Inizio (nessuna qualifica)</option>
+        <select name="qualifica"><option value=""${sel("")}>Inizio (nessuna qualifica)</option>
           <optgroup label="Percentuale raggiunta">${pin}</optgroup>
           <optgroup label="Qualifiche">${qual}</optgroup></select></label>
-      <div data-mostra="pagamenti" hidden>
+      <div data-mostra="pagamenti" ${tappa && tappa.pagamenti_max ? "" : "hidden"}>
         <label class="field"><span>Mese della prima qualifica</span>
-          <input type="month" name="mese" max="${meseDi(oggi())}"></label>
+          <input type="month" name="mese" max="${meseDi(oggi())}" value="${esc(scelta.mese || "")}"></label>
         <label class="field"><span>Pagamenti già ricevuti (su 12)</span>
-          <input type="number" name="pagamenti" min="0" max="12" inputmode="numeric" value="0"></label>
+          <input type="number" name="pagamenti" min="0" max="12" inputmode="numeric" value="${Number(scelta.pagamenti) || 0}"></label>
       </div>
-      <label class="field"><span>Data di iscrizione ad Amway <i data-obbl>${obbligoData ? "(obbligatoria per chi inizia)" : "(facoltativa)"}</i></span>
-        <input type="date" name="data" max="${oggi()}"></label>
+      ${scelta.senzaData ? "" : `<label class="field"><span>Data di iscrizione ad Amway <i data-obbl>${obbligoData ? "(obbligatoria per chi inizia)" : "(facoltativa)"}</i></span>
+        <input type="date" name="data" max="${oggi()}"></label>`}
       ${obbligoData ? `<p class="nota" style="margin-top:6px">Serve al conto alla rovescia dei 30 giorni per il primo ordine.</p>` : ""}`;
+}
+function valoreQualifica(p){ return p.qualifica_iniziale || (p.percentuale_iniziale ? "pin:" + p.percentuale_iniziale : ""); }
+function testoPartenza(p){
+  const t = st.stages.find(x => x.chiave === p.qualifica_iniziale);
+  return [t ? t.nome : "", p.percentuale_iniziale ? p.percentuale_iniziale + "%" : ""].filter(Boolean).join(" · ") || "Inizio";
 }
 /* Dal modulo: { qualifica, percentuale, tappa, mese, pagamenti, data } */
 function leggiQualifica(f){
@@ -514,7 +533,7 @@ function leggiQualifica(f){
   const qualifica = v && !percentuale ? v : null;
   const t = st.stages.find(s => s.chiave === qualifica);
   const conPagamenti = !!(t && t.pagamenti_max);
-  return { qualifica, percentuale, tappa:t, data: f.data.value || null,
+  return { qualifica, percentuale, tappa:t, data: f.data ? f.data.value || null : null,
     mese: conPagamenti && f.mese.value ? f.mese.value + "-01" : null,
     pagamenti: conPagamenti ? Math.max(0, Math.min(12, Number(f.pagamenti.value) || 0)) : 0,
     mancaMese: conPagamenti && !f.mese.value };
@@ -573,7 +592,7 @@ function vPrivacyPrimo(){
 function vSelettore(){
   return `<div class="schede" role="tablist" aria-label="Pagina">
     <button role="tab" aria-selected="${st.vista === "io"}" class="${st.vista === "io" ? "on" : ""}" data-act="vista-io">Io</button>
-    <button role="tab" aria-selected="${st.vista === "gruppo"}" class="${st.vista === "gruppo" ? "on" : ""}" data-act="vista-gruppo">Gruppo</button>
+    <button role="tab" aria-selected="${st.vista !== "io"}" class="${st.vista !== "io" ? "on" : ""}" data-act="vista-gruppo">Gruppo</button>
   </div>`;
 }
 
@@ -592,15 +611,16 @@ function vFondo(){
 
 function vHome(){
   const p = st.profilo;
-  const gruppo = st.vista === "gruppo";
+  const gruppo = st.vista === "gruppo" || st.vista === "scheda";
   const persone = alberoSotto(p.id, 0).length;
   return `
   <div class="testata">
-    <div>${marchio()}<h1>${gruppo ? "Il mio gruppo" : `Ciao ${esc(nomeSaluto(p.nome))}`}</h1>
-      ${gruppo ? `<p class="small" style="margin:0">${persone === 1 ? "1 persona" : `${num(persone)} persone`}</p>` : ""}</div>
+    <div>${marchio()}<h1>${st.vista === "scheda" ? "Scheda partner" : gruppo ? "Il mio gruppo" : `Ciao ${esc(nomeSaluto(p.nome))}`}</h1>
+      ${st.vista === "gruppo" ? `<p class="small" style="margin:0">${persone === 1 ? "1 persona" : `${num(persone)} persone`}</p>` : ""}</div>
     ${vSelettore()}
   </div>
-  ${gruppo ? `
+  ${st.vista === "scheda" ? vScheda() : gruppo ? `
+  ${vDaConfermare()}
   ${vStruttura()}
   ${vInvita()}` : `
   ${leggiLocale(CHIAVE_SALVATA) === "1" || !st.chiave ? "" : vSalvaChiave()}
@@ -798,19 +818,98 @@ function alberoSotto(id, livello, out){
   for(const p of figli(id)){ out.push({ p, livello }); alberoSotto(p.id, livello + 1, out); }
   return out;
 }
+/* attivo / rallenta / fermo: giorni dall'ultimo aggiornamento fatto dal partner stesso (7 e 14) */
+function statoDi(p){
+  if(p.stato === "gestito") return { txt:"senza app", cl:"" };
+  const g = giorniTra(String(p.ultimo_aggiornamento || p.creato_il || oggi()).slice(0, 10), oggi());
+  return g <= 7 ? { txt:"attivo", cl:"v", g } : g <= 14 ? { txt:"rallenta", cl:"g", g } : { txt:"fermo", cl:"r", g };
+}
 function vStruttura(){
   const righe = alberoSotto(st.profilo.id, 0);
   return `<div class="card">
     <div class="spread"><span class="eyebrow">La mia struttura</span>
       <button class="btn small" data-act="aggiungi">+ Aggiungi persona</button></div>
-    ${righe.length ? `<ul class="albero">${righe.map(({ p, livello }) => `<li style="padding-left:${Math.min(livello, 6) * 18}px">
-      <span class="grow">${livello ? `<span class="faint">└ </span>` : ""}${esc(p.nome)}</span>
-      ${p.stato === "gestito"
-        ? `<span class="pill">senza app</span><button class="btn link small" data-act="manda-link" data-id="${esc(p.id)}">Manda il link</button>`
-        : `<span class="pill v">usa l'app</span>`}</li>`).join("")}</ul>`
+    ${righe.length ? `<ul class="albero">${righe.map(({ p, livello }) => {
+      const r = rigaDi(st.riep, p.id) || {}, sp = statoDi(p);
+      return `<li style="padding-left:${Math.min(livello, 6) * 16}px">
+      <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}">
+        <span>${livello ? `<span class="faint">└ </span>` : ""}${esc(p.nome)}</span>
+        <span class="small">${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${r.linee_attive ? ` · ${r.linee_attive} ${r.linee_attive === 1 ? "linea" : "linee"}` : ""}</span>
+      </button>
+      ${p.partenza_confermata_il ? "" : `<span class="pill g" title="Punto di partenza da confermare">!</span>`}
+      <span class="pill ${sp.cl}">${sp.txt}</span></li>`; }).join("")}</ul>
+      <p class="nota">Tocca un nome per aprire la sua scheda. VP del mese e VP di gruppo.</p>`
       : `<p class="muted" style="margin:8px 0 0">Ancora nessuno nel tuo gruppo. Invita chi usa il telefono con il link qui sotto,
           oppure aggiungi a mano chi non usa l'app.</p>`}
   </div>`;
+}
+
+function vDaConfermare(){
+  const l = alberoSotto(st.profilo.id, 0).map(x => x.p).filter(p => !p.partenza_confermata_il);
+  if(!l.length) return "";
+  return `<div class="card" style="border-color:var(--giallo)">
+    <span class="eyebrow">Da confermare</span>
+    <p class="small" style="margin:4px 0 0">Il punto di partenza che hanno dichiarato entrando. Confermalo o correggilo:
+      così i numeri del gruppo restano affidabili.</p>
+    <ul class="albero">${l.map(p => `<li><span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${esc(testoPartenza(p))}</span></span>
+      <button class="btn small" data-act="conferma" data-id="${esc(p.id)}">Conferma</button></li>`).join("")}</ul>
+  </div>`;
+}
+
+/* ---- Scheda partner ---- */
+function inseritoDa(a, p){
+  if(!a.inserito_da || a.inserito_da === p.id) return "";
+  if(a.inserito_da === st.profilo.id) return "inserito da te";
+  const n = nomeDi(a.inserito_da);
+  return n ? `inserito da ${n}` : "inserito dalla sua upline";
+}
+function vScheda(){
+  const p = st.struttura.find(x => x.id === st.schedaId);
+  if(!p) return `<p class="muted">Partner non trovato.</p>`;
+  const r = rigaDi(st.riep, p.id) || {}, sp = statoDi(p);
+  const sponsor = p.sponsor_id === st.profilo.id ? "te" : nomeDi(p.sponsor_id);
+  const gestito = p.stato === "gestito";
+  const m = meseDi(oggi());
+  const recenti = st.attScheda.slice().sort((a, b) => a.inserito_il < b.inserito_il ? 1 : -1).slice(0, 12);
+  const frontali = st.riep.filter(x => x.sponsor_id === p.id);
+  return `<button class="btn link" data-act="vista-gruppo" style="padding:0">‹ Il mio gruppo</button>
+  <div class="card">
+    <div class="spread"><h2>${esc(p.nome)}</h2><span class="pill ${sp.cl}">${sp.txt}</span></div>
+    <p class="small" style="margin:2px 0 0">${sponsor ? `Sponsor: ${esc(sponsor)} · ` : ""}${gestito ? "non usa l'app: i suoi numeri li aggiorni tu"
+      : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</p>
+    <div class="dati-scheda">
+      <div><span class="small">VP personali</span><b class="num">${num(r.vp_personali)}</b></div>
+      <div><span class="small">VP di gruppo</span><b class="num">${num(r.vp_gruppo)}</b></div>
+      <div><span class="small">Linee attive</span><b class="num">${r.linee_attive || 0}</b></div>
+      <div><span class="small">Percentuale</span><b class="num">${r.percentuale ? r.percentuale + "%" : "–"}</b></div>
+    </div>
+    ${frontali.length ? `<ul class="linee">${frontali.map(x => `<li><span class="grow">${esc(nomeDi(x.partner_id))}</span>
+      <span class="num ${Number(x.vp_gruppo) >= soglia() ? "" : "faint"}">${num(x.vp_gruppo)} VP</span></li>`).join("")}</ul>` : ""}
+    <p class="small" style="margin:10px 0 0">Punto di partenza: <b>${esc(testoPartenza(p))}</b>
+      ${p.partenza_confermata_il ? `<span class="pill v">confermato</span>`
+        : `<button class="btn link small" data-act="conferma" data-id="${esc(p.id)}">Conferma</button>`}</p>
+  </div>
+  ${gestito ? `<div class="card">
+    <span class="eyebrow">I suoi numeri · ${nomeMese(m)}</span>
+    <div class="griglia-azioni">
+      <button class="btn" data-act="contatto">+ Contatto</button>
+      <button class="btn" data-act="piano">+ Piano</button>
+      <button class="btn" data-act="ordine">+ Ordine</button>
+      <button class="btn" data-act="totale-mese">Aggiorna il totale</button>
+      <button class="btn" data-act="cliente">+ Cliente</button>
+    </div>
+    ${recenti.length ? `<ul class="oggi">${recenti.map(a => `<li>
+      <span class="grow">${ETICHETTE[a.tipo]}${a.vp != null ? ` · <b>${a.tipo === "rettifica" ? vpFirmati(a.vp) : num(a.vp)} VP</b>` : ""}
+        <br><span class="small">${dataIt(a.data)}${inseritoDa(a, p) ? " · " + esc(inseritoDa(a, p)) : ""}</span></span>
+      ${String(a.id).startsWith("tmp") ? "" : `<button class="x" data-act="elimina" data-id="${esc(a.id)}" aria-label="Elimina">×</button>`}</li>`).join("")}</ul>`
+      : `<p class="muted" style="margin:8px 0 0">Ancora niente questo mese.</p>`}
+    <button class="btn wide" style="margin-top:12px" data-act="manda-link" data-id="${esc(p.id)}">Manda il suo link personale</button>
+    <p class="nota">Quando apre il suo link prende in mano il profilo: da lì i suoi numeri li aggiorna lui.</p>
+  </div>` : `<div class="card">
+    <p class="small" style="margin:0">Usa l'app: i suoi numeri li aggiorna lui.</p>
+    ${st.profilo.is_admin ? `<button class="btn wide" style="margin-top:12px" data-act="nuovo-link" data-id="${esc(p.id)}">Nuovo link personale</button>
+      <p class="nota">Solo per chi ha perso il suo link: quello vecchio smette di funzionare e i suoi telefoni vanno ricollegati.</p>` : ""}
+  </div>`}`;
 }
 
 function testoInvito(){
@@ -845,7 +944,7 @@ function vSheet(){
   const err = st.errore ? `<p class="errore">${esc(st.errore)}</p>` : "";
   const piede = `<div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
         <button class="btn primary grow">Salva</button></div>`;
-  if(s === "ordine") return `<h2>Nuovo ordine</h2>
+  if(s === "ordine") return `<h2>Nuovo ordine${st.target ? ` di ${esc(nomeSaluto(nomeDi(st.target)))}` : ""}</h2>
     <form data-form="ordine" novalidate>
       <label class="field"><span>VP dell'ordine</span>
         <input name="vp" type="text" inputmode="decimal" autocomplete="off" required autofocus placeholder="es. 60 o 62,5"></label>
@@ -865,13 +964,14 @@ function vSheet(){
         ${[meseDi(oggi()), mesePrecedente()].map(x => `<label><input type="radio" name="mese" value="${x}" ${x === m ? "checked" : ""} data-act="scegli-mese">
           ${nomeMese(x).replace(/^./, c => c.toUpperCase())}${x === mesePrecedente() ? ` <span class="small">(si chiude il ${giornoChiusura()})</span>` : ""}</label>`).join("")}
       </div>` : "";
-    return `<h2>VP di ${nomeMese(m).split(" ")[0]}</h2>
-    <p class="small">Scrivi il totale dei tuoi VP personali del mese, per esempio quello del tuo ufficio virtuale Amway.
-      L'app registra solo la differenza con quanto hai già inserito (${num(vpMese(m))} VP).</p>
+    const chi = st.target ? ` di ${esc(nomeSaluto(nomeDi(st.target)))}` : "";
+    return `<h2>VP di ${nomeMese(m).split(" ")[0]}${chi}</h2>
+    <p class="small">Scrivi il totale dei VP personali del mese${st.target ? chi : ""}, per esempio quello dell'ufficio virtuale Amway.
+      L'app registra solo la differenza con quanto è già inserito (${num(vpMese(m, lista()))} VP).</p>
     <form data-form="totale-mese" novalidate>
       ${scelta}
       <label class="field"><span>Totale VP del mese</span>
-        <input name="vp" type="text" inputmode="decimal" autocomplete="off" autofocus value="${num(vpMese(m))}"></label>
+        <input name="vp" type="text" inputmode="decimal" autocomplete="off" autofocus value="${num(vpMese(m, lista()))}"></label>
       ${piede}${err}
     </form>`;
   }
@@ -909,13 +1009,25 @@ function vSheet(){
       ${piede}${err}
     </form>`;
   }
+  if(s === "conferma"){
+    const p = st.struttura.find(x => x.id === st.confermaId);
+    if(!p) return "";
+    return `<h2>Punto di partenza di ${esc(nomeSaluto(p.nome))}</h2>
+    <p class="small">Ha dichiarato: <b>${esc(testoPartenza(p))}</b>. Se è giusto conferma; se no correggilo e poi conferma.</p>
+    <form data-form="conferma" novalidate>
+      ${campiQualifica(false, { valore:valoreQualifica(p), mese:p.qualifica_iniziale_mese ? meseDi(p.qualifica_iniziale_mese) : "",
+                               pagamenti:p.pagamenti_iniziali, senzaData:true })}
+      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
+        <button class="btn primary grow">Conferma</button></div>
+    </form>`;
+  }
   if(s === "link-gestito"){
     const g = st.linkGestito, link = base() + "#chiave=" + g.chiave;
     const testo = `Ciao ${nomeSaluto(g.nome)}! Ti ho preparato il profilo su Growup, l'app del nostro gruppo. `
       + `Apri questo link: è la tua chiave personale, salvala nella chat con te stesso e non inoltrarla.`;
     return `<h2>Il link di ${esc(g.nome)}</h2>
-    <p class="small">Mandalo <b>a ${esc(nomeSaluto(g.nome))}</b>: aprendolo entra nell'app e trova il suo profilo già pronto.
-      Da quel momento i suoi dati li aggiorna lui.</p>
+    <p class="small">Mandalo <b>a ${esc(nomeSaluto(g.nome))}</b>: ${g.nuovo ? "il link vecchio non funziona più; con questo rientra nel suo profilo, con tutti i suoi dati."
+      : "aprendolo entra nell'app e trova il suo profilo già pronto. Da quel momento i suoi dati li aggiorna lui."}</p>
     <div class="condividi">
       <a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(testo + " " + link)}">WhatsApp</a>
       <a class="btn tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(testo)}">Telegram</a>
@@ -932,30 +1044,36 @@ function vSheet(){
 }
 
 /* ---- 11. Azioni ---- */
+/* Registra per me o, se st.target è impostato, per il partner senza app aperto nella scheda. */
 async function registra(tipo, extra){
-  const p = st.profilo;
-  const riga = Object.assign({ partner_id:p.id, tipo, quantita:1, data:oggi() }, extra || {});
-  const tmp = Object.assign({ id:"tmp" + Math.random().toString(36).slice(2), inserito_il:new Date().toISOString() }, riga);
-  st.att.push(tmp); render();
+  const perAltri = !!st.target;
+  const pid = st.target || st.profilo.id;
+  const prendi = () => perAltri ? st.attScheda : st.att;
+  const metti = l => { if(perAltri) st.attScheda = l; else st.att = l; };
+  const riga = Object.assign({ partner_id:pid, tipo, quantita:1, data:oggi() }, extra || {});
+  const tmp = Object.assign({ id:"tmp" + Math.random().toString(36).slice(2), inserito_il:new Date().toISOString(),
+                              inserito_da:st.profilo.id }, riga);
+  metti(prendi().concat([tmp])); render();
   const promessa = api.addActivity(riga);
-  const msg = tipo === "ordine" ? `Ordine da ${num(riga.vp)} VP registrato`
-    : tipo === "rettifica" ? `Totale di ${nomeMese(meseDi(riga.data)).split(" ")[0]} aggiornato: ${num(vpMese(meseDi(riga.data)))} VP`
-    : `${ETICHETTE[tipo]} registrato`;
+  const per = perAltri ? ` per ${nomeSaluto(nomeDi(pid))}` : "";
+  const msg = tipo === "ordine" ? `Ordine da ${num(riga.vp)} VP registrato${per}`
+    : tipo === "rettifica" ? `Totale di ${nomeMese(meseDi(riga.data)).split(" ")[0]} aggiornato${per}: ${num(vpMese(meseDi(riga.data), prendi()))} VP`
+    : `${ETICHETTE[tipo]} registrato${per}`;
+  const dopo = () => { if(perAltri) caricaNumeri().then(render).catch(() => {}); };
   toast(msg, async () => {
     try{
       const vero = await promessa;
       await api.deleteActivity(vero.id);
-      st.att = st.att.filter(a => a.id !== vero.id && a.id !== tmp.id);
-      render(); toast("Annullato");
+      metti(prendi().filter(a => a.id !== vero.id && a.id !== tmp.id));
+      render(); toast("Annullato"); dopo();
     }catch(e){ toast(messaggio(e)); }
   });
   try{
     const vero = await promessa;
-    const i = st.att.findIndex(a => a.id === tmp.id);
-    if(i >= 0) st.att[i] = vero;
-    render();
+    metti(prendi().map(a => a.id === tmp.id ? vero : a));
+    render(); dopo();
   }catch(e){
-    st.att = st.att.filter(a => a.id !== tmp.id); render();
+    metti(prendi().filter(a => a.id !== tmp.id)); render();
     toast(messaggio(e));
   }
 }
@@ -984,8 +1102,23 @@ const AZIONI = {
   "totale-mese"(){ st.errore = ""; st.meseTotale = meseDi(oggi()); st.sheet = "totale-mese"; render(); focusSheet(); },
   "scegli-mese"(el){ st.meseTotale = el.value; render(); },
   storico(){ st.sheet = "storico"; render(); },
-  "vista-io"(){ st.vista = "io"; render(); window.scrollTo(0, 0); },
-  "vista-gruppo"(){ st.vista = "gruppo"; render(); window.scrollTo(0, 0); },
+  "vista-io"(){ st.vista = "io"; st.target = null; render(); window.scrollTo(0, 0); },
+  "vista-gruppo"(){ st.vista = "gruppo"; st.target = null; st.schedaId = null; render(); window.scrollTo(0, 0); },
+  async "apri-scheda"(el){
+    const p = st.struttura.find(x => x.id === el.dataset.id);
+    if(!p) return;
+    st.schedaId = p.id; st.target = p.stato === "gestito" ? p.id : null; st.attScheda = [];
+    st.vista = "scheda"; render(); window.scrollTo(0, 0);
+    try{ st.attScheda = (await api.activities(p.id, primaDataAperta()) || []).filter(a => a.data >= primaDataAperta()); render(); }
+    catch(e){ toast(messaggio(e)); }
+  },
+  conferma(el){ st.confermaId = el.dataset.id; st.sheet = "conferma"; render(); },
+  async "nuovo-link"(el){
+    const p = st.struttura.find(x => x.id === el.dataset.id);
+    if(!p || !confirm(`Creare un nuovo link personale per ${p.nome}? Quello vecchio smetterà di funzionare.`)) return;
+    try{ st.linkGestito = { nome:p.nome, chiave: await api.nuovaChiavePer(p.id), nuovo:true }; st.sheet = "link-gestito"; render(); }
+    catch(e){ toast(messaggio(e)); }
+  },
   "mia-chiave"(){ st.sheet = "mia-chiave"; render(); },
   privacy(){ st.sheet = "privacy"; render(); },
   chiudi(){ st.sheet = null; render(); },
@@ -1009,9 +1142,14 @@ const AZIONI = {
   },
   async elimina(el){
     const id = el.dataset.id;
-    const a = st.att.find(x => x.id === id);
+    const a = lista().find(x => x.id === id);
     if(!a || !confirm(`Eliminare "${ETICHETTE[a.tipo]}${a.vp != null ? " " + num(a.vp) + " VP" : ""}"?`)) return;
-    try{ await api.deleteActivity(id); st.att = st.att.filter(x => x.id !== id); render(); toast("Eliminato"); }
+    try{
+      await api.deleteActivity(id);
+      if(st.target){ st.attScheda = st.attScheda.filter(x => x.id !== id); caricaNumeri().then(render).catch(() => {}); }
+      else st.att = st.att.filter(x => x.id !== id);
+      render(); toast("Eliminato");
+    }
     catch(e){ toast(messaggio(e)); }
   },
   copia(){ copiaTesto(linkInvito(), "Link d'invito copiato"); },
@@ -1055,6 +1193,16 @@ const MODULI = {
       await api.accettaPrivacy(st.profilo.id);
       st.profilo.privacy_accettata_il = new Date().toISOString();
       st.fase = "home"; render();
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async conferma(f){
+    const q = leggiQualifica(f);
+    if(q.mancaMese){ mostraErroreForm(f, "Indica il mese della prima qualifica."); return; }
+    try{
+      await api.conferma({ p_partner:st.confermaId, p_qualifica:q.qualifica, p_percentuale:q.percentuale,
+                           p_qualifica_mese:q.mese, p_pagamenti:q.pagamenti });
+      await caricaStruttura();
+      st.sheet = null; render(); toast("Punto di partenza confermato");
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
   async aggiungi(f){
@@ -1122,7 +1270,7 @@ const MODULI = {
     const totale = numIt(f.vp.value);
     if(!(totale >= 0) || totale > 100000){ mostraErroreForm(f, "Scrivi il totale dei VP del mese (un numero, anche con la virgola)."); return; }
     const m = st.meseTotale || meseDi(oggi());
-    const diff = Math.round((totale - vpMese(m)) * 100) / 100;
+    const diff = Math.round((totale - vpMese(m, lista())) * 100) / 100;
     st.sheet = null;
     if(diff === 0){ render(); toast("Il totale era già questo"); return; }
     /* nel mese precedente la correzione va all'ultimo giorno di quel mese */
