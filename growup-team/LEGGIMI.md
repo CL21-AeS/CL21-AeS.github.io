@@ -5,7 +5,7 @@ Indirizzo dell'app: **https://cl21-aes.github.io/growup-team/**
 Growup Team sostituisce `growup/` con un database condiviso. **Non si usa l'email**: si entra con un link.
 
 - **Link d'invito** (`…/growup-team/#ABC234`): ogni partner ha il suo e lo manda su WhatsApp o Telegram ai nuovi.
-  Chi lo apre scrive nome, data di iscrizione e qualifica, ed è dentro, sotto chi l'ha invitato.
+  Chi lo apre scrive nome, qualifica e (se sta iniziando) data di iscrizione, e inizia, sotto chi l'ha invitato.
 - **Link personale** (`…/growup-team/#chiave=…`): è la chiave del proprio profilo. L'app lo consegna al primo
   ingresso e chiede di mandarlo **a sé stessi** (WhatsApp: chat con sé stessi · Telegram: Messaggi salvati).
   Toccandolo si rientra da qualsiasi telefono o computer. Non va inoltrato.
@@ -76,7 +76,7 @@ e mettile in `growup-team/config.js` (oppure mandale a Claude Code e lo fa lui).
 
 1. Stefano apre il `link_personale` dal telefono: entra come "Stefano e Alessia". Alessia fa lo stesso dal suo.
 2. Nel riquadro **Invita un nuovo partner** mandate il link d'invito su WhatsApp o Telegram a un secondo telefono di prova.
-3. Il secondo telefono apre il link, scrive nome, data e qualifica: è dentro.
+3. Il secondo telefono apre il link, scrive nome, qualifica e data: inizia.
    L'app gli chiede di salvare il suo link personale: lo manda a sé stesso.
 4. Registra un contatto: **un tocco** su *+ Contatto*.
 5. Apre il suo link personale da un altro dispositivo (o dal computer): ritrova il contatto e gli obiettivi.

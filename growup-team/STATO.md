@@ -1,6 +1,6 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 14 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 15 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 
 ## Fatto
 
@@ -16,6 +16,21 @@ Ultimo aggiornamento: 14 ottobre 2026. Da leggere all'inizio di ogni nuova sessi
 - Claude ha accesso al progetto tramite il connettore Supabase (MCP). Nota: le istruzioni SQL che contengono
   `delete` richiedono una conferma che dal connettore scade; quelle parti si lanciano dall'SQL Editor.
 
+**Ritocchi dopo il primo collaudo (15 ottobre)**, migrazione `supabase/004_ritocchi.sql` già applicata al progetto:
+
+- marchio **A&S** al posto di CumLaude21; "Due informazioni e iniziamo", pulsante "Inizia";
+- tolte le opzioni prima/dopo il 1° giugno 2026: la data di iscrizione è obbligatoria solo per chi sceglie "Inizio";
+  il Path to Bronze conta tutte le prime linee (vincolo di data tolto dal database);
+- "Qualifica più alta raggiunta": Inizio, pin 3%…21% (campo `percentuale_iniziale`) e qualifiche Bronze/Argento;
+  primo ordine e primi clienti non si dichiarano. Un pin senza Bronze fa partire dal Path to Bronze;
+- "Entra con il tuo link personale" ora ha il ritorno all'invito;
+- **La mia struttura**: albero della downline, **+ Aggiungi persona** (chi non usa l'app, posizione a scelta nella
+  propria struttura, conferma del consenso) e **Manda il link** per farle prendere possesso del profilo
+  (al primo ingresso accetta la privacy);
+- l'iscrizione ora è la funzione `iscrivi_con_codice`; la vecchia `join_with_code` non è più richiamabile
+  (si può eliminare dall'SQL Editor, vedi 004).
+- Profili di prova nel database: "Prova uno" e "Prova due" (da cancellare a collaudo finito).
+
 ## Decisioni prese con Stefano
 
 - **Niente email**: si entra dal link d'invito dello sponsor (`#CODICE`) e poi dal link personale (`#chiave=…`),
@@ -28,7 +43,8 @@ Ultimo aggiornamento: 14 ottobre 2026. Da leggere all'inizio di ogni nuova sessi
 
 ## Prossimi passi
 
-1. **Collaudo Fase 1 dal telefono** (criterio del brief), con due account:
+1. **Collaudo dei ritocchi** dal telefono (ingresso, qualifiche, struttura, aggiunta manuale, link a chi è aggiunto),
+   poi cancellare i profili di prova. Collaudo Fase 1 (fatto il 14-15 ottobre: ok) con due account:
    - Stefano e Alessia entrano con il link personale dai loro telefoni.
    - Un secondo telefono entra da `https://cl21-aes.github.io/growup-team/#ABCDEF`, compila l'ingresso,
      salva il suo link personale, registra un contatto con un tocco e lo ritrova da un altro dispositivo.
