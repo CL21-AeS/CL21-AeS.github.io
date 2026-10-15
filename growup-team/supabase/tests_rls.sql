@@ -65,7 +65,7 @@ declare
   u6 constant uuid := '00000000-0000-0000-0000-0000000000a6';  -- R, telefono di Alessia
   u7 constant uuid := '00000000-0000-0000-0000-0000000000a7';  -- telefono nuovo, poi D
   u8 constant uuid := '00000000-0000-0000-0000-0000000000a8';  -- E, aggiunta a mano, poi entra
-  r uuid; a uuid; b uuid; c uuid; d uuid; e uuid; f uuid; g uuid; x record; mese_prec date;
+  r uuid; a uuid; b uuid; c uuid; d uuid; e uuid; f uuid; g uuid; h uuid; k uuid; x record; mese_prec date;
   k_r text; k_a text; k_a2 text; k_d text; k_e text;
 begin
   begin  -- tutto quello che succede qui dentro viene annullato alla fine
@@ -354,6 +354,33 @@ begin
   perform growup_test.ok((public.conferma_partenza(c, null, 6)->>'percentuale_iniziale')::int = 6, 'R conferma C correggendo il pin');
   execute 'reset role';
   perform growup_test.ok((select partenza_confermata_da = r from public.partners where id = c), 'la conferma registra chi l''ha data');
+
+  -- ---- Inserire una persona in mezzo alla linea ----
+  perform growup_test.come(u5);  -- A: tra lei e B c'era H, mai inserito
+  h := (public.inserisci_in_mezzo('Ugo Test', array[b])->>'id')::uuid;
+  execute 'reset role';
+  perform growup_test.ok((select sponsor_id = a and stato = 'gestito' and gestore_id = a from public.partners where id = h),
+                         'H inserito sotto A, senza app, gestito da A');
+  perform growup_test.ok((select sponsor_id from public.partners where id = b) = h, 'B ora sta sotto H');
+  perform growup_test.come(u5);
+  perform growup_test.ok(exists (select 1 from public.partners where id = h) and exists (select 1 from public.partners where id = g),
+                         'A vede H e, più in basso, tutto il gruppo di B');
+  perform growup_test.deve_fallire(format('select public.inserisci_in_mezzo(%L, array[%L]::uuid[])', 'X', a), 'nessuno si inserisce sopra di sé');
+  perform growup_test.deve_fallire(format('select public.inserisci_in_mezzo(%L, array[%L, %L]::uuid[])', 'X', h, e), 'tutti devono avere lo stesso sponsor');
+  perform growup_test.deve_fallire(format('select public.inserisci_in_mezzo(%L, array[]::uuid[])', 'X'), 'serve almeno una persona');
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.deve_fallire(format('select public.inserisci_in_mezzo(%L, array[%L]::uuid[])', 'X', b), 'C non tocca la linea di A');
+  -- B era stato scollegato dalla chiave rigenerata: la radice (admin) gliene dà una nuova
+  perform growup_test.come(u1);
+  k_e := public.nuova_chiave_per(b);
+  perform growup_test.come(u3);
+  perform public.entra_con_chiave(k_e);
+  k := (public.inserisci_in_mezzo('Kevin Test', array[e, g])->>'id')::uuid;  -- B inserisce K sopra E e G, suoi diretti
+  execute 'reset role';
+  perform growup_test.ok((select count(*) from public.partners where sponsor_id = k) = 2, 'K ha sotto E e G');
+  perform growup_test.come(u5);  -- A
+  perform growup_test.ok((select count(*) from public.riepilogo_mese(current_date) where partner_id in (h, k, e, g)) = 4,
+                         'i numeri del mese seguono la struttura corretta');
 
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';

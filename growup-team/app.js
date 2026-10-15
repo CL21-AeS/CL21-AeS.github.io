@@ -44,6 +44,7 @@ function creaApi(){
     struttura:    () => q(sb.from("partners").select("id,nome,sponsor_id,stato,gestore_id,creato_il,ultimo_aggiornamento,"
                     + "qualifica_iniziale,percentuale_iniziale,qualifica_iniziale_mese,pagamenti_iniziali,partenza_confermata_il").order("creato_il")),
     conferma:     args => q(sb.rpc("conferma_partenza", args)),
+    inMezzo:      args => q(sb.rpc("inserisci_in_mezzo", args)),
     nuovaChiavePer: pid => q(sb.rpc("nuova_chiave_per", { p_partner:pid })),
     aggiungi:     args => q(sb.rpc("aggiungi_partner", args)),
     linkGestito:  pid => q(sb.rpc("link_per_gestito", { p_partner:pid })),
@@ -888,6 +889,10 @@ function vScheda(){
     <p class="small" style="margin:10px 0 0">Punto di partenza: <b>${esc(testoPartenza(p))}</b>
       ${p.partenza_confermata_il ? `<span class="pill v">confermato</span>`
         : `<button class="btn link small" data-act="conferma" data-id="${esc(p.id)}">Conferma</button>`}</p>
+    <div class="spread" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)">
+      <span class="small">Il suo sponsor vero non è ${p.sponsor_id === st.profilo.id ? "te" : esc(sponsor || "nell'app")}?</span>
+      <button class="btn small" data-act="in-mezzo" data-id="${esc(p.id)}" style="white-space:nowrap">Manca qualcuno sopra?</button>
+    </div>
   </div>
   ${gestito ? `<div class="card">
     <span class="eyebrow">I suoi numeri · ${nomeMese(m)}</span>
@@ -1009,6 +1014,25 @@ function vSheet(){
       ${piede}${err}
     </form>`;
   }
+  if(s === "in-mezzo"){
+    const x = st.struttura.find(y => y.id === st.inMezzoId);
+    if(!x) return "";
+    const sopra = x.sponsor_id === st.profilo.id ? "te" : nomeDi(x.sponsor_id);
+    const fratelli = st.struttura.filter(y => y.sponsor_id === x.sponsor_id);
+    return `<h2>Inserisci in mezzo</h2>
+    <p class="small">Per chi manca nella linea tra <b>${esc(sopra)}</b> e <b>${esc(x.nome)}</b>. La persona entra come
+      "senza app": puoi inserire i suoi numeri o mandarle il suo link.</p>
+    <form data-form="in-mezzo" novalidate>
+      <label class="field"><span>Nome e cognome</span><input name="nome" autocomplete="off" maxlength="80" required></label>
+      <div class="field" style="margin-top:14px"><span class="small">Chi è sotto questa persona? (sponsorizzati da lei)</span>
+        <div class="scelte">${fratelli.map(y => `<label><input type="checkbox" name="sotto" value="${esc(y.id)}" ${y.id === x.id ? "checked" : ""}> ${esc(y.nome)}</label>`).join("")}</div>
+        <p class="nota">Chi spunti si sposta sotto la nuova persona, con tutto il suo gruppo.</p></div>
+      ${campiQualifica(false)}
+      <label class="check"><input type="checkbox" name="consenso" required>
+        <span>Ho il suo consenso (a voce o per messaggio) a inserire il suo nome e i suoi numeri nell'app.</span></label>
+      ${piede}${err}
+    </form>`;
+  }
   if(s === "conferma"){
     const p = st.struttura.find(x => x.id === st.confermaId);
     if(!p) return "";
@@ -1113,6 +1137,7 @@ const AZIONI = {
     catch(e){ toast(messaggio(e)); }
   },
   conferma(el){ st.confermaId = el.dataset.id; st.sheet = "conferma"; render(); },
+  "in-mezzo"(el){ st.inMezzoId = el.dataset.id; st.errore = ""; st.sheet = "in-mezzo"; render(); },
   async "nuovo-link"(el){
     const p = st.struttura.find(x => x.id === el.dataset.id);
     if(!p || !confirm(`Creare un nuovo link personale per ${p.nome}? Quello vecchio smetterà di funzionare.`)) return;
@@ -1194,6 +1219,29 @@ const MODULI = {
       st.profilo.privacy_accettata_il = new Date().toISOString();
       st.fase = "home"; render();
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async "in-mezzo"(f){
+    const nome = f.nome.value.trim();
+    const sotto = Array.from(f.querySelectorAll("input[name=sotto]:checked")).map(i => i.value);
+    const q = leggiQualifica(f);
+    let err = "";
+    if(!nome) err = "Scrivi il nome della persona.";
+    else if(!sotto.length) err = "Spunta almeno una persona che sta sotto di lei.";
+    else if(q.data && q.data > oggi()) err = "La data di iscrizione non può essere nel futuro.";
+    else if(q.mancaMese) err = "Indica il mese della prima qualifica.";
+    else if(!f.consenso.checked) err = "Serve il suo consenso per inserirla nell'app.";
+    if(err){ mostraErroreForm(f, err); return; }
+    st.occupato = true;
+    try{
+      await api.inMezzo({ p_nome:nome, p_sotto:sotto, p_data_iscrizione:q.data, p_qualifica:q.qualifica,
+        p_percentuale:q.percentuale, p_qualifica_mese:q.mese, p_pagamenti:q.pagamenti });
+      await caricaStruttura(); await caricaNumeri();
+      st.sheet = null; st.vista = "gruppo"; st.target = null; st.schedaId = null;
+      render(); window.scrollTo(0, 0);
+      const nomi = sotto.map(nomeDi).map(nomeSaluto).join(", ");
+      toast(`${nome} inserito: ora ${nomi} ${sotto.length === 1 ? "è" : "sono"} nel suo gruppo`);
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+    st.occupato = false;
   },
   async conferma(f){
     const q = leggiQualifica(f);
