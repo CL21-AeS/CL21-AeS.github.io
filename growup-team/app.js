@@ -75,6 +75,7 @@ const st = {
   invitoRiserva: null,    // l'invito lasciato per "entra con il tuo link": si può tornare indietro
   struttura: [],          // io e la mia downline
   linkGestito: null,      // { nome, chiave } da mandare a una persona aggiunta a mano
+  vista: "io",            // pagina della home: "io" (settimana, mese, percorso) o "gruppo" (struttura, inviti)
   sponsorNome: "",
   errore: "",
   occupato: false,
@@ -121,7 +122,7 @@ const MESSAGGI_ERRORE = {
   data_futura: "La data di iscrizione non può essere nel futuro.",
   qualifica_non_valida: "Qualifica non riconosciuta.",
   percentuale_non_valida: "Percentuale non riconosciuta.",
-  posizione_non_valida: "Puoi aggiungere persone solo sotto di te o sotto qualcuno della tua struttura.",
+  posizione_non_valida: "Puoi aggiungere persone solo nel tuo gruppo.",
   nome_mancante: "Scrivi il nome della persona.",
   non_gestito: "Questa persona usa già l'app: entra con il suo link personale.",
   non_autorizzato: "Non puoi farlo per questa persona.",
@@ -362,8 +363,9 @@ function render(){
                   ingresso:vIngresso, privacy_primo:vPrivacyPrimo, home:vHome, errore:vErrore };
   const html = (viste[st.fase] || vAvvio)();
   if(html !== ultimoApp){ app.innerHTML = html; ultimoApp = html; }
-  document.body.classList.toggle("con-azioni", st.fase === "home");
-  document.getElementById("azioni").innerHTML = st.fase === "home" ? vAzioni() : "";
+  const conAzioni = st.fase === "home" && st.vista === "io";
+  document.body.classList.toggle("con-azioni", conAzioni);
+  document.getElementById("azioni").innerHTML = conAzioni ? vAzioni() : "";
   document.getElementById("sheet").innerHTML = st.sheet ? `<div class="sheet" data-act="chiudi-fuori"><div class="sheet-box" role="dialog" aria-modal="true">${vSheet()}</div></div>` : "";
 }
 
@@ -492,21 +494,47 @@ function vPrivacyPrimo(){
   </div>`;
 }
 
+/* Due pagine, scelte dal selettore in alto a destra: "Io" e "Gruppo". */
+function vSelettore(){
+  return `<div class="schede" role="tablist" aria-label="Pagina">
+    <button role="tab" aria-selected="${st.vista === "io"}" class="${st.vista === "io" ? "on" : ""}" data-act="vista-io">Io</button>
+    <button role="tab" aria-selected="${st.vista === "gruppo"}" class="${st.vista === "gruppo" ? "on" : ""}" data-act="vista-gruppo">Gruppo</button>
+  </div>`;
+}
+
+/* In fondo a ogni pagina: link personale, privacy, uscita (prima stavano nel menu ⋯). */
+function vFondo(){
+  return `<div class="fondo">
+    <div class="row wrap" style="justify-content:center">
+      <button class="btn small ghost" data-act="mia-chiave">Il mio link personale</button>
+      <button class="btn small ghost" data-act="privacy">Privacy</button>
+      <button class="btn small ghost" data-act="esci">Esci</button>
+    </div>
+    <p class="nota" style="text-align:center">${esc(st.profilo.nome)} · codice d'invito <b>${esc(st.profilo.codice_invito)}</b><br>
+      Per cancellare il profilo e i tuoi dati scrivi a Stefano e Alessia.</p>
+  </div>`;
+}
+
 function vHome(){
   const p = st.profilo;
+  const gruppo = st.vista === "gruppo";
+  const persone = alberoSotto(p.id, 0).length;
   return `
   <div class="testata">
-    <div>${marchio()}<h1>Ciao ${esc(nomeSaluto(p.nome))}</h1></div>
-    <button class="menu-btn" data-act="menu" aria-label="Menu">⋯</button>
+    <div>${marchio()}<h1>${gruppo ? "Il mio gruppo" : `Ciao ${esc(nomeSaluto(p.nome))}`}</h1>
+      ${gruppo ? `<p class="small" style="margin:0">${persone === 1 ? "1 persona" : `${num(persone)} persone`}</p>` : ""}</div>
+    ${vSelettore()}
   </div>
+  ${gruppo ? `
+  ${vStruttura()}
+  ${vInvita()}` : `
   ${leggiLocale(CHIAVE_SALVATA) === "1" || !st.chiave ? "" : vSalvaChiave()}
   ${vVisione()}
   ${vTappa()}
   ${vSettimana()}
   ${vMese()}
-  ${vOggi()}
-  ${vStruttura()}
-  ${vInvita()}`;
+  ${vOggi()}`}
+  ${vFondo()}`;
 }
 
 function testoChiave(){ return "La mia chiave per entrare in Growup Team. È personale, non inoltrarla:"; }
@@ -608,8 +636,12 @@ function vMese(){
   return `<div class="card">
     <div class="spread"><div><span class="eyebrow">Il mio mese</span>
       <h2 style="margin-top:2px">${nomeMese(m).replace(/^./, x => x.toUpperCase())}</h2></div>
-      <button class="btn small ghost" data-act="obiettivo-mese">Modifica</button></div>
+      <button class="btn small ghost" data-act="obiettivo-mese">Obiettivo</button></div>
     <div style="margin-top:12px">${barra("VP fatturati", vpMese(m), st.goalMese.obiettivo_vp)}</div>
+    <div class="spread" style="margin-top:8px">
+      <span class="small">I VP del mese sono la somma dei tuoi ordini.</span>
+      <button class="btn small" data-act="ordine" style="white-space:nowrap">+ VP</button>
+    </div>
     <div class="spread" style="margin-top:12px">
       <span>Nuovi clienti nel mese <b class="num">${num(c)}</b></span>
       <button class="btn small" data-act="cliente" style="white-space:nowrap">+ Cliente</button>
@@ -631,7 +663,7 @@ function vOggi(){
   </div>`;
 }
 
-/* ---- La mia struttura: albero di chi sta sotto di me ---- */
+/* ---- La mia struttura: l'albero del mio gruppo ---- */
 function figli(id){ return st.struttura.filter(p => p.sponsor_id === id); }
 /* [{ p, livello }] in ordine di albero, me escluso */
 function alberoSotto(id, livello, out){
@@ -649,7 +681,7 @@ function vStruttura(){
       ${p.stato === "gestito"
         ? `<span class="pill">senza app</span><button class="btn link small" data-act="manda-link" data-id="${esc(p.id)}">Manda il link</button>`
         : `<span class="pill v">usa l'app</span>`}</li>`).join("")}</ul>`
-      : `<p class="muted" style="margin:8px 0 0">Ancora nessuno sotto di te. Invita chi usa il telefono con il link qui sotto,
+      : `<p class="muted" style="margin:8px 0 0">Ancora nessuno nel tuo gruppo. Invita chi usa il telefono con il link qui sotto,
           oppure aggiungi a mano chi non usa l'app.</p>`}
   </div>`;
 }
@@ -661,7 +693,7 @@ function testoInvito(){
 function vInvita(){
   return `<div class="card">
     <span class="eyebrow">Invita un nuovo partner</span>
-    <p class="small" style="margin:4px 0 0">Chi entra con questo link viene messo sotto di te. Non è il tuo link personale: questo si può girare.</p>
+    <p class="small" style="margin:4px 0 0">Chi entra con questo link entra nel tuo gruppo, con te come sponsor. Non è il tuo link personale: questo si può girare.</p>
     <div class="condividi">
       <a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(testoInvito() + " " + linkInvito())}">WhatsApp</a>
       <a class="btn tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(linkInvito())}&text=${encodeURIComponent(testoInvito())}">Telegram</a>
@@ -706,14 +738,6 @@ function vSheet(){
       <label class="field"><span>VP fatturati nel mese</span><input name="vp" type="text" inputmode="decimal" autocomplete="off" value="${num(st.goalMese.obiettivo_vp)}"></label>
       ${piede}${err}
     </form>`;
-  if(s === "menu") return `<h2>${esc(st.profilo ? st.profilo.nome : "")}</h2>
-    <div class="stack" style="margin-top:12px">
-      <button class="btn wide" data-act="mia-chiave">Il mio link personale</button>
-      <button class="btn wide" data-act="privacy">Informativa privacy</button>
-      <button class="btn wide" data-act="esci">Esci da questo telefono</button>
-      <button class="btn wide ghost" data-act="chiudi">Chiudi</button>
-    </div>
-    <p class="nota">Il tuo codice d'invito: <b>${esc(st.profilo ? st.profilo.codice_invito : "")}</b> · Per cancellare il profilo e i tuoi dati scrivi a Stefano e Alessia.</p>`;
   if(s === "mia-chiave") return `<h2>Il mio link personale</h2>
     ${st.chiave ? `<p class="small">Con questo link entri da qualsiasi telefono o computer. È personale: tienilo per te
       (WhatsApp: chat con te stesso · Telegram: Messaggi salvati).</p>
@@ -727,14 +751,14 @@ function vSheet(){
     <p class="nota">Crea un link nuovo se pensi che il tuo sia finito a qualcun altro: quello vecchio smette di funzionare
       e gli altri telefoni dovranno rientrare con il nuovo.</p>`;
   if(s === "aggiungi"){
-    const posti = [`<option value="${esc(st.profilo.id)}">Sotto di me</option>`]
+    const posti = [`<option value="${esc(st.profilo.id)}">Io</option>`]
       .concat(alberoSotto(st.profilo.id, 1).map(({ p, livello }) =>
-        `<option value="${esc(p.id)}">${"— ".repeat(livello)}sotto ${esc(p.nome)}</option>`)).join("");
+        `<option value="${esc(p.id)}">${"— ".repeat(livello)}${esc(p.nome)}</option>`)).join("");
     return `<h2>Aggiungi una persona</h2>
     <p class="small">Per chi non usa l'app. Se un giorno vorrà usarla, le mandi il suo link e troverà già il suo profilo.</p>
     <form data-form="aggiungi" novalidate>
       <label class="field"><span>Nome e cognome</span><input name="nome" autocomplete="off" maxlength="80" required></label>
-      <label class="field"><span>Dove la metti nella struttura?</span><select name="sponsor">${posti}</select></label>
+      <label class="field"><span>Chi è il suo sponsor?</span><select name="sponsor">${posti}</select></label>
       ${campiQualifica(false)}
       <label class="check"><input type="checkbox" name="consenso" required>
         <span>Ho il suo consenso (a voce o per messaggio) a inserire il suo nome e i suoi numeri nell'app.</span></label>
@@ -811,7 +835,8 @@ const AZIONI = {
   ordine(){ st.errore = ""; st.sheet = "ordine"; render(); focusSheet(); },
   obiettivi(){ st.errore = ""; st.sheet = "obiettivi"; render(); },
   "obiettivo-mese"(){ st.errore = ""; st.sheet = "obiettivo-mese"; render(); },
-  menu(){ st.sheet = "menu"; render(); },
+  "vista-io"(){ st.vista = "io"; render(); window.scrollTo(0, 0); },
+  "vista-gruppo"(){ st.vista = "gruppo"; render(); window.scrollTo(0, 0); },
   "mia-chiave"(){ st.sheet = "mia-chiave"; render(); },
   privacy(){ st.sheet = "privacy"; render(); },
   chiudi(){ st.sheet = null; render(); },
@@ -899,7 +924,7 @@ const MODULI = {
         p_percentuale:q.percentuale, p_qualifica_mese:q.mese, p_pagamenti:q.pagamenti });
       await caricaStruttura();
       st.sheet = null; render();
-      toast(`${nome} aggiunto ${sotto && sotto.id !== st.profilo.id ? "sotto " + sotto.nome : "sotto di te"}`);
+      toast(`${nome} aggiunto ${sotto && sotto.id !== st.profilo.id ? "al gruppo di " + sotto.nome : "al tuo gruppo"}`);
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
     st.occupato = false;
   },

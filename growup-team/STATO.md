@@ -31,6 +31,14 @@ Ultimo aggiornamento: 15 ottobre 2026. Da leggere all'inizio di ogni nuova sessi
   (si può eliminare dall'SQL Editor, vedi 004).
 - Profili di prova nel database: "Prova uno" e "Prova due" (da cancellare a collaudo finito).
 
+**Seconda tornata di ritocchi (15 ottobre)**, solo interfaccia:
+
+- due pagine con selettore **Io / Gruppo** in alto a destra: "Io" = percorso, settimana, mese, oggi;
+  "Gruppo" = La mia struttura + Invita un nuovo partner. Il menu ⋯ è sparito: link personale, privacy ed Esci
+  stanno in fondo a ogni pagina;
+- "Ancora nessuno nel tuo gruppo"; niente più "sotto di te": nell'aggiunta manuale si sceglie "Chi è il suo sponsor?";
+- "Il mio mese": pulsante **+ VP** (apre il nuovo ordine) e la riga "I VP del mese sono la somma dei tuoi ordini".
+
 ## Decisioni prese con Stefano
 
 - **Niente email**: si entra dal link d'invito dello sponsor (`#CODICE`) e poi dal link personale (`#chiave=…`),
@@ -40,6 +48,8 @@ Ultimo aggiornamento: 15 ottobre 2026. Da leggere all'inizio di ogni nuova sessi
 - **Primi clienti**: valgono i primi 3 in totale, non nello stesso mese. Dopo, solo il conteggio dei nuovi clienti
   del mese, senza obiettivo.
 - **Obiettivi**: contatti (10) e piani (3) a settimana; VP solo al mese (100, o di più se la tappa lo chiede).
+- **Rimandati alla Fase 2**: inserire i numeri per conto di chi è aggiunto a mano; mostrare numeri (es. VP del mese)
+  accanto ai nomi nella struttura.
 
 ## Prossimi passi
 
