@@ -37,7 +37,10 @@ Ultimo aggiornamento: 15 ottobre 2026. Da leggere all'inizio di ogni nuova sessi
   "Gruppo" = La mia struttura + Invita un nuovo partner. Il menu ⋯ è sparito: link personale, privacy ed Esci
   stanno in fondo a ogni pagina;
 - "Ancora nessuno nel tuo gruppo"; niente più "sotto di te": nell'aggiunta manuale si sceglie "Chi è il suo sponsor?";
-- "Il mio mese": pulsante **+ VP** (apre il nuovo ordine) e la riga "I VP del mese sono la somma dei tuoi ordini".
+- "Il mio mese": pulsanti **+ Ordine** e **Aggiorna il totale** (si scrive il totale VP del mese, per esempio
+  dall'ufficio virtuale Amway; l'app registra la differenza come attività `rettifica`, anche negativa).
+  Migrazione `supabase/005_totale_mese.sql` già applicata. In Fase 2 lo sponsor userà lo stesso meccanismo
+  per i VP di chi non usa l'app.
 
 ## Decisioni prese con Stefano
 
