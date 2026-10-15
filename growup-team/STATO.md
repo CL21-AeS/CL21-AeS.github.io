@@ -1,6 +1,6 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 15 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 15 ottobre 2026, sera. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 
 ## Fatto
 
@@ -85,13 +85,20 @@ dall'SQL Editor perché contiene un `delete`):
 - **Imbuto del gruppo** (te escluso, ultime 4 settimane): contatti → piani → ordini, con obiettivo contatti del gruppo,
   % dei contatti che diventano piani, % dei piani che diventano ordini, VP. Il **collo di bottiglia** è il primo
   passaggio sotto soglia, evidenziato in giallo con una frase su cosa allenare (lista nomi, invito, follow-up);
-- **Chi seguire adesso**: tutto il gruppo ordinato per urgenza, con un'etichetta e il perché:
-  1. *Da chiamare*: non aggiorna da più di 7 giorni (per chi è senza app: nessun dato inserito da più di 7 giorni);
+- **Chi seguire adesso**: chi usa l'app, ordinato per urgenza, con un'etichetta e il perché
+  (PR CL21-AeS/CL21-AeS.github.io#9 unita; poi il ritocco sotto):
+  1. *Da chiamare*: non aggiorna da più di 7 giorni;
   2. *Lista nomi*: in 4 settimane meno della metà dei contatti dell'obiettivo;
   3. *Invito*: meno di 1 piano ogni 5 contatti;
   4. *Follow-up*: almeno 2 piani ma meno della metà dei VP dell'obiettivo del mese;
   5. *In crescita*: tutto il resto.
   Le soglie si cambiano dal Table editor: `settings` → `soglie_etichette`. Toccando un nome si apre la scheda.
+- **Ritocco della sera del 15 ottobre** (decisione di Stefano): chi è **senza app non ha etichetta** (i suoi numeri
+  dipendono da quando lo sponsor li inserisce, quindi non sarebbe reale); sotto l'elenco una riga dice quante persone
+  senza app ci sono. Restano nella struttura e i loro numeri contano nell'imbuto.
+  Confermati: soglia Invito 1 piano ogni 5 contatti (giusta per chi fa contatti a freddo), Follow-up misurato sui VP.
+- I **test** ora stanno nel repository: `test/` (vedi `test/LEGGIMI.md`): 97 controlli dell'interfaccia
+  e i controlli dei permessi del database.
 
 ## Decisioni prese con Stefano
 
@@ -105,24 +112,27 @@ dall'SQL Editor perché contiene un `delete`):
 - **Rimandati alla Fase 2**: inserire i numeri per conto di chi è aggiunto a mano; mostrare numeri (es. VP del mese)
   accanto ai nomi nella struttura.
 
-## Prossimi passi
+## Prossimi passi (da qui si riparte)
 
-0. **Collaudo dei blocchi 1-3** della Fase 2, poi blocco 4: scheda partner arricchita (4 settimane, punto debole,
-   azioni suggerite), "Fissa una chiamata" (calendario .ics + WhatsApp), storico del gruppo (vedi `FASE2.md`).
-1. (Fatto) **Collaudo dei ritocchi** dal telefono (ingresso, qualifiche, struttura, aggiunta manuale, link a chi è aggiunto),
-   poi cancellare i profili di prova. Collaudo Fase 1 (fatto il 14-15 ottobre: ok) con due account:
-   - Stefano e Alessia entrano con il link personale dai loro telefoni.
-   - Un secondo telefono entra da `https://cl21-aes.github.io/growup-team/#XSHV48`, compila l'ingresso,
-     salva il suo link personale, registra un contatto con un tocco e lo ritrova da un altro dispositivo.
-   - In Supabase → Table editor → partners il nuovo partner ha `sponsor_id` = "Stefano e Alessia".
-2. Raccogliere e sistemare quello che emerge dal collaudo.
-3. **Piano tecnico della Fase 2** (visione upline: Il mio gruppo, Scheda partner, Struttura; VP di gruppo e linee
-   attive calcolati dall'albero; conferma dello sponsor sul punto di partenza; rigenerare il link a un partner che
-   l'ha perso direttamente dall'app). Da far approvare prima di scrivere codice.
-4. Prima del lancio a tutto il gruppo: captcha (Cloudflare Turnstile) sugli accessi anonimi e limite
+1. **Pubblicare il ritocco "senza app senza etichetta"** se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+   PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
+2. **Collaudo dal telefono dei blocchi 1-3** della Fase 2 (pagina Io con i calcoli, struttura con i numeri,
+   scheda partner, partner senza app, Da confermare, in mezzo / cancella / cambia sponsor, imbuto ed etichette).
+3. **Blocco 4 della Fase 2** (ultimo, vedi `FASE2.md`):
+   - scheda partner arricchita: ultime 4 settimane di contatti, piani, VP; punto debole confrontato con la media
+     del gruppo e con chi cresce; azioni suggerite;
+   - "Fissa una chiamata": evento di calendario (.ics) con promemoria e note **e** messaggio WhatsApp già scritto;
+   - storico del gruppo (mesi chiusi da `monthly_totals`).
+4. **Prima del lancio a tutto il gruppo**: captcha (Cloudflare Turnstile) sugli accessi anonimi e limite
    "anonymous sign-ins" più alto in Authentication → Rate Limits.
+5. Dopo la Fase 2: Fase 3 (presa in carico dopo 14 giorni, avvisi) e Fase 4 (diagnosi, serie di settimane, 90 giorni).
+
+## Proposte in sospeso (Stefano non ha ancora risposto)
+
+- Schermata **"Rinnovi"** per fine anno: elenco di chi non ha rinnovato il codice Amway da cancellare in blocco.
+- Captcha prima del lancio (punto 4 sopra).
 
 ## Domande aperte
 
-- Chi può rigenerare il link personale di un partner che l'ha perso: solo Stefano e Alessia, o anche il suo sponsor?
+- (Risolta: il link personale perso lo rigenerano solo Stefano e Alessia.)
 - PIN di 4 cifre in più sul link personale? (Proposta: per ora no.)

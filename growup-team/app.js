@@ -903,14 +903,12 @@ function obiettiviDi(pid){
 /* L'etichetta dice chi ha bisogno di te adesso e che tipo di aiuto serve */
 function etichettaDi(p){
   const s = soglieEtichette(), n = numeri4(p.id), o = obiettiviDi(p.id);
-  /* per chi usa l'app conta quando ha aggiornato lui; per chi è senza app, l'ultimo dato inserito */
-  const rif = p.stato === "gestito" ? (n.ultima || String(p.creato_il || "").slice(0, 10))
-                                    : String(p.ultimo_aggiornamento || p.creato_il || "").slice(0, 10);
+  const rif = String(p.ultimo_aggiornamento || p.creato_il || "").slice(0, 10);
   const giorni = rif ? giorniTra(rif, oggi()) : 99;
   const minContatti = Math.ceil(o.contatti * 4 * s.quota_contatti);
   let k, perche;
   if(giorni > s.giorni_da_chiamare){
-    k = "chiamare"; perche = p.stato === "gestito" ? `nessun dato inserito da ${plur(giorni, "giorno", "giorni")}` : `non aggiorna da ${plur(giorni, "giorno", "giorni")}`;
+    k = "chiamare"; perche = `non aggiorna da ${plur(giorni, "giorno", "giorni")}`;
   } else if(n.contatti < minContatti){
     k = "lista"; perche = `${plur(n.contatti, "contatto", "contatti")} in 4 settimane (obiettivo ${o.contatti} a settimana)`;
   } else if(n.piani < n.contatti * s.piani_per_contatti){
@@ -922,8 +920,9 @@ function etichettaDi(p){
   }
   return Object.assign({ k, perche, giorni, n }, ETICHETTE_GRUPPO[k]);
 }
+/* chi è senza app non ha etichetta: i suoi numeri dipendono da quando lo sponsor li inserisce */
 function elencoUrgenza(){
-  return alberoSotto(st.profilo.id, 0).map(x => ({ p:x.p, e:etichettaDi(x.p) }))
+  return alberoSotto(st.profilo.id, 0).filter(x => x.p.stato !== "gestito").map(x => ({ p:x.p, e:etichettaDi(x.p) }))
     .sort((a, b) => a.e.ordine - b.e.ordine || b.e.giorni - a.e.giorni || a.p.nome.localeCompare(b.p.nome));
 }
 function imbuto(){
@@ -967,12 +966,14 @@ function vImbuto(){
 }
 function vDaSeguire(){
   const l = elencoUrgenza();
-  if(!l.length) return "";
+  const senzaApp = alberoSotto(st.profilo.id, 0).filter(x => x.p.stato === "gestito").length;
+  if(!l.length && !senzaApp) return "";
   return `<div class="card">
     <div class="spread"><span class="eyebrow">Chi seguire adesso</span><span class="small">ultime 4 settimane</span></div>
-    <ul class="albero seguire">${l.map(({ p, e }) => `<li>
+    ${l.length ? `<ul class="albero seguire">${l.map(({ p, e }) => `<li>
       <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}"><span>${esc(p.nome)}</span><span class="small">${esc(e.perche)}</span></button>
-      <span class="pill ${e.cl}">${e.nome}</span></li>`).join("")}</ul>
+      <span class="pill ${e.cl}">${e.nome}</span></li>`).join("")}</ul>` : `<p class="muted">Nessuno nel tuo gruppo usa ancora l'app.</p>`}
+    ${senzaApp ? `<p class="small muted">${senzaApp === 1 ? "1 persona senza app non ha l'etichetta" : `${senzaApp} persone senza app non hanno l'etichetta`}: i numeri li inserisce lo sponsor, quando può. Le trovi nella struttura.</p>` : ""}
   </div>`;
 }
 
