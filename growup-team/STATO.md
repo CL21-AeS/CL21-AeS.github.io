@@ -80,6 +80,19 @@ dall'SQL Editor perché contiene un `delete`):
 - "Cambia sponsor" nella scheda, solo admin: sposta una persona con tutto il suo gruppo (niente giri);
 - "Manca qualcuno sopra?" più chiaro: la persona e il suo gruppo passano da soli; i "fratelli" si spuntano solo se serve.
 
+**Fase 2, blocco 3 — imbuto ed elenco per urgenza** (migrazione `010_etichette.sql` già applicata), pagina Gruppo:
+
+- **Imbuto del gruppo** (te escluso, ultime 4 settimane): contatti → piani → ordini, con obiettivo contatti del gruppo,
+  % dei contatti che diventano piani, % dei piani che diventano ordini, VP. Il **collo di bottiglia** è il primo
+  passaggio sotto soglia, evidenziato in giallo con una frase su cosa allenare (lista nomi, invito, follow-up);
+- **Chi seguire adesso**: tutto il gruppo ordinato per urgenza, con un'etichetta e il perché:
+  1. *Da chiamare*: non aggiorna da più di 7 giorni (per chi è senza app: nessun dato inserito da più di 7 giorni);
+  2. *Lista nomi*: in 4 settimane meno della metà dei contatti dell'obiettivo;
+  3. *Invito*: meno di 1 piano ogni 5 contatti;
+  4. *Follow-up*: almeno 2 piani ma meno della metà dei VP dell'obiettivo del mese;
+  5. *In crescita*: tutto il resto.
+  Le soglie si cambiano dal Table editor: `settings` → `soglie_etichette`. Toccando un nome si apre la scheda.
+
 ## Decisioni prese con Stefano
 
 - **Niente email**: si entra dal link d'invito dello sponsor (`#CODICE`) e poi dal link personale (`#chiave=…`),
@@ -94,7 +107,8 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi
 
-0. **Collaudo dei blocchi 1 e 2** della Fase 2, poi blocco 3: imbuto ed elenco per urgenza (vedi `FASE2.md`).
+0. **Collaudo dei blocchi 1-3** della Fase 2, poi blocco 4: scheda partner arricchita (4 settimane, punto debole,
+   azioni suggerite), "Fissa una chiamata" (calendario .ics + WhatsApp), storico del gruppo (vedi `FASE2.md`).
 1. (Fatto) **Collaudo dei ritocchi** dal telefono (ingresso, qualifiche, struttura, aggiunta manuale, link a chi è aggiunto),
    poi cancellare i profili di prova. Collaudo Fase 1 (fatto il 14-15 ottobre: ok) con due account:
    - Stefano e Alessia entrano con il link personale dai loro telefoni.
