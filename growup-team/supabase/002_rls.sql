@@ -3,7 +3,7 @@
 -- Il repository è pubblico e la chiave pubblica di Supabase sta nel codice:
 -- è sicura SOLO perché ogni tabella qui sotto ha la RLS attiva.
 -- Gli accessi anonimi di Supabase hanno il ruolo "authenticated": vedono qualcosa
--- solo dopo che entra_con_chiave o join_with_code li ha collegati a un profilo.
+-- solo dopo che entra_con_chiave o iscrivi_con_codice li ha collegati a un profilo.
 -- ============================================================
 
 alter table public.partners           enable row level security;
@@ -25,10 +25,10 @@ grant insert, update, delete on public.stage_requirements, public.settings to au
 -- Sul profilo si possono cambiare solo i campi propri: sponsor, stato, gestore,
 -- chiave, admin e codice d'invito non si toccano dal telefono.
 grant select (id, nome, email, sponsor_id, codice_invito, stato, gestore_id, data_iscrizione,
-              qualifica_iniziale, qualifica_iniziale_mese, pagamenti_iniziali, privacy_accettata_il,
-              is_admin, ultimo_aggiornamento, creato_da, creato_il)
+              qualifica_iniziale, percentuale_iniziale, qualifica_iniziale_mese, pagamenti_iniziali,
+              privacy_accettata_il, consenso_confermato_il, is_admin, ultimo_aggiornamento, creato_da, creato_il)
   on public.partners to authenticated;                      -- chiave_hash resta fuori
-grant update (nome, email, data_iscrizione, qualifica_iniziale, qualifica_iniziale_mese,
+grant update (nome, email, data_iscrizione, qualifica_iniziale, percentuale_iniziale, qualifica_iniziale_mese,
               pagamenti_iniziali, privacy_accettata_il)
   on public.partners to authenticated;
 
@@ -49,7 +49,8 @@ grant update (partner_id, mese, obiettivo_vp) on public.monthly_goals to authent
 
 revoke execute on function public.my_partner_id(), public.is_in_downline(uuid), public.sono_admin(),
   public.collega_profilo(), public.entra_con_chiave(text),
-  public.join_with_code(text, text, date, text, date, int),
+  public.iscrivi_con_codice(text, text, date, text, date, int, int),
+  public.aggiungi_partner(text, uuid, date, text, int, date, int), public.link_per_gestito(uuid),
   public.cambia_chiave(), public.nuova_chiave_per(uuid),
   public.sponsor_da_codice(text), public.nuovo_codice(), public.nuova_chiave_segreta(), public.impronta(text)
   from public, anon, authenticated;
@@ -62,7 +63,8 @@ revoke execute on function public.attivita_prima(), public.attivita_dopo(),
 grant execute on function public.sponsor_da_codice(text) to anon, authenticated;
 grant execute on function public.my_partner_id(), public.is_in_downline(uuid), public.sono_admin(),
   public.collega_profilo(), public.entra_con_chiave(text),
-  public.join_with_code(text, text, date, text, date, int),
+  public.iscrivi_con_codice(text, text, date, text, date, int, int),
+  public.aggiungi_partner(text, uuid, date, text, int, date, int), public.link_per_gestito(uuid),
   public.cambia_chiave(), public.nuova_chiave_per(uuid)
   to authenticated;
 
@@ -76,7 +78,7 @@ create policy partners_modifico_me on public.partners
   for update to authenticated
   using (id = public.my_partner_id())
   with check (id = public.my_partner_id());
--- Nessuna policy di insert/delete: il profilo nasce solo da join_with_code.
+-- Nessuna policy di insert/delete: il profilo nasce solo da iscrivi_con_codice.
 
 -- ---- activities: scrivo solo le mie; leggo le mie e quelle della mia downline ----
 

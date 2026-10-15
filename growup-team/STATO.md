@@ -1,0 +1,62 @@
+# Growup Team — a che punto siamo
+
+Ultimo aggiornamento: 15 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+
+## Fatto
+
+**Fase 1 pubblicata** su https://cl21-aes.github.io/growup-team/ (PR CL21-AeS/CL21-AeS.github.io#1, unita a `main`).
+
+- **Database**: progetto Supabase **Growup-Team** (`mxpuvmggexjyieylmfss`), organizzazione "CL21-AeS's Org",
+  regione Central EU (Francoforte). Installati schema, RLS, 8 tappe e impostazioni; i controlli dei permessi
+  (`supabase/tests_rls.sql`) sono passati sul progetto.
+- **Profilo radice**: un solo profilo **"Stefano e Alessia"** (admin), codice d'invito **ABCDEF**.
+  Il link personale è stato salvato da Stefano su WhatsApp (non è in nessun file: nel database c'è solo l'impronta).
+- **Accesso anonimo** attivo in Supabase (Authentication → Sign In / Providers).
+- `config.js` contiene URL e chiave publishable del progetto.
+- Claude ha accesso al progetto tramite il connettore Supabase (MCP). Nota: le istruzioni SQL che contengono
+  `delete` richiedono una conferma che dal connettore scade; quelle parti si lanciano dall'SQL Editor.
+
+**Ritocchi dopo il primo collaudo (15 ottobre)**, migrazione `supabase/004_ritocchi.sql` già applicata al progetto:
+
+- marchio **A&S** al posto di CumLaude21; "Due informazioni e iniziamo", pulsante "Inizia";
+- tolte le opzioni prima/dopo il 1° giugno 2026: la data di iscrizione è obbligatoria solo per chi sceglie "Inizio";
+  il Path to Bronze conta tutte le prime linee (vincolo di data tolto dal database);
+- "Qualifica più alta raggiunta": Inizio, pin 3%…21% (campo `percentuale_iniziale`) e qualifiche Bronze/Argento;
+  primo ordine e primi clienti non si dichiarano. Un pin senza Bronze fa partire dal Path to Bronze;
+- "Entra con il tuo link personale" ora ha il ritorno all'invito;
+- **La mia struttura**: albero della downline, **+ Aggiungi persona** (chi non usa l'app, posizione a scelta nella
+  propria struttura, conferma del consenso) e **Manda il link** per farle prendere possesso del profilo
+  (al primo ingresso accetta la privacy);
+- l'iscrizione ora è la funzione `iscrivi_con_codice`; la vecchia `join_with_code` non è più richiamabile
+  (si può eliminare dall'SQL Editor, vedi 004).
+- Profili di prova nel database: "Prova uno" e "Prova due" (da cancellare a collaudo finito).
+
+## Decisioni prese con Stefano
+
+- **Niente email**: si entra dal link d'invito dello sponsor (`#CODICE`) e poi dal link personale (`#chiave=…`),
+  che il partner si manda da solo su WhatsApp (chat con sé stesso) o Telegram (Messaggi salvati).
+  Scelta confermata: niente custodia delle chiavi da parte dello sponsor (rispetta "nessuno modifica un partner attivo").
+- **Stefano e Alessia**: un solo profilo e un solo codice per tutti e due.
+- **Primi clienti**: valgono i primi 3 in totale, non nello stesso mese. Dopo, solo il conteggio dei nuovi clienti
+  del mese, senza obiettivo.
+- **Obiettivi**: contatti (10) e piani (3) a settimana; VP solo al mese (100, o di più se la tappa lo chiede).
+
+## Prossimi passi
+
+1. **Collaudo dei ritocchi** dal telefono (ingresso, qualifiche, struttura, aggiunta manuale, link a chi è aggiunto),
+   poi cancellare i profili di prova. Collaudo Fase 1 (fatto il 14-15 ottobre: ok) con due account:
+   - Stefano e Alessia entrano con il link personale dai loro telefoni.
+   - Un secondo telefono entra da `https://cl21-aes.github.io/growup-team/#ABCDEF`, compila l'ingresso,
+     salva il suo link personale, registra un contatto con un tocco e lo ritrova da un altro dispositivo.
+   - In Supabase → Table editor → partners il nuovo partner ha `sponsor_id` = "Stefano e Alessia".
+2. Raccogliere e sistemare quello che emerge dal collaudo.
+3. **Piano tecnico della Fase 2** (visione upline: Il mio gruppo, Scheda partner, Struttura; VP di gruppo e linee
+   attive calcolati dall'albero; conferma dello sponsor sul punto di partenza; rigenerare il link a un partner che
+   l'ha perso direttamente dall'app). Da far approvare prima di scrivere codice.
+4. Prima del lancio a tutto il gruppo: captcha (Cloudflare Turnstile) sugli accessi anonimi e limite
+   "anonymous sign-ins" più alto in Authentication → Rate Limits.
+
+## Domande aperte
+
+- Chi può rigenerare il link personale di un partner che l'ha perso: solo Stefano e Alessia, o anche il suo sponsor?
+- PIN di 4 cifre in più sul link personale? (Proposta: per ora no.)

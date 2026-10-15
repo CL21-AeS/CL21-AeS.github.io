@@ -64,15 +64,16 @@ declare
   u5 constant uuid := '00000000-0000-0000-0000-0000000000a5';  -- A, secondo dispositivo
   u6 constant uuid := '00000000-0000-0000-0000-0000000000a6';  -- R, telefono di Alessia
   u7 constant uuid := '00000000-0000-0000-0000-0000000000a7';  -- telefono nuovo, poi D
-  r uuid; a uuid; b uuid; c uuid; d uuid;
-  k_r text; k_a text; k_a2 text; k_d text;
+  u8 constant uuid := '00000000-0000-0000-0000-0000000000a8';  -- E, aggiunta a mano, poi entra
+  r uuid; a uuid; b uuid; c uuid; d uuid; e uuid;
+  k_r text; k_a text; k_a2 text; k_d text; k_e text;
 begin
   begin  -- tutto quello che succede qui dentro viene annullato alla fine
 
   -- ---- Preparazione (come amministratore del database) ----
   insert into auth.users (id, aud, role)
   select ('00000000-0000-0000-0000-0000000000a' || i)::uuid, 'authenticated', 'authenticated'
-  from generate_series(1, 7) i;
+  from generate_series(1, 8) i;
 
   insert into public.partners (nome, codice_invito, is_admin, stato)
   values ('Radice Test', 'RRRR22', true, 'gestito') returning id into r;
@@ -103,19 +104,21 @@ begin
 
   -- ---- Iscrizioni dai link d'invito ----
   perform growup_test.come(u2);
-  perform growup_test.deve_fallire($q$select public.join_with_code('ZZZZ99','A',null)$q$, 'codice inesistente');
-  perform growup_test.deve_fallire($q$select public.join_with_code('RRRR22','A', current_date + 5)$q$, 'data di iscrizione nel futuro');
-  k_a := public.join_with_code('RRRR22', 'Anna Test', date '2026-07-01')->>'chiave';
+  perform growup_test.deve_fallire($q$select public.iscrivi_con_codice('ZZZZ99','A',null)$q$, 'codice inesistente');
+  perform growup_test.deve_fallire($q$select public.iscrivi_con_codice('RRRR22','A', current_date + 5)$q$, 'data di iscrizione nel futuro');
+  k_a := public.iscrivi_con_codice('RRRR22', 'Anna Test', date '2026-07-01')->>'chiave';
   a := (public.collega_profilo()->>'id')::uuid;
   perform growup_test.ok((public.collega_profilo()->>'sponsor_id')::uuid = r, 'A agganciata a R');
-  perform growup_test.deve_fallire($q$select public.join_with_code('RRRR22','A',null)$q$, 'secondo profilo dallo stesso telefono');
+  perform growup_test.deve_fallire($q$select public.iscrivi_con_codice('RRRR22','A',null)$q$, 'secondo profilo dallo stesso telefono');
   execute 'reset role';
   update public.partners set codice_invito = 'AAAA22' where id = a;
 
   perform growup_test.come(u3);
-  b := (public.join_with_code('aaaa22', 'Bruno Test', null, 'path_to_bronze')->'profilo'->>'id')::uuid;
+  b := (public.iscrivi_con_codice('aaaa22', 'Bruno Test', null, 'path_to_bronze')->'profilo'->>'id')::uuid;
   perform growup_test.come(u4);
-  c := (public.join_with_code('RRRR22', 'Carla Test', null)->'profilo'->>'id')::uuid;
+  perform growup_test.deve_fallire($q$select public.iscrivi_con_codice('RRRR22','C',null,null,null,0,7)$q$, 'pin inesistente');
+  c := (public.iscrivi_con_codice('RRRR22', 'Carla Test', null, null, null, 0, 9)->'profilo'->>'id')::uuid;
+  perform growup_test.ok((public.collega_profilo()->>'percentuale_iniziale')::int = 9, 'pin 9% registrato senza qualifica Bronze');
   execute 'reset role';
   perform growup_test.ok((select sponsor_id from public.partners where id = b) = a, 'B agganciato ad A');
 
@@ -177,7 +180,7 @@ begin
   perform growup_test.deve_fallire('update public.partners set is_admin = true where id = public.my_partner_id()', 'A non si fa admin');
   perform growup_test.deve_fallire($q$update public.partners set stato = 'gestito' where id = public.my_partner_id()$q$, 'A non cambia stato');
   perform growup_test.deve_fallire($q$update public.partners set chiave_hash = 'x' where id = public.my_partner_id()$q$, 'A non scrive l''impronta');
-  perform growup_test.deve_fallire($q$insert into public.partners (nome) values ('Fantasma')$q$, 'nessun profilo fuori da join_with_code');
+  perform growup_test.deve_fallire($q$insert into public.partners (nome) values ('Fantasma')$q$, 'nessun profilo fuori da iscrivi_con_codice');
   perform growup_test.deve_fallire(format('insert into public.accessi (user_id, partner_id) values (auth.uid(), %L)', r),
                                    'nessuno si collega da solo a un altro profilo');
   perform growup_test.ok(growup_test.righe($q$update public.partners set nome = 'Anna T.' where id = public.my_partner_id()$q$) = 1, 'A cambia il suo nome');
@@ -215,6 +218,30 @@ begin
   perform growup_test.ok(public.entra_con_chiave(k_d)->>'stato' = 'attivo', 'D prende possesso e diventa attivo');
   perform growup_test.ok((select count(*) from public.activities) = 1, 'D ritrova il suo storico');
   perform growup_test.ok((select count(*) from public.partners) = 1, 'nessun duplicato');
+
+  -- ---- Aggiungere a mano una persona che non usa l'app ----
+  perform growup_test.come(u5);  -- A (dal computer)
+  e := (public.aggiungi_partner('Elena Test', b, null, null, 6)->>'id')::uuid;
+  execute 'reset role';
+  perform growup_test.ok((select sponsor_id = b and stato = 'gestito' and gestore_id = a and consenso_confermato_il is not null
+                          from public.partners where id = e), 'E aggiunta sotto B, gestita da A, con consenso');
+  perform growup_test.come(u5);
+  perform growup_test.ok(exists (select 1 from public.partners where id = e), 'A vede E nella sua struttura');
+  perform growup_test.deve_fallire(format($q$select public.aggiungi_partner('X', %L)$q$, r), 'A non aggiunge persone sopra di sé');
+  perform growup_test.deve_fallire(format($q$select public.aggiungi_partner('X', %L)$q$, c), 'A non aggiunge persone in un''altra linea');
+  perform growup_test.deve_fallire(format($q$select public.aggiungi_partner('', %L)$q$, a), 'serve il nome');
+  perform growup_test.deve_fallire(format('select public.link_per_gestito(%L)', b), 'niente link per chi usa già l''app');
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.deve_fallire(format('select public.link_per_gestito(%L)', e), 'C non genera il link di E');
+  perform growup_test.ok(public.collega_profilo() is not null and not exists (select 1 from public.partners where id = e), 'C non vede E');
+  perform growup_test.come(u1);  -- R, upline di E
+  perform growup_test.ok(length(public.link_per_gestito(e)) = 32, 'chi sta sopra genera il link di E');
+  perform growup_test.come(u5);  -- A, gestore di E
+  k_e := public.link_per_gestito(e);
+  perform growup_test.come(u8);
+  perform growup_test.ok(public.entra_con_chiave(k_e)->>'stato' = 'attivo', 'E apre il suo link e diventa attiva');
+  perform growup_test.come(u5);
+  perform growup_test.deve_fallire(format('select public.link_per_gestito(%L)', e), 'E è attiva: niente più link dal gestore');
 
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
