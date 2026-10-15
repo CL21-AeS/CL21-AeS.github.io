@@ -382,6 +382,34 @@ begin
   perform growup_test.ok((select count(*) from public.riepilogo_mese(current_date) where partner_id in (h, k, e, g)) = 4,
                          'i numeri del mese seguono la struttura corretta');
 
+  -- ---- Cambiare sponsor: solo admin ----
+  perform growup_test.come(u5);  -- A
+  perform growup_test.deve_fallire(format('select public.cambia_sponsor(%L, %L)', d, a), 'A non cambia sponsor (non è admin)');
+  perform growup_test.come(u1);  -- R admin
+  perform growup_test.ok((public.cambia_sponsor(d, c)->>'sponsor_id')::uuid = c, 'l''admin sposta D sotto C');
+  perform growup_test.deve_fallire(format('select public.cambia_sponsor(%L, %L)', a, b), 'niente giri: A non va sotto qualcuno del suo gruppo');
+  perform growup_test.deve_fallire(format('select public.cambia_sponsor(%L, %L)', r, a), 'la radice non si sposta');
+  perform growup_test.ok(public.cambia_sponsor(d, a) is not null, 'l''admin rimette D sotto A');
+
+  -- ---- Cancellare una persona: sponsor e upline; chi stava sotto sale ----
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.deve_fallire(format('select public.cancella_partner(%L)', h), 'C non cancella nella linea di A');
+  perform growup_test.come(u5);  -- A
+  perform growup_test.deve_fallire(format('select public.cancella_partner(%L)', a), 'nessuno cancella sé stesso');
+  perform growup_test.deve_fallire(format('select public.cancella_partner(%L)', r), 'nessuno cancella chi sta sopra');
+  perform growup_test.ok(public.cancella_partner(h) = 1, 'A cancella H: una persona sale');
+  execute 'reset role';
+  perform growup_test.ok(not exists (select 1 from public.partners where id = h), 'H non c''è più');
+  perform growup_test.ok((select sponsor_id from public.partners where id = b) = a, 'B è salito sotto A, con il suo gruppo');
+  perform growup_test.ok((select sponsor_id from public.partners where id = k) = b, 'il gruppo di B è rimasto intatto');
+  perform growup_test.come(u3);  -- B cancella G (usa l'app, ha attività)
+  perform growup_test.ok(public.cancella_partner(g) = 0, 'B cancella G');
+  execute 'reset role';
+  perform growup_test.ok(not exists (select 1 from public.activities where partner_id = g)
+                         and not exists (select 1 from public.monthly_totals where partner_id = g)
+                         and not exists (select 1 from public.accessi where partner_id = g),
+                         'con G spariscono attività, storico e telefoni collegati');
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),

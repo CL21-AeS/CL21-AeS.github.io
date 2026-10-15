@@ -45,6 +45,8 @@ function creaApi(){
                     + "qualifica_iniziale,percentuale_iniziale,qualifica_iniziale_mese,pagamenti_iniziali,partenza_confermata_il").order("creato_il")),
     conferma:     args => q(sb.rpc("conferma_partenza", args)),
     inMezzo:      args => q(sb.rpc("inserisci_in_mezzo", args)),
+    cancella:     pid => q(sb.rpc("cancella_partner", { p_partner:pid })),
+    cambiaSponsor: (pid, sp) => q(sb.rpc("cambia_sponsor", { p_partner:pid, p_sponsor:sp })),
     nuovaChiavePer: pid => q(sb.rpc("nuova_chiave_per", { p_partner:pid })),
     aggiungi:     args => q(sb.rpc("aggiungi_partner", args)),
     linkGestito:  pid => q(sb.rpc("link_per_gestito", { p_partner:pid })),
@@ -142,6 +144,7 @@ const MESSAGGI_ERRORE = {
   nome_mancante: "Scrivi il nome della persona.",
   non_gestito: "Questa persona usa già l'app: entra con il suo link personale.",
   non_autorizzato: "Non puoi farlo per questa persona.",
+  partner_inesistente: "Questa persona non c'è più nella struttura.",
   mese_chiuso: "Quel mese è già chiuso: si registrano il mese in corso e, fino al giorno 5, il mese precedente.",
   non_autenticato: "Sessione scaduta: apri di nuovo il tuo link personale."
 };
@@ -914,7 +917,14 @@ function vScheda(){
     <p class="small" style="margin:0">Usa l'app: i suoi numeri li aggiorna lui.</p>
     ${st.profilo.is_admin ? `<button class="btn wide" style="margin-top:12px" data-act="nuovo-link" data-id="${esc(p.id)}">Nuovo link personale</button>
       <p class="nota">Solo per chi ha perso il suo link: quello vecchio smette di funzionare e i suoi telefoni vanno ricollegati.</p>` : ""}
-  </div>`}`;
+  </div>`}
+  <div class="card">
+    <span class="eyebrow">Struttura</span>
+    ${st.profilo.is_admin ? `<button class="btn wide" style="margin-top:10px" data-act="cambia-sponsor" data-id="${esc(p.id)}">Cambia sponsor</button>` : ""}
+    <button class="btn wide pericolo" style="margin-top:10px" data-act="cancella" data-id="${esc(p.id)}">Cancella dalla struttura</button>
+    <p class="nota">Per i codici che Amway non rinnova. Chi è nel suo gruppo passa a ${esc(sponsor || "il suo sponsor")};
+      i suoi dati vengono cancellati.</p>
+  </div>`;
 }
 
 function testoInvito(){
@@ -1014,19 +1024,34 @@ function vSheet(){
       ${piede}${err}
     </form>`;
   }
+  if(s === "cambia-sponsor"){
+    const x = st.struttura.find(y => y.id === st.spostaId);
+    if(!x) return "";
+    const esclusi = new Set([x.id, x.sponsor_id].concat(alberoSotto(x.id, 0).map(z => z.p.id)));
+    const posti = [{ p:st.profilo, livello:0 }].concat(alberoSotto(st.profilo.id, 1)).filter(z => !esclusi.has(z.p.id));
+    return `<h2>Cambia sponsor di ${esc(nomeSaluto(x.nome))}</h2>
+    <p class="small">${esc(x.nome)} passa sotto il nuovo sponsor con tutto il suo gruppo. Lo storico dei mesi chiusi non cambia.</p>
+    <form data-form="cambia-sponsor" novalidate>
+      <label class="field"><span>Nuovo sponsor</span><select name="sponsor">${posti.map(({ p, livello }) =>
+        `<option value="${esc(p.id)}">${"— ".repeat(livello)}${esc(p.id === st.profilo.id ? p.nome + " (noi)" : p.nome)}</option>`).join("")}</select></label>
+      ${piede}${err}
+    </form>`;
+  }
   if(s === "in-mezzo"){
     const x = st.struttura.find(y => y.id === st.inMezzoId);
     if(!x) return "";
     const sopra = x.sponsor_id === st.profilo.id ? "te" : nomeDi(x.sponsor_id);
-    const fratelli = st.struttura.filter(y => y.sponsor_id === x.sponsor_id);
-    return `<h2>Inserisci in mezzo</h2>
-    <p class="small">Per chi manca nella linea tra <b>${esc(sopra)}</b> e <b>${esc(x.nome)}</b>. La persona entra come
+    const fratelli = st.struttura.filter(y => y.sponsor_id === x.sponsor_id && y.id !== x.id);
+    return `<h2>Manca qualcuno sopra ${esc(nomeSaluto(x.nome))}?</h2>
+    <p class="small">Inserisci la persona che manca tra <b>${esc(sopra)}</b> e <b>${esc(x.nome)}</b>. Entra come
       "senza app": puoi inserire i suoi numeri o mandarle il suo link.</p>
     <form data-form="in-mezzo" novalidate>
+      <input type="hidden" name="sotto" value="${esc(x.id)}">
       <label class="field"><span>Nome e cognome</span><input name="nome" autocomplete="off" maxlength="80" required></label>
-      <div class="field" style="margin-top:14px"><span class="small">Chi è sotto questa persona? (sponsorizzati da lei)</span>
-        <div class="scelte">${fratelli.map(y => `<label><input type="checkbox" name="sotto" value="${esc(y.id)}" ${y.id === x.id ? "checked" : ""}> ${esc(y.nome)}</label>`).join("")}</div>
-        <p class="nota">Chi spunti si sposta sotto la nuova persona, con tutto il suo gruppo.</p></div>
+      <p class="avviso">${esc(x.nome)} e tutto il suo gruppo passano sotto questa persona.</p>
+      ${fratelli.length ? `<div class="field" style="margin-top:14px"><span class="small">Facoltativo: anche altri di ${esc(sopra)} sono in realtà suoi?
+        Spunta solo se è così.</span>
+        <div class="scelte">${fratelli.map(y => `<label><input type="checkbox" name="sotto" value="${esc(y.id)}"> ${esc(y.nome)}</label>`).join("")}</div></div>` : ""}
       ${campiQualifica(false)}
       <label class="check"><input type="checkbox" name="consenso" required>
         <span>Ho il suo consenso (a voce o per messaggio) a inserire il suo nome e i suoi numeri nell'app.</span></label>
@@ -1137,6 +1162,22 @@ const AZIONI = {
     catch(e){ toast(messaggio(e)); }
   },
   conferma(el){ st.confermaId = el.dataset.id; st.sheet = "conferma"; render(); },
+  "cambia-sponsor"(el){ st.spostaId = el.dataset.id; st.errore = ""; st.sheet = "cambia-sponsor"; render(); },
+  async cancella(el){
+    const p = st.struttura.find(x => x.id === el.dataset.id);
+    if(!p) return;
+    const sopra = p.sponsor_id === st.profilo.id ? "te" : nomeDi(p.sponsor_id);
+    const sotto = figli(p.id).length;
+    if(!confirm(`Cancellare ${p.nome} dalla struttura?\n\nI suoi dati (attività, obiettivi, storico) vengono cancellati.`
+      + (sotto ? `\n${sotto === 1 ? "La persona del suo gruppo passa" : `Le ${sotto} persone dirette del suo gruppo passano`} a ${sopra}, con tutto il loro gruppo.` : "")
+      + "\n\nNon si può annullare.")) return;
+    try{
+      await api.cancella(p.id);
+      await caricaStruttura(); await caricaNumeri();
+      st.vista = "gruppo"; st.schedaId = null; st.target = null; render(); window.scrollTo(0, 0);
+      toast(`${p.nome} cancellato${sotto ? `: il suo gruppo ora è di ${sopra}` : ""}`);
+    }catch(e){ toast(messaggio(e)); }
+  },
   "in-mezzo"(el){ st.inMezzoId = el.dataset.id; st.errore = ""; st.sheet = "in-mezzo"; render(); },
   async "nuovo-link"(el){
     const p = st.struttura.find(x => x.id === el.dataset.id);
@@ -1220,9 +1261,18 @@ const MODULI = {
       st.fase = "home"; render();
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
+  async "cambia-sponsor"(f){
+    const x = st.struttura.find(y => y.id === st.spostaId);
+    try{
+      await api.cambiaSponsor(st.spostaId, f.sponsor.value);
+      await caricaStruttura(); await caricaNumeri();
+      st.sheet = null; render();
+      toast(`${x ? x.nome : ""} ora è ${f.sponsor.value === st.profilo.id ? "nel vostro gruppo diretto" : "nel gruppo di " + nomeDi(f.sponsor.value)}`);
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
   async "in-mezzo"(f){
     const nome = f.nome.value.trim();
-    const sotto = Array.from(f.querySelectorAll("input[name=sotto]:checked")).map(i => i.value);
+    const sotto = Array.from(f.querySelectorAll("input[name=sotto][type=hidden], input[name=sotto]:checked")).map(i => i.value);
     const q = leggiQualifica(f);
     let err = "";
     if(!nome) err = "Scrivi il nome della persona.";
