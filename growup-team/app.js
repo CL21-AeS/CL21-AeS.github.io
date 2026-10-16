@@ -91,6 +91,7 @@ const st = {
   struttura: [],          // io e la mia downline
   linkGestito: null,      // { nome, chiave } da mandare a una persona aggiunta a mano
   riep: [],               // numeri del mese in corso: io e la mia downline (riepilogo_mese)
+  chiusi: new Set(),       // nella struttura: persone con il gruppo richiuso
   gruppo4: { att:[], goals:[], mgoals:[] },  // ultime 4 settimane del gruppo: imbuto ed etichette
   riepPrec: [],           // lo stesso per il mese precedente, finché non è chiuso
   storico: [],            // i miei mesi chiusi (monthly_totals)
@@ -930,20 +931,33 @@ function statoDi(p){
   return g <= 7 ? { txt:"attivo", cl:"v", g } : g <= 14 ? { txt:"rallenta", cl:"g", g } : { txt:"fermo", cl:"r", g };
 }
 function vStruttura(){
-  const righe = alberoSotto(st.profilo.id, 0);
+  /* Come nei report Amway: accanto al nome il livello (1 = tuoi diretti, 2 = i loro, …) e lo sponsor;
+     il gruppo di una persona si può richiudere. */
+  const tutte = alberoSotto(st.profilo.id, 0), righe = [];
+  let nascondiSotto = -1;
+  for(const r of tutte){
+    if(nascondiSotto >= 0 && r.livello > nascondiSotto) continue;
+    nascondiSotto = st.chiusi.has(r.p.id) ? r.livello : -1;
+    righe.push(r);
+  }
   return `<div class="card">
     <div class="spread"><span class="eyebrow">La mia struttura</span>
       <button class="btn small" data-act="aggiungi">+ Aggiungi persona</button></div>
     ${righe.length ? `<ul class="albero">${righe.map(({ p, livello }) => {
       const r = rigaDi(st.riep, p.id) || {}, sp = statoDi(p);
-      return `<li style="padding-left:${Math.min(livello, 6) * 16}px">
+      const quanti = alberoSotto(p.id, 0).length, chiuso = st.chiusi.has(p.id);
+      return `<li class="liv" style="--rientro:${Math.min(livello, 4) * 10}px">
+      <span class="livello l${livello % 4}" title="Livello ${livello + 1}">${livello + 1}</span>
       <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}">
-        <span>${livello ? `<span class="faint">└ </span>` : ""}${esc(p.nome)}</span>
-        <span class="small">${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${r.linee_attive ? ` · ${r.linee_attive} ${r.linee_attive === 1 ? "linea" : "linee"}` : ""}</span>
+        <span>${esc(p.nome)}</span>
+        <span class="small">${livello ? `sponsor ${esc(nomeSaluto(nomeDi(p.sponsor_id)))} · ` : ""}${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${r.linee_attive ? ` · ${r.linee_attive} ${r.linee_attive === 1 ? "linea" : "linee"}` : ""}</span>
       </button>
+      ${quanti ? `<button class="piega" data-act="piega" data-id="${esc(p.id)}" aria-expanded="${!chiuso}"
+        aria-label="${chiuso ? "Mostra" : "Nascondi"} il gruppo di ${esc(p.nome)}">${chiuso ? "▸" : "▾"} ${quanti}</button>` : ""}
       ${p.partenza_confermata_il ? "" : `<span class="pill g" title="Punto di partenza da confermare">!</span>`}
       <span class="pill ${sp.cl}">${sp.txt}</span></li>`; }).join("")}</ul>
-      <p class="nota">Tocca un nome per aprire la sua scheda. VP del mese e VP di gruppo.</p>`
+      <p class="nota">Il numero è il livello: 1 i tuoi diretti, 2 i loro, e così via. ▾ chiude o riapre il gruppo di una persona.
+        Tocca un nome per aprire la sua scheda.</p>`
       : `<p class="muted" style="margin:8px 0 0">Ancora nessuno nel tuo gruppo. Invita chi usa il telefono con il link qui sotto,
           oppure aggiungi a mano chi non usa l'app.</p>`}
   </div>`;
@@ -1507,6 +1521,7 @@ const AZIONI = {
   },
   "vista-io"(){ st.vista = "io"; st.target = null; render(); window.scrollTo(0, 0); },
   "vista-gruppo"(){ st.vista = "gruppo"; st.target = null; st.schedaId = null; render(); window.scrollTo(0, 0); },
+  piega(el){ const id = el.dataset.id; if(st.chiusi.has(id)) st.chiusi.delete(id); else st.chiusi.add(id); render(); },
   async "apri-scheda"(el){
     const p = st.struttura.find(x => x.id === el.dataset.id);
     if(!p) return;

@@ -122,7 +122,7 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare l'invito nuovo** (anteprima del link, testo con il nome, immagini; icona già unita con la PR #21) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare i livelli nella struttura** (invito nuovo già unito con la PR #22) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
@@ -161,7 +161,11 @@ dall'SQL Editor perché contiene un `delete`):
   (B + D, E)** in `design/GRAFICA.md`; tavola con tutte le prove in `design/tavola-grafica.html`.
   **Icona nuova: G Smeraldo** (G avorio con la stanghetta che diventa una freccia ambra che sale), `icon.svg`
   e PNG per Android, iPhone e browser. Per vederla sul telefono va reinstallata l'app.
-- **Invito** (16 ottobre, approvato da Stefano): anteprima del link su WhatsApp/Telegram (`anteprima.png` + meta
+- **Livelli nella struttura** (17 ottobre, richiesta di Stefano: con tante persone non si capiva chi è sotto chi):
+  come nei report Amway, accanto al nome un cerchio con il **livello** (1 = diretti, 2 = i loro, …, colore diverso
+  per livello), sotto il nome **"sponsor Nome"**, rientro più piccolo; pulsante **▾ N / ▸ N** per richiudere
+  o riaprire il gruppo di una persona (N = quante persone ha nel gruppo).
+1. **Pubblicare i livelli nella struttura** (invito nuovo già unito con la PR #22), approvato da Stefano): anteprima del link su WhatsApp/Telegram (`anteprima.png` + meta
   og: in `index.html`, frase "La tua crescita, settimana dopo settimana."); testo d'invito con il nome di chi invita
   ("Siamo Stefano e Alessia: ti mandiamo…" / "Sono Marco: ti mando…") e i tre passi (entra, salva il link personale,
   installa l'app); nel riquadro "Invita un nuovo partner" i pulsanti **Immagine** (`invito-quadrato.png`) e
