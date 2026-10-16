@@ -122,14 +122,16 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare il ritocco "etichette come dati"** (16 ottobre; "niente suggerimenti" già unito con la PR #11) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare il confronto col mese prima nella scheda partner** (16 ottobre; "niente suggerimenti" ed
+   "etichette come dati" già uniti con le PR #11 e #12) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono dei blocchi 1-3** della Fase 2 (pagina Io con i calcoli, struttura con i numeri,
-   scheda partner, partner senza app, Da confermare, in mezzo / cancella / cambia sponsor, imbuto ed etichette).
+   scheda partner, partner senza app, Da confermare, in mezzo / cancella / cambia sponsor, imbuto ed etichette) e del nuovo confronto col mese prima.
 3. **Blocco 4 della Fase 2** (ultimo, vedi `FASE2.md`):
-   - scheda partner arricchita: ultime 4 settimane di contatti, piani, VP, confrontate con la media del gruppo
-     e con chi cresce, evidenziando dove sta sotto; **niente azioni suggerite**;
+   - (FATTO il 16 ottobre, da pubblicare/collaudare) scheda partner: riquadro **"Questo mese e il mese prima"**,
+     confronto con i **suoi numeri del mese prima** (non con la media del gruppo: scelta di Stefano), fino a oggi /
+     mese prima allo stesso giorno / mese prima totale; ▼ in rosso dove è sotto; niente azioni suggerite;
    - "Fissa una chiamata": evento di calendario (.ics) con promemoria e note **e** messaggio WhatsApp già scritto;
    - storico del gruppo (mesi chiusi da `monthly_totals`).
 4. **Prima del lancio a tutto il gruppo**: captcha (Cloudflare Turnstile) sugli accessi anonimi e limite
