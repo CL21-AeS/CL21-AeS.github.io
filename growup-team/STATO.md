@@ -122,17 +122,22 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare il confronto col mese prima nella scheda partner** (16 ottobre; "niente suggerimenti" ed
-   "etichette come dati" già uniti con le PR #11 e #12) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare "Fissa una chiamata"** (16 ottobre; "niente suggerimenti", "etichette come dati" e il confronto col
+   mese prima già uniti con le PR #11, #12 e #13) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
-2. **Collaudo dal telefono dei blocchi 1-3** della Fase 2 (pagina Io con i calcoli, struttura con i numeri,
-   scheda partner, partner senza app, Da confermare, in mezzo / cancella / cambia sponsor, imbuto ed etichette) e del nuovo confronto col mese prima.
+2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
+   scheda partner, partner senza app, Da confermare, in mezzo / cancella / cambia sponsor, imbuto ed etichette),
+   del confronto col mese prima e di "Fissa una chiamata"
+   (provare il file .ics sia su iPhone sia su Android).
 3. **Blocco 4 della Fase 2** (ultimo, vedi `FASE2.md`):
    - (FATTO il 16 ottobre, da pubblicare/collaudare) scheda partner: riquadro **"Questo mese e il mese prima"**,
      confronto con i **suoi numeri del mese prima** (non con la media del gruppo: scelta di Stefano), fino a oggi /
      mese prima allo stesso giorno / mese prima totale; ▼ in rosso dove è sotto; niente azioni suggerite;
-   - "Fissa una chiamata": evento di calendario (.ics) con promemoria e note **e** messaggio WhatsApp già scritto;
+   - (FATTO il 16 ottobre, da pubblicare/collaudare) **"Fissa una chiamata"** nella scheda partner: giorno, ora
+     (proposta domani alle 21), durata, promemoria, note → **Calendario** scarica un file .ics da aprire e aggiungere;
+     **WhatsApp** apre un messaggio neutro già scritto ("Ciao Marco, ci sentiamo sabato 17 ottobre alle 21:00?")
+     e si sceglie a chi mandarlo (l'app non conserva numeri di telefono né le chiamate fissate);
    - storico del gruppo (mesi chiusi da `monthly_totals`).
 4. **Prima del lancio a tutto il gruppo**: captcha (Cloudflare Turnstile) sugli accessi anonimi e limite
    "anonymous sign-ins" più alto in Authentication → Rate Limits.
