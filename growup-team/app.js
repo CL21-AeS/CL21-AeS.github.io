@@ -1227,21 +1227,32 @@ function vScheda(){
   </div>`;
 }
 
+/* Il messaggio d'invito: con il nome di chi invita e i tre passi per entrare, salvare il link e installare l'app */
 function testoInvito(){
-  return `Ciao! Ti mando Growup, l'app del nostro gruppo per pianificare la settimana e seguire il percorso fino ad Argento. `
-       + `Apri il link e inizi subito, non serve nessuna registrazione:`;
+  const n = nomeSaluto(st.profilo && st.profilo.nome), noi = / e /i.test(n);
+  return `Ciao! ${n ? `${noi ? "Siamo" : "Sono"} ${n}: ` : ""}${noi ? "ti mandiamo" : "ti mando"} Growup, l'app del nostro gruppo A&S `
+       + `per pianificare la settimana e seguire il percorso fino ad Argento.\n\n`
+       + `1. Apri il link qui sotto e scrivi nome e qualifica: in un minuto sei dentro, senza registrazione.\n`
+       + `2. L'app ti dà il tuo link personale: mandalo a te stesso su WhatsApp e tienilo, è la tua chiave.\n`
+       + `3. Installa l'app: su Android menu ⋮ → Installa app; su iPhone Condividi → Aggiungi alla schermata Home.`;
 }
 function vInvita(){
   return `<div class="card">
     <span class="eyebrow">Invita un nuovo partner</span>
     <p class="small" style="margin:4px 0 0">Chi entra con questo link entra nel tuo gruppo, con te come sponsor. Non è il tuo link personale: questo si può girare.</p>
     <div class="condividi">
-      <a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(testoInvito() + " " + linkInvito())}">WhatsApp</a>
+      <a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(testoInvito() + "\n\n" + linkInvito())}">WhatsApp</a>
       <a class="btn tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(linkInvito())}&text=${encodeURIComponent(testoInvito())}">Telegram</a>
       <button class="btn" data-act="copia">Copia link</button>
       ${navigator.share ? `<button class="btn" data-act="condividi">Altro…</button>` : ""}
     </div>
     <div class="linkbox">${esc(linkInvito())}</div>
+    <p class="small" style="margin:14px 0 0"><b>Immagini da inviare</b>: mandale prima del link quando presenti l'app,
+      o mettile nello stato di WhatsApp.</p>
+    <div class="immagini-invito">
+      <button data-act="condividi-immagine" data-file="invito-quadrato.png"><img src="invito-quadrato.png" alt="">Immagine</button>
+      <button class="stato" data-act="condividi-immagine" data-file="invito-stato.png"><img src="invito-stato.png" alt="">Per lo stato</button>
+    </div>
   </div>`;
 }
 
@@ -1597,6 +1608,17 @@ const AZIONI = {
   },
   copia(){ copiaTesto(linkInvito(), "Link d'invito copiato"); },
   "copia-chiave"(){ copiaTesto(linkPersonale(), "Link personale copiato"); },
+  /* l'immagine va nella condivisione del telefono (WhatsApp, Telegram…); se non si può, si apre per salvarla */
+  async "condividi-immagine"(el){
+    const nome = el.dataset.file;
+    try{
+      const blob = await (await fetch(nome)).blob();
+      const file = new File([blob], nome, { type:"image/png" });
+      if(navigator.canShare && navigator.canShare({ files:[file] })){ await navigator.share({ files:[file] }); return; }
+    }catch(e){ if(e && e.name === "AbortError") return; }
+    window.open(nome, "_blank", "noopener");
+    toast("Tieni premuto sull'immagine per salvarla");
+  },
   async condividi(){ try{ await navigator.share({ title:"Growup", text:testoInvito(), url:linkInvito() }); }catch(e){} },
   async "condividi-chiave"(){ try{ await navigator.share({ title:"La mia chiave Growup", text:testoChiave(), url:linkPersonale() }); }catch(e){} },
   async "cambia-chiave"(){
