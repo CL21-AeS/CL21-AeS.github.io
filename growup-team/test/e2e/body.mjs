@@ -540,6 +540,23 @@ check((await page.evaluate(async () => (await fetch("invito-stato.png")).status)
 await page.locator(".card", { hasText:"Invita un nuovo partner" }).screenshot({ path: S + "/e2e/21-invito.png" });
 await ctx.close();
 
+// 15. Trascinare il dito: Io ⇄ Gruppo
+({ ctx, page } = await apri({ hasTouch:true, isMobile:true }, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+const trascina = (x1, x2, y1 = 400, y2 = 400, su = "#app") => page.evaluate(([x1, x2, y1, y2, su]) => {
+  const el = document.querySelector(su);
+  const tocca = (tipo, x, y) => { const t = new Touch({ identifier:1, target:el, clientX:x, clientY:y });
+    el.dispatchEvent(new TouchEvent(tipo, { bubbles:true, cancelable:true, touches: tipo === "touchend" ? [] : [t], changedTouches:[t] })); };
+  tocca("touchstart", x1, y1); tocca("touchend", x2, y2);
+}, [x1, x2, y1, y2, su]);
+await trascina(320, 80);
+check(await page.getByText("Il mio gruppo").first().isVisible(), "verso sinistra: da Io a Gruppo");
+await trascina(80, 320);
+check(await page.getByText("Ciao Stefano e Alessia").isVisible(), "verso destra: da Gruppo a Io");
+await trascina(320, 290, 400, 700);
+check(await page.getByText("Ciao Stefano e Alessia").isVisible(), "movimento verticale o corto: resta su Io");
+await ctx.close();
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
