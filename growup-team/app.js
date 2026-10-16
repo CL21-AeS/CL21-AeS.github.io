@@ -92,7 +92,8 @@ const st = {
   linkGestito: null,      // { nome, chiave } da mandare a una persona aggiunta a mano
   riep: [],               // numeri del mese in corso: io e la mia downline (riepilogo_mese)
   chiusi: new Set(),
-  cerca: "",               // ricerca nella struttura       // nella struttura: persone con il gruppo richiuso
+  cerca: "",               // ricerca nella struttura
+  espansi: new Set(),      // durante la ricerca: persone di cui mostrare anche il gruppo       // nella struttura: persone con il gruppo richiuso
   gruppo4: { att:[], goals:[], mgoals:[] },  // ultime 4 settimane del gruppo: imbuto ed etichette
   riepPrec: [],           // lo stesso per il mese precedente, finché non è chiuso
   storico: [],            // i miei mesi chiusi (monthly_totals)
@@ -470,12 +471,26 @@ function applicaRicerca(){
   if(!ul) return;
   const q = senzaAccenti(st.cerca), lis = [...ul.querySelectorAll("li")];
   ul.classList.toggle("in-ricerca", !!q);
-  if(!q){ lis.forEach(li => li.classList.remove("fuori", "trovato")); if(esito) esito.textContent = ""; return; }
+  if(!q){ lis.forEach(li => li.classList.remove("fuori", "trovato")); if(esito) esito.textContent = ""; st.espansi.clear(); etichettePiega(false); return; }
   const trovati = lis.filter(li => li.dataset.nome.includes(q)), visibili = new Set();
   for(const li of trovati){ visibili.add(li.dataset.id); li.dataset.path.split(" ").filter(Boolean).forEach(id => visibili.add(id)); }
+  /* ▸ N su una persona visibile apre anche il suo gruppo */
+  for(const li of lis){
+    const sopra = li.dataset.path.split(" ").filter(Boolean);
+    if(sopra.some(id => st.espansi.has(id) && visibili.has(id))) visibili.add(li.dataset.id);
+  }
   for(const li of lis){ li.classList.toggle("fuori", !visibili.has(li.dataset.id)); li.classList.toggle("trovato", trovati.includes(li)); }
+  etichettePiega(true);
   if(esito) esito.textContent = !trovati.length ? "Nessuno con questo nome nel tuo gruppo."
     : (trovati.length === 1 ? "1 persona trovata" : `${trovati.length} persone trovate`) + ", con la linea fino a te.";
+}
+/* L'etichetta ▾ N / ▸ N: fuori dalla ricerca segue i gruppi richiusi, durante la ricerca i gruppi aperti */
+function etichettePiega(inRicerca){
+  document.querySelectorAll(".albero.struttura .piega").forEach(b => {
+    const aperto = inRicerca ? st.espansi.has(b.dataset.id) : !st.chiusi.has(b.dataset.id);
+    b.textContent = `${aperto ? "▾" : "▸"} ${b.dataset.quanti}`;
+    b.setAttribute("aria-expanded", aperto);
+  });
 }
 function render(){
   const app = document.getElementById("app");
@@ -970,7 +985,7 @@ function vStruttura(){
         <span>${esc(p.nome)}</span>
         <span class="small">${livello ? `sponsor ${esc(nomeSaluto(nomeDi(p.sponsor_id)))} · ` : ""}${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${r.linee_attive ? ` · ${r.linee_attive} ${r.linee_attive === 1 ? "linea" : "linee"}` : ""}</span>
       </button>
-      ${quanti ? `<button class="piega" data-act="piega" data-id="${esc(p.id)}" aria-expanded="${!chiuso}"
+      ${quanti ? `<button class="piega" data-act="piega" data-id="${esc(p.id)}" data-quanti="${quanti}" aria-expanded="${!chiuso}"
         aria-label="${chiuso ? "Mostra" : "Nascondi"} il gruppo di ${esc(p.nome)}">${chiuso ? "▸" : "▾"} ${quanti}</button>` : ""}
       ${p.partenza_confermata_il ? "" : `<span class="pill g" title="Punto di partenza da confermare">!</span>`}
       <span class="pill ${sp.cl}">${sp.txt}</span></li>`; }).join("")}</ul>
@@ -1541,7 +1556,11 @@ const AZIONI = {
   },
   "vista-io"(){ st.vista = "io"; st.target = null; render(); window.scrollTo(0, 0); },
   "vista-gruppo"(){ st.vista = "gruppo"; st.target = null; st.schedaId = null; render(); window.scrollTo(0, 0); },
-  piega(el){ const id = el.dataset.id; if(st.chiusi.has(id)) st.chiusi.delete(id); else st.chiusi.add(id); render(); },
+  piega(el){
+    const id = el.dataset.id, insieme = senzaAccenti(st.cerca) ? st.espansi : st.chiusi;
+    if(insieme.has(id)) insieme.delete(id); else insieme.add(id);
+    render();
+  },
   async "apri-scheda"(el){
     const p = st.struttura.find(x => x.id === el.dataset.id);
     if(!p) return;
