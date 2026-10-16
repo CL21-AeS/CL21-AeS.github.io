@@ -83,21 +83,24 @@ dall'SQL Editor perché contiene un `delete`):
 **Fase 2, blocco 3 — imbuto ed elenco per urgenza** (migrazione `010_etichette.sql` già applicata), pagina Gruppo:
 
 - **Imbuto del gruppo** (te escluso, ultime 4 settimane): contatti → piani → ordini, con obiettivo contatti del gruppo,
-  % dei contatti che diventano piani, % dei piani che diventano ordini, VP. Il **collo di bottiglia** è il primo
+  % dei contatti che diventano piani, % dei piani che diventano ordini, VP. Il primo
   passaggio sotto soglia, evidenziato in giallo con il dato e la soglia (es. "Contatti: 75 su 240 di obiettivo del gruppo (31%), sotto la soglia
   del 50%"); dal 16 ottobre senza frasi su cosa allenare;
-- **Chi seguire adesso**: chi usa l'app, ordinato per urgenza, con un'etichetta e il perché
+- **Situazione per persona** (era "Chi seguire adesso"): chi usa l'app, ordinato per urgenza, con un'etichetta e il perché
   (PR CL21-AeS/CL21-AeS.github.io#9 unita; poi il ritocco sotto):
-  1. *Da chiamare*: non aggiorna da più di 7 giorni;
-  2. *Lista nomi*: in 4 settimane meno della metà dei contatti dell'obiettivo;
-  3. *Invito*: meno di 1 piano ogni 5 contatti;
-  4. *Follow-up*: almeno 2 piani ma meno della metà dei VP dell'obiettivo del mese;
+  1. *Non aggiorna*: nessun aggiornamento da più di 7 giorni;
+  2. *Contatti sotto soglia*: in 4 settimane meno della metà dei contatti dell'obiettivo;
+  3. *Piani sotto soglia*: meno di 1 piano ogni 5 contatti;
+  4. *VP sotto soglia*: almeno 2 piani ma meno della metà dei VP dell'obiettivo del mese;
   5. *In crescita*: tutto il resto.
   Le soglie si cambiano dal Table editor: `settings` → `soglie_etichette`. Toccando un nome si apre la scheda.
 - **Ritocco della sera del 15 ottobre** (decisione di Stefano): chi è **senza app non ha etichetta** (i suoi numeri
   dipendono da quando lo sponsor li inserisce, quindi non sarebbe reale); sotto l'elenco una riga dice quante persone
   senza app ci sono. Restano nella struttura e i loro numeri contano nell'imbuto.
-  Confermati: soglia Invito 1 piano ogni 5 contatti (giusta per chi fa contatti a freddo), Follow-up misurato sui VP.
+  Confermati: soglia dei piani 1 piano ogni 5 contatti (giusta per chi fa contatti a freddo), soglia misurata sui VP.
+- **16 ottobre**: tolti i suggerimenti (vedi il principio); le etichette sono diventate descrizioni del dato
+  (Non aggiorna, Contatti / Piani / VP sotto soglia, In crescita), "collo di bottiglia" è diventato "sotto soglia"
+  e il riquadro "Chi seguire adesso" si chiama "Situazione per persona".
 - I **test** ora stanno nel repository: `test/` (vedi `test/LEGGIMI.md`): 97 controlli dell'interfaccia
   e i controlli dei permessi del database.
 
@@ -119,7 +122,7 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare il ritocco "niente suggerimenti"** (16 ottobre) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare il ritocco "etichette come dati"** (16 ottobre; "niente suggerimenti" già unito con la PR #11) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono dei blocchi 1-3** della Fase 2 (pagina Io con i calcoli, struttura con i numeri,

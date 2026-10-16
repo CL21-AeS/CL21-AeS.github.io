@@ -879,10 +879,10 @@ const SOGLIE_BASE = { giorni_da_chiamare:7, quota_contatti:0.5, piani_per_contat
 function soglieEtichette(){ return Object.assign({}, SOGLIE_BASE, cfg("soglie_etichette") || {}); }
 function inizio4(){ return piuGiorni(oggi(), -27); }
 const ETICHETTE_GRUPPO = {
-  chiamare: { nome:"Da chiamare", cl:"r", ordine:1 },
-  lista:    { nome:"Lista nomi",  cl:"g", ordine:2 },
-  invito:   { nome:"Invito",      cl:"g", ordine:3 },
-  followup: { nome:"Follow-up",   cl:"g", ordine:4 },
+  chiamare: { nome:"Non aggiorna", cl:"r", ordine:1 },
+  lista:    { nome:"Contatti sotto soglia", cl:"g", ordine:2 },
+  invito:   { nome:"Piani sotto soglia", cl:"g", ordine:3 },
+  followup: { nome:"VP sotto soglia", cl:"g", ordine:4 },
   crescita: { nome:"In crescita", cl:"v", ordine:5 }
 };
 /* I numeri di una persona nelle ultime 4 settimane */
@@ -907,7 +907,7 @@ function etichettaDi(p){
   const minContatti = Math.ceil(o.contatti * 4 * s.quota_contatti);
   let k, perche;
   if(giorni > s.giorni_da_chiamare){
-    k = "chiamare"; perche = `non aggiorna da ${plur(giorni, "giorno", "giorni")}`;
+    k = "chiamare"; perche = `ultimo aggiornamento ${plur(giorni, "giorno", "giorni")} fa`;
   } else if(n.contatti < minContatti){
     k = "lista"; perche = `${plur(n.contatti, "contatto", "contatti")} in 4 settimane (obiettivo ${o.contatti} a settimana)`;
   } else if(n.piani < n.contatti * s.piani_per_contatti){
@@ -958,10 +958,10 @@ function vImbuto(){
   return `<div class="card">
     <div class="spread"><span class="eyebrow">Imbuto del gruppo</span><span class="small">ultime 4 settimane</span></div>
     <ul class="imbuto">${righe.map(r => `<li class="${f.collo === r.k ? "collo" : ""}" title="${esc(r.nome)}: ${num(r.v)}">
-      <div class="spread"><span>${r.nome}${f.collo === r.k ? ` <span class="pill g">collo di bottiglia</span>` : ""}</span><b class="num">${num(r.v)}</b></div>
+      <div class="spread"><span>${r.nome}${f.collo === r.k ? ` <span class="pill g">sotto soglia</span>` : ""}</span><b class="num">${num(r.v)}</b></div>
       <div class="barra-imbuto"><i style="width:${Math.max(r.v ? 3 : 0, Math.round(r.v / max * 100))}%"></i></div>
       ${r.nota ? `<span class="small">${esc(r.nota)}</span>` : ""}</li>`).join("")}</ul>
-    ${f.collo ? `<p class="avviso">${esc(frasi[f.collo])}</p>` : f.contatti ? `<p class="small" style="margin:8px 0 0">Nessun collo di bottiglia evidente.</p>` : ""}
+    ${f.collo ? `<p class="avviso">${esc(frasi[f.collo])}</p>` : f.contatti ? `<p class="small" style="margin:8px 0 0">Nessun passaggio sotto soglia.</p>` : ""}
     <p class="nota">Il tuo gruppo, te escluso: contatti, piani e ordini registrati da tutti, anche quelli inseriti per chi è senza app.</p>
   </div>`;
 }
@@ -970,7 +970,7 @@ function vDaSeguire(){
   const senzaApp = alberoSotto(st.profilo.id, 0).filter(x => x.p.stato === "gestito").length;
   if(!l.length && !senzaApp) return "";
   return `<div class="card">
-    <div class="spread"><span class="eyebrow">Chi seguire adesso</span><span class="small">ultime 4 settimane</span></div>
+    <div class="spread"><span class="eyebrow">Situazione per persona</span><span class="small">ultime 4 settimane</span></div>
     ${l.length ? `<ul class="albero seguire">${l.map(({ p, e }) => `<li>
       <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}"><span>${esc(p.nome)}</span><span class="small">${esc(e.perche)}</span></button>
       <span class="pill ${e.cl}">${e.nome}</span></li>`).join("")}</ul>` : `<p class="muted">Nessuno nel tuo gruppo usa ancora l'app.</p>`}
