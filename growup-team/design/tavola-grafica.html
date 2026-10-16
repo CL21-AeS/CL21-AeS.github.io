@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Growup Tavola Grafica</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&family=DM+Serif+Display&family=Cormorant+Garamond:wght@600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap">
+<style>
+/* Layout: banco di prova — controlli in alto, poi i quattro telefoni affiancati (su telefono uno alla volta) */
+:root{
+  --bg:#f3f2f7; --fg:#191726; --fg2:#5d5a70; --line:#dedbe8; --panel:#ffffff; --sel:#191726; --sel-ink:#ffffff;
+  --f-ui:"Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#121119; --fg:#efedf6; --fg2:#a7a3b8; --line:#2c2a38; --panel:#1b1a24; --sel:#efedf6; --sel-ink:#121119; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#121119; --fg:#efedf6; --fg2:#a7a3b8; --line:#2c2a38; --panel:#1b1a24; --sel:#efedf6; --sel-ink:#121119; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--f-ui);
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:20px 48px}
+.pagina{max-width:1560px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.intro h1{font-size:24px;margin:0 0 4px;letter-spacing:-.01em;text-wrap:balance}
+.intro p{margin:0;color:var(--fg2);max-width:70ch}
+.controlli{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
+.gruppo-ctl{display:flex;flex-direction:column;gap:6px}
+.gruppo-ctl>span{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2)}
+.seg{display:inline-flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:12px;background:var(--panel);border:1px solid var(--line)}
+.seg button{font:600 14px var(--f-ui);border:0;background:transparent;color:var(--fg);padding:8px 12px;border-radius:9px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--sel);color:var(--sel-ink)}
+.seg button:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.nota-stile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;max-width:900px}
+.nota-stile b{font-size:16px}
+.nota-stile p{margin:4px 0 0;color:var(--fg2)}
+.palette{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.palette span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--fg2);font-variant-numeric:tabular-nums}
+.palette i{width:18px;height:18px;border-radius:6px;border:1px solid var(--line);display:inline-block}
+.schermi-tab{display:none}
+.telefoni{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:22px;align-items:start}
+.telefono-box{display:flex;flex-direction:column;gap:8px;min-width:0}
+.telefono-box>h2{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--fg2);margin:0}
+@media (max-width:760px){
+  .schermi-tab{display:flex}
+  .telefoni{grid-template-columns:1fr}
+  .telefono-box{display:none}
+  .telefono-box.attivo{display:flex}
+}
+
+/* ====== Il telefono finto: i token dei quattro stili ====== */
+.mock{width:100%;max-width:390px;border-radius:30px;overflow:hidden;border:1px solid var(--line);
+  background:var(--m-bg);color:var(--m-ink);font:15px/1.45 var(--m-fb);position:relative;
+  box-shadow:0 18px 40px -24px rgba(20,16,40,.45)}
+
+/* A · Aurora */
+.mock[data-stile="a"]{
+  --m-bg:#faf7ff; --m-card:#ffffff; --m-ink:#1d1533; --m-ink2:#625a7a; --m-ink3:#8a83a0; --m-line:#ece6f7;
+  --m-head:linear-gradient(125deg,#6d28d9 0%,#c026d3 52%,#f97316 100%); --m-head-ink:#ffffff; --m-head-ink2:rgba(255,255,255,.82);
+  --m-head-r:0 0 28px 28px; --m-eb:#8a83a0; --m-num:#1d1533;
+  --a-week:#7c3aed; --a-week2:#db2777; --a-month:#db2777; --a-path:#7c3aed; --a-group:#ea580c;
+  --m-b1:#7c3aed; --m-b2:#db2777; --m-b3:#ea580c; --m-b-ink:#ffffff;
+  --m-prim:#7c3aed; --m-prim-ink:#ffffff; --m-r:20px; --m-shadow:0 6px 18px -10px rgba(76,29,149,.35); --m-bordo:transparent;
+  --m-fd:"Plus Jakarta Sans", system-ui, sans-serif; --m-fb:"Plus Jakarta Sans", system-ui, sans-serif; --m-fn:"Plus Jakarta Sans", system-ui, sans-serif;
+  --ok:#0f9d58; --warn:#b45309; --bad:#dc2626; --track:#efe9fb; --visione:linear-gradient(135deg,#f5edff,#ffeef6);
+}
+.mock[data-stile="a"][data-modo="scuro"]{
+  --m-bg:#110c1e; --m-card:#1b1530; --m-ink:#f4effd; --m-ink2:#b5aacd; --m-ink3:#8c82a6; --m-line:#2c2447;
+  --m-head:linear-gradient(125deg,#5b21b6 0%,#a21caf 52%,#c2410c 100%); --m-eb:#8c82a6; --m-num:#f4effd;
+  --a-week:#a78bfa; --a-week2:#f472b6; --a-month:#f472b6; --a-path:#a78bfa; --a-group:#fb923c;
+  --m-b1:#8b5cf6; --m-b2:#db2777; --m-b3:#ea580c; --m-prim:#8b5cf6;
+  --m-shadow:none; --m-bordo:#2c2447; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --track:#2a2242; --visione:linear-gradient(135deg,#2a1d4a,#361a3a);
+}
+/* B · Notte e oro */
+.mock[data-stile="b"], .mock[data-stile="bd"]{
+  --m-bg:#fbf8f1; --m-card:#ffffff; --m-ink:#0f172a; --m-ink2:#55607a; --m-ink3:#7c8499; --m-line:#ece5d4;
+  --m-head:#0f172a; --m-head-ink:#fbf8f1; --m-head-ink2:#c9cfdc; --m-head-r:0; --m-eb:#9a7a1c; --m-num:#0f172a;
+  --a-week:#b8860b; --a-week2:#0f9f74; --a-month:#0f9f74; --a-path:#b8860b; --a-group:#0f9f74;
+  --m-b1:#0f172a; --m-b2:#0f172a; --m-b3:#0f172a; --m-b-ink:#f5c84c;
+  --m-prim:#0f172a; --m-prim-ink:#f5c84c; --m-r:16px; --m-shadow:0 1px 0 #ece5d4; --m-bordo:#ece5d4;
+  --m-fd:"Fraunces", Georgia, serif; --m-fb:"Manrope", system-ui, sans-serif; --m-fn:"Fraunces", Georgia, serif;
+  --ok:#0f8a64; --warn:#9a6b00; --bad:#c2410c; --track:#f1ebdc; --visione:linear-gradient(135deg,#0f172a,#1e2a4a);
+  --visione-ink:#fbf8f1; --visione-oro:#f5c84c;
+}
+.mock[data-stile="b"][data-modo="scuro"], .mock[data-stile="bd"][data-modo="scuro"]{
+  --m-bg:#0a0f1d; --m-card:#121a2d; --m-ink:#f2eee4; --m-ink2:#a9b1c4; --m-ink3:#7d869b; --m-line:#222c43;
+  --m-head:#060a14; --m-eb:#e0b43a; --m-num:#f2eee4;
+  --a-week:#f5c84c; --a-week2:#34d399; --a-month:#34d399; --a-path:#f5c84c; --a-group:#34d399;
+  --m-b1:#f5c84c; --m-b2:#f5c84c; --m-b3:#f5c84c; --m-b-ink:#0a0f1d; --m-prim:#f5c84c; --m-prim-ink:#0a0f1d;
+  --m-shadow:none; --m-bordo:#222c43; --ok:#34d399; --warn:#f5c84c; --bad:#fb7d5b; --track:#1d2740;
+  --visione:linear-gradient(135deg,#17213a,#0e1527);
+}
+/* B+D: notte e oro con un colore per area */
+.mock[data-stile="bd"]{
+  --a-week:#2f5bd3; --a-week2:#2f5bd3; --a-month:#0f9f74; --a-path:#b8860b; --a-group:#be185d;
+  --m-b1:#2f5bd3; --m-b2:#0f9f74; --m-b3:#b8860b; --m-b-ink:#ffffff;
+}
+.mock[data-stile="bd"][data-modo="scuro"]{
+  --a-week:#7aa2ff; --a-week2:#7aa2ff; --a-month:#34d399; --a-path:#f5c84c; --a-group:#f472b6;
+  --m-b1:#3a63d8; --m-b2:#0f8a64; --m-b3:#d4a017; --m-b-ink:#ffffff;
+}
+/* D · Percorso a colori */
+.mock[data-stile="d"]{
+  --m-bg:#f4f6fb; --m-card:#ffffff; --m-ink:#111827; --m-ink2:#4b5567; --m-ink3:#7b8494; --m-line:#e3e7ef;
+  --m-head:transparent; --m-head-ink:#111827; --m-head-ink2:#4b5567; --m-head-r:0; --m-eb:#7b8494; --m-num:#111827;
+  --a-week:#2563eb; --a-week2:#2563eb; --a-month:#4d7c0f; --a-path:#b5652a; --a-group:#c0267a;
+  --m-b1:#2563eb; --m-b2:#7c3aed; --m-b3:#4d7c0f; --m-b-ink:#ffffff;
+  --m-prim:#111827; --m-prim-ink:#ffffff; --m-r:18px; --m-shadow:0 4px 14px -10px rgba(17,24,39,.35); --m-bordo:#e3e7ef;
+  --m-fd:"Outfit", system-ui, sans-serif; --m-fb:"Outfit", system-ui, sans-serif; --m-fn:"Outfit", system-ui, sans-serif;
+  --ok:#15803d; --warn:#a16207; --bad:#dc2626; --track:#eceff5; --visione:linear-gradient(120deg,#fbefe4,#eef0f4);
+}
+.mock[data-stile="d"][data-modo="scuro"]{
+  --m-bg:#0d1117; --m-card:#161b24; --m-ink:#eef2f7; --m-ink2:#a5aebd; --m-ink3:#7d8696; --m-line:#262d3a;
+  --m-head-ink:#eef2f7; --m-head-ink2:#a5aebd; --m-eb:#7d8696; --m-num:#eef2f7;
+  --a-week:#60a5fa; --a-week2:#60a5fa; --a-month:#a3e635; --a-path:#e0a06a; --a-group:#f472b6;
+  --m-b1:#2563eb; --m-b2:#7c3aed; --m-b3:#3f6212; --m-prim:#eef2f7; --m-prim-ink:#0d1117;
+  --m-shadow:none; --ok:#4ade80; --warn:#facc15; --bad:#f87171; --track:#232a37; --visione:linear-gradient(120deg,#2b2118,#1b2029);
+}
+
+/* E · Oceano di vetro: fondo sfumato, card trasparenti, testata integrata */
+.mock[data-stile="e"]{
+  --m-bg:linear-gradient(165deg,#dbeafe 0%,#ede9fe 50%,#fce7f3 100%); --m-bg-solid:#eef0fd;
+  --m-card:rgba(255,255,255,.72); --m-ink:#0d1a3a; --m-ink2:#4a5677; --m-ink3:#6f7a96; --m-line:rgba(13,26,58,.10);
+  --m-head:transparent; --m-head-ink:#0d1a3a; --m-head-ink2:#4a5677; --m-head-r:0; --m-eb:#6f7a96; --m-num:#0d1a3a;
+  --a-week:#4f46e5; --a-week2:#06b6d4; --a-month:#0e9488; --a-path:#7c3aed; --a-group:#db2777;
+  --m-b1:#4f46e5; --m-b2:#0891b2; --m-b3:#c026d3; --m-b-ink:#ffffff;
+  --m-prim:#4f46e5; --m-prim-ink:#ffffff; --m-r:22px; --m-shadow:0 10px 30px -18px rgba(49,46,129,.45); --m-bordo:rgba(255,255,255,.9);
+  --m-fd:"Sora", system-ui, sans-serif; --m-fb:"Sora", system-ui, sans-serif; --m-fn:"Sora", system-ui, sans-serif;
+  --ok:#0f8a5f; --warn:#b45309; --bad:#dc2626; --track:rgba(79,70,229,.12); --visione:linear-gradient(135deg,rgba(255,255,255,.85),rgba(255,255,255,.55));
+}
+.mock[data-stile="e"][data-modo="scuro"]{
+  --m-bg:linear-gradient(165deg,#0b1033 0%,#0b2a3c 55%,#2b0b31 100%); --m-bg-solid:#0d1733;
+  --m-card:rgba(255,255,255,.07); --m-ink:#eef2ff; --m-ink2:#aab3d1; --m-ink3:#8590b2; --m-line:rgba(255,255,255,.10);
+  --m-head-ink:#eef2ff; --m-head-ink2:#aab3d1; --m-eb:#8590b2; --m-num:#eef2ff;
+  --a-week:#818cf8; --a-week2:#22d3ee; --a-month:#2dd4bf; --a-path:#c084fc; --a-group:#f472b6;
+  --m-b1:#6366f1; --m-b2:#0891b2; --m-b3:#c026d3; --m-prim:#818cf8; --m-prim-ink:#0b1033;
+  --m-shadow:none; --m-bordo:rgba(255,255,255,.12); --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --track:rgba(255,255,255,.10);
+  --visione:linear-gradient(135deg,rgba(129,140,248,.22),rgba(244,114,182,.14));
+}
+.mock[data-stile="e"] .c{backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.mock[data-stile="e"] .hd h3{font-size:26px;font-weight:800}
+.mock[data-stile="e"] .sel{background:rgba(255,255,255,.55);border:1px solid var(--m-bordo)}
+.mock[data-stile="e"][data-modo="scuro"] .sel{background:rgba(255,255,255,.08)}
+.mock[data-stile="e"] .sel span.on{background:var(--m-prim);color:var(--m-prim-ink)}
+.mock[data-stile="e"] .barra i{background:linear-gradient(90deg,var(--a-week),var(--a-week2))}
+.mock[data-stile="e"] .eb.area{color:var(--area)}
+.mock[data-stile="e"] .azioni div{border-radius:999px;box-shadow:0 8px 18px -10px rgba(49,46,129,.6)}
+.mock[data-stile="e"] .visione .num{background:linear-gradient(90deg,#4f46e5,#db2777);-webkit-background-clip:text;background-clip:text;color:transparent}
+.mock[data-stile="e"][data-modo="scuro"] .visione .num{background:linear-gradient(90deg,#a5b4fc,#f9a8d4);-webkit-background-clip:text;background-clip:text}
+
+/* F · Pop a blocchi: sezioni a colore pieno, numeri grandi */
+.mock[data-stile="f"]{
+  --m-bg:#fff8f1; --m-card:#ffffff; --m-ink:#1a1423; --m-ink2:#5c5566; --m-ink3:#857e8f; --m-line:#f0e6db;
+  --m-head:transparent; --m-head-ink:#1a1423; --m-head-ink2:#5c5566; --m-head-r:0; --m-eb:#857e8f; --m-num:#1a1423;
+  --a-week:#e63946; --a-week2:#e63946; --a-month:#0f8b7d; --a-path:#6d28d9; --a-group:#e63946;
+  --m-b1:#e63946; --m-b2:#0f8b7d; --m-b3:#6d28d9; --m-b-ink:#ffffff;
+  --m-prim:#1a1423; --m-prim-ink:#ffffff; --m-r:24px; --m-shadow:none; --m-bordo:#f0e6db;
+  --m-fd:"Sora", system-ui, sans-serif; --m-fb:"DM Sans", system-ui, sans-serif; --m-fn:"Sora", system-ui, sans-serif;
+  --ok:#0f8b4d; --warn:#b45309; --bad:#d62839; --track:#f3ebe2; --visione:#ffc93c; --visione-ink:#1a1423;
+}
+.mock[data-stile="f"][data-modo="scuro"]{
+  --m-bg:#141119; --m-card:#1f1a26; --m-ink:#f6f1fa; --m-ink2:#b5aec0; --m-ink3:#8b8496; --m-line:#2d2735;
+  --m-head-ink:#f6f1fa; --m-head-ink2:#b5aec0; --m-eb:#8b8496; --m-num:#f6f1fa;
+  --a-week:#d62f3c; --a-week2:#d62f3c; --a-month:#0c7a6e; --a-path:#6024c8; --a-group:#ff6b75;
+  --m-b1:#d62f3c; --m-b2:#0c7a6e; --m-b3:#6024c8; --m-prim:#f6f1fa; --m-prim-ink:#141119;
+  --m-bordo:#2d2735; --ok:#4ade80; --warn:#fbbf24; --bad:#ff6b75; --track:#2d2735; --visione:#e8b21f; --visione-ink:#1a1423;
+}
+.mock[data-stile="f"] .hd h3{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.mock[data-stile="f"] .sel{background:var(--m-line)}
+.mock[data-stile="f"] .sel span.on{background:var(--m-ink);color:var(--m-bg)}
+.mock[data-stile="f"] .c[style*="--a-week"], .mock[data-stile="f"] .c[style*="--a-month"], .mock[data-stile="f"] .c[style*="--a-path"]{
+  background:var(--area);color:#ffffff;border-color:transparent;--m-ink:#ffffff;--m-ink2:rgba(255,255,255,.85);--m-num:#ffffff;
+  --track:rgba(255,255,255,.28);--ok:#ffffff;--m-line:rgba(255,255,255,.25)}
+.mock[data-stile="f"] .c[style*="--a-week"] .eb, .mock[data-stile="f"] .c[style*="--a-month"] .eb, .mock[data-stile="f"] .c[style*="--a-path"] .eb{color:rgba(255,255,255,.85)}
+.mock[data-stile="f"] .c[style*="--a-week"] .barra i, .mock[data-stile="f"] .c[style*="--a-month"] .barra i, .mock[data-stile="f"] .c[style*="--a-path"] .tappe i.f{background:#ffffff}
+.mock[data-stile="f"] .c[style*="--a-path"] .tappe i.ora{background:linear-gradient(90deg,#fff 60%,rgba(255,255,255,.28) 60%)}
+.mock[data-stile="f"] .c[style*="--a-path"] .pill.acc, .mock[data-stile="f"] .c[style*="--a-month"] .pill{color:#ffffff}
+.mock[data-stile="f"] .c[style*="--a-path"] .spinta{background:rgba(255,255,255,.16);color:rgba(255,255,255,.9)}
+.mock[data-stile="f"] .c[style*="--a-path"] .spinta b{color:#fff}
+.mock[data-stile="f"] .obiettivo .num{font-size:22px;font-weight:800}
+.mock[data-stile="f"] .t2{font-size:21px;font-weight:800}
+.mock[data-stile="f"] .barra{height:12px}
+.mock[data-stile="f"] .azioni div{border-radius:20px;padding:12px 6px}
+
+/* G · Prugna e pesca: testata prugna, titoli con le grazie, accenti caldi */
+.mock[data-stile="g"]{
+  --m-bg:#fdf5f0; --m-card:#ffffff; --m-ink:#2a1029; --m-ink2:#6b5468; --m-ink3:#8f7a8c; --m-line:#f2e2da;
+  --m-head:linear-gradient(140deg,#3d0f3f 0%,#6b1d5c 70%,#8a2a5c 100%); --m-head-ink:#fff4ee; --m-head-ink2:#f3c9b8; --m-head-r:0 0 26px 26px;
+  --m-eb:#b0532f; --m-num:#2a1029;
+  --a-week:#e8693f; --a-week2:#f2a65a; --a-month:#13958a; --a-path:#8a2a6e; --a-group:#e8693f;
+  --m-b1:#6b1d5c; --m-b2:#e8693f; --m-b3:#13958a; --m-b-ink:#ffffff;
+  --m-prim:#6b1d5c; --m-prim-ink:#ffffff; --m-r:18px; --m-shadow:0 6px 18px -12px rgba(61,15,63,.35); --m-bordo:#f2e2da;
+  --m-fd:"DM Serif Display", Georgia, serif; --m-fb:"DM Sans", system-ui, sans-serif; --m-fn:"DM Serif Display", Georgia, serif;
+  --ok:#0f8a6c; --warn:#b4530f; --bad:#c81e4a; --track:#f7e9e2; --visione:linear-gradient(135deg,#ffe3d6,#fbe0ee);
+}
+.mock[data-stile="g"][data-modo="scuro"]{
+  --m-bg:#160913; --m-card:#22111f; --m-ink:#fbeff4; --m-ink2:#c3a9bc; --m-ink3:#977f92; --m-line:#3a2236;
+  --m-head:linear-gradient(140deg,#2a0828 0%,#4a1240 100%); --m-eb:#f2a07c; --m-num:#fbeff4;
+  --a-week:#ff8a5c; --a-week2:#ffc078; --a-month:#3fd0c0; --a-path:#e07ac8; --a-group:#ff8a5c;
+  --m-b1:#8a2a7a; --m-b2:#d9572c; --m-b3:#0f8a7e; --m-prim:#f2a07c; --m-prim-ink:#160913;
+  --m-shadow:none; --m-bordo:#3a2236; --ok:#5ee0b0; --warn:#ffc078; --bad:#ff7a98; --track:#3a2236;
+  --visione:linear-gradient(135deg,#3a1630,#2a1428);
+}
+.mock[data-stile="g"] h3, .mock[data-stile="g"] .t2{font-weight:400;letter-spacing:0}
+.mock[data-stile="g"] .hd .eb{color:#f3c9b8}
+.mock[data-stile="g"] .sel{background:rgba(255,255,255,.12)}
+.mock[data-stile="g"] .sel span.on{background:#fff4ee;color:#3d0f3f}
+.mock[data-stile="g"] .barra i{background:linear-gradient(90deg,var(--a-week),var(--a-week2))}
+.mock[data-stile="g"] .c[style*="--a-month"] .barra i{background:var(--a-month)}
+.mock[data-stile="g"] .eb.area{color:var(--area)}
+.mock[data-stile="g"][data-modo="scuro"] .eb.area{color:var(--area)}
+
+/* H · Smeraldo e rame */
+.mock[data-stile="h"]{
+  --m-bg:#f6f3ec; --m-card:#ffffff; --m-ink:#10231c; --m-ink2:#4f5f58; --m-ink3:#7a8781; --m-line:#e7e0d2;
+  --m-head:linear-gradient(145deg,#0a3a2c 0%,#13604a 100%); --m-head-ink:#f7f0e3; --m-head-ink2:#d9c3a0; --m-head-r:0 0 22px 22px;
+  --m-eb:#a8552b; --m-num:#10231c;
+  --a-week:#c26a3d; --a-week2:#d98b4f; --a-month:#13795b; --a-path:#b07d22; --a-group:#13795b;
+  --m-b1:#0a3a2c; --m-b2:#c26a3d; --m-b3:#13795b; --m-b-ink:#ffffff;
+  --m-prim:#0a3a2c; --m-prim-ink:#f7f0e3; --m-r:16px; --m-shadow:0 1px 0 #e7e0d2; --m-bordo:#e7e0d2;
+  --m-fd:"Cormorant Garamond", Georgia, serif; --m-fb:"Manrope", system-ui, sans-serif; --m-fn:"Cormorant Garamond", Georgia, serif;
+  --ok:#13795b; --warn:#a8552b; --bad:#b42318; --track:#efe8da; --visione:linear-gradient(135deg,#0a3a2c,#164d3b);
+  --visione-ink:#f7f0e3; --visione-oro:#e2a46f;
+}
+.mock[data-stile="h"][data-modo="scuro"]{
+  --m-bg:#07130e; --m-card:#0f1f18; --m-ink:#eef5f0; --m-ink2:#a7b8ae; --m-ink3:#7d8f85; --m-line:#1f3329;
+  --m-head:linear-gradient(145deg,#04100b 0%,#0b2c21 100%); --m-eb:#e2a46f; --m-num:#eef5f0;
+  --a-week:#e08a5a; --a-week2:#f0a76f; --a-month:#34c08f; --a-path:#e2b45a; --a-group:#34c08f;
+  --m-b1:#13604a; --m-b2:#c26a3d; --m-b3:#1f8a68; --m-prim:#e2a46f; --m-prim-ink:#07130e;
+  --m-shadow:none; --m-bordo:#1f3329; --ok:#34c08f; --warn:#f0a76f; --bad:#ff7b6b; --track:#1c2e25;
+  --visione:linear-gradient(135deg,#123528,#0c2219);
+}
+.mock[data-stile="h"] h3{font-size:27px;font-weight:700}
+.mock[data-stile="h"] .t2{font-size:22px;font-weight:700}
+.mock[data-stile="h"] .num{font-weight:700;font-size:1.15em;font-variant-numeric:lining-nums tabular-nums}
+.mock[data-stile="h"] .hd .eb{color:#d9c3a0}
+.mock[data-stile="h"] .sel{background:rgba(255,255,255,.1);border:1px solid rgba(217,195,160,.35)}
+.mock[data-stile="h"] .sel span.on{background:#e2a46f;color:#0a3a2c}
+.mock[data-stile="h"] .barra i{background:linear-gradient(90deg,var(--a-week),var(--a-week2))}
+.mock[data-stile="h"] .c[style*="--a-month"] .barra i{background:var(--a-month)}
+.mock[data-stile="h"] .eb.area{color:var(--area)}
+
+/* I · Anelli: cerchi di avanzamento al posto delle barre */
+.mock[data-stile="i"]{
+  --m-bg:#f1f4f9; --m-card:#ffffff; --m-ink:#0f172a; --m-ink2:#4b5568; --m-ink3:#78819a; --m-line:#e2e7f0;
+  --m-head:#ffffff; --m-head-ink:#0f172a; --m-head-ink2:#4b5568; --m-head-r:0 0 26px 26px; --m-eb:#78819a; --m-num:#0f172a;
+  --a-week:#f2600c; --a-week2:#f2600c; --a-month:#00999a; --a-path:#2f6fe4; --a-group:#7c3aed;
+  --m-b1:#f2600c; --m-b2:#2f6fe4; --m-b3:#00999a; --m-b-ink:#ffffff;
+  --m-prim:#2f6fe4; --m-prim-ink:#ffffff; --m-r:22px; --m-shadow:0 6px 20px -14px rgba(15,23,42,.35); --m-bordo:transparent;
+  --m-fd:"Outfit", system-ui, sans-serif; --m-fb:"Outfit", system-ui, sans-serif; --m-fn:"Outfit", system-ui, sans-serif;
+  --ok:#0f8a5f; --warn:#b45309; --bad:#dc2626; --track:#e8edf5; --visione:linear-gradient(120deg,#e8f0ff,#fff1e8);
+}
+.mock[data-stile="i"][data-modo="scuro"]{
+  --m-bg:#0a0e16; --m-card:#141a26; --m-ink:#eef2f8; --m-ink2:#a3adc0; --m-ink3:#7a849a; --m-line:#232b3a;
+  --m-head:#141a26; --m-head-ink:#eef2f8; --m-head-ink2:#a3adc0; --m-eb:#7a849a; --m-num:#eef2f8;
+  --a-week:#ff8a4c; --a-week2:#ff8a4c; --a-month:#2fd1c4; --a-path:#6ea0ff; --a-group:#b18cff;
+  --m-b1:#e2560a; --m-b2:#2f6fe4; --m-b3:#008a8b; --m-prim:#6ea0ff; --m-prim-ink:#0a0e16;
+  --m-shadow:none; --m-bordo:#232b3a; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --track:#262f40;
+  --visione:linear-gradient(120deg,#16233f,#2a1a14);
+}
+.mock[data-stile="i"] .hd{box-shadow:0 8px 20px -16px rgba(15,23,42,.5)}
+.mock[data-stile="i"] .sel{background:var(--track)}
+.mock[data-stile="i"] .sel span.on{background:var(--m-prim);color:var(--m-prim-ink)}
+.mock[data-stile="i"] .eb.area{color:var(--area)}
+.mock[data-stile="i"] .c[style*="--a-week"]{display:grid;grid-template-columns:1fr 1fr;column-gap:10px}
+.mock[data-stile="i"] .c[style*="--a-week"]>.spread{grid-column:1 / -1}
+.mock[data-stile="i"] .obiettivo{display:grid;justify-items:center;text-align:center;gap:6px;margin-top:12px}
+.mock[data-stile="i"] .obiettivo .barra{grid-row:1;width:86px;height:86px;border-radius:50%;margin:0;
+  background:conic-gradient(var(--area) calc(var(--p) * 1%), var(--track) 0);display:grid;place-items:center}
+.mock[data-stile="i"] .obiettivo .barra i{width:66px !important;height:66px;border-radius:50%;background:var(--m-card) !important}
+.mock[data-stile="i"] .obiettivo .spread{flex-direction:column;gap:0}
+.mock[data-stile="i"] .obiettivo .num{font-size:20px;font-weight:800}
+.mock[data-stile="i"] .c[style*="--a-month"] .obiettivo{grid-template-columns:auto 1fr;justify-items:start;text-align:left;column-gap:14px;align-items:center}
+.mock[data-stile="i"] .c[style*="--a-month"] .obiettivo .barra{grid-column:1}
+.mock[data-stile="i"] .c[style*="--a-month"] .obiettivo .spread{grid-column:2;grid-row:1;align-items:flex-start}
+.mock[data-stile="i"] .imbuto .barra i{background:var(--area)}
+.mock[data-stile="i"] .azioni div{border-radius:18px}
+
+/* J · Tessere: sezioni come tessere tinte, numeri grandi */
+.mock[data-stile="j"]{
+  --m-bg:#faf9fd; --m-card:#ffffff; --m-ink:#17142a; --m-ink2:#565170; --m-ink3:#827d98; --m-line:#e9e6f2;
+  --m-head:transparent; --m-head-ink:#17142a; --m-head-ink2:#565170; --m-head-r:0; --m-eb:#827d98; --m-num:#17142a;
+  --a-week:#e8336d; --a-week2:#e8336d; --a-month:#0388a6; --a-path:#c77700; --a-group:#7b2cbf;
+  --m-b1:#e8336d; --m-b2:#7b2cbf; --m-b3:#0388a6; --m-b-ink:#ffffff;
+  --m-prim:#17142a; --m-prim-ink:#ffffff; --m-r:26px; --m-shadow:none; --m-bordo:transparent;
+  --m-fd:"DM Sans", system-ui, sans-serif; --m-fb:"DM Sans", system-ui, sans-serif; --m-fn:"Sora", system-ui, sans-serif;
+  --ok:#0f8a5f; --warn:#b45309; --bad:#d62839; --track:rgba(23,20,42,.08); --visione:#fff1c9; --tinta:#ffffff;
+}
+.mock[data-stile="j"][data-modo="scuro"]{
+  --m-bg:#0e0c16; --m-card:#181524; --m-ink:#f4f1fb; --m-ink2:#b3adc8; --m-ink3:#878199; --m-line:#2a2638;
+  --m-head-ink:#f4f1fb; --m-head-ink2:#b3adc8; --m-eb:#878199; --m-num:#f4f1fb;
+  --a-week:#ff6b98; --a-week2:#ff6b98; --a-month:#3cc9e8; --a-path:#ffb84d; --a-group:#b57bff;
+  --m-b1:#d42a60; --m-b2:#7b2cbf; --m-b3:#037a94; --m-prim:#f4f1fb; --m-prim-ink:#0e0c16;
+  --ok:#4ade80; --warn:#fbbf24; --bad:#ff6b75; --track:rgba(255,255,255,.10); --visione:#2d2614; --tinta:#181524;
+}
+.mock[data-stile="j"] .hd h3{font-size:27px;font-weight:700;letter-spacing:-.02em}
+.mock[data-stile="j"] .sel{background:var(--m-line)}
+.mock[data-stile="j"] .sel span.on{background:var(--m-ink);color:var(--m-bg)}
+.mock[data-stile="j"] .c[style*="--area"]{background:color-mix(in srgb,var(--area) 13%,var(--tinta))}
+.mock[data-stile="j"][data-modo="scuro"] .c[style*="--area"]{background:color-mix(in srgb,var(--area) 18%,var(--tinta))}
+.mock[data-stile="j"] .corpo[style*="--area"]>.c{background:color-mix(in srgb,var(--area) 9%,var(--tinta))}
+.mock[data-stile="j"] .eb.area{color:var(--area)}
+.mock[data-stile="j"] .c[style*="--a-week"]{display:grid;grid-template-columns:1fr 1fr;column-gap:10px}
+.mock[data-stile="j"] .c[style*="--a-week"]>.spread{grid-column:1 / -1}
+.mock[data-stile="j"] .obiettivo{background:var(--m-card);border-radius:18px;padding:10px 12px;margin-top:10px}
+.mock[data-stile="j"] .obiettivo .spread{flex-direction:column;align-items:flex-start;gap:0}
+.mock[data-stile="j"] .obiettivo .num{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.mock[data-stile="j"] .c[style*="--a-month"] .obiettivo .spread{flex-direction:row;align-items:center}
+.mock[data-stile="j"] .barra i{background:var(--area)}
+.mock[data-stile="j"] .tiles div{background:var(--m-card)}
+.mock[data-stile="j"] .azioni div{border-radius:22px}
+
+/* ====== Componenti dentro il telefono ====== */
+.mock .hd{background:var(--m-head);color:var(--m-head-ink);border-radius:var(--m-head-r);padding:18px 18px 20px}
+.mock .hd .riga{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.mock .hd .eb{color:var(--m-head-ink2)}
+.mock[data-stile="b"] .hd .eb, .mock[data-stile="bd"] .hd .eb{color:#f5c84c}
+.mock h3{font:700 22px/1.2 var(--m-fd);margin:4px 0 0;letter-spacing:-.01em;text-wrap:balance}
+.mock[data-stile="b"] h3, .mock[data-stile="bd"] h3{font-weight:600}
+.mock .sotto{font-size:13px;color:var(--m-head-ink2);margin-top:2px}
+.mock .sel{display:inline-flex;padding:3px;border-radius:12px;background:rgba(255,255,255,.18);flex:none}
+.mock[data-stile="d"] .sel{background:var(--m-line)}
+.mock[data-stile="b"] .sel, .mock[data-stile="bd"] .sel{background:rgba(255,255,255,.08);border:1px solid rgba(245,200,76,.35)}
+.mock .sel span{font-size:13px;font-weight:700;padding:6px 11px;border-radius:9px;color:var(--m-head-ink2)}
+.mock .sel span.on{background:#ffffff;color:#1d1533}
+.mock[data-stile="b"] .sel span.on, .mock[data-stile="bd"] .sel span.on{background:#f5c84c;color:#0f172a}
+.mock[data-stile="d"] .sel span.on{background:var(--m-card);color:var(--m-ink)}
+.mock .corpo{padding:12px 12px 16px;display:flex;flex-direction:column;gap:12px}
+.mock .c{background:var(--m-card);border-radius:var(--m-r);padding:15px;box-shadow:var(--m-shadow);border:1px solid var(--m-bordo)}
+.mock .eb{font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--m-eb)}
+.mock[data-stile="d"] .eb.area, .mock[data-stile="bd"] .eb.area{color:var(--area)}
+.mock .eb.area::before{content:"";display:none}
+.mock[data-stile="d"] .eb.area::before, .mock[data-stile="bd"] .eb.area::before{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--area);margin-right:7px;vertical-align:1px}
+.mock .spread{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.mock .t2{font:700 18px/1.25 var(--m-fd);margin:4px 0 0}
+.mock[data-stile="b"] .t2, .mock[data-stile="bd"] .t2{font-weight:600}
+.mock .num{font-family:var(--m-fn);font-weight:700;font-variant-numeric:tabular-nums;color:var(--m-num)}
+.mock .small{font-size:12.5px;color:var(--m-ink2)}
+.mock .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:99px;
+  border:1px solid currentColor;white-space:nowrap}
+.mock .pill.acc{color:var(--area, var(--m-prim))}
+.mock .pill.ok{color:var(--ok)} .mock .pill.warn{color:var(--warn)} .mock .pill.bad{color:var(--bad)}
+.mock .pill.piena{background:var(--area);color:#fff;border-color:transparent}
+.mock .visione{background:var(--visione);color:var(--visione-ink, var(--m-ink))}
+.mock .visione .eb{color:var(--visione-oro, var(--m-eb))}
+.mock .visione .num{color:var(--visione-oro, var(--m-num))}
+.mock .visione .small{color:var(--visione-ink, var(--m-ink2));opacity:.8}
+.mock .barra{height:9px;border-radius:99px;background:var(--track);overflow:hidden;margin-top:6px}
+.mock .barra i{display:block;height:100%;border-radius:99px;background:var(--area, var(--m-prim))}
+.mock[data-stile="a"] .barra i{background:linear-gradient(90deg,var(--a-week),var(--a-week2))}
+.mock[data-stile="a"] [style*="--area:var(--a-month)"] .barra i{background:linear-gradient(90deg,#db2777,#f97316)}
+.mock .obiettivo{display:flex;flex-direction:column;gap:2px;margin-top:10px}
+.mock .obiettivo .spread span:first-child{font-weight:600}
+.mock .tappe{display:flex;gap:6px;margin-top:10px}
+.mock .tappe i{flex:1;height:6px;border-radius:99px;background:var(--track)}
+.mock .tappe i.f{background:var(--area)}
+.mock .tappe i.ora{background:linear-gradient(90deg,var(--area) 60%,var(--track) 60%)}
+.mock .req{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+.mock .req li{display:flex;justify-content:space-between;gap:8px}
+.mock .req .ok{color:var(--ok);font-weight:700}
+.mock .spinta{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--track);font-size:13px;color:var(--m-ink2)}
+.mock .spinta b{color:var(--m-ink)}
+.mock .azioni{position:sticky;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 12px 14px;
+  background:linear-gradient(to top,var(--m-bg-solid, var(--m-bg)) 70%,transparent)}
+.mock .azioni div{border-radius:16px;padding:10px 6px;text-align:center;font-weight:800;font-size:14px;color:var(--m-b-ink);line-height:1.2}
+.mock .azioni div small{display:block;font-weight:500;font-size:11px;opacity:.85;margin-top:2px}
+.mock .azioni div:nth-child(1){background:var(--m-b1)} .mock .azioni div:nth-child(2){background:var(--m-b2)} .mock .azioni div:nth-child(3){background:var(--m-b3)}
+.mock .lista{list-style:none;margin:6px 0 0;padding:0}
+.mock .lista li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--m-line)}
+.mock .lista li:first-child{border-top:0}
+.mock .lista b{font-weight:600}
+.mock .imbuto{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.mock .imbuto .barra i{background:var(--area)}
+.mock[data-stile="a"] .imbuto .barra i{background:linear-gradient(90deg,#7c3aed,#db2777)}
+.mock .imbuto .collo .barra i{background:var(--warn)}
+.mock .avviso{margin-top:10px;padding:10px 12px;border-radius:12px;font-size:13px;border:1px solid var(--warn);color:var(--m-ink);
+  background:color-mix(in srgb,var(--warn) 10%,var(--m-card))}
+.mock .tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.mock .tiles div{background:var(--track);border-radius:12px;padding:9px 11px;display:flex;flex-direction:column}
+.mock .tiles .num{font-size:19px}
+.mock .btn{display:block;text-align:center;border-radius:12px;padding:11px;font-weight:700;margin-top:10px;border:1px solid var(--m-line);color:var(--m-ink);background:var(--m-card)}
+.mock .btn.prim{background:var(--m-prim);color:var(--m-prim-ink);border-color:transparent}
+.mock .btn.wa{background:#1fa855;color:#fff;border-color:transparent}
+.mock table{width:100%;border-collapse:collapse;font:inherit;font-size:13.5px;color:var(--m-ink);margin-top:6px}
+.mock th{font-size:11px;font-weight:700;color:var(--m-ink2);text-align:right;padding:2px 0 6px 6px}
+.mock td{padding:7px 0;border-top:1px solid var(--m-line)}
+.mock td.n{text-align:right;padding-left:6px;font-variant-numeric:tabular-nums;font-weight:700}
+.mock td.f{color:var(--m-ink3);font-weight:500}
+.mock td.sotto{color:var(--bad)}
+.mock .velo{position:absolute;inset:0;background:rgba(10,8,20,.45)}
+.mock .foglio{position:absolute;left:0;right:0;bottom:0;background:var(--m-card);border-radius:24px 24px 0 0;padding:18px 16px 18px}
+.mock .campi{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.mock .campo span{display:block;font-size:12px;color:var(--m-ink2);margin-bottom:4px}
+.mock .campo div{border:1px solid var(--m-line);border-radius:11px;padding:9px 11px;background:var(--m-bg-solid, var(--m-bg));font-weight:600}
+.mock .due{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mock .due .btn{margin-top:12px}
+.mock .indietro{font-weight:700;color:var(--area, var(--m-prim));font-size:14px}
+.mock[data-stile="b"][data-modo="scuro"] .indietro, .mock[data-stile="b"] .hd .indietro{color:#f5c84c}
+@media (prefers-reduced-motion: no-preference){ .mock{transition:background .25s} }
+</style>
+</head>
+<body>
+
+<div class="pagina">
+  <div class="intro">
+    <h1>Growup Team · tavola grafica</h1>
+    <p>Le direzioni applicate alle schermate vere con numeri di esempio. Ultime aggiunte: <b>H</b>, <b>I</b> e <b>J</b>;
+      prima ancora E, F e G. Cambia stile e prova chiaro e scuro. Nessuna modifica all'app finché non scegliete.</p>
+  </div>
+
+  <div class="controlli">
+    <div class="gruppo-ctl"><span>Stile</span>
+      <div class="seg" role="group" aria-label="Stile" id="ctl-stile">
+        <button id="s-a" data-stile="a" aria-pressed="true">A · Aurora</button>
+        <button id="s-b" data-stile="b" aria-pressed="false">B · Notte e oro</button>
+        <button id="s-d" data-stile="d" aria-pressed="false">D · Percorso a colori</button>
+        <button id="s-bd" data-stile="bd" aria-pressed="false">B + D</button>
+        <button id="s-e" data-stile="e" aria-pressed="false">E · Oceano di vetro</button>
+        <button id="s-f" data-stile="f" aria-pressed="false">F · Pop a blocchi</button>
+        <button id="s-g" data-stile="g" aria-pressed="false">G · Prugna e pesca</button>
+        <button id="s-h" data-stile="h" aria-pressed="false">H · Smeraldo e rame</button>
+        <button id="s-i" data-stile="i" aria-pressed="false">I · Anelli</button>
+        <button id="s-j" data-stile="j" aria-pressed="false">J · Tessere</button>
+      </div></div>
+    <div class="gruppo-ctl"><span>Tema del telefono</span>
+      <div class="seg" role="group" aria-label="Tema" id="ctl-modo">
+        <button id="m-c" data-modo="chiaro" aria-pressed="true">Chiaro</button>
+        <button id="m-s" data-modo="scuro" aria-pressed="false">Scuro</button>
+      </div></div>
+    <div class="gruppo-ctl schermi-tab"><span>Schermata</span>
+      <div class="seg" role="group" aria-label="Schermata" id="ctl-schermo">
+        <button id="v-io" data-schermo="io" aria-pressed="true">Io</button>
+        <button id="v-gr" data-schermo="gruppo" aria-pressed="false">Gruppo</button>
+        <button id="v-sc" data-schermo="scheda" aria-pressed="false">Scheda</button>
+        <button id="v-ch" data-schermo="chiamata" aria-pressed="false">Chiamata</button>
+      </div></div>
+  </div>
+
+  <div class="nota-stile" id="nota"></div>
+
+  <div class="telefoni">
+    <!-- IO -->
+    <section class="telefono-box attivo" data-schermo="io"><h2>Pagina Io</h2>
+      <div class="mock">
+        <div class="hd"><div class="riga">
+          <div><div class="eb">A&amp;S · Growup Team</div><h3>Ciao Stefano e Alessia</h3></div>
+          <div class="sel"><span class="on">Io</span><span>Gruppo</span></div></div></div>
+        <div class="corpo">
+          <div class="c visione">
+            <div class="eb">La visione</div>
+            <div class="spread"><span class="t2">Argento 21%</span><span class="num" style="font-size:20px">3.750 €<span class="small"> /mese*</span></span></div>
+            <div class="small">Calcolato su: 200 VP personali + 3 linee da 4.100 VP</div>
+          </div>
+          <div class="c" style="--area:var(--a-path)">
+            <div class="spread"><span class="eb area">Tappa 3 di 8</span><span class="pill acc">3% questo mese</span></div>
+            <div class="t2">Path to Bronze</div>
+            <div class="tappe"><i class="f"></i><i class="f"></i><i class="ora"></i><i></i><i></i><i></i><i></i><i></i></div>
+            <ul class="req">
+              <li><span>100 VP personali</span><span class="ok">✓ 120 / 100</span></li>
+              <li><span>3 linee frontali da 100 VP</span><span class="num">2 / 3</span></li>
+            </ul>
+            <div class="spinta"><b>Linee attive: 2 su 3.</b> Manca 1 linea da 100 VP per il Path to Bronze.</div>
+          </div>
+          <div class="c" style="--area:var(--a-week)">
+            <div class="spread"><span class="eb area">La mia settimana</span><span class="small">13–19 ottobre</span></div>
+            <div class="obiettivo"><div class="spread"><span>Contatti</span><span class="num">7 / 10</span></div><div class="barra" style="--p:70"><i style="width:70%"></i></div></div>
+            <div class="obiettivo"><div class="spread"><span>Piani</span><span class="num">2 / 3</span></div><div class="barra" style="--p:66"><i style="width:66%"></i></div></div>
+          </div>
+          <div class="c" style="--area:var(--a-month)">
+            <div class="spread"><span class="eb area">Il mio mese · ottobre</span><span class="pill ok">✓ obiettivo</span></div>
+            <div class="obiettivo"><div class="spread"><span>VP del mese</span><span class="num">120 / 100</span></div><div class="barra" style="--p:100"><i style="width:100%"></i></div></div>
+            <div class="small" style="margin-top:8px">Nuovi clienti nel mese: <b class="num">1</b></div>
+          </div>
+        </div>
+        <div class="azioni"><div>+ Contatto<small>7 questa sett.</small></div><div>+ Piano<small>2 questa sett.</small></div><div>+ Ordine<small>120 VP nel mese</small></div></div>
+      </div>
+    </section>
+
+    <!-- GRUPPO -->
+    <section class="telefono-box" data-schermo="gruppo"><h2>Pagina Gruppo</h2>
+      <div class="mock">
+        <div class="hd"><div class="riga">
+          <div><div class="eb">A&amp;S · Growup Team</div><h3>Il mio gruppo</h3><div class="sotto">6 persone</div></div>
+          <div class="sel"><span>Io</span><span class="on">Gruppo</span></div></div></div>
+        <div class="corpo">
+          <div class="c" style="--area:var(--a-group)">
+            <div class="spread"><span class="eb area">Imbuto del gruppo</span><span class="small">ultime 4 settimane</span></div>
+            <ul class="imbuto">
+              <li class="collo"><div class="spread"><span>Contatti <span class="pill warn">sotto soglia</span></span><span class="num">75</span></div><div class="barra" style="--p:100"><i style="width:100%"></i></div><span class="small">obiettivo del gruppo 240</span></li>
+              <li><div class="spread"><span>Piani</span><span class="num">14</span></div><div class="barra" style="--p:19"><i style="width:19%"></i></div><span class="small">19% dei contatti</span></li>
+              <li><div class="spread"><span>Ordini</span><span class="num">3</span></div><div class="barra" style="--p:4"><i style="width:4%"></i></div><span class="small">21% dei piani · 140 VP</span></li>
+            </ul>
+            <div class="avviso">Contatti: 75 su 240 di obiettivo del gruppo (31%), sotto la soglia del 50%.</div>
+          </div>
+          <div class="c" style="--area:var(--a-group)">
+            <div class="spread"><span class="eb area">Situazione per persona</span><span class="small">ultime 4 settimane</span></div>
+            <ul class="lista">
+              <li><span><b>Rosa Ferma</b><br><span class="small">ultimo aggiornamento 20 giorni fa</span></span><span class="pill bad">Non aggiorna</span></li>
+              <li><span><b>Ivo Invito</b><br><span class="small">25 contatti, 2 piani</span></span><span class="pill warn">Piani sotto soglia</span></li>
+              <li><span><b>Cri Crescita</b><br><span class="small">25 contatti, 6 piani, 120 VP</span></span><span class="pill ok">In crescita</span></li>
+            </ul>
+          </div>
+          <div class="c" style="--area:var(--a-group)">
+            <div class="spread"><span class="eb area">La mia struttura</span><span class="pill acc">+ Aggiungi persona</span></div>
+            <ul class="lista">
+              <li><span><b>Cri Crescita</b><br><span class="small">120 VP · gruppo 120</span></span><span class="pill ok">attivo</span></li>
+              <li><span><b>Gino Senza App</b><br><span class="small">0 VP · gruppo 0</span></span><span class="pill" style="color:var(--m-ink3)">senza app</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCHEDA -->
+    <section class="telefono-box" data-schermo="scheda"><h2>Scheda partner</h2>
+      <div class="mock">
+        <div class="hd"><div class="riga">
+          <div><div class="eb">A&amp;S · Growup Team</div><h3>Scheda partner</h3></div>
+          <div class="sel"><span>Io</span><span class="on">Gruppo</span></div></div></div>
+        <div class="corpo" style="--area:var(--a-group)">
+          <span class="indietro">‹ Il mio gruppo</span>
+          <div class="c">
+            <div class="spread"><span class="t2">Cri Crescita</span><span class="pill ok">attivo</span></div>
+            <div class="small">Sponsor: te · ultimo aggiornamento 1 giorno fa</div>
+            <div class="tiles">
+              <div><span class="small">VP personali</span><span class="num">120</span></div>
+              <div><span class="small">VP di gruppo</span><span class="num">120</span></div>
+              <div><span class="small">Linee attive</span><span class="num">0</span></div>
+              <div><span class="small">Percentuale</span><span class="num">–</span></div>
+            </div>
+            <span class="btn">Fissa una chiamata</span>
+          </div>
+          <div class="c">
+            <div class="eb area">Questo mese e il mese prima</div>
+            <table>
+              <thead><tr><th></th><th>ott<br>fino a oggi</th><th>set<br>al 16</th><th>set<br>totale</th></tr></thead>
+              <tbody>
+                <tr><td>Contatti</td><td class="n sotto">▼ 2</td><td class="n f">5</td><td class="n f">8</td></tr>
+                <tr><td>Piani</td><td class="n">1</td><td class="n f">0</td><td class="n f">0</td></tr>
+                <tr><td>Ordini</td><td class="n sotto">▼ 0</td><td class="n f">1</td><td class="n f">1</td></tr>
+                <tr><td>VP personali</td><td class="n sotto">▼ 0</td><td class="n f">80</td><td class="n f">80</td></tr>
+                <tr><td>VP di gruppo</td><td class="n">0</td><td class="n f">–</td><td class="n f">80</td></tr>
+              </tbody>
+            </table>
+            <div class="small" style="margin-top:8px">▼ in rosso: sotto il mese prima allo stesso giorno.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHIAMATA -->
+    <section class="telefono-box" data-schermo="chiamata"><h2>Fissa una chiamata</h2>
+      <div class="mock" style="min-height:620px">
+        <div class="hd"><div class="riga">
+          <div><div class="eb">A&amp;S · Growup Team</div><h3>Scheda partner</h3></div>
+          <div class="sel"><span>Io</span><span class="on">Gruppo</span></div></div></div>
+        <div class="corpo"><div class="c"><span class="t2">Cri Crescita</span><div class="small">Sponsor: te</div></div></div>
+        <div class="velo"></div>
+        <div class="foglio" style="--area:var(--a-group)">
+          <div class="t2">Chiamata con Cri</div>
+          <div class="campi">
+            <div class="campo"><span>Giorno</span><div>sab 17 ott</div></div>
+            <div class="campo"><span>Ora</span><div>21:00</div></div>
+            <div class="campo"><span>Durata</span><div>30 minuti</div></div>
+            <div class="campo"><span>Promemoria</span><div>30 minuti prima</div></div>
+          </div>
+          <div class="due"><span class="btn prim">Calendario</span><span class="btn wa">WhatsApp</span></div>
+          <div class="small" style="margin-top:10px">Su WhatsApp parte un messaggio già scritto: "Ciao Cri, ci sentiamo sabato 17 ottobre alle 21:00?"</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const NOTE = {
+  a: { t:"A · Aurora", d:"Testata con sfumatura viola, fucsia e arancio; card bianche morbide senza bordi; i tre pulsanti in basso ognuno col suo colore. Energica e moderna, fa \"app di oggi\".",
+       c:[["#7c3aed","viola"],["#db2777","fucsia"],["#ea580c","arancio"],["#faf7ff","fondo lilla"]] },
+  b: { t:"B · Notte e oro", d:"Testata blu notte con scritte oro, fondo avorio, titoli e numeri in un carattere con le grazie. Elegante, da \"club dei riconoscimenti\"; il colore sta nei dettagli oro e smeraldo.",
+       c:[["#0f172a","blu notte"],["#f5c84c","oro"],["#0f9f74","smeraldo"],["#fbf8f1","avorio"]] },
+  d: { t:"D · Percorso a colori", d:"Ogni area ha il suo colore: settimana blu, mese verde, percorso bronzo, gruppo magenta. Si capisce dove si è a colpo d'occhio; testata pulita, carattere geometrico.",
+       c:[["#2563eb","settimana"],["#4d7c0f","mese"],["#b5652a","percorso"],["#c0267a","gruppo"]] },
+  bd:{ t:"B + D · Notte e oro con un colore per area", d:"L'eleganza di Notte e oro (testata blu notte, oro, titoli con le grazie) con un colore per area come in D, più vivace nei pulsanti in basso.",
+       c:[["#0f172a","blu notte"],["#f5c84c","oro"],["#2f5bd3","settimana"],["#0f9f74","mese"],["#be185d","gruppo"]] },
+  e: { t:"E · Oceano di vetro", d:"Fondo sfumato azzurro, lilla e rosa; card semitrasparenti come vetro smerigliato; testata integrata, senza fascia; pulsanti a pillola. Molto moderna, leggera, da app di ultima generazione.",
+       c:[["#4f46e5","indaco"],["#06b6d4","ciano"],["#0e9488","acqua"],["#db2777","rosa"]] },
+  f: { t:"F · Pop a blocchi", d:"Le sezioni principali diventano blocchi a colore pieno (settimana rosso corallo, mese verde acqua, percorso viola, visione giallo sole) con numeri grandi. La più colorata ed energica: si vede subito dove guardare.",
+       c:[["#e63946","corallo"],["#0f8b7d","verde acqua"],["#6d28d9","viola"],["#ffc93c","giallo sole"],["#fff8f1","fondo"]] },
+  g: { t:"G · Prugna e pesca", d:"Testata prugna con sfumatura, accenti pesca e verde acqua, titoli e numeri con un carattere con le grazie. Calda ed elegante, colorata senza essere chiassosa.",
+       c:[["#6b1d5c","prugna"],["#e8693f","pesca"],["#13958a","verde acqua"],["#fdf5f0","fondo"]] },
+  h: { t:"H · Smeraldo e rame", d:"Testata verde smeraldo profondo, accenti rame e ambra, titoli e numeri in un carattere classico con le grazie. Elegante e ricca come un club esclusivo, ma con più colore del blu notte.",
+       c:[["#0a3a2c","smeraldo"],["#c26a3d","rame"],["#b07d22","ambra"],["#13795b","verde"],["#f6f3ec","fondo"]] },
+  i: { t:"I · Anelli", d:"Gli obiettivi diventano cerchi di avanzamento, come gli anelli di attività dello smartwatch: contatti arancio, piani e VP verde acqua. Testata bianca sospesa, colori freschi e accesi. A colpo d'occhio si vede quanto manca.",
+       c:[["#f2600c","arancio"],["#2f6fe4","blu"],["#00999a","verde acqua"],["#7c3aed","viola"]] },
+  j: { t:"J · Tessere", d:"Ogni sezione è una tessera tinta del suo colore (rosa, azzurro, ambra, viola), come i widget del telefono; dentro, i numeri stanno su tasselli bianchi, grandi. Allegra, ordinata e molto leggibile.",
+       c:[["#e8336d","rosa"],["#0388a6","azzurro"],["#c77700","ambra"],["#7b2cbf","viola"]] }
+};
+const st = { stile:"h", modo: (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "scuro" : "chiaro", schermo:"io" };
+try{ const s = JSON.parse(localStorage.getItem("tavola3") || "{}"); Object.assign(st, s); }catch(e){}
+function applica(){
+  document.querySelectorAll(".mock").forEach(m => { m.dataset.stile = st.stile; m.dataset.modo = st.modo; });
+  document.querySelectorAll("#ctl-stile button").forEach(b => b.setAttribute("aria-pressed", b.dataset.stile === st.stile));
+  document.querySelectorAll("#ctl-modo button").forEach(b => b.setAttribute("aria-pressed", b.dataset.modo === st.modo));
+  document.querySelectorAll("#ctl-schermo button").forEach(b => b.setAttribute("aria-pressed", b.dataset.schermo === st.schermo));
+  document.querySelectorAll(".telefono-box").forEach(t => t.classList.toggle("attivo", t.dataset.schermo === st.schermo));
+  const n = NOTE[st.stile];
+  document.getElementById("nota").innerHTML = `<b>${n.t}</b><p>${n.d}</p><div class="palette">${n.c.map(([h, l]) => `<span><i style="background:${h}"></i>${l} ${h}</span>`).join("")}</div>`;
+  try{ localStorage.setItem("tavola3", JSON.stringify(st)); }catch(e){}
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("button"); if(!b) return;
+  if(b.dataset.stile) st.stile = b.dataset.stile;
+  if(b.dataset.modo) st.modo = b.dataset.modo;
+  if(b.dataset.schermo) st.schermo = b.dataset.schermo;
+  applica();
+});
+applica();
+</script>
+</body>
+</html>
