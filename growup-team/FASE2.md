@@ -12,6 +12,10 @@ di altre linee (già garantito dalla RLS della Fase 1).
 
 ## Decisioni di Stefano
 
+**Principio (16 ottobre 2026): l'app non dà suggerimenti.** Rende evidenti i dati, il percorso e le eventuali
+mancanze di quello che viene fatto; come muoversi lo decide ogni partner, da solo. Niente frasi del tipo "allenate…",
+"costruisci…", "lavorate su…", niente azioni suggerite: solo numeri, soglie e cosa manca.
+
 | Tema | Decisione |
 |---|---|
 | Soglie percentuali (VP di gruppo nel mese) | 3% = 200 · 6% = 600 · 9% = 1.200 · 12% = 2.400 · 15% = 4.000 · 18% = 7.000 · 21% = 10.000 (tabella di amministrazione) |
@@ -28,7 +32,7 @@ di altre linee (già garantito dalla RLS della Fase 1).
      percentuale raggiunta (tabella `percent_levels`) e qualifica del mese, tutto calcolato nel database
      su "io e la mia downline".
    - Tappe dal Path to Bronze in su riconosciute dai numeri; percentuale e qualifica mostrate separate
-     ("9% raggiunto · Bronze Foundation non qualificato: manca la terza linea"); "Costruisci la terza linea".
+     ("9% raggiunto · Bronze Foundation non qualificato: manca la terza linea"); "Linee attive: 2 su 3. Manca 1 linea".
    - Storico mensile: tabella `monthly_totals` congelata il giorno 5 da un'attività pianificata (pg_cron);
      il mese in corso e quello non ancora chiuso si calcolano dal vivo.
    - Pagamenti Foundation/Builder contati in automatico dai mesi qualificati (12 entro 18 mesi).
@@ -46,8 +50,8 @@ di altre linee (già garantito dalla RLS della Fase 1).
    - Fatto: soglie in `settings.soglie_etichette` (migrazione `010_etichette.sql`), regole in STATO.md.
      Chi è senza app non ha etichetta (decisione di Stefano).
 4. **Scheda partner e storico del gruppo**
-   - Ultime 4 settimane di contatti, piani, VP; punto debole confrontato con la media del gruppo e con chi cresce;
-     azioni suggerite.
+   - Ultime 4 settimane di contatti, piani, VP, confrontate con la media del gruppo e con chi cresce:
+     si evidenzia dove sta sotto, **senza azioni suggerite** (vedi il principio).
    - Fissa una chiamata: evento di calendario (.ics) con promemoria e note, e messaggio WhatsApp già scritto.
 
 ## Regole di sicurezza nuove

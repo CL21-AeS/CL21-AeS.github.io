@@ -1,6 +1,6 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 15 ottobre 2026, sera. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 16 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 
 ## Fatto
 
@@ -54,7 +54,7 @@ già applicate; attività pianificata `growup-chiusura-mese` attiva):
 - il database accetta registrazioni solo nel mese in corso e, fino al giorno 5, nel precedente (`mese_chiuso`);
 - pagina Io: requisiti veri di linee e VP di gruppo, "X% questo mese" separato dalla qualifica
   ("9% raggiunto · Bronze Foundation 9% non qualificato: …"), linee frontali con i loro VP,
-  "Costruisci la terza linea", pagamenti Foundation/Builder contati dallo storico, Storico,
+  "Linee attive: 2 su 3. Manca 1 linea…" (era "Costruisci la terza linea", tolto il 16 ottobre), pagamenti Foundation/Builder contati dallo storico, Storico,
   "Aggiorna il totale" anche per il mese precedente fino al giorno 5.
 
 **Fase 2, blocco 2 — struttura, partner senza app, conferme** (migrazione `007_fase2_gestiti.sql` già applicata):
@@ -84,7 +84,8 @@ dall'SQL Editor perché contiene un `delete`):
 
 - **Imbuto del gruppo** (te escluso, ultime 4 settimane): contatti → piani → ordini, con obiettivo contatti del gruppo,
   % dei contatti che diventano piani, % dei piani che diventano ordini, VP. Il **collo di bottiglia** è il primo
-  passaggio sotto soglia, evidenziato in giallo con una frase su cosa allenare (lista nomi, invito, follow-up);
+  passaggio sotto soglia, evidenziato in giallo con il dato e la soglia (es. "Contatti: 75 su 240 di obiettivo del gruppo (31%), sotto la soglia
+  del 50%"); dal 16 ottobre senza frasi su cosa allenare;
 - **Chi seguire adesso**: chi usa l'app, ordinato per urgenza, con un'etichetta e il perché
   (PR CL21-AeS/CL21-AeS.github.io#9 unita; poi il ritocco sotto):
   1. *Da chiamare*: non aggiorna da più di 7 giorni;
@@ -102,6 +103,10 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Decisioni prese con Stefano
 
+- **Principio (16 ottobre 2026): l'app non dà suggerimenti.** Rende evidenti i dati, il percorso e le eventuali
+  mancanze di quello che viene fatto; come muoversi lo decide ogni partner, da solo. Niente frasi del tipo "allenate…",
+  "costruisci…", "lavorate su…", niente azioni suggerite: solo numeri, soglie e cosa manca.
+
 - **Niente email**: si entra dal link d'invito dello sponsor (`#CODICE`) e poi dal link personale (`#chiave=…`),
   che il partner si manda da solo su WhatsApp (chat con sé stesso) o Telegram (Messaggi salvati).
   Scelta confermata: niente custodia delle chiavi da parte dello sponsor (rispetta "nessuno modifica un partner attivo").
@@ -114,13 +119,14 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare il ritocco "senza app senza etichetta"** se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare il ritocco "niente suggerimenti"** (16 ottobre) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
+   ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono dei blocchi 1-3** della Fase 2 (pagina Io con i calcoli, struttura con i numeri,
    scheda partner, partner senza app, Da confermare, in mezzo / cancella / cambia sponsor, imbuto ed etichette).
 3. **Blocco 4 della Fase 2** (ultimo, vedi `FASE2.md`):
-   - scheda partner arricchita: ultime 4 settimane di contatti, piani, VP; punto debole confrontato con la media
-     del gruppo e con chi cresce; azioni suggerite;
+   - scheda partner arricchita: ultime 4 settimane di contatti, piani, VP, confrontate con la media del gruppo
+     e con chi cresce, evidenziando dove sta sotto; **niente azioni suggerite**;
    - "Fissa una chiamata": evento di calendario (.ics) con promemoria e note **e** messaggio WhatsApp già scritto;
    - storico del gruppo (mesi chiusi da `monthly_totals`).
 4. **Prima del lancio a tutto il gruppo**: captcha (Cloudflare Turnstile) sugli accessi anonimi e limite
