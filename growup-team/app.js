@@ -986,6 +986,43 @@ function inseritoDa(a, p){
   const n = nomeDi(a.inserito_da);
   return n ? `inserito da ${n}` : "inserito dalla sua upline";
 }
+/* ---- Fissa una chiamata: evento di calendario (.ics) e messaggio WhatsApp neutro ---- */
+const GIORNI_SETT = ["domenica","lunedì","martedì","mercoledì","giovedì","venerdì","sabato"];
+function quandoIt(d, ora){
+  const g = new Date(d + "T00:00:00Z").getUTCDay();
+  return `${GIORNI_SETT[g]} ${dataIt(d)} alle ${ora}`;
+}
+function testoChiamata(nome, d, ora){ return `Ciao ${nomeSaluto(nome)}, ci sentiamo ${quandoIt(d, ora)}?`; }
+function icsTesto(t){ return String(t || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); }
+function icsUtc(dt){ return dt.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, ""); }
+/* L'ora è quella del telefono: chi la fissa e il calendario stanno sullo stesso telefono. */
+function creaIcs({ nome, data, ora, minuti, avviso, note }){
+  const inizio = new Date(`${data}T${ora}:00`), fine = new Date(inizio.getTime() + minuti * 60000);
+  const titolo = `Chiamata con ${nome}`;
+  const righe = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//A&S//Growup Team//IT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    "BEGIN:VEVENT", `UID:${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}@growup-team`,
+    `DTSTAMP:${icsUtc(new Date())}`, `DTSTART:${icsUtc(inizio)}`, `DTEND:${icsUtc(fine)}`,
+    `SUMMARY:${icsTesto(titolo)}`].concat(note ? [`DESCRIPTION:${icsTesto(note)}`] : [],
+    avviso ? ["BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${icsTesto(titolo)}`, `TRIGGER:-PT${avviso}M`, "END:VALARM"] : [],
+    ["END:VEVENT", "END:VCALENDAR"]);
+  return righe.join("\r\n") + "\r\n";
+}
+function scaricaIcs(testo, nome){
+  const url = URL.createObjectURL(new Blob([testo], { type:"text/calendar;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = "chiamata-" + String(nome).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".ics";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+function datiChiamata(f){
+  return { data:f.data.value, ora:f.ora.value, minuti:Number(f.durata.value) || 30, avviso:Number(f.avviso.value) || 0, note:f.note.value.trim() };
+}
+function erroreChiamata(c){
+  if(!c.data || !c.ora) return "Scegli giorno e ora.";
+  if(new Date(`${c.data}T${c.ora}:00`).getTime() < Date.now() - 60000) return "Il giorno e l'ora sono già passati.";
+  return "";
+}
+
 /* Questo mese fino a oggi, il mese prima fino allo stesso giorno e il mese prima intero.
    Solo i dati: in rosso con ▼ dove è sotto il mese prima allo stesso giorno. */
 function confrontoMese(pid){
@@ -1050,6 +1087,7 @@ function vScheda(){
     <p class="small" style="margin:10px 0 0">Punto di partenza: <b>${esc(testoPartenza(p))}</b>
       ${p.partenza_confermata_il ? `<span class="pill v">confermato</span>`
         : `<button class="btn link small" data-act="conferma" data-id="${esc(p.id)}">Conferma</button>`}</p>
+    <button class="btn wide" style="margin-top:12px" data-act="chiamata" data-id="${esc(p.id)}">Fissa una chiamata</button>
     <div class="spread" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)">
       <span class="small">Il suo sponsor vero non è ${p.sponsor_id === st.profilo.id ? "te" : esc(sponsor || "nell'app")}?</span>
       <button class="btn small" data-act="in-mezzo" data-id="${esc(p.id)}" style="white-space:nowrap">Manca qualcuno sopra?</button>
@@ -1181,6 +1219,32 @@ function vSheet(){
       <label class="check"><input type="checkbox" name="consenso" required>
         <span>Ho il suo consenso (a voce o per messaggio) a inserire il suo nome e i suoi numeri nell'app.</span></label>
       ${piede}${err}
+    </form>`;
+  }
+  if(s === "chiamata"){
+    const x = st.struttura.find(y => y.id === st.chiamataId);
+    if(!x) return "";
+    return `<h2>Chiamata con ${esc(nomeSaluto(x.nome))}</h2>
+    <form data-form="chiamata" novalidate>
+      <div class="row">
+        <label class="field grow"><span>Giorno</span><input name="data" type="date" value="${piuGiorni(oggi(), 1)}" min="${oggi()}"></label>
+        <label class="field grow"><span>Ora</span><input name="ora" type="time" value="21:00" step="300"></label>
+      </div>
+      <div class="row">
+        <label class="field grow"><span>Durata</span><select name="durata">
+          ${[15, 30, 45, 60].map(m => `<option value="${m}"${m === 30 ? " selected" : ""}>${m} minuti</option>`).join("")}</select></label>
+        <label class="field grow"><span>Promemoria</span><select name="avviso">
+          <option value="10">10 minuti prima</option><option value="30" selected>30 minuti prima</option>
+          <option value="60">1 ora prima</option><option value="1440">1 giorno prima</option><option value="0">nessuno</option></select></label>
+      </div>
+      <label class="field"><span>Note (restano solo nel tuo calendario)</span><textarea name="note" rows="3" maxlength="1000"></textarea></label>
+      <div class="condividi" style="margin-top:16px">
+        <button class="btn primary">Calendario</button>
+        <button type="button" class="btn wa" data-act="chiamata-wa">WhatsApp</button>
+      </div>
+      <p class="nota">Su WhatsApp parte un messaggio già scritto, per esempio: "${esc(testoChiamata(x.nome, piuGiorni(oggi(), 1), "21:00"))}".
+        Scegli tu a chi mandarlo.</p>
+      <button type="button" class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>${err}
     </form>`;
   }
   if(s === "cambia-sponsor"){
@@ -1321,6 +1385,14 @@ const AZIONI = {
     catch(e){ toast(messaggio(e)); }
   },
   conferma(el){ st.confermaId = el.dataset.id; st.sheet = "conferma"; render(); },
+  chiamata(el){ st.chiamataId = el.dataset.id; st.errore = ""; st.sheet = "chiamata"; render(); },
+  "chiamata-wa"(el){
+    const f = el.form, x = st.struttura.find(y => y.id === st.chiamataId);
+    if(!f || !x) return;
+    const c = datiChiamata(f), err = erroreChiamata(c);
+    if(err){ mostraErroreForm(f, err); return; }
+    window.open("https://wa.me/?text=" + encodeURIComponent(testoChiamata(x.nome, c.data, c.ora)), "_blank", "noopener");
+  },
   "cambia-sponsor"(el){ st.spostaId = el.dataset.id; st.errore = ""; st.sheet = "cambia-sponsor"; render(); },
   async cancella(el){
     const p = st.struttura.find(x => x.id === el.dataset.id);
@@ -1419,6 +1491,14 @@ const MODULI = {
       st.profilo.privacy_accettata_il = new Date().toISOString();
       st.fase = "home"; render();
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  chiamata(f){
+    const x = st.struttura.find(y => y.id === st.chiamataId);
+    if(!x) return;
+    const c = datiChiamata(f), err = erroreChiamata(c);
+    if(err){ mostraErroreForm(f, err); return; }
+    scaricaIcs(creaIcs(Object.assign({ nome:x.nome }, c)), x.nome);
+    toast("Apri il file per aggiungere la chiamata al calendario");
   },
   async "cambia-sponsor"(f){
     const x = st.struttura.find(y => y.id === st.spostaId);

@@ -73,7 +73,7 @@ small,.small{font-size:13px;color:var(--ink2)}
 .btn.link{border:0;background:none;color:var(--accent);padding:0 4px;min-height:38px}
 .btn[disabled]{opacity:.45;pointer-events:none}
 a{color:var(--accent)}
-input,select{
+input,select,textarea{
   font:inherit;color:var(--ink);background:var(--bg);
   border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%;min-height:46px;
 }
@@ -81,6 +81,7 @@ input:focus,select:focus{outline:2px solid color-mix(in srgb,var(--accent) 45%,t
 input::placeholder{color:var(--ink3);opacity:.8}
 input.codice{font-size:26px;letter-spacing:.35em;text-align:center;font-variant-numeric:tabular-nums}
 label.field{display:block;margin:14px 0 0}
+textarea{resize:vertical;min-height:72px}
 label.field>span{display:block;font-size:13px;color:var(--ink2);margin-bottom:5px}
 label.check{display:flex;gap:10px;align-items:flex-start;margin:14px 0 0;font-size:14px;color:var(--ink2)}
 label.check input{width:22px;min-height:22px;height:22px;margin:1px 0 0;flex:none}
