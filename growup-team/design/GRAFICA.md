@@ -21,6 +21,12 @@ una freccia ambra che sale. Disegno in `icon.svg`; da lì le PNG `icon-512.png`,
 ritagliate a cerchio: il disegno sta nell'area sicura), `apple-touch-icon.png` (180, iPhone), `favicon-32.png`.
 Per rifarle: aprire `icon.svg` in un browser e salvarne una cattura alle misure indicate.
 
+## Immagini dell'invito
+
+`anteprima.png` (1200×630, anteprima del link), `invito-quadrato.png` (1080×1080), `invito-stato.png` (1080×1920):
+fondo smeraldo, icona, "A&S · Growup Team", "La tua crescita, settimana dopo settimana." in Cormorant avorio e ambra.
+Sorgente: la pagina di prova dell'invito (SVG), resa in PNG.
+
 ## Alternative da tenere per il futuro (scelta di Stefano)
 
 Sono nella tavola `design/tavola-grafica.html` (apribile nel browser, con chiaro/scuro), insieme alle altre provate.

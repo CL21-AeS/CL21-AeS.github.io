@@ -492,6 +492,19 @@ check(await page.getByText("Salva il tuo link personale").count() === 0 && await
   "dopo l'incolla: niente richiesta di salvare il link né guida all'installazione");
 await ctx.close();
 
+// 14. Invito: anteprima del link, testo con il nome e i tre passi, immagini da inviare
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+check(await page.locator('meta[property="og:image"]').getAttribute("content") === "https://cl21-aes.github.io/growup-team/anteprima.png", "anteprima del link: immagine");
+await page.click("button[data-act=vista-gruppo]");
+const waInvito = decodeURIComponent((await page.locator(".card", { hasText:"Invita un nuovo partner" }).locator("a.wa").getAttribute("href")).split("text=")[1]);
+check(waInvito.startsWith("Ciao! Siamo Stefano e Alessia: ti mandiamo Growup") && waInvito.includes("3. Installa l'app") && waInvito.endsWith("\n\nhttp://127.0.0.1:8765/growup-team/#RRRR22"),
+  "invito: nome, tre passi e link (" + waInvito.slice(0, 60) + "…)");
+check(await page.locator("button[data-act=condividi-immagine]").count() === 2, "invito: due immagini da inviare");
+check((await page.evaluate(async () => (await fetch("invito-stato.png")).status)) === 200, "immagine per lo stato pubblicata");
+await page.locator(".card", { hasText:"Invita un nuovo partner" }).screenshot({ path: S + "/e2e/21-invito.png" });
+await ctx.close();
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
