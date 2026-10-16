@@ -1247,9 +1247,9 @@ function vInvita(){
 
 function vAzioni(){
   return `<div class="azioni"><div class="in">
-    <button class="btn primary" data-act="contatto">+ Contatto<b>${num(fattoSettimana("contatto"))} questa sett.</b></button>
-    <button class="btn primary" data-act="piano">+ Piano<b>${num(fattoSettimana("piano"))} questa sett.</b></button>
-    <button class="btn primary" data-act="ordine">+ Ordine<b>${num(vpMese(meseDi(oggi())))} VP nel mese</b></button>
+    <button class="btn primary c1" data-act="contatto">+ Contatto<b>${num(fattoSettimana("contatto"))} questa sett.</b></button>
+    <button class="btn primary c2" data-act="piano">+ Piano<b>${num(fattoSettimana("piano"))} questa sett.</b></button>
+    <button class="btn primary c3" data-act="ordine">+ Ordine<b>${num(vpMese(meseDi(oggi())))} VP nel mese</b></button>
   </div></div>`;
 }
 
