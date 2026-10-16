@@ -245,6 +245,16 @@ check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isVis
   "ricerca: Luca con la sua linea (Anna, Paolo, Marco), gli altri nascosti");
 check((await page.locator("#cerca-esito").innerText()).startsWith("1 persona trovata"), "ricerca: 1 persona trovata");
 await page.screenshot({ path: S + "/e2e/23-ricerca.png" });
+// durante la ricerca ▸ N apre anche il gruppo della persona trovata
+await page.fill("#cerca-struttura", "paolo");
+const piegaPaolo = page.locator(".albero.struttura li", { hasText:"Paolo Neri" }).locator("button[data-act=piega]");
+check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isHidden() && (await piegaPaolo.innerText()).trim() === "▸ 2", "ricerca: Paolo trovato, il suo gruppo chiuso (▸ 2)");
+await piegaPaolo.click();
+check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isVisible()
+  && (await piegaPaolo.innerText()).trim() === "▾ 2" && await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isHidden(), "ricerca: ▸ apre la downline di Paolo (Marco, Luca)");
+check(await page.locator("#cerca-struttura").inputValue() === "paolo", "ricerca: il testo cercato resta");
+await piegaPaolo.click();
+check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isHidden(), "ricerca: ▾ la richiude");
 await page.fill("#cerca-struttura", "zzz");
 check(await page.getByText("Nessuno con questo nome nel tuo gruppo.").isVisible(), "ricerca senza risultati");
 await page.fill("#cerca-struttura", "");
