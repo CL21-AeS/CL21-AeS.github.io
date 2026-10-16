@@ -335,6 +335,33 @@ check(rv[1] === "▼ 0" && rv[2] === "80", "VP personali sotto il mese prima");
 check((await riga("VP di gruppo"))[2] === "–", "VP di gruppo: solo il totale del mese prima");
 check(await page.locator(".confronto td.sotto").count() >= 2, "valori sotto evidenziati");
 await page.screenshot({ path: S + "/e2e/15-confronto.png", fullPage:true });
+
+// 11. Fissa una chiamata: calendario e WhatsApp neutro
+await page.click("button[data-act=chiamata]");
+await page.getByText("Chiamata con Cri").waitFor();
+const domani = (() => { const d = new Date(oggiStr + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); })();
+check(await page.locator(".sheet input[name=data]").inputValue() === domani && await page.locator(".sheet input[name=ora]").inputValue() === "21:00", "proposta: domani alle 21");
+await page.fill(".sheet input[name=ora]", "20:30");
+await page.selectOption(".sheet select[name=durata]", "45");
+await page.selectOption(".sheet select[name=avviso]", "60");
+await page.fill(".sheet textarea[name=note]", "Numeri del mese, prossimo piano");
+await page.screenshot({ path: S + "/e2e/16-chiamata.png" });
+const [scaricato] = await Promise.all([page.waitForEvent("download"), page.click(".sheet button:has-text('Calendario')")]);
+const ics = fs.readFileSync(await scaricato.path(), "utf8");
+check(scaricato.suggestedFilename() === "chiamata-cri-crescita.ics", "nome del file .ics");
+const [inizioUtc, fineUtc] = await page.evaluate(d => { const t = new Date(d + "T20:30:00"), f = x => x.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  return [f(t), f(new Date(t.getTime() + 45 * 60000))]; }, domani);
+check(ics.includes("BEGIN:VEVENT") && ics.includes("SUMMARY:Chiamata con Cri Crescita") && ics.includes("DTSTART:" + inizioUtc) && ics.includes("DTEND:" + fineUtc), "evento: titolo, inizio e durata");
+check(ics.includes("TRIGGER:-PT60M") && ics.includes("DESCRIPTION:Numeri del mese\\, prossimo piano") && ics.includes("\r\n"), "promemoria, note e formato");
+await page.evaluate(() => { window.__aperto = null; window.open = u => { window.__aperto = u; return null; }; });
+await page.click(".sheet button[data-act=chiamata-wa]");
+const wa = await page.evaluate(() => window.__aperto);
+const giornoIt = new Intl.DateTimeFormat("it-IT", { weekday:"long", timeZone:"UTC" }).format(new Date(domani + "T00:00:00Z"));
+check(wa && wa.startsWith("https://wa.me/?text=") && decodeURIComponent(wa.split("text=")[1]).startsWith("Ciao Cri, ci sentiamo " + giornoIt + " ")
+  && decodeURIComponent(wa.split("text=")[1]).endsWith(" alle 20:30?"), "WhatsApp: messaggio neutro (" + (wa ? decodeURIComponent(wa.split("text=")[1]) : "") + ")");
+await page.fill(".sheet input[name=data]", "2020-01-01");
+await page.click(".sheet button:has-text('Calendario')");
+check(await page.getByText("Il giorno e l'ora sono già passati.").isVisible(), "niente chiamate nel passato");
 await ctx.close();
 
 await browser.close();
