@@ -640,6 +640,7 @@ function vHome(){
   ${vImbuto()}
   ${vDaSeguire()}
   ${vStruttura()}
+  ${vStoricoGruppo()}
   ${vInvita()}` : `
   ${leggiLocale(CHIAVE_SALVATA) === "1" || !st.chiave ? "" : vSalvaChiave()}
   ${vVisione()}
@@ -811,6 +812,51 @@ function vStorico(){
       </div>
       ${r.qual ? `<p class="small" style="margin:4px 0 0">Qualifica: <b>${esc(r.qual)}</b></p>` : ""}</li>`).join("")}</ul>
     <button class="btn wide ghost" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
+}
+
+/* ---- Storico del gruppo: i mesi chiusi; toccando un mese, il dettaglio per persona ---- */
+function meseAvanti(m, n){ const [y, mm] = m.split("-").map(Number), d = new Date(Date.UTC(y, mm - 1 + n, 1)); return d.toISOString().slice(0, 7); }
+function vStoricoGruppo(){
+  if(!figli(st.profilo.id).length) return "";
+  const righe = st.storico.map(r => ({ mese:meseDi(r.mese), gruppo:Number(r.vp_gruppo) || 0, attive:r.linee_attive || 0, pct:r.percentuale }))
+    .sort((a, b) => a.mese < b.mese ? 1 : -1).slice(0, 12);
+  const prossima = meseAvanti(meseDi(oggi()), precedenteAperto() ? 0 : 1) + "-" + String(giornoChiusura()).padStart(2, "0");
+  return `<div class="card">
+    <span class="eyebrow">Storico del gruppo</span>
+    ${righe.length ? `<table class="confronto mesi">
+      <thead><tr><th></th><th>VP di gruppo</th><th>Linee</th><th>%</th></tr></thead>
+      <tbody>${righe.map(r => `<tr data-act="mese-gruppo" data-mese="${r.mese}"><td><button class="btn link" data-act="mese-gruppo" data-mese="${r.mese}">${nomeMese(r.mese).replace(/^./, c => c.toUpperCase())}</button></td>
+        <td class="num">${num(r.gruppo)}</td><td class="num">${r.attive}</td><td class="num">${r.pct ? r.pct + "%" : "–"}</td></tr>`).join("")}</tbody>
+    </table>
+    <p class="nota">Mesi chiusi, i tuoi totali. Tocca un mese per vedere ogni persona del gruppo.</p>`
+    : `<p class="muted" style="margin:8px 0 0">Ancora nessun mese chiuso: il primo si chiude il ${dataIt(prossima)}.</p>`}
+  </div>`;
+}
+function vMeseGruppo(){
+  const g = st.meseGruppo;
+  if(!g) return "";
+  const titolo = `<h2>${nomeMese(g.mese).replace(/^./, c => c.toUpperCase())}</h2>`;
+  const chiudi = `<button class="btn wide ghost" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
+  if(g.errore) return `${titolo}<p class="errore">${esc(g.errore)}</p>${chiudi}`;
+  if(!g.righe) return `${titolo}<p class="muted">Carico i numeri…</p>${chiudi}`;
+  const prima = new Map((g.prima || []).map(r => [r.partner_id, r]));
+  const nomeQ = chiave => { const t = st.stages.find(x => x.chiave === chiave); return t ? t.nome : ""; };
+  const persone = g.righe.filter(r => r.partner_id !== st.profilo.id && nomeDi(r.partner_id))
+    .sort((a, b) => Number(b.vp_gruppo) - Number(a.vp_gruppo) || nomeDi(a.partner_id).localeCompare(nomeDi(b.partner_id)));
+  const freccia = (v, rif) => rif != null && Number(v) < Number(rif) ? `<b class="num sotto">▼ ${num(v)}</b>` : `<b class="num">${num(v)}</b>`;
+  return `${titolo}
+    <p class="small">Ogni persona del gruppo in ${nomeMese(g.mese)}. ▼ in rosso: sotto il mese prima.</p>
+    ${persone.length ? `<ul class="storico">${persone.map(r => { const p = prima.get(r.partner_id) || {}; return `<li>
+      <div class="spread"><b>${esc(nomeDi(r.partner_id))}</b>${r.percentuale ? `<span class="pill">${r.percentuale}%</span>` : ""}</div>
+      <div class="dati">
+        <span>VP personali ${freccia(r.vp_personali, p.vp_personali)}</span>
+        <span>VP di gruppo ${freccia(r.vp_gruppo, p.vp_gruppo)}</span>
+        <span>Linee attive ${freccia(r.linee_attive || 0, p.linee_attive)}</span>
+        <span>${MESI[Number(meseAvanti(g.mese, -1).slice(5)) - 1].replace(/^./, c => c.toUpperCase())} <b class="num faint">${p.vp_gruppo != null ? num(p.vp_gruppo) + " VP" : "–"}</b></span>
+      </div>
+      ${r.qualifica ? `<p class="small" style="margin:4px 0 0">Qualifica: <b>${esc(nomeQ(r.qualifica))}</b></p>` : ""}</li>`; }).join("")}</ul>`
+      : `<p class="muted">Nessuno nel gruppo quel mese.</p>`}
+    ${chiudi}`;
 }
 
 const ETICHETTE = { contatto:"Contatto", piano:"Piano mostrato", ordine:"Ordine", cliente:"Nuovo cliente", rettifica:"Totale del mese aggiornato" };
@@ -1188,6 +1234,7 @@ function vSheet(){
     </form>`;
   }
   if(s === "storico") return vStorico();
+  if(s === "mese-gruppo") return vMeseGruppo();
   if(s === "obiettivo-mese") return `<h2>Obiettivo del mese</h2>
     <p class="small">VP fatturati in ${nomeMese(meseDi(oggi()))}. Il mese prossimo riparte da questo.</p>
     <form data-form="obiettivo-mese" novalidate>
@@ -1374,6 +1421,15 @@ const AZIONI = {
   "totale-mese"(){ st.errore = ""; st.meseTotale = meseDi(oggi()); st.sheet = "totale-mese"; render(); focusSheet(); },
   "scegli-mese"(el){ st.meseTotale = el.value; render(); },
   storico(){ st.sheet = "storico"; render(); },
+  async "mese-gruppo"(el){
+    const mese = el.dataset.mese;
+    if(st.sheet === "mese-gruppo" && st.meseGruppo && st.meseGruppo.mese === mese) return;
+    st.meseGruppo = { mese, righe:null }; st.sheet = "mese-gruppo"; render();
+    try{
+      const [righe, prima] = await Promise.all([api.riepilogo(mese + "-01"), api.riepilogo(meseAvanti(mese, -1) + "-01").catch(() => [])]);
+      if(st.meseGruppo && st.meseGruppo.mese === mese){ st.meseGruppo.righe = righe || []; st.meseGruppo.prima = prima || []; render(); }
+    }catch(e){ if(st.meseGruppo && st.meseGruppo.mese === mese){ st.meseGruppo.errore = messaggio(e); render(); } }
+  },
   "vista-io"(){ st.vista = "io"; st.target = null; render(); window.scrollTo(0, 0); },
   "vista-gruppo"(){ st.vista = "gruppo"; st.target = null; st.schedaId = null; render(); window.scrollTo(0, 0); },
   async "apri-scheda"(el){
