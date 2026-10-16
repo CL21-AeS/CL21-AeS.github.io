@@ -82,7 +82,7 @@ check(await page.locator(".albero:not(.seguire) li", { hasText:"Marco Rossi" }).
 // seconda persona sotto Marco
 await page.click("button[data-act=aggiungi]");
 const posti = await page.locator(".sheet select[name=sponsor] option").allInnerTexts();
-check(posti[0] === "Io" && posti.some(x => x.includes("Marco Rossi")), "sponsor: io o qualcuno del mio gruppo");
+check(posti[0] === "Io" && posti.some(x => x === "1 · Marco Rossi"), "sponsor: io o qualcuno del mio gruppo, con il livello");
 await page.fill(".sheet input[name=nome]", "Luca Verdi");
 await page.selectOption(".sheet select[name=sponsor]", { label: posti.find(x => x.includes("Marco")) });
 await page.check(".sheet input[name=consenso]");
@@ -208,7 +208,7 @@ await page.click("button.link[data-act=vista-gruppo]");
 await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=apri-scheda]").click();
 await page.click("button[data-act=cambia-sponsor]");
 const opzSponsor = await page.locator(".sheet select[name=sponsor] option").allInnerTexts();
-check(opzSponsor.some(o => o.includes("Luca Verdi (nel suo gruppo)")) && opzSponsor.some(o => o.includes("Marco Rossi (nel suo gruppo)")), "si può scegliere anche chi è nel suo gruppo");
+check(opzSponsor.some(o => o.includes("Luca Verdi (sponsor Marco) · nel suo gruppo")) && opzSponsor.some(o => o.includes("Marco Rossi (sponsor Paolo) · nel suo gruppo")), "si può scegliere anche chi è nel suo gruppo");
 await page.selectOption(".sheet select[name=sponsor]", DB.partners.find(p => p.nome === "Luca Verdi").id);
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("Paolo Neri ora è nel gruppo di Luca Verdi, che è salito al suo posto").waitFor();

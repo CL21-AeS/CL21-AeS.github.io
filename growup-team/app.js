@@ -1353,10 +1353,12 @@ function vSheet(){
     </div>
     <p class="nota">Crea un link nuovo se pensi che il tuo sia finito a qualcun altro: quello vecchio smette di funzionare
       e gli altri telefoni dovranno rientrare con il nuovo.</p>`;
+  /* Negli elenchi a scelta: livello come nella struttura (1 = diretti) e, dal 2 in giù, lo sponsor */
+  const voce = (p, livello, extra) => `${livello} · ${p.nome}${livello > 1 ? ` (sponsor ${nomeSaluto(nomeDi(p.sponsor_id))})` : ""}${extra || ""}`;
   if(s === "aggiungi"){
     const posti = [`<option value="${esc(st.profilo.id)}">Io</option>`]
       .concat(alberoSotto(st.profilo.id, 1).map(({ p, livello }) =>
-        `<option value="${esc(p.id)}">${"— ".repeat(livello)}${esc(p.nome)}</option>`)).join("");
+        `<option value="${esc(p.id)}">${esc(voce(p, livello))}</option>`)).join("");
     return `<h2>Aggiungi una persona</h2>
     <p class="small">Per chi non usa l'app. Se un giorno vorrà usarla, le mandi il suo link e troverà già il suo profilo.</p>
     <form data-form="aggiungi" novalidate>
@@ -1410,7 +1412,7 @@ function vSheet(){
       di ${esc(nomeSaluto(x.nome))} sotto ${esc(sopra)}, e ${esc(nomeSaluto(x.nome))} passa sotto di lei.</p>` : ""}
     <form data-form="cambia-sponsor" novalidate>
       <label class="field"><span>Nuovo sponsor</span><select name="sponsor">${posti.map(({ p, livello }) =>
-        `<option value="${esc(p.id)}">${"— ".repeat(livello)}${esc(p.id === st.profilo.id ? p.nome + " (noi)" : p.nome + (suoGruppo.has(p.id) ? " (nel suo gruppo)" : ""))}</option>`).join("")}</select></label>
+        `<option value="${esc(p.id)}">${esc(p.id === st.profilo.id ? p.nome + " (noi)" : voce(p, livello, suoGruppo.has(p.id) ? " · nel suo gruppo" : ""))}</option>`).join("")}</select></label>
       ${piede}${err}
     </form>`;
   }
