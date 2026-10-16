@@ -1893,6 +1893,31 @@ document.addEventListener("keydown", e => {
   if(e.key === "Escape" && st.sheet){ st.sheet = null; render(); }
 });
 
+/* Trascinando il dito: verso sinistra da Io a Gruppo, verso destra da Gruppo (o da una scheda) a Io / al gruppo.
+   Non scatta nei campi da scrivere, nei fogli aperti, nelle tabelle che scorrono di lato e nei movimenti in verticale. */
+let tocco = null;
+document.addEventListener("touchstart", e => {
+  tocco = null;
+  if(st.fase !== "home" || st.sheet || e.touches.length !== 1) return;
+  if(e.target.closest("input, select, textarea, .sheet, [data-no-swipe]")) return;
+  const t = e.touches[0];
+  tocco = { x:t.clientX, y:t.clientY, quando:Date.now() };
+}, { passive:true });
+document.addEventListener("touchend", e => {
+  if(!tocco || !e.changedTouches.length) return;
+  const t = e.changedTouches[0], dx = t.clientX - tocco.x, dy = t.clientY - tocco.y, ms = Date.now() - tocco.quando;
+  tocco = null;
+  if(Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8 || ms > 800) return;
+  if(dx < 0 && st.vista === "io") scorri("vista-gruppo", "da-destra");
+  else if(dx > 0 && st.vista === "gruppo") scorri("vista-io", "da-sinistra");
+  else if(dx > 0 && st.vista === "scheda") scorri("vista-gruppo", "da-sinistra");
+}, { passive:true });
+function scorri(azione, verso){
+  AZIONI[azione]();
+  const app = document.getElementById("app");
+  app.classList.remove("da-destra", "da-sinistra"); void app.offsetWidth; app.classList.add(verso);
+}
+
 /* Tornando sull'app (da un altro dispositivo si è magari scritto qualcosa) si ricarica. */
 document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") aggiornaAttivita(); });
 
