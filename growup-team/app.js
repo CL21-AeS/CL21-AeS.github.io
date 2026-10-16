@@ -1357,13 +1357,17 @@ function vSheet(){
   if(s === "cambia-sponsor"){
     const x = st.struttura.find(y => y.id === st.spostaId);
     if(!x) return "";
-    const esclusi = new Set([x.id, x.sponsor_id].concat(alberoSotto(x.id, 0).map(z => z.p.id)));
+    const suoGruppo = new Set(alberoSotto(x.id, 0).map(z => z.p.id));
+    const esclusi = new Set([x.id, x.sponsor_id]);
     const posti = [{ p:st.profilo, livello:0 }].concat(alberoSotto(st.profilo.id, 1)).filter(z => !esclusi.has(z.p.id));
+    const sopra = x.sponsor_id === st.profilo.id ? "voi" : nomeDi(x.sponsor_id);
     return `<h2>Cambia sponsor di ${esc(nomeSaluto(x.nome))}</h2>
     <p class="small">${esc(x.nome)} passa sotto il nuovo sponsor con tutto il suo gruppo. Lo storico dei mesi chiusi non cambia.</p>
+    ${suoGruppo.size ? `<p class="small">Puoi scegliere anche qualcuno <b>del suo gruppo</b>: quella persona, con il suo gruppo, sale al posto
+      di ${esc(nomeSaluto(x.nome))} sotto ${esc(sopra)}, e ${esc(nomeSaluto(x.nome))} passa sotto di lei.</p>` : ""}
     <form data-form="cambia-sponsor" novalidate>
       <label class="field"><span>Nuovo sponsor</span><select name="sponsor">${posti.map(({ p, livello }) =>
-        `<option value="${esc(p.id)}">${"— ".repeat(livello)}${esc(p.id === st.profilo.id ? p.nome + " (noi)" : p.nome)}</option>`).join("")}</select></label>
+        `<option value="${esc(p.id)}">${"— ".repeat(livello)}${esc(p.id === st.profilo.id ? p.nome + " (noi)" : p.nome + (suoGruppo.has(p.id) ? " (nel suo gruppo)" : ""))}</option>`).join("")}</select></label>
       ${piede}${err}
     </form>`;
   }
@@ -1647,10 +1651,12 @@ const MODULI = {
   async "cambia-sponsor"(f){
     const x = st.struttura.find(y => y.id === st.spostaId);
     try{
+      const scambio = alberoSotto(st.spostaId, 0).some(z => z.p.id === f.sponsor.value);
       await api.cambiaSponsor(st.spostaId, f.sponsor.value);
       await caricaStruttura(); await caricaNumeri();
       st.sheet = null; render();
-      toast(`${x ? x.nome : ""} ora è ${f.sponsor.value === st.profilo.id ? "nel vostro gruppo diretto" : "nel gruppo di " + nomeDi(f.sponsor.value)}`);
+      toast(`${x ? x.nome : ""} ora è ${f.sponsor.value === st.profilo.id ? "nel vostro gruppo diretto" : "nel gruppo di " + nomeDi(f.sponsor.value)}`
+        + (scambio ? `, che è salito al suo posto` : ""));
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
   async "in-mezzo"(f){

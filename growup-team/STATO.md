@@ -122,7 +122,7 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare "Installa l'app" e "Incolla il link personale"** (PR #16 e #17 già unite) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare "Cambia sponsor verso il proprio gruppo"** (PR #16-#18 già unite; la funzione nel database è già aggiornata) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
@@ -151,6 +151,10 @@ dall'SQL Editor perché contiene un `delete`):
      di ogni persona (VP personali, VP di gruppo, linee, %, qualifica) con ▼ in rosso dove è sotto il mese prima.
      Usa `riepilogo_mese`, nessuna migrazione. Il primo mese chiuso sarà ottobre, il 5 novembre.
    **Con questo la Fase 2 è completa**: resta il collaudo.
+- **Cambia sponsor anche verso il proprio gruppo** (16 ottobre, migrazione `011_cambia_sponsor_nel_gruppo.sql`
+  già applicata al progetto; solo admin): se il nuovo sponsor scelto sta nel gruppo della persona (errore di
+  inserimento, es. Marco risulta sopra Luca ma è Luca lo sponsor di Marco), quella persona con il suo gruppo sale
+  al posto di Marco sotto il suo sponsor, poi Marco passa sotto di lei. Nell'elenco è segnata "(nel suo gruppo)".
 - **Installare l'app** (16 ottobre, da collaudare soprattutto sull'iPhone di Alessia):
   - pagina Io, dopo "Salva il tuo link personale": riquadro **"Installa Growup sul telefono"**. Android: pulsante
     **Installa** (proposta di Chrome) o istruzioni dal menu ⋮; iPhone: **Copia il mio link** → Condividi →

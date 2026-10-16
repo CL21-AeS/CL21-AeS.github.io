@@ -387,7 +387,14 @@ begin
   perform growup_test.deve_fallire(format('select public.cambia_sponsor(%L, %L)', d, a), 'A non cambia sponsor (non è admin)');
   perform growup_test.come(u1);  -- R admin
   perform growup_test.ok((public.cambia_sponsor(d, c)->>'sponsor_id')::uuid = c, 'l''admin sposta D sotto C');
-  perform growup_test.deve_fallire(format('select public.cambia_sponsor(%L, %L)', a, b), 'niente giri: A non va sotto qualcuno del suo gruppo');
+  -- A sotto B, che sta nel gruppo di A (A → H → B): B sale sotto R, A passa sotto B, H resta con A
+  perform growup_test.ok((public.cambia_sponsor(a, b)->>'sponsor_id')::uuid = b, 'l''admin mette A sotto B, che era nel suo gruppo');
+  perform growup_test.ok((select sponsor_id from public.partners where id = b) = r
+                         and (select sponsor_id from public.partners where id = h) = a, 'B sale al posto di A, H resta con A: niente giri');
+  perform public.cambia_sponsor(a, r);
+  perform public.cambia_sponsor(b, h);
+  perform growup_test.ok((select sponsor_id from public.partners where id = a) = r
+                         and (select sponsor_id from public.partners where id = b) = h, 'struttura rimessa com''era');
   perform growup_test.deve_fallire(format('select public.cambia_sponsor(%L, %L)', r, a), 'la radice non si sposta');
   perform growup_test.ok(public.cambia_sponsor(d, a) is not null, 'l''admin rimette D sotto A');
 

@@ -63,7 +63,11 @@
     cancella: async pid => { const t = db.partners.find(x => x.id === pid); let n = 0;
       for(const x of db.partners) if(x.sponsor_id === pid){ x.sponsor_id = t.sponsor_id; n++; }
       db.partners = db.partners.filter(x => x.id !== pid); db.activities = db.activities.filter(a => a.partner_id !== pid); salva(); return n; },
-    cambiaSponsor: async (pid, sp) => { if(!mio().is_admin) throw new Error("non_autorizzato"); db.partners.find(x => x.id === pid).sponsor_id = sp; salva(); return {}; },
+    cambiaSponsor: async (pid, sp) => { if(!mio().is_admin) throw new Error("non_autorizzato");
+      const x = db.partners.find(y => y.id === pid);
+      const s = db.partners.find(y => y.id === sp);
+      for(let u = s; u; u = db.partners.find(y => y.id === u.sponsor_id)) if(u.sponsor_id === pid){ s.sponsor_id = x.sponsor_id; break; }
+      x.sponsor_id = sp; salva(); return {}; },
     attivitaGruppo: async dal => { const io = mio(); if(!io) return [];
       const sotto = id => db.partners.filter(p => p.sponsor_id === id).flatMap(p => [p.id].concat(sotto(p.id)));
       const ids = new Set([io.id].concat(sotto(io.id))); return db.activities.filter(a => ids.has(a.partner_id) && a.data >= dal); },
