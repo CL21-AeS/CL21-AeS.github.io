@@ -122,8 +122,7 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare il ritocco "Calendario" di Fissa una chiamata** (16 ottobre; tutta la Fase 2 è già unita con le
-   PR #11-#15) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare il secondo ritocco "Calendario"** (Android → Google Calendar diretto; PR #16 già unita) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
@@ -139,9 +138,11 @@ dall'SQL Editor perché contiene un `delete`):
      **WhatsApp** apre un messaggio neutro già scritto ("Ciao Marco, ci sentiamo sabato 17 ottobre alle 21:00?")
      e si sceglie a chi mandarlo (l'app non conserva numeri di telefono né le chiamate fissate);
      **Ritocco del 16 ottobre** (Stefano: il file .ics chiedeva ogni volta di essere riscaricato):
-     su **Android** "Calendario" apre subito la scelta dell'app di calendario (intent di inserimento evento,
-     riserva: Google Calendar sul web); il promemoria è quello predefinito del calendario e sotto c'è
-     "Scarica il file del calendario" come riserva. Su **iPhone** il file si apre direttamente
+     su **Android** "Calendario" apre **Google Calendar** (pagina web) con la chiamata già compilata: si tocca Salva.
+     (Collaudo di Stefano: Chrome non permette a una pagina web di aprire la scelta dell'app di calendario;
+     l'intent provato con la PR #16 finiva comunque su Google Calendar, ora ci si va direttamente.)
+     Il promemoria è quello predefinito di Google Calendar; per altri calendari c'è "Scarica il file"
+     (nome del file sempre diverso, così Chrome non chiede di riscaricarlo). Su **iPhone** il file si apre direttamente
      ("Aggiungi al calendario") senza scaricarlo. Sul computer resta il download. Da provare sui telefoni veri;
    - (FATTO il 16 ottobre, da pubblicare/collaudare) **Storico del gruppo** (scelta C): riquadro nella pagina Gruppo
      con gli ultimi 12 mesi chiusi e i propri totali (VP di gruppo, linee, %); toccando un mese si apre il dettaglio

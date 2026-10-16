@@ -348,7 +348,7 @@ await page.fill(".sheet textarea[name=note]", "Numeri del mese, prossimo piano")
 await page.screenshot({ path: S + "/e2e/16-chiamata.png" });
 const [scaricato] = await Promise.all([page.waitForEvent("download"), page.click(".sheet button:has-text('Calendario')")]);
 const ics = fs.readFileSync(await scaricato.path(), "utf8");
-check(scaricato.suggestedFilename() === "chiamata-cri-crescita.ics", "nome del file .ics");
+check(/^chiamata-cri-crescita-[a-z0-9]+\.ics$/.test(scaricato.suggestedFilename()), "nome del file .ics, diverso ogni volta (" + scaricato.suggestedFilename() + ")");
 const [inizioUtc, fineUtc] = await page.evaluate(d => { const t = new Date(d + "T20:30:00"), f = x => x.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   return [f(t), f(new Date(t.getTime() + 45 * 60000))]; }, domani);
 check(ics.includes("BEGIN:VEVENT") && ics.includes("SUMMARY:Chiamata con Cri Crescita") && ics.includes("DTSTART:" + inizioUtc) && ics.includes("DTEND:" + fineUtc), "evento: titolo, inizio e durata");
@@ -372,12 +372,11 @@ await page.click("button[data-act=chiamata]");
 check(await page.locator(".sheet select[name=avviso]").count() === 0, "Android: niente scelta del promemoria");
 await page.fill(".sheet input[name=ora]", "20:30");
 await page.click(".sheet button:has-text('Calendario')");
-const intent = await page.evaluate(() => window.__vai);
-const inizioMs = await page.evaluate(d => new Date(d + "T20:30:00").getTime(), domani);
-check(intent && intent.startsWith("intent:#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.dir/event")
-  && intent.includes(";l.beginTime=" + inizioMs + ";") && intent.includes(";l.endTime=" + (inizioMs + 30 * 60000) + ";")
-  && intent.includes(";S.title=Chiamata%20con%20Cri%20Crescita") && intent.includes("S.browser_fallback_url=https%3A%2F%2Fcalendar.google.com") && intent.endsWith(";end"),
-  "Android: intent di inserimento evento (" + intent + ")");
+const gcal = await page.evaluate(() => window.__vai);
+const [gIni, gFine] = await page.evaluate(d => { const t = new Date(d + "T20:30:00"), f = x => x.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  return [f(t), f(new Date(t.getTime() + 30 * 60000))]; }, domani);
+check(gcal === "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Chiamata%20con%20Cri%20Crescita&dates=" + gIni + "/" + gFine,
+  "Android: Google Calendar con la chiamata compilata (" + gcal + ")");
 const [scaricatoA] = await Promise.all([page.waitForEvent("download"), page.click(".sheet button[data-act=chiamata-ics]")]);
 check(scaricatoA.suggestedFilename().endsWith(".ics"), "Android: resta il file come riserva");
 await ctx.close();
