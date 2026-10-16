@@ -56,6 +56,9 @@ mancanze di quello che viene fatto; come muoversi lo decide ogni partner, da sol
      il mese prima allo stesso giorno, **senza azioni suggerite**. FATTO (16 ottobre).
    - Fissa una chiamata: evento di calendario (.ics) con promemoria e note, e messaggio WhatsApp già scritto,
      **neutro** (scelta di Stefano): "Ciao Marco, ci sentiamo giovedì 17 ottobre alle 21:00?". FATTO (16 ottobre).
+   - Storico del gruppo (scelta C di Stefano): nella pagina Gruppo i mesi chiusi con i propri totali (VP di gruppo,
+     linee, %); toccando un mese, ogni persona del gruppo con VP personali, VP di gruppo, linee, % e qualifica,
+     ▼ in rosso dove è sotto il mese prima. FATTO (16 ottobre).
 
 ## Regole di sicurezza nuove
 
