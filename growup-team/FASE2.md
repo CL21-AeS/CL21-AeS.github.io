@@ -21,7 +21,7 @@ mancanze di quello che viene fatto; come muoversi lo decide ogni partner, da sol
 | Soglie percentuali (VP di gruppo nel mese) | 3% = 200 · 6% = 600 · 9% = 1.200 · 12% = 2.400 · 15% = 4.000 · 18% = 7.000 · 21% = 10.000 (tabella di amministrazione) |
 | Chiusura del mese | il giorno **5** del mese successivo: fino ad allora il mese precedente si può ancora correggere, poi viene congelato |
 | Link personale perso | lo rigenerano **solo Stefano e Alessia** (admin), dall'app |
-| Etichette del gruppo | **Da chiamare · Invito · Follow-up · Lista nomi · In crescita** (soglie nelle impostazioni) |
+| Etichette del gruppo | **Non aggiorna · Contatti sotto soglia · Piani sotto soglia · VP sotto soglia · In crescita** (soglie nelle impostazioni; fino al 16 ottobre si chiamavano Da chiamare, Lista nomi, Invito, Follow-up) |
 | Fissa una chiamata | **entrambi**: promemoria nel calendario del telefono e messaggio WhatsApp già scritto |
 | Numeri di chi non usa l'app | li inserisce chi l'ha aggiunto e tutta la sua upline (anche "Aggiorna il totale") |
 
@@ -45,8 +45,8 @@ mancanze di quello che viene fatto; come muoversi lo decide ogni partner, da sol
    - Conferma dello sponsor sul punto di partenza (qualifica e pin dichiarati) con il riquadro "Da confermare".
    - Rigenerare il link personale di un partner (solo admin).
 3. **Imbuto ed elenco per urgenza** (pagina Gruppo)
-   - Imbuto contatti → piani → VP delle ultime 4 settimane, con tassi di passaggio e collo di bottiglia.
-   - Elenco ordinato per urgenza con le etichette Da chiamare, Invito, Follow-up, Lista nomi, In crescita.
+   - Imbuto contatti → piani → VP delle ultime 4 settimane, con tassi di passaggio e passaggio sotto soglia.
+   - "Situazione per persona": elenco ordinato per urgenza con le etichette (vedi sopra).
    - Fatto: soglie in `settings.soglie_etichette` (migrazione `010_etichette.sql`), regole in STATO.md.
      Chi è senza app non ha etichetta (decisione di Stefano).
 4. **Scheda partner e storico del gruppo**
