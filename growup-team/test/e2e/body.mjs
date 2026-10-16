@@ -227,6 +227,19 @@ await page.selectOption(".sheet select[name=sponsor]", idDi("Marco Rossi"));
 await page.click(".sheet button:has-text('Salva')"); await page.getByText("Luca Verdi ora è nel gruppo di Marco Rossi").waitFor();
 await sync(page);
 check(DB.partners.find(p => p.nome === "Luca Verdi").sponsor_id === idDi("Marco Rossi") && DB.partners.find(p => p.nome === "Paolo Neri").sponsor_id === anna.id, "struttura rimessa com'era");
+// livelli come nei report Amway, sponsor accanto al nome, gruppi richiudibili
+await page.click("button.link[data-act=vista-gruppo]");
+const rigaLuca = page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" });
+check(await rigaLuca.locator(".livello").innerText() === "4" && await rigaLuca.getByText("sponsor Marco").isVisible(), "Luca: livello 4, sponsor Marco");
+check(await page.locator(".albero:not(.seguire) li", { hasText:"Anna Bianchi" }).locator(".livello").innerText() === "1", "Anna: livello 1");
+await page.screenshot({ path: S + "/e2e/22-livelli.png", fullPage:true });
+await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=piega]").click();
+check(await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).count() === 0 && await page.locator(".albero:not(.seguire) li", { hasText:"Marco Rossi" }).count() === 0,
+  "gruppo di Paolo richiuso: Marco e Luca nascosti");
+check((await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=piega]").innerText()).trim() === "▸ 2", "Paolo: ▸ 2");
+await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=piega]").click();
+check(await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).isVisible(), "gruppo riaperto");
+await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=apri-scheda]").click();
 // cancella: Paolo non rinnova, Marco (con Luca) torna sotto Anna
 await page.click("button.link[data-act=vista-gruppo]");
 await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=apri-scheda]").click();
