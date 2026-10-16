@@ -46,7 +46,7 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 5. `supabase/007_fase2_gestiti.sql` — numeri inseriti dall'upline per chi non usa l'app, conferma del punto di partenza
 6. `supabase/008_inserisci_in_mezzo.sql` — inserire una persona mancante in mezzo alla linea
 7. `supabase/009_cancella_e_sposta.sql` — cancellare una persona (il suo gruppo sale) e cambiare sponsor (admin)
-8. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Da chiamare, Lista nomi, Invito, Follow-up)
+8. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 9. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 10. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
@@ -96,7 +96,7 @@ e mettile in `growup-team/config.js` (oppure mandale a Claude Code e lo fa lui).
 - **Requisiti delle tappe e guadagni**: tabella `stage_requirements` (Table editor). Cambiate i numeri lì:
   l'app li legge a ogni apertura. Le cifre vengono dal *Simulatore di reddito ufficiale Amway*.
 - **Impostazioni**: tabella `settings` (obiettivi proposti, soglia della linea attiva, fonte e avviso dei guadagni,
-  `soglie_etichette` per le etichette del gruppo e il collo di bottiglia dell'imbuto).
+  `soglie_etichette` per le etichette del gruppo e i passaggi sotto soglia dell'imbuto).
 - **Un partner ha perso il suo link personale**: nell'SQL editor
 
   ```sql
