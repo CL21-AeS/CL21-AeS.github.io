@@ -238,7 +238,7 @@ for(let i = 0; i < 3; i++) DB.activities.push({ id:"c" + i, partner_id:"R", tipo
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 check(await page.locator(".card h2", { hasText:"Path to Bronze" }).isVisible(), "radice alla tappa Path to Bronze");
 check(await page.locator(".req li", { hasText:"3 linee frontali" }).getByText("2 / 3").isVisible(), "linee attive vere: 2 su 3");
-check(await page.getByText("Costruisci la terza linea").isVisible(), "costruisci la terza linea");
+check(await page.locator(".spinta").innerText() === "Linee attive: 2 su 3. Manca 1 linea da 100 VP per il Path to Bronze.", "linee mancanti come dato, senza consiglio");
 check(await page.locator(".linee li", { hasText:"Linea Uno" }).getByText("250 VP").isVisible(), "VP di gruppo della linea 1 (150 + 100)");
 check(await page.getByText("3% questo mese").isVisible(), "percentuale del mese: 570 VP = 3%");
 check(await page.locator(".card", { hasText:"Il mio mese" }).getByText("570").isVisible(), "VP di gruppo nel mio mese");
@@ -293,7 +293,7 @@ const etich = await page.locator(".card", { hasText:"Chi seguire adesso" }).loca
 const etichettaDi = nome => (etich.find(t => t.includes(nome)) || "");
 check(etichettaDi("Rosa").includes("Da chiamare") && etichettaDi("Rosa").includes("non aggiorna da 20 giorni"), "Rosa: Da chiamare");
 check(etichettaDi("Lino").includes("Lista nomi"), "Lino: Lista nomi");
-check(etichettaDi("Ivo").includes("Invito"), "Ivo: Invito");
+check(etichettaDi("Ivo").includes("Invito") && etichettaDi("Ivo").includes("25 contatti, 2 piani: 1 piano ogni 13 contatti"), "Ivo: Invito, con i dati");
 check(etichettaDi("Fede").includes("Follow-up"), "Fede: Follow-up");
 check(etichettaDi("Cri").includes("In crescita"), "Cri: In crescita");
 check(!etich.some(t => t.includes("Gino")), "chi è senza app non ha etichetta");
@@ -304,6 +304,8 @@ check(await page.locator(".imbuto li", { hasText:"Contatti" }).getByText("75", {
 check(await page.locator(".imbuto li", { hasText:"dei contatti" }).getByText("14", { exact:true }).isVisible(), "imbuto: 14 piani");
 check(await page.locator(".imbuto li", { hasText:"dei contatti" }).getByText("19% dei contatti").isVisible(), "imbuto: tasso di passaggio");
 check(await page.locator(".imbuto li.collo", { hasText:"Contatti" }).getByText("collo di bottiglia").isVisible(), "collo di bottiglia evidenziato");
+check(await page.locator(".card", { hasText:"Imbuto del gruppo" }).locator(".avviso").innerText() === "Contatti: 75 su 240 di obiettivo del gruppo (31%), sotto la soglia del 50%.", "imbuto: solo dati e soglia");
+check(!/allenate|lavorate|costruisci/i.test(await page.locator("#app").innerText()), "nessun consiglio nella pagina Gruppo");
 await page.locator(".card", { hasText:"Chi seguire adesso" }).locator("button[data-act=apri-scheda]").first().click();
 await page.getByText("Scheda partner").waitFor(); check(true, "dall'elenco si apre la scheda");
 await page.click("button.link[data-act=vista-gruppo]");
