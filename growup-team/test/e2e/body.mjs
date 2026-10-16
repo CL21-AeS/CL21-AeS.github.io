@@ -203,6 +203,30 @@ await page.click(".sheet button:has-text('Salva')");
 await page.getByText("Bea Verdi ora è nel gruppo di Ciro Neri").waitFor();
 await sync(page);
 check(DB.partners.find(p => p.nome === "Bea Verdi").sponsor_id === DB.partners.find(p => p.nome === "Ciro Neri").id, "Bea sotto Ciro");
+// cambia sponsor verso il proprio gruppo: Paolo (Anna → Paolo → Marco → Luca) va sotto Luca
+await page.click("button.link[data-act=vista-gruppo]");
+await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=apri-scheda]").click();
+await page.click("button[data-act=cambia-sponsor]");
+const opzSponsor = await page.locator(".sheet select[name=sponsor] option").allInnerTexts();
+check(opzSponsor.some(o => o.includes("Luca Verdi (nel suo gruppo)")) && opzSponsor.some(o => o.includes("Marco Rossi (nel suo gruppo)")), "si può scegliere anche chi è nel suo gruppo");
+await page.selectOption(".sheet select[name=sponsor]", DB.partners.find(p => p.nome === "Luca Verdi").id);
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Paolo Neri ora è nel gruppo di Luca Verdi, che è salito al suo posto").waitFor();
+await sync(page);
+const idDi = n => DB.partners.find(p => p.nome === n).id;
+check(DB.partners.find(p => p.nome === "Luca Verdi").sponsor_id === anna.id && DB.partners.find(p => p.nome === "Paolo Neri").sponsor_id === idDi("Luca Verdi")
+  && DB.partners.find(p => p.nome === "Marco Rossi").sponsor_id === idDi("Paolo Neri"), "Luca sale sotto Anna, Paolo sotto Luca, Marco resta con Paolo");
+// e si rimette com'era: Paolo sotto Anna, poi Luca sotto Marco
+await page.click("button[data-act=cambia-sponsor]");
+await page.selectOption(".sheet select[name=sponsor]", anna.id);
+await page.click(".sheet button:has-text('Salva')"); await page.getByText("Paolo Neri ora è nel gruppo di Anna Bianchi").waitFor();
+await page.click("button.link[data-act=vista-gruppo]");
+await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).locator("button[data-act=apri-scheda]").click();
+await page.click("button[data-act=cambia-sponsor]");
+await page.selectOption(".sheet select[name=sponsor]", idDi("Marco Rossi"));
+await page.click(".sheet button:has-text('Salva')"); await page.getByText("Luca Verdi ora è nel gruppo di Marco Rossi").waitFor();
+await sync(page);
+check(DB.partners.find(p => p.nome === "Luca Verdi").sponsor_id === idDi("Marco Rossi") && DB.partners.find(p => p.nome === "Paolo Neri").sponsor_id === anna.id, "struttura rimessa com'era");
 // cancella: Paolo non rinnova, Marco (con Luca) torna sotto Anna
 await page.click("button.link[data-act=vista-gruppo]");
 await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=apri-scheda]").click();
