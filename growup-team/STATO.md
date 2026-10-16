@@ -122,13 +122,13 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare "Fissa una chiamata"** (16 ottobre; "niente suggerimenti", "etichette come dati" e il confronto col
-   mese prima già uniti con le PR #11, #12 e #13) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare lo storico del gruppo** (16 ottobre; "niente suggerimenti", "etichette come dati", confronto col
+   mese prima e "Fissa una chiamata" già uniti con le PR #11-#14) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
    scheda partner, partner senza app, Da confermare, in mezzo / cancella / cambia sponsor, imbuto ed etichette),
-   del confronto col mese prima e di "Fissa una chiamata"
+   del confronto col mese prima, di "Fissa una chiamata" e dello storico del gruppo
    (provare il file .ics sia su iPhone sia su Android).
 3. **Blocco 4 della Fase 2** (ultimo, vedi `FASE2.md`):
    - (FATTO il 16 ottobre, da pubblicare/collaudare) scheda partner: riquadro **"Questo mese e il mese prima"**,
@@ -138,7 +138,11 @@ dall'SQL Editor perché contiene un `delete`):
      (proposta domani alle 21), durata, promemoria, note → **Calendario** scarica un file .ics da aprire e aggiungere;
      **WhatsApp** apre un messaggio neutro già scritto ("Ciao Marco, ci sentiamo sabato 17 ottobre alle 21:00?")
      e si sceglie a chi mandarlo (l'app non conserva numeri di telefono né le chiamate fissate);
-   - storico del gruppo (mesi chiusi da `monthly_totals`).
+   - (FATTO il 16 ottobre, da pubblicare/collaudare) **Storico del gruppo** (scelta C): riquadro nella pagina Gruppo
+     con gli ultimi 12 mesi chiusi e i propri totali (VP di gruppo, linee, %); toccando un mese si apre il dettaglio
+     di ogni persona (VP personali, VP di gruppo, linee, %, qualifica) con ▼ in rosso dove è sotto il mese prima.
+     Usa `riepilogo_mese`, nessuna migrazione. Il primo mese chiuso sarà ottobre, il 5 novembre.
+   **Con questo la Fase 2 è completa**: resta il collaudo.
 4. **Prima del lancio a tutto il gruppo**: captcha (Cloudflare Turnstile) sugli accessi anonimi e limite
    "anonymous sign-ins" più alto in Authentication → Rate Limits.
 5. Dopo la Fase 2: Fase 3 (presa in carico dopo 14 giorni, avvisi) e Fase 4 (diagnosi, serie di settimane, 90 giorni).
