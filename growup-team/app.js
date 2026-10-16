@@ -15,6 +15,7 @@ const TZ = "Europe/Rome";
 const CHIAVE_INVITO = "growup-team.invito";
 const CHIAVE_LOCALE = "growup-team.chiave";
 const CHIAVE_SALVATA = "growup-team.chiave-salvata";
+const CHIAVE_INSTALLA_NO = "growup-team.installa-no";
 const FORMA_CODICE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
 const FORMA_CHIAVE = /^[0-9a-f]{32}$/;
 const PIN = [3, 6, 9, 12, 15, 18, 21];   // percentuali raggiungibili anche senza qualifica Bronze
@@ -485,9 +486,12 @@ function marchio(){ return `<div class="eyebrow">A&amp;S · Growup Team</div>`; 
 
 function formIncolla(){
   return `<form data-form="incolla" class="card" novalidate>
+    ${navigator.clipboard && navigator.clipboard.readText ? `<button type="button" class="btn primary wide" data-act="incolla-appunti">Incolla il link personale</button>
+    <p class="small" style="margin:8px 0 4px">Prima copia il link dal messaggio che ti sei mandato su WhatsApp o Telegram
+      (tieni premuto sul messaggio → Copia). Oppure incollalo qui:</p>` : ""}
     <label class="field" style="margin:0"><span>Incolla qui il tuo link personale</span>
       <input name="link" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://…/growup-team/#chiave=…"></label>
-    <button class="btn primary wide" style="margin-top:12px">Entra</button>
+    <button class="btn wide${navigator.clipboard && navigator.clipboard.readText ? "" : " primary"}" style="margin-top:12px">Entra</button>
   </form>`;
 }
 
@@ -495,8 +499,9 @@ function vBenvenuto(){
   return `<div class="centro">
     ${marchio()}
     <h1 style="margin-top:6px">Entra in Growup</h1>
-    <p class="muted">Per entrare apri il tuo <b>link personale</b>: quello che ti sei salvato su WhatsApp o Telegram
-      quando sei entrato la prima volta. Toccalo da lì, oppure copialo e incollalo qui sotto.</p>
+    ${installata() ? `<p class="muted">Growup è installata: la prima volta entra con il tuo <b>link personale</b>, quello che ti sei
+      salvato su WhatsApp o Telegram. Copialo dal messaggio e tocca «Incolla il link personale». Poi resti dentro.</p>` : `<p class="muted">Per entrare apri il tuo <b>link personale</b>: quello che ti sei salvato su WhatsApp o Telegram
+      quando sei entrato la prima volta. Toccalo da lì, oppure copialo e incollalo qui sotto.</p>`}
     ${formIncolla()}
     ${st.invitoRiserva ? `<button class="btn ghost wide" data-act="torna-invito">‹ Torna all'invito${st.sponsorNome ? " di " + esc(st.sponsorNome) : ""}</button>`
       : `<p class="small"><b>Sei nuovo?</b> Chiedi al tuo sponsor il suo link d'invito.</p>`}
@@ -618,6 +623,7 @@ function vFondo(){
     <div class="row wrap" style="justify-content:center">
       <button class="btn small ghost" data-act="mia-chiave">Il mio link personale</button>
       <button class="btn small ghost" data-act="privacy">Privacy</button>
+      ${puoInstallare() && leggiLocale(CHIAVE_INSTALLA_NO) === "1" ? `<button class="btn small ghost" data-act="installa-si">Installa l'app</button>` : ""}
       <button class="btn small ghost" data-act="esci">Esci</button>
     </div>
     <p class="nota" style="text-align:center">${esc(st.profilo.nome)} · codice d'invito <b>${esc(st.profilo.codice_invito)}</b><br>
@@ -643,6 +649,7 @@ function vHome(){
   ${vStoricoGruppo()}
   ${vInvita()}` : `
   ${leggiLocale(CHIAVE_SALVATA) === "1" || !st.chiave ? "" : vSalvaChiave()}
+  ${vInstalla()}
   ${vVisione()}
   ${vTappa()}
   ${vSettimana()}
@@ -660,6 +667,41 @@ function bottoniChiave(){
       ${navigator.share ? `<button class="btn" data-act="condividi-chiave">Altro…</button>` : ""}
     </div>`;
 }
+/* ---- Installare l'app: guida per Android e iPhone ---- */
+function installata(){
+  try{ return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; }catch(e){ return false; }
+}
+let promptInstalla = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); promptInstalla = e; if(st.fase === "home") render(); });
+window.addEventListener("appinstalled", () => { promptInstalla = null; salvaLocale(CHIAVE_INSTALLA_NO, "1"); if(st.fase === "home") render(); });
+function puoInstallare(){ return !installata() && (suAndroid() || suIos()); }
+function vInstalla(){
+  if(!puoInstallare() || leggiLocale(CHIAVE_SALVATA) !== "1" || leggiLocale(CHIAVE_INSTALLA_NO) === "1") return "";
+  const corpo = suIos() ? `
+    <ol class="passi">
+      <li>Tocca <b>Copia il mio link</b> qui sotto: ti servirà tra un attimo.</li>
+      <li>In Safari tocca <b>Condividi</b> (il quadrato con la freccia in su) e poi <b>Aggiungi alla schermata Home</b>.</li>
+      <li>Apri Growup dalla nuova icona e tocca <b>Incolla il link personale</b>: sei dentro, una volta per sempre.</li>
+    </ol>
+    <p class="nota">Su iPhone l'app sulla Home non vede quello che hai fatto in Safari: per questo la prima volta ti chiede il link.</p>
+    <div class="row" style="margin-top:10px"><button class="btn primary grow" data-act="copia-chiave">Copia il mio link</button>
+      <button class="btn ghost" data-act="installa-no">Non ora</button></div>`
+  : `
+    ${promptInstalla ? "" : `<ol class="passi">
+      <li>Tocca il menu <b>⋮</b> di Chrome in alto a destra.</li>
+      <li>Tocca <b>Installa app</b> (o <b>Aggiungi a schermata Home</b> → <b>Installa</b>).</li>
+    </ol>`}
+    <p class="nota">Si apre a schermo intero, come un'app, ed entri già con il tuo profilo.</p>
+    <div class="row" style="margin-top:10px">${promptInstalla ? `<button class="btn primary grow" data-act="installa">Installa</button>` : ""}
+      <button class="btn ghost${promptInstalla ? "" : " grow"}" data-act="installa-no">${promptInstalla ? "Non ora" : "Fatto"}</button></div>`;
+  return `<div class="card">
+    <span class="eyebrow">Consigliato</span>
+    <h2 style="margin-top:4px">Installa Growup sul telefono</h2>
+    <p class="small" style="margin:6px 0 0">Avrai l'icona sulla Home e l'app a schermo intero, senza la barra del browser.</p>
+    ${corpo}
+  </div>`;
+}
+
 function vSalvaChiave(){
   return `<div class="card" style="border-color:var(--accent)">
     <span class="eyebrow">Importante · una volta sola</span>
@@ -1510,6 +1552,25 @@ const AZIONI = {
     catch(e){ toast(messaggio(e)); }
   },
   "copia-gestito"(){ copiaTesto(base() + "#chiave=" + st.linkGestito.chiave, "Link copiato"); },
+  async installa(){
+    if(!promptInstalla) return;
+    const e = promptInstalla; promptInstalla = null;
+    try{ e.prompt(); const r = await e.userChoice; if(r && r.outcome === "accepted") salvaLocale(CHIAVE_INSTALLA_NO, "1"); }catch(x){}
+    render();
+  },
+  "installa-no"(){ salvaLocale(CHIAVE_INSTALLA_NO, "1"); render(); },
+  "installa-si"(){ salvaLocale(CHIAVE_INSTALLA_NO, null); st.vista = "io"; render(); window.scrollTo(0, 0); },
+  "copia-chiave"(){ copiaTesto(linkPersonale(), "Link copiato: ora aggiungi Growup alla schermata Home"); },
+  async "incolla-appunti"(el){
+    const f = el.closest("form");
+    let t = "";
+    try{ t = await navigator.clipboard.readText(); }
+    catch(e){ mostraErroreForm(f, "Non riesco a leggere il link copiato: tienilo premuto nel campo qui sotto e scegli Incolla."); return; }
+    const l = leggiLink(t);
+    if(!l || !l.chiave){ if(f.link) f.link.value = t.slice(0, 300); mostraErroreForm(f, "Quello che hai copiato non è il tuo link personale. Copia il messaggio con il link e riprova."); return; }
+    salvaLocale(CHIAVE_SALVATA, "1");
+    await entraConChiave(l.chiave);
+  },
   "chiave-salvata"(){ salvaLocale(CHIAVE_SALVATA, "1"); render(); toast("Perfetto: ora puoi entrare da qualsiasi telefono"); },
   async "conferma-obiettivi"(){
     try{
@@ -1562,7 +1623,7 @@ const MODULI = {
   async incolla(f){
     const l = leggiLink(f.link.value);
     if(!l){ mostraErroreForm(f, "Non sembra un link di Growup. Copia tutto il messaggio con il link e riprova."); return; }
-    if(l.chiave){ await entraConChiave(l.chiave); return; }
+    if(l.chiave){ salvaLocale(CHIAVE_SALVATA, "1"); await entraConChiave(l.chiave); return; }
     await apriInvito(l.invito); render();
   },
   async "privacy-primo"(f){

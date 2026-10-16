@@ -419,6 +419,55 @@ check(!det.some(t => t.startsWith("Stefano e Alessia")), "nel dettaglio solo il 
 await page.screenshot({ path: S + "/e2e/17-storico-gruppo.png" });
 await ctx.close();
 
+// 13. Installare l'app e incollare il link personale
+const PERM = ["clipboard-read", "clipboard-write"];
+({ ctx, page } = await apri({ userAgent:UA_IPHONE, permissions:PERM }, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.evaluate(() => localStorage.setItem("growup-team.chiave-salvata", "1"));
+await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor();
+check(await page.getByText("Installa Growup sul telefono").isVisible() && await page.getByText("Aggiungi alla schermata Home").isVisible(), "iPhone: guida all'installazione");
+await page.screenshot({ path: S + "/e2e/18-installa-iphone.png" });
+await page.click("button[data-act=copia-chiave]");
+check((await page.evaluate(() => navigator.clipboard.readText())).endsWith("#chiave=" + "a".repeat(32)), "iPhone: link personale copiato");
+await page.click("button[data-act=installa-no]");
+check(await page.getByText("Installa Growup sul telefono").count() === 0, "Non ora: la guida sparisce");
+await page.click("button[data-act=installa-si]");
+check(await page.getByText("Installa Growup sul telefono").isVisible(), "dal fondo pagina si riapre");
+await ctx.close();
+
+({ ctx, page } = await apri({ userAgent:UA_ANDROID }, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.evaluate(() => localStorage.setItem("growup-team.chiave-salvata", "1"));
+await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor();
+check(await page.getByText("Installa app").isVisible(), "Android senza proposta del browser: istruzioni dal menu");
+await page.evaluate(() => { const e = new Event("beforeinstallprompt", { cancelable:true });
+  e.prompt = () => { window.__promptato = true; }; e.userChoice = Promise.resolve({ outcome:"accepted" }); window.dispatchEvent(e); });
+await page.locator("button[data-act=installa]").waitFor();
+await page.screenshot({ path: S + "/e2e/19-installa-android.png" });
+await page.click("button[data-act=installa]");
+await page.waitForFunction(() => !document.querySelector("button[data-act=installa]"));
+check(await page.evaluate(() => window.__promptato) === true, "Android: il pulsante Installa apre la proposta del browser");
+check(await page.getByText("Installa Growup sul telefono").count() === 0, "installata: la guida non c'è più");
+await ctx.close();
+
+// app installata (iPhone): ingresso con il link copiato
+({ ctx, page } = await apri({ userAgent:UA_IPHONE, permissions:PERM }, ""));
+await page.addInitScript(() => Object.defineProperty(navigator, "standalone", { value:true }));
+await page.reload();
+await page.getByText("Entra in Growup").waitFor();
+check(await page.getByText("Growup è installata").isVisible(), "app installata: spiega di incollare il link");
+await page.screenshot({ path: S + "/e2e/20-incolla.png" });
+await page.evaluate(() => navigator.clipboard.writeText("ciao, niente link qui"));
+await page.click("button[data-act=incolla-appunti]");
+await page.getByText("non è il tuo link personale").waitFor({ timeout:5000 }).catch(() => {});
+check(await page.getByText("non è il tuo link personale").isVisible(), "testo sbagliato negli appunti");
+await page.evaluate(k => navigator.clipboard.writeText("Il mio link Growup: http://127.0.0.1:8765/growup-team/#chiave=" + k), "a".repeat(32));
+await page.click("button[data-act=incolla-appunti]");
+await page.getByText("Ciao Stefano e Alessia").waitFor(); check(true, "incolla il link: entra");
+check(await page.getByText("Salva il tuo link personale").count() === 0 && await page.getByText("Installa Growup sul telefono").count() === 0,
+  "dopo l'incolla: niente richiesta di salvare il link né guida all'installazione");
+await ctx.close();
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
