@@ -122,7 +122,7 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare la nuova grafica H** (PR #19 "Cambia sponsor verso il proprio gruppo" già unita) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare l'icona G Smeraldo** (grafica H già unita con la PR #20) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
@@ -159,7 +159,8 @@ dall'SQL Editor perché contiene un `delete`):
   accenti rame e ambra, fondo avorio, titoli e numeri in Cormorant Garamond, tema scuro verde bosco; pulsanti
   + Contatto / + Piano / + Ordine in smeraldo, rame e verde. Dettagli e **alternative tenute per il futuro
   (B + D, E)** in `design/GRAFICA.md`; tavola con tutte le prove in `design/tavola-grafica.html`.
-  Da fare dopo, se serve: nuova icona dell'app nei colori H.
+  **Icona nuova: G Smeraldo** (G avorio con la stanghetta che diventa una freccia ambra che sale), `icon.svg`
+  e PNG per Android, iPhone e browser. Per vederla sul telefono va reinstallata l'app.
 - **Installare l'app** (16 ottobre, da collaudare soprattutto sull'iPhone di Alessia):
   - pagina Io, dopo "Salva il tuo link personale": riquadro **"Installa Growup sul telefono"**. Android: pulsante
     **Installa** (proposta di Chrome) o istruzioni dal menu ⋮; iPhone: **Copia il mio link** → Condividi →
