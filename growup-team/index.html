@@ -238,6 +238,12 @@ label.check input{width:22px;min-height:22px;height:22px;margin:1px 0 0;flex:non
 .sheet{position:fixed;inset:0;background:rgba(8,10,14,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
 .sheet-box{background:var(--card);width:100%;max-width:640px;max-height:90vh;overflow:auto;border-radius:18px 18px 0 0;
   padding:18px var(--pad) calc(18px + env(safe-area-inset-bottom))}
+@media (prefers-reduced-motion: no-preference){
+  #app.da-destra{animation:entra-destra .22s ease-out}
+  #app.da-sinistra{animation:entra-sinistra .22s ease-out}
+}
+@keyframes entra-destra{from{transform:translateX(28px);opacity:.4}to{transform:none;opacity:1}}
+@keyframes entra-sinistra{from{transform:translateX(-28px);opacity:.4}to{transform:none;opacity:1}}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(100px + env(safe-area-inset-bottom));z-index:60;
   background:var(--ink);color:var(--bg);padding:10px 10px 10px 16px;border-radius:12px;font-size:14px;font-weight:600;
   display:flex;align-items:center;gap:12px;max-width:calc(100% - 32px);box-shadow:0 6px 24px rgba(0,0,0,.2)}
