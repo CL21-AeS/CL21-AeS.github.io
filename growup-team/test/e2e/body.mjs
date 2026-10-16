@@ -312,6 +312,31 @@ await page.click("button.link[data-act=vista-gruppo]");
 await page.screenshot({ path: S + "/e2e/14-imbuto.png", fullPage:true });
 await ctx.close();
 
+// 10. Blocco 4: nella scheda, questo mese e il mese prima
+DB.activities = DB.activities.filter(a => a.partner_id !== "cri");
+const ultimoPrec = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCDate(0); return d.toISOString().slice(0, 10); })();
+const B = (tipo, n, data, vp) => { for(let i = 0; i < n; i++) DB.activities.push({ id:"z" + DB.activities.length, partner_id:"cri", tipo, quantita:1,
+  vp: vp != null ? vp : null, data, inserito_il:new Date().toISOString() }); };
+B("contatto", 2, oggiStr.slice(0, 7) + "-01"); B("piano", 1, oggiStr.slice(0, 7) + "-01");
+B("contatto", 5, mesePrec + "-01"); B("contatto", 3, ultimoPrec); B("ordine", 1, mesePrec + "-01", 80);
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.click("button[data-act=vista-gruppo]");
+await page.locator(".albero:not(.seguire) li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
+await page.getByText("Questo mese e il mese prima").waitFor();
+const riga = async nome => (await page.locator(".confronto tr", { hasText:nome }).locator("td").allInnerTexts()).map(t => t.trim());
+const fineMese = Number(oggiStr.slice(8, 10)) >= Number(ultimoPrec.slice(8, 10));
+const rc = await riga("Contatti");
+check(rc[1] === "▼ 2" && rc[2] === (fineMese ? "8" : "5") && rc[3] === "8", "contatti: 2 ora, 5 allo stesso giorno, 8 totale (" + rc.join("|") + ")");
+const rp = await riga("Piani");
+check(rp[1] === "1" && rp[3] === "0", "piani sopra il mese prima: nessun ▼");
+const rv = await riga("VP personali");
+check(rv[1] === "▼ 0" && rv[2] === "80", "VP personali sotto il mese prima");
+check((await riga("VP di gruppo"))[2] === "–", "VP di gruppo: solo il totale del mese prima");
+check(await page.locator(".confronto td.sotto").count() >= 2, "valori sotto evidenziati");
+await page.screenshot({ path: S + "/e2e/15-confronto.png", fullPage:true });
+await ctx.close();
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

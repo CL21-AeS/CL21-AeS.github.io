@@ -367,12 +367,12 @@ async function caricaNumeri(){
   const pid = st.profilo.id;
   const [riep, prec, storico, livelli] = await Promise.all([
     api.riepilogo(primoDelMese()).catch(() => []),
-    precedenteAperto() ? api.riepilogo(mesePrecedente() + "-01").catch(() => []) : Promise.resolve([]),
+    api.riepilogo(mesePrecedente() + "-01").catch(() => []),  // serve anche al confronto nella scheda partner
     api.storico(pid).catch(() => []),
     api.livelli().catch(() => [])
   ]);
   st.riep = riep || []; st.riepPrec = prec || []; st.storico = storico || []; st.livelli = livelli || [];
-  const dal = inizio4();
+  const dal = [inizio4(), mesePrecedente() + "-01"].sort()[0];  // 4 settimane e tutto il mese prima
   const [att, goals, mgoals] = await Promise.all([
     api.attivitaGruppo(dal).catch(() => []),
     api.obiettiviGruppo(lunedi(piuGiorni(dal, -7))).catch(() => []),
@@ -887,7 +887,8 @@ const ETICHETTE_GRUPPO = {
 };
 /* I numeri di una persona nelle ultime 4 settimane */
 function numeri4(pid){
-  const l = st.gruppo4.att.filter(a => a.partner_id === pid);
+  const dal = inizio4();
+  const l = st.gruppo4.att.filter(a => a.partner_id === pid && a.data >= dal);
   const q = tipo => somma(l.filter(a => a.tipo === tipo), "quantita");
   const ultima = l.reduce((m, a) => a.data > m ? a.data : m, "");
   return { contatti:q("contatto"), piani:q("piano"), ordini:q("ordine"),
@@ -985,6 +986,45 @@ function inseritoDa(a, p){
   const n = nomeDi(a.inserito_da);
   return n ? `inserito da ${n}` : "inserito dalla sua upline";
 }
+/* Questo mese fino a oggi, il mese prima fino allo stesso giorno e il mese prima intero.
+   Solo i dati: in rosso con ▼ dove è sotto il mese prima allo stesso giorno. */
+function confrontoMese(pid){
+  const m = meseDi(oggi()), mp = mesePrecedente();
+  const giorniPrec = Number(piuGiorni(m + "-01", -1).slice(8, 10));
+  const stessoGiorno = mp + "-" + String(Math.min(Number(oggi().slice(8, 10)), giorniPrec)).padStart(2, "0");
+  const att = st.gruppo4.att.filter(a => a.partner_id === pid);
+  const conta = (dal, al) => {
+    const l = att.filter(a => a.data >= dal && a.data <= al);
+    const q = tipo => somma(l.filter(a => a.tipo === tipo), "quantita");
+    return { contatti:q("contatto"), piani:q("piano"), ordini:q("ordine"), clienti:q("cliente"),
+             vp:somma(l.filter(a => a.tipo === "ordine" || a.tipo === "rettifica"), "vp") };
+  };
+  const ora = conta(m + "-01", oggi()), allora = conta(mp + "-01", stessoGiorno), prima = conta(mp + "-01", mp + "-31");
+  const r = rigaDi(st.riep, pid) || {}, rp = rigaDi(st.riepPrec, pid) || {};
+  return { m, mp, stessoGiorno, righe: [
+    { nome:"Contatti", ora:ora.contatti, allora:allora.contatti, prima:prima.contatti },
+    { nome:"Piani", ora:ora.piani, allora:allora.piani, prima:prima.piani },
+    { nome:"Ordini", ora:ora.ordini, allora:allora.ordini, prima:prima.ordini },
+    { nome:"Nuovi clienti", ora:ora.clienti, allora:allora.clienti, prima:prima.clienti },
+    { nome:"VP personali", ora:ora.vp, allora:allora.vp, prima: rp.vp_personali != null ? Number(rp.vp_personali) : prima.vp },
+    { nome:"VP di gruppo", ora:Number(r.vp_gruppo) || 0, allora:null, prima:Number(rp.vp_gruppo) || 0 },
+    { nome:"Linee attive", ora:Number(r.linee_attive) || 0, allora:null, prima:Number(rp.linee_attive) || 0 }
+  ]};
+}
+function vConfronto(p){
+  const c = confrontoMese(p.id);
+  const breve = m => MESI[Number(m.slice(5, 7)) - 1].slice(0, 3);
+  const cella = (v, rif) => rif != null && v < rif ? `<td class="num sotto">▼ ${num(v)}</td>` : `<td class="num">${num(v)}</td>`;
+  return `<div class="card">
+    <span class="eyebrow">Questo mese e il mese prima</span>
+    <table class="confronto">
+      <thead><tr><th></th><th>${breve(c.m)}<br><span>fino a oggi</span></th><th>${breve(c.mp)}<br><span>al ${Number(c.stessoGiorno.slice(8))}</span></th><th>${breve(c.mp)}<br><span>totale</span></th></tr></thead>
+      <tbody>${c.righe.map(x => `<tr><td>${x.nome}</td>${cella(x.ora, x.allora)}
+        <td class="num faint">${x.allora == null ? "–" : num(x.allora)}</td><td class="num faint">${num(x.prima)}</td></tr>`).join("")}</tbody>
+    </table>
+    <p class="nota">▼ in rosso: sotto il mese prima allo stesso giorno. VP di gruppo e linee attive del mese prima ci sono solo come totale.</p>
+  </div>`;
+}
 function vScheda(){
   const p = st.struttura.find(x => x.id === st.schedaId);
   if(!p) return `<p class="muted">Partner non trovato.</p>`;
@@ -1015,6 +1055,7 @@ function vScheda(){
       <button class="btn small" data-act="in-mezzo" data-id="${esc(p.id)}" style="white-space:nowrap">Manca qualcuno sopra?</button>
     </div>
   </div>
+  ${vConfronto(p)}
   ${gestito ? `<div class="card">
     <span class="eyebrow">I suoi numeri · ${nomeMese(m)}</span>
     <div class="griglia-azioni">
