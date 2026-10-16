@@ -126,4 +126,4 @@ Unica dipendenza esterna: la libreria ufficiale `@supabase/supabase-js` 2.117.2 
   dall'albero; conferma dello sponsor sul punto di partenza.
 - **Fase 3 — Partner gestiti e presa in carico**: inserimento per conto terzi, soglia dei 14 giorni, link per
   prendere possesso del profilo (stesso link personale, mandato su WhatsApp/Telegram), avvisi.
-- **Fase 4 — Diagnosi e rifinitura**: punto debole automatico, azioni suggerite, serie di settimane, 90 giorni.
+- **Fase 4 — Diagnosi e rifinitura**: mancanze evidenziate (nessun suggerimento: decide il partner), serie di settimane, 90 giorni.

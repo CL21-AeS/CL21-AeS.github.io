@@ -707,11 +707,10 @@ function vTappa(){
   const pinMax = Math.max(Number(st.profilo.percentuale_iniziale) || 0, ...st.storico.map(r => Number(r.percentuale) || 0));
   const distinti = conLinee && n.percentuale && attuale.percentuale && n.percentuale >= attuale.percentuale && manca.length
     ? `<p class="avviso">${n.percentuale}% raggiunto · ${esc(attuale.nome)} non qualificato: ${esc(manca.join(", "))}.</p>` : "";
-  const ordinale = ["la prima", "la seconda", "la terza"][n.attive];
+  /* solo il dato: come muoversi lo decide il partner */
   const terza = conLinee && n.attive < 3
-    ? `<div class="spinta"><b>Costruisci ${ordinale} linea.</b> Hai ${n.attive === 1 ? "1 linea attiva" : `${n.attive} linee attive`} su 3:
-        un nuovo partner frontale da accompagnare nel Path to Bronze.
-        <button class="btn small" data-act="vista-gruppo" style="margin-top:8px">Invita un nuovo partner</button></div>` : "";
+    ? `<div class="spinta"><b>Linee attive: ${n.attive} su 3.</b> ${3 - n.attive === 1 ? "Manca 1 linea" : `Mancano ${3 - n.attive} linee`}
+        da ${num(soglia())} VP per il Path to Bronze.</div>` : "";
   const linee = conLinee && n.linee.length
     ? `<ul class="linee">${n.linee.map(l => `<li><span class="grow">${esc(l.nome)}</span>
         <span class="num ${l.vp >= soglia() ? "" : "faint"}">${num(l.vp)} VP</span></li>`).join("")}</ul>
@@ -912,7 +911,7 @@ function etichettaDi(p){
   } else if(n.contatti < minContatti){
     k = "lista"; perche = `${plur(n.contatti, "contatto", "contatti")} in 4 settimane (obiettivo ${o.contatti} a settimana)`;
   } else if(n.piani < n.contatti * s.piani_per_contatti){
-    k = "invito"; perche = `${plur(n.contatti, "contatto", "contatti")}, ${plur(n.piani, "piano", "piani")}: pochi inviti vanno a buon fine`;
+    k = "invito"; perche = `${plur(n.contatti, "contatto", "contatti")}, ${plur(n.piani, "piano", "piani")}: 1 piano ogni ${Math.round(n.contatti / Math.max(n.piani, 1))} contatti`;
   } else if(n.piani >= s.piani_min_followup && n.vp < o.vp * s.quota_vp_followup){
     k = "followup"; perche = `${plur(n.piani, "piano", "piani")} mostrati, ${num(n.vp)} VP su ${num(o.vp)} di obiettivo`;
   } else {
@@ -949,10 +948,12 @@ function vImbuto(){
     { k:"piani", nome:"Piani", v:f.piani, nota: f.contatti ? `${pct(f.r1)} dei contatti` : "" },
     { k:"ordini", nome:"Ordini", v:f.ordini, nota: f.piani ? `${pct(f.r2)} dei piani · ${num(f.vp)} VP` : `${num(f.vp)} VP` }
   ];
+  /* solo i dati e la soglia superata, nessun consiglio */
+  const s = soglieEtichette();
   const frasi = {
-    contatti: "Si fanno pochi contatti: lavorate sulla lista nomi e sulla motivazione.",
-    piani: `Pochi contatti diventano piani: ${f.contatti ? `1 piano ogni ${Math.max(1, Math.round(f.contatti / Math.max(f.piani, 1)))} contatti` : ""}. Allenate l'invito.`,
-    ordini: "I piani non diventano ordini: allenate il follow-up e la chiusura."
+    contatti: `Contatti: ${num(f.contatti)} su ${num(f.obC)} di obiettivo del gruppo (${pct(f.obC ? f.contatti / f.obC : 0)}), sotto la soglia del ${pct(s.quota_contatti)}.`,
+    piani: `Piani: 1 ogni ${Math.round(f.contatti / Math.max(f.piani, 1))} contatti (${pct(f.r1)}), sotto la soglia di 1 ogni ${Math.round(1 / s.piani_per_contatti)}.`,
+    ordini: `Ordini: ${pct(f.r2)} dei piani, sotto la soglia del ${pct(s.ordini_per_piani)}.`
   };
   return `<div class="card">
     <div class="spread"><span class="eyebrow">Imbuto del gruppo</span><span class="small">ultime 4 settimane</span></div>
