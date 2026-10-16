@@ -234,9 +234,21 @@ check(await rigaLuca.locator(".livello").innerText() === "4" && await rigaLuca.g
 check(await page.locator(".albero:not(.seguire) li", { hasText:"Anna Bianchi" }).locator(".livello").innerText() === "1", "Anna: livello 1");
 await page.screenshot({ path: S + "/e2e/22-livelli.png", fullPage:true });
 await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=piega]").click();
-check(await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).count() === 0 && await page.locator(".albero:not(.seguire) li", { hasText:"Marco Rossi" }).count() === 0,
+check(await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).isHidden() && await page.locator(".albero:not(.seguire) li", { hasText:"Marco Rossi" }).isHidden(),
   "gruppo di Paolo richiuso: Marco e Luca nascosti");
 check((await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=piega]").innerText()).trim() === "▸ 2", "Paolo: ▸ 2");
+check(await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).isHidden(), "ancora richiuso");
+// la ricerca trova anche dentro un gruppo richiuso e mostra la linea fino a noi
+await page.fill("#cerca-struttura", "lùca");
+check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Paolo Neri" }).isVisible()
+  && await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isHidden(),
+  "ricerca: Luca con la sua linea (Anna, Paolo, Marco), gli altri nascosti");
+check((await page.locator("#cerca-esito").innerText()).startsWith("1 persona trovata"), "ricerca: 1 persona trovata");
+await page.screenshot({ path: S + "/e2e/23-ricerca.png" });
+await page.fill("#cerca-struttura", "zzz");
+check(await page.getByText("Nessuno con questo nome nel tuo gruppo.").isVisible(), "ricerca senza risultati");
+await page.fill("#cerca-struttura", "");
+check(await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isHidden(), "ricerca vuota: torna com'era");
 await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=piega]").click();
 check(await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).isVisible(), "gruppo riaperto");
 await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=apri-scheda]").click();

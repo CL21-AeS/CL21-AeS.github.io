@@ -91,7 +91,8 @@ const st = {
   struttura: [],          // io e la mia downline
   linkGestito: null,      // { nome, chiave } da mandare a una persona aggiunta a mano
   riep: [],               // numeri del mese in corso: io e la mia downline (riepilogo_mese)
-  chiusi: new Set(),       // nella struttura: persone con il gruppo richiuso
+  chiusi: new Set(),
+  cerca: "",               // ricerca nella struttura       // nella struttura: persone con il gruppo richiuso
   gruppo4: { att:[], goals:[], mgoals:[] },  // ultime 4 settimane del gruppo: imbuto ed etichette
   riepPrec: [],           // lo stesso per il mese precedente, finché non è chiuso
   storico: [],            // i miei mesi chiusi (monthly_totals)
@@ -461,6 +462,21 @@ async function avvio(){
 /* #app si riscrive solo se è cambiato: così aprire un foglio (es. la privacy) non cancella
    quello che si sta scrivendo in un modulo. */
 let ultimoApp = "";
+/* Ricerca nella struttura: si filtra sulla pagina senza ridisegnarla, così la tastiera resta aperta.
+   Restano visibili le persone trovate e la loro linea fino a te. */
+function senzaAccenti(s){ return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim(); }
+function applicaRicerca(){
+  const ul = document.querySelector(".albero.struttura"), esito = document.getElementById("cerca-esito");
+  if(!ul) return;
+  const q = senzaAccenti(st.cerca), lis = [...ul.querySelectorAll("li")];
+  ul.classList.toggle("in-ricerca", !!q);
+  if(!q){ lis.forEach(li => li.classList.remove("fuori", "trovato")); if(esito) esito.textContent = ""; return; }
+  const trovati = lis.filter(li => li.dataset.nome.includes(q)), visibili = new Set();
+  for(const li of trovati){ visibili.add(li.dataset.id); li.dataset.path.split(" ").filter(Boolean).forEach(id => visibili.add(id)); }
+  for(const li of lis){ li.classList.toggle("fuori", !visibili.has(li.dataset.id)); li.classList.toggle("trovato", trovati.includes(li)); }
+  if(esito) esito.textContent = !trovati.length ? "Nessuno con questo nome nel tuo gruppo."
+    : (trovati.length === 1 ? "1 persona trovata" : `${trovati.length} persone trovate`) + ", con la linea fino a te.";
+}
 function render(){
   const app = document.getElementById("app");
   const viste = { avvio:vAvvio, config:vConfig, benvenuto:vBenvenuto, chiave_errata:vChiaveErrata,
@@ -471,6 +487,7 @@ function render(){
   document.body.classList.toggle("con-azioni", conAzioni);
   document.getElementById("azioni").innerHTML = conAzioni ? vAzioni() : "";
   document.getElementById("sheet").innerHTML = st.sheet ? `<div class="sheet" data-act="chiudi-fuori"><div class="sheet-box" role="dialog" aria-modal="true">${vSheet()}</div></div>` : "";
+  applicaRicerca();
 }
 
 function vAvvio(){ return `<div class="centro"><p class="muted">Caricamento…</p></div>`; }
@@ -933,20 +950,21 @@ function statoDi(p){
 function vStruttura(){
   /* Come nei report Amway: accanto al nome il livello (1 = tuoi diretti, 2 = i loro, …) e lo sponsor;
      il gruppo di una persona si può richiudere. */
-  const tutte = alberoSotto(st.profilo.id, 0), righe = [];
-  let nascondiSotto = -1;
-  for(const r of tutte){
-    if(nascondiSotto >= 0 && r.livello > nascondiSotto) continue;
-    nascondiSotto = st.chiusi.has(r.p.id) ? r.livello : -1;
-    righe.push(r);
-  }
+  /* Tutte le righe sono nella pagina: quelle dei gruppi richiusi sono solo nascoste, così la ricerca le trova. */
+  const righe = alberoSotto(st.profilo.id, 0), sopra = [];
+  for(const r of righe){ sopra.length = r.livello; r.path = sopra.slice(); sopra.push(r.p.id); }
   return `<div class="card">
     <div class="spread"><span class="eyebrow">La mia struttura</span>
       <button class="btn small" data-act="aggiungi">+ Aggiungi persona</button></div>
-    ${righe.length ? `<ul class="albero">${righe.map(({ p, livello }) => {
+    ${righe.length > 1 ? `<input type="search" id="cerca-struttura" class="cerca" placeholder="Cerca un nome nel tuo gruppo…"
+        autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Cerca un nome nel tuo gruppo" value="${esc(st.cerca || "")}">
+      <p class="small" id="cerca-esito" aria-live="polite" style="margin:6px 0 0"></p>` : ""}
+    ${righe.length ? `<ul class="albero struttura">${righe.map(({ p, livello, path }) => {
       const r = rigaDi(st.riep, p.id) || {}, sp = statoDi(p);
       const quanti = alberoSotto(p.id, 0).length, chiuso = st.chiusi.has(p.id);
-      return `<li class="liv" style="--rientro:${Math.min(livello, 4) * 10}px">
+      const piegato = path.some(id => st.chiusi.has(id));
+      return `<li class="liv${piegato ? " piegato" : ""}" style="--rientro:${Math.min(livello, 4) * 10}px"
+        data-id="${esc(p.id)}" data-path="${esc(path.join(" "))}" data-nome="${esc(senzaAccenti(p.nome))}">
       <span class="livello l${livello % 4}" title="Livello ${livello + 1}">${livello + 1}</span>
       <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}">
         <span>${esc(p.nome)}</span>
@@ -1845,6 +1863,7 @@ document.addEventListener("change", e => {
 
 /* Appena si corregge un campo, l'errore del modulo sparisce. */
 document.addEventListener("input", e => {
+  if(e.target.id === "cerca-struttura"){ st.cerca = e.target.value; applicaRicerca(); return; }
   const err = e.target.form && e.target.form.querySelector(".errore");
   if(err) err.remove();
 });
