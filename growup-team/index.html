@@ -195,6 +195,14 @@ label.check input{width:22px;min-height:22px;height:22px;margin:1px 0 0;flex:non
 .albero li{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:15px}
 .albero li:first-child{border-top:0}
 .albero .btn.link{min-height:32px;padding:0 2px;font-size:13px}
+.albero li.liv{padding-left:var(--rientro)}
+.livello{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;
+  font-variant-numeric:tabular-nums;color:#fff;background:var(--lv)}
+.livello.l0{--lv:#0a3a2c} .livello.l1{--lv:#c26a3d} .livello.l2{--lv:#13795b} .livello.l3{--lv:#8a6414}
+:root[data-theme="dark"] .livello.l0{--lv:#1f7a5c}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .livello.l0{--lv:#1f7a5c} }
+.piega{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:99px;
+  font:inherit;font-size:12px;font-weight:700;padding:3px 9px;min-height:30px;cursor:pointer;white-space:nowrap}
 .azioni{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);border-top:1px solid var(--line);
   padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
 .azioni .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
