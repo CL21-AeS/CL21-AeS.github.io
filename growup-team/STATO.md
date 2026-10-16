@@ -122,7 +122,7 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare i livelli negli elenchi a scelta** (ricerca già unita con la PR #24) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare "▸ apre il gruppo anche durante la ricerca"** (livelli negli elenchi già uniti con la PR #25) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
@@ -167,7 +167,8 @@ dall'SQL Editor perché contiene un `delete`):
   o riaprire il gruppo di una persona (N = quante persone ha nel gruppo).
 - **Ricerca nella struttura** (17 ottobre): casella "Cerca un nome nel tuo gruppo…" sopra la struttura; filtra mentre
   si scrive (senza badare agli accenti), mostra le persone trovate in rame con la loro linea fino a te, trova anche
-  dentro i gruppi richiusi; svuotandola torna tutto com'era.
+  dentro i gruppi richiusi; svuotandola torna tutto com'era. Durante la ricerca **▸ N** sulla persona trovata (o su
+  chiunque della sua linea) apre anche il suo gruppo; ▾ N lo richiude.
 - **Elenchi a scelta dello sponsor** (Aggiungi persona, Cambia sponsor; 17 ottobre): al posto dei trattini il livello
   e, dal 2 in giù, lo sponsor: "3 · Marcella Peyron (sponsor Elisa)".
 1. **Pubblicare i livelli nella struttura** (invito nuovo già unito con la PR #22), approvato da Stefano): anteprima del link su WhatsApp/Telegram (`anteprima.png` + meta
