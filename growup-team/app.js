@@ -1056,26 +1056,19 @@ function creaIcs({ nome, data, ora, minuti, avviso, note }){
 function scaricaIcs(testo, nome){
   const url = URL.createObjectURL(new Blob([testo], { type:"text/calendar;charset=utf-8" }));
   const a = document.createElement("a");
-  a.href = url; a.download = "chiamata-" + String(nome).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".ics";
+  a.href = url; a.download = "chiamata-" + String(nome).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now().toString(36).slice(-5) + ".ics";
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
-/* Su Android si apre subito la scelta dell'app di calendario (intent di inserimento evento);
-   se nessuna app risponde, Chrome apre Google Calendar sul web. Il promemoria lo mette l'app del calendario. */
+/* Su Android Chrome non lascia aprire da una pagina web la scelta dell'app di calendario: si apre Google Calendar
+   con la chiamata già compilata (basta "Salva"); per gli altri calendari c'è il file .ics. */
 function suAndroid(){ return /Android/i.test(navigator.userAgent); }
 function suIos(){ return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); }
-function vaiA(u){ (window.GROWUP_VAI || (x => { location.href = x; }))(u); }
+function vaiA(u, nuova){ (window.GROWUP_VAI || (x => { if(nuova) window.open(x, "_blank", "noopener"); else location.href = x; }))(u); }
 function googleCalendar({ nome, data, ora, minuti, note }){
   const inizio = new Date(`${data}T${ora}:00`), fine = new Date(inizio.getTime() + minuti * 60000);
   return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(`Chiamata con ${nome}`)
     + "&dates=" + icsUtc(inizio) + "/" + icsUtc(fine) + (note ? "&details=" + encodeURIComponent(note) : "");
-}
-function intentCalendario(c){
-  const inizio = new Date(`${c.data}T${c.ora}:00`).getTime(), fine = inizio + c.minuti * 60000;
-  return "intent:#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.dir/event"
-    + `;l.beginTime=${inizio};l.endTime=${fine};S.title=${encodeURIComponent("Chiamata con " + c.nome)}`
-    + (c.note ? `;S.description=${encodeURIComponent(c.note)}` : "")
-    + `;S.browser_fallback_url=${encodeURIComponent(googleCalendar(c))};end`;
 }
 /* Su iPhone il file si apre direttamente nella schermata "Aggiungi al calendario", senza scaricarlo */
 function apriIcs(testo, nome){
@@ -1306,14 +1299,14 @@ function vSheet(){
           <option value="10">10 minuti prima</option><option value="30" selected>30 minuti prima</option>
           <option value="60">1 ora prima</option><option value="1440">1 giorno prima</option><option value="0">nessuno</option></select></label>`}
       </div>
-      ${suAndroid() ? `<p class="nota">Il promemoria è quello che usi di solito nel tuo calendario: puoi cambiarlo prima di salvare.</p>` : ""}
+      ${suAndroid() ? `<p class="nota">Il promemoria è quello che usi di solito in Google Calendar: puoi cambiarlo prima di salvare.</p>` : ""}
       <label class="field"><span>Note (restano solo nel tuo calendario)</span><textarea name="note" rows="3" maxlength="1000"></textarea></label>
       <div class="condividi" style="margin-top:16px">
         <button class="btn primary">Calendario</button>
         <button type="button" class="btn wa" data-act="chiamata-wa">WhatsApp</button>
       </div>
-      ${suAndroid() ? `<p class="nota">Si apre la scelta dell'app di calendario. Non si apre?
-        <button type="button" class="btn link small" data-act="chiamata-ics">Scarica il file del calendario</button></p>` : ""}
+      ${suAndroid() ? `<p class="nota">"Calendario" apre Google Calendar con la chiamata già compilata: tocca Salva.
+        Usi un altro calendario? <button type="button" class="btn link small" data-act="chiamata-ics">Scarica il file</button> e aprilo.</p>` : ""}
       <p class="nota">Su WhatsApp parte un messaggio già scritto, per esempio: "${esc(testoChiamata(x.nome, piuGiorni(oggi(), 1), "21:00"))}".
         Scegli tu a chi mandarlo.</p>
       <button type="button" class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>${err}
@@ -1586,7 +1579,7 @@ const MODULI = {
     const c = datiChiamata(f), err = erroreChiamata(c);
     if(err){ mostraErroreForm(f, err); return; }
     const dati = Object.assign({ nome:x.nome }, c);
-    if(suAndroid()){ vaiA(intentCalendario(dati)); return; }
+    if(suAndroid()){ vaiA(googleCalendar(dati), true); return; }
     apriIcs(creaIcs(dati), x.nome);
     if(!suIos()) toast("Apri il file per aggiungere la chiamata al calendario");
   },
