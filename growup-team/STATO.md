@@ -122,13 +122,15 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare il secondo ritocco "Calendario"** (Android → Google Calendar diretto; PR #16 già unita) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare "Installa l'app" e "Incolla il link personale"** (PR #16 e #17 già unite) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
    scheda partner, partner senza app, Da confermare, in mezzo / cancella / cambia sponsor, imbuto ed etichette),
    del confronto col mese prima, di "Fissa una chiamata" e dello storico del gruppo
-   (provare il file .ics sia su iPhone sia su Android).
+   (provare il file .ics sia su iPhone sia su Android). **Sull'iPhone di Alessia, dall'icona sulla Home**:
+   Fissa una chiamata → Calendario, e tutto il percorso d'installazione (copia link → Aggiungi alla Home →
+   Incolla il link personale). Stefano usa Android + Google Calendar; Alessia iPhone.
 3. **Blocco 4 della Fase 2** (ultimo, vedi `FASE2.md`):
    - (FATTO il 16 ottobre, da pubblicare/collaudare) scheda partner: riquadro **"Questo mese e il mese prima"**,
      confronto con i **suoi numeri del mese prima** (non con la media del gruppo: scelta di Stefano), fino a oggi /
@@ -149,6 +151,14 @@ dall'SQL Editor perché contiene un `delete`):
      di ogni persona (VP personali, VP di gruppo, linee, %, qualifica) con ▼ in rosso dove è sotto il mese prima.
      Usa `riepilogo_mese`, nessuna migrazione. Il primo mese chiuso sarà ottobre, il 5 novembre.
    **Con questo la Fase 2 è completa**: resta il collaudo.
+- **Installare l'app** (16 ottobre, da collaudare soprattutto sull'iPhone di Alessia):
+  - pagina Io, dopo "Salva il tuo link personale": riquadro **"Installa Growup sul telefono"**. Android: pulsante
+    **Installa** (proposta di Chrome) o istruzioni dal menu ⋮; iPhone: **Copia il mio link** → Condividi →
+    Aggiungi alla schermata Home → apri dall'icona e **Incolla il link personale**. "Non ora" lo nasconde;
+    in fondo alla pagina resta "Installa l'app". Non compare se l'app è già installata o sul computer;
+  - schermata d'ingresso: pulsante **Incolla il link personale** (legge il link copiato); nell'app installata
+    spiega che la prima volta serve il link. Perché: su iPhone l'app sulla Home ha una memoria separata da Safari.
+  - Ordine giusto per un nuovo partner su iPhone: prima entra dal link d'invito, poi installa.
 4. **Prima del lancio a tutto il gruppo**: captcha (Cloudflare Turnstile) sugli accessi anonimi e limite
    "anonymous sign-ins" più alto in Authentication → Rate Limits.
 5. Dopo la Fase 2: Fase 3 (presa in carico dopo 14 giorni, avvisi) e Fase 4 (diagnosi, serie di settimane, 90 giorni).
