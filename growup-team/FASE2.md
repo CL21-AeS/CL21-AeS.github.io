@@ -54,7 +54,8 @@ mancanze di quello che viene fatto; come muoversi lo decide ogni partner, da sol
      contatti, piani, ordini, nuovi clienti, VP personali di questo mese fino a oggi, del mese prima allo stesso
      giorno e del mese prima intero; VP di gruppo e linee attive col totale del mese prima. ▼ in rosso dove è sotto
      il mese prima allo stesso giorno, **senza azioni suggerite**. FATTO (16 ottobre).
-   - Fissa una chiamata: evento di calendario (.ics) con promemoria e note, e messaggio WhatsApp già scritto.
+   - Fissa una chiamata: evento di calendario (.ics) con promemoria e note, e messaggio WhatsApp già scritto,
+     **neutro** (scelta di Stefano): "Ciao Marco, ci sentiamo giovedì 17 ottobre alle 21:00?". FATTO (16 ottobre).
 
 ## Regole di sicurezza nuove
 
