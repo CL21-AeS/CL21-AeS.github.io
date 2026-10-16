@@ -359,6 +359,39 @@ const wa = await page.evaluate(() => window.__aperto);
 const giornoIt = new Intl.DateTimeFormat("it-IT", { weekday:"long", timeZone:"UTC" }).format(new Date(domani + "T00:00:00Z"));
 check(wa && wa.startsWith("https://wa.me/?text=") && decodeURIComponent(wa.split("text=")[1]).startsWith("Ciao Cri, ci sentiamo " + giornoIt + " ")
   && decodeURIComponent(wa.split("text=")[1]).endsWith(" alle 20:30?"), "WhatsApp: messaggio neutro (" + (wa ? decodeURIComponent(wa.split("text=")[1]) : "") + ")");
+await ctx.close();
+
+// 11b. Android: si apre la scelta dell'app di calendario; iPhone: il file si apre senza scaricarlo
+const UA_ANDROID = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36";
+({ ctx, page } = await apri({ userAgent:UA_ANDROID }, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.evaluate(() => { window.__vai = null; window.GROWUP_VAI = u => { window.__vai = u; }; });
+await page.click("button[data-act=vista-gruppo]");
+await page.locator(".albero:not(.seguire) li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
+await page.click("button[data-act=chiamata]");
+check(await page.locator(".sheet select[name=avviso]").count() === 0, "Android: niente scelta del promemoria");
+await page.fill(".sheet input[name=ora]", "20:30");
+await page.click(".sheet button:has-text('Calendario')");
+const intent = await page.evaluate(() => window.__vai);
+const inizioMs = await page.evaluate(d => new Date(d + "T20:30:00").getTime(), domani);
+check(intent && intent.startsWith("intent:#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.dir/event")
+  && intent.includes(";l.beginTime=" + inizioMs + ";") && intent.includes(";l.endTime=" + (inizioMs + 30 * 60000) + ";")
+  && intent.includes(";S.title=Chiamata%20con%20Cri%20Crescita") && intent.includes("S.browser_fallback_url=https%3A%2F%2Fcalendar.google.com") && intent.endsWith(";end"),
+  "Android: intent di inserimento evento (" + intent + ")");
+const [scaricatoA] = await Promise.all([page.waitForEvent("download"), page.click(".sheet button[data-act=chiamata-ics]")]);
+check(scaricatoA.suggestedFilename().endsWith(".ics"), "Android: resta il file come riserva");
+await ctx.close();
+const UA_IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+({ ctx, page } = await apri({ userAgent:UA_IPHONE }, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.evaluate(() => { window.__vai = null; window.GROWUP_VAI = u => { window.__vai = u; }; });
+await page.click("button[data-act=vista-gruppo]");
+await page.locator(".albero:not(.seguire) li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
+await page.click("button[data-act=chiamata]");
+check(await page.locator(".sheet select[name=avviso]").count() === 1, "iPhone: promemoria nel file");
+await page.click(".sheet button:has-text('Calendario')");
+const blobIcs = await page.evaluate(async () => window.__vai && window.__vai.startsWith("blob:") ? await (await fetch(window.__vai)).text() : "");
+check(blobIcs.includes("SUMMARY:Chiamata con Cri Crescita") && blobIcs.includes("TRIGGER:-PT30M"), "iPhone: il file si apre senza scaricarlo");
 await page.fill(".sheet input[name=data]", "2020-01-01");
 await page.click(".sheet button:has-text('Calendario')");
 check(await page.getByText("Il giorno e l'ora sono già passati.").isVisible(), "niente chiamate nel passato");
