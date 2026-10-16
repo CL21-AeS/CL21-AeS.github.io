@@ -14,6 +14,13 @@ I colori stanno tutti nelle variabili su `:root` di `index.html` (chiaro) e nei 
 | + Contatto / + Piano / + Ordine | `#0a3a2c` / `#c26a3d` / `#13795b` | `#13604a` / `#b8602f` / `#1f8a68` |
 | stato: ok · sotto soglia · ▼ | `#13795b` · `#9a6a00` · `#b42318` | `#34c08f` · `#e2b45a` · `#ff7b6b` |
 
+## Icona
+
+**G Smeraldo** (scelta da Stefano il 16 ottobre 2026): fondo sfumato smeraldo, G avorio la cui stanghetta diventa
+una freccia ambra che sale. Disegno in `icon.svg`; da lì le PNG `icon-512.png`, `icon-192.png` (Android, anche
+ritagliate a cerchio: il disegno sta nell'area sicura), `apple-touch-icon.png` (180, iPhone), `favicon-32.png`.
+Per rifarle: aprire `icon.svg` in un browser e salvarne una cattura alle misure indicate.
+
 ## Alternative da tenere per il futuro (scelta di Stefano)
 
 Sono nella tavola `design/tavola-grafica.html` (apribile nel browser, con chiaro/scuro), insieme alle altre provate.
