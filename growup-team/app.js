@@ -1060,8 +1060,30 @@ function scaricaIcs(testo, nome){
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
+/* Su Android si apre subito la scelta dell'app di calendario (intent di inserimento evento);
+   se nessuna app risponde, Chrome apre Google Calendar sul web. Il promemoria lo mette l'app del calendario. */
+function suAndroid(){ return /Android/i.test(navigator.userAgent); }
+function suIos(){ return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); }
+function vaiA(u){ (window.GROWUP_VAI || (x => { location.href = x; }))(u); }
+function googleCalendar({ nome, data, ora, minuti, note }){
+  const inizio = new Date(`${data}T${ora}:00`), fine = new Date(inizio.getTime() + minuti * 60000);
+  return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(`Chiamata con ${nome}`)
+    + "&dates=" + icsUtc(inizio) + "/" + icsUtc(fine) + (note ? "&details=" + encodeURIComponent(note) : "");
+}
+function intentCalendario(c){
+  const inizio = new Date(`${c.data}T${c.ora}:00`).getTime(), fine = inizio + c.minuti * 60000;
+  return "intent:#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.dir/event"
+    + `;l.beginTime=${inizio};l.endTime=${fine};S.title=${encodeURIComponent("Chiamata con " + c.nome)}`
+    + (c.note ? `;S.description=${encodeURIComponent(c.note)}` : "")
+    + `;S.browser_fallback_url=${encodeURIComponent(googleCalendar(c))};end`;
+}
+/* Su iPhone il file si apre direttamente nella schermata "Aggiungi al calendario", senza scaricarlo */
+function apriIcs(testo, nome){
+  if(!suIos()) return scaricaIcs(testo, nome);
+  vaiA(URL.createObjectURL(new Blob([testo], { type:"text/calendar;charset=utf-8" })));
+}
 function datiChiamata(f){
-  return { data:f.data.value, ora:f.ora.value, minuti:Number(f.durata.value) || 30, avviso:Number(f.avviso.value) || 0, note:f.note.value.trim() };
+  return { data:f.data.value, ora:f.ora.value, minuti:Number(f.durata.value) || 30, avviso:f.avviso ? Number(f.avviso.value) || 0 : 30, note:f.note.value.trim() };
 }
 function erroreChiamata(c){
   if(!c.data || !c.ora) return "Scegli giorno e ora.";
@@ -1280,15 +1302,18 @@ function vSheet(){
       <div class="row">
         <label class="field grow"><span>Durata</span><select name="durata">
           ${[15, 30, 45, 60].map(m => `<option value="${m}"${m === 30 ? " selected" : ""}>${m} minuti</option>`).join("")}</select></label>
-        <label class="field grow"><span>Promemoria</span><select name="avviso">
+        ${suAndroid() ? "" : `<label class="field grow"><span>Promemoria</span><select name="avviso">
           <option value="10">10 minuti prima</option><option value="30" selected>30 minuti prima</option>
-          <option value="60">1 ora prima</option><option value="1440">1 giorno prima</option><option value="0">nessuno</option></select></label>
+          <option value="60">1 ora prima</option><option value="1440">1 giorno prima</option><option value="0">nessuno</option></select></label>`}
       </div>
+      ${suAndroid() ? `<p class="nota">Il promemoria è quello che usi di solito nel tuo calendario: puoi cambiarlo prima di salvare.</p>` : ""}
       <label class="field"><span>Note (restano solo nel tuo calendario)</span><textarea name="note" rows="3" maxlength="1000"></textarea></label>
       <div class="condividi" style="margin-top:16px">
         <button class="btn primary">Calendario</button>
         <button type="button" class="btn wa" data-act="chiamata-wa">WhatsApp</button>
       </div>
+      ${suAndroid() ? `<p class="nota">Si apre la scelta dell'app di calendario. Non si apre?
+        <button type="button" class="btn link small" data-act="chiamata-ics">Scarica il file del calendario</button></p>` : ""}
       <p class="nota">Su WhatsApp parte un messaggio già scritto, per esempio: "${esc(testoChiamata(x.nome, piuGiorni(oggi(), 1), "21:00"))}".
         Scegli tu a chi mandarlo.</p>
       <button type="button" class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>${err}
@@ -1442,6 +1467,13 @@ const AZIONI = {
   },
   conferma(el){ st.confermaId = el.dataset.id; st.sheet = "conferma"; render(); },
   chiamata(el){ st.chiamataId = el.dataset.id; st.errore = ""; st.sheet = "chiamata"; render(); },
+  "chiamata-ics"(el){
+    const f = el.form, x = st.struttura.find(y => y.id === st.chiamataId);
+    if(!f || !x) return;
+    const c = datiChiamata(f), err = erroreChiamata(c);
+    if(err){ mostraErroreForm(f, err); return; }
+    scaricaIcs(creaIcs(Object.assign({ nome:x.nome }, c)), x.nome);
+  },
   "chiamata-wa"(el){
     const f = el.form, x = st.struttura.find(y => y.id === st.chiamataId);
     if(!f || !x) return;
@@ -1553,8 +1585,10 @@ const MODULI = {
     if(!x) return;
     const c = datiChiamata(f), err = erroreChiamata(c);
     if(err){ mostraErroreForm(f, err); return; }
-    scaricaIcs(creaIcs(Object.assign({ nome:x.nome }, c)), x.nome);
-    toast("Apri il file per aggiungere la chiamata al calendario");
+    const dati = Object.assign({ nome:x.nome }, c);
+    if(suAndroid()){ vaiA(intentCalendario(dati)); return; }
+    apriIcs(creaIcs(dati), x.nome);
+    if(!suIos()) toast("Apri il file per aggiungere la chiamata al calendario");
   },
   async "cambia-sponsor"(f){
     const x = st.struttura.find(y => y.id === st.spostaId);
