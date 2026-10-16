@@ -50,8 +50,10 @@ mancanze di quello che viene fatto; come muoversi lo decide ogni partner, da sol
    - Fatto: soglie in `settings.soglie_etichette` (migrazione `010_etichette.sql`), regole in STATO.md.
      Chi è senza app non ha etichetta (decisione di Stefano).
 4. **Scheda partner e storico del gruppo**
-   - Ultime 4 settimane di contatti, piani, VP, confrontate con la media del gruppo e con chi cresce:
-     si evidenzia dove sta sotto, **senza azioni suggerite** (vedi il principio).
+   - **Confronto con i suoi numeri del mese prima** (scelta di Stefano, 16 ottobre: non con la media del gruppo):
+     contatti, piani, ordini, nuovi clienti, VP personali di questo mese fino a oggi, del mese prima allo stesso
+     giorno e del mese prima intero; VP di gruppo e linee attive col totale del mese prima. ▼ in rosso dove è sotto
+     il mese prima allo stesso giorno, **senza azioni suggerite**. FATTO (16 ottobre).
    - Fissa una chiamata: evento di calendario (.ics) con promemoria e note, e messaggio WhatsApp già scritto.
 
 ## Regole di sicurezza nuove
