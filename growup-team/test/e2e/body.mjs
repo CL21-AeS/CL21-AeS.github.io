@@ -122,6 +122,11 @@ check(await page.isChecked(".sheet input[name=aggiungi][value='1000002']") && !(
   "Spunta chi ha VPP: solo Luca (12,5 VP)");
 await page.click(".sheet button[data-act=spunta-tutti]");
 check(await page.locator(".sheet input[name=aggiungi]:checked").count() === 2, "Spunta tutti");
+check(await page.getAttribute(".sheet button[data-act=spunta-tutti]", "aria-pressed") === "true"
+  && await page.getAttribute(".sheet button[data-act=spunta-vpp]", "aria-pressed") === "false", "il pulsante usato resta acceso, gli altri si spengono");
+await page.uncheck(".sheet input[name=aggiungi][value='1000001']");
+check(!(await page.locator(".sheet .scelte-rapide .btn.on").count()), "una casella cambiata a mano spegne il pulsante");
+await page.click(".sheet button[data-act=spunta-tutti]");
 check(await page.locator(".sheet label", { hasText:"Luca Verdi" }).getByText("sponsor Marco Rossi").isVisible(), "import: lo sponsor del report accanto al nome");
 await page.screenshot({ path: S + "/e2e/26-importa.png", fullPage:true });
 await page.click(".sheet button:has-text('Importa')");
