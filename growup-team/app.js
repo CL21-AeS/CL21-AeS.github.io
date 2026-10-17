@@ -43,8 +43,9 @@ function creaApi(){
     cambiaChiave: () => q(sb.rpc("cambia_chiave")),
     accettaPrivacy: pid => q(sb.from("partners").update({ privacy_accettata_il:new Date().toISOString() }).eq("id", pid)),
     /* io e tutta la mia downline: la RLS restituisce solo quella */
-    struttura:    () => q(sb.from("partners").select("id,nome,sponsor_id,stato,gestore_id,creato_il,ultimo_aggiornamento,codice_amway,"
-                    + "qualifica_iniziale,percentuale_iniziale,qualifica_iniziale_mese,pagamenti_iniziali,partenza_confermata_il").order("creato_il")),
+    /* io e chi vedo, ognuno sotto il primo sopra di lui che vedo (struttura "ricucita" nel database) */
+    struttura:    () => q(sb.rpc("struttura_visibile")),
+    creaInvitoSopra: (pid, altri) => q(sb.rpc("crea_invito_sopra", { p_partner:pid, p_altri:altri })),
     conferma:     args => q(sb.rpc("conferma_partenza", args)),
     cancella:     pid => q(sb.rpc("cancella_partner", { p_partner:pid })),
     preferiti:    () => q(sb.from("preferiti").select("preferito_id")),
@@ -238,10 +239,22 @@ function primaDataAperta(){ return precedenteAperto() ? mesePrecedente() + "-01"
 function rigaDi(righe, id){ return righe.find(r => r.partner_id === id); }
 function nomeDi(id){ const p = st.struttura.find(x => x.id === id); return p ? p.nome : ""; }
 /* { personali, gruppo, linee:[{ id, nome, vp }], attive, percentuale } per un mese (m) */
+/* le linee frontali di una persona dal report Amway: per chi è nell'app il suo nome, per gli altri il codice */
+function lineeReport(r){
+  return (r.linee_report || []).map(l => { const p = st.struttura.find(x => x.codice_amway === l.codice);
+    return { id:p ? p.id : null, nome:p ? p.nome : `Codice ${l.codice} (non nell'app)`, vp:Number(l.vpg) || 0 }; })
+    .sort((a, b) => b.vp - a.vp);
+}
 function numeriMese(m){
   const righe = m === meseDi(oggi()) ? st.riep : m === mesePrecedente() ? st.riepPrec : [];
   const me = st.profilo.id, r = rigaDi(righe, me);
   const personali = vpMese(m);
+  /* con un import del report: VP di gruppo, linee e percentuale ufficiali di Amway */
+  if(r && r.da_report){
+    const linee = lineeReport(r);
+    return { personali, gruppo:Number(r.vp_gruppo), linee, attive:linee.filter(l => l.vp >= soglia()).length,
+             percentuale:r.percentuale != null ? Number(r.percentuale) : percentualeDa(Number(r.vp_gruppo)), daReport:true };
+  }
   const gruppo = (r ? Number(r.vp_gruppo) - Number(r.vp_personali) : 0) + personali;
   const linee = righe.filter(x => x.sponsor_id === me)
     .map(x => ({ id:x.partner_id, nome:nomeDi(x.partner_id), vp:Number(x.vp_gruppo) }))
@@ -713,8 +726,8 @@ function vFondo(){
     </div>
     ${st.profilo.is_admin ? vCopiaDati() : ""}
     <p class="nota" style="text-align:center">${esc(st.profilo.nome)} · codice d'invito <b>${esc(st.profilo.codice_invito)}</b><br>
-      ${st.profilo.codice_amway ? `Codice Amway Partner <b>${esc(st.profilo.codice_amway)}</b>` : "Codice Amway Partner non scritto"}
-      <button class="btn link small" data-act="codice" data-id="${esc(st.profilo.id)}" style="min-height:0;padding:0 4px">${st.profilo.codice_amway ? "Modifica" : "Aggiungi"}</button><br>
+      ${st.profilo.codice_amway ? `Codice Amway Partner <b>${esc(st.profilo.codice_amway)}</b>` : "Codice Amway Partner non ancora scritto"}
+      ${st.profilo.is_admin ? `<button class="btn link small" data-act="codice" data-id="${esc(st.profilo.id)}" style="min-height:0;padding:0 4px">Correggi</button>` : ""}<br>
       Per cancellare il profilo e i tuoi dati scrivi a Stefano e Alessia.</p>
   </div>`;
 }
@@ -968,6 +981,7 @@ function vTappa(){
     <div class="spread"><span class="eyebrow">Tappa ${indice + 1} di ${st.stages.length}</span>
       <span class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end">
       ${n.percentuale ? `<span class="pill s">${n.percentuale}% questo mese</span>` : ""}
+      ${n.daReport ? `<span class="pill">dal report Amway</span>` : ""}
       ${pinMax && pinMax > (n.percentuale || 0) ? `<span class="pill">${pinMax}% raggiunto</span>` : ""}
       ${raggiunta ? `<span class="pill v">✓ ${esc(raggiunta.nome)}</span>` : ""}</span></div>
     <h2 style="margin-top:4px">${esc(attuale.nome)}</h2>
@@ -1398,15 +1412,18 @@ function vScheda(){
       : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</p>
     ${p.stato === "gestito" ? "" : `<p class="small" style="margin:6px 0 0">${rigaObiettivoDi(p.id)}</p>`}
     <p class="small" style="margin:6px 0 0">${p.codice_amway ? `Codice Amway <b>${esc(p.codice_amway)}</b>` : "Codice Amway non scritto"}
-      ${gestito ? `<button class="btn link small" data-act="codice" data-id="${esc(p.id)}" style="min-height:0;padding:0 4px">${p.codice_amway ? "Modifica" : "Aggiungi"}</button>` : ""}</p>
+      ${st.profilo.is_admin && !gestito ? `<button class="btn link small" data-act="codice" data-id="${esc(p.id)}" style="min-height:0;padding:0 4px">Correggi</button>` : ""}</p>
     <div class="dati-scheda">
       <div><span class="small">VP personali</span><b class="num">${num(r.vp_personali)}</b></div>
       <div><span class="small">VP di gruppo</span><b class="num">${num(r.vp_gruppo)}</b></div>
       <div><span class="small">Linee attive</span><b class="num">${r.linee_attive || 0}</b></div>
       <div><span class="small">Percentuale</span><b class="num">${r.percentuale ? r.percentuale + "%" : "–"}</b></div>
     </div>
-    ${frontali.length ? `<ul class="linee">${frontali.map(x => `<li><span class="grow">${esc(nomeDi(x.partner_id))}</span>
-      <span class="num ${Number(x.vp_gruppo) >= soglia() ? "" : "faint"}">${num(x.vp_gruppo)} VP</span></li>`).join("")}</ul>` : ""}
+    ${r.da_report ? `<p class="nota" style="margin:6px 0 0">VP di gruppo, linee e percentuale dal report Amway${r.linee_nascoste
+      ? ". Linee non visibili nel report (il suo gruppo Amway non lo mostra): la qualifica non può contarle" : ""}.</p>` : ""}
+    ${(() => { const l = r.da_report ? lineeReport(r) : frontali.map(x => ({ nome:nomeDi(x.partner_id), vp:Number(x.vp_gruppo) }));
+      return l.length ? `<ul class="linee">${l.map(x => `<li><span class="grow">${esc(x.nome)}</span>
+      <span class="num ${x.vp >= soglia() ? "" : "faint"}">${num(x.vp)} VP</span></li>`).join("")}</ul>` : ""; })()}
     <p class="small" style="margin:10px 0 0">Punto di partenza: <b>${esc(testoPartenza(p))}</b>
       ${p.partenza_confermata_il ? `<span class="pill v">confermato</span>`
         : `<button class="btn link small" data-act="conferma" data-id="${esc(p.id)}">Conferma</button>`}</p>
@@ -1434,6 +1451,7 @@ function vScheda(){
     ${st.profilo.is_admin ? `<button class="btn wide" style="margin-top:12px" data-act="nuovo-link" data-id="${esc(p.id)}">Nuovo link personale</button>
       <p class="nota">Solo per chi ha perso il suo link: quello vecchio smette di funzionare e i suoi telefoni vanno ricollegati.</p>` : ""}
   </div>`}
+  ${st.profilo.is_admin ? vInvitiAdmin(p) : ""}
   <div class="card">
     <span class="eyebrow">Struttura</span>
     ${gestito ? "" : `<button class="btn wide" style="margin-top:10px" data-act="nascondi" data-id="${esc(p.id)}">Nascondi dalla mia struttura</button>
@@ -1443,6 +1461,27 @@ function vScheda(){
       Chi è nel suo gruppo passa a ${esc(sponsor || "il suo sponsor")}.`
       : `Per i codici che Amway non rinnova: la cancella per tutti, con la sua app e i suoi dati.
       Chi è nel suo gruppo passa a ${esc(sponsor || "il suo sponsor")}.`}</p>
+  </div>`;
+}
+
+/* Solo admin: far entrare qualcuno sotto una persona precisa (anche nei gruppi dei Platino, che il report non mostra)
+   o tra lo sponsor e la persona (link speciale, valido una volta) */
+function bottoniLink(link){
+  return `<div class="condividi">
+      <a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(testoInvito() + "\n\n" + link)}">WhatsApp</a>
+      <a class="btn tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(testoInvito())}">Telegram</a>
+      <button class="btn" data-act="copia-link" data-link="${esc(link)}">Copia link</button>
+    </div>
+    <div class="linkbox">${esc(link)}</div>`;
+}
+function vInvitiAdmin(p){
+  return `<div class="card">
+    <span class="eyebrow">Inviti · solo admin</span>
+    <p class="small" style="margin:4px 0 0"><b>Invita sotto ${esc(nomeSaluto(p.nome))}</b>: chi entra con questo link va nel suo gruppo, sotto di lei.</p>
+    ${p.codice_invito ? bottoniLink(base() + "#" + p.codice_invito) : ""}
+    <button class="btn wide" style="margin-top:12px" data-act="invito-sopra" data-id="${esc(p.id)}">Invita chi manca sopra di ${esc(nomeSaluto(p.nome))}</button>
+    <p class="nota">Un link valido una volta sola: chi lo apre entra tra ${esc(p.sponsor_id === st.profilo.id ? "voi" : nomeDi(p.sponsor_id) || "il suo sponsor")}
+      e ${esc(nomeSaluto(p.nome))}, che passa sotto di lui con il suo gruppo.</p>
   </div>`;
 }
 
@@ -1516,8 +1555,6 @@ function numReport(v){
   const n = Number(v);
   return isFinite(n) ? n : NaN;
 }
-/* "ROSSI, MARIO" e "Mario Rossi" diventano la stessa chiave */
-function chiaveNome(n){ return senzaAccenti(n).replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean).sort().join(" "); }
 function maiuscole(n){ return n.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (x, a, b) => a + b.toUpperCase()); }
 function nomeReport(n){ const [cognome, nome] = pulito(n).split(/,\s*/); return maiuscole(nome ? `${nome} ${cognome}` : cognome); }
 
@@ -1530,7 +1567,8 @@ function leggiReport(testo){
   if(!mm) return { errore:"Nel file non c'è il mese di competenza: scaricalo di nuovo dal sito Amway." };
   const testa = tutte[iTesta].map(pulito), col = n => testa.indexOf(n);
   const c = { livello:col("Qualifica Amway Partner"), sponsor:col("Codice Amway Partner Sponsor"),
-              codice:col("Codice Amway Partner"), nome:col("Nome"), vpp:col("VPP") };
+              codice:col("Codice Amway Partner"), nome:col("Nome"), vpp:col("VPP"), vpg:col("VPG"),
+              perc:col("Percentuale di bonus"), dimensione:col("Dimensioni gruppo") };
   if(c.codice < 0 || c.nome < 0 || c.vpp < 0) return { errore:"Nel file mancano le colonne del codice, del nome o dei VPP: esporta «con tutti i KPI disponibili»." };
   const righe = [];
   for(const r of tutte.slice(iTesta + 1)){
@@ -1538,8 +1576,11 @@ function leggiReport(testo){
     if(!codice) continue;
     const vpp = numReport(r[c.vpp]);
     if(!(vpp >= 0)) return { errore:`I VPP di ${nomeReport(r[c.nome])} non sono un numero: scarica di nuovo il file.` };
+    const vpg = c.vpg >= 0 ? numReport(r[c.vpg]) : NaN, perc = c.perc >= 0 ? parseInt(soloCifre(pulito(r[c.perc])), 10) : NaN;
     righe.push({ codice, livello:c.livello >= 0 ? Number(pulito(r[c.livello])) || 0 : 0,
-      sponsor:c.sponsor >= 0 ? soloCifre(pulito(r[c.sponsor])) : "", nome:nomeReport(r[c.nome]), vpp:Math.round(vpp * 100) / 100 });
+      sponsor:c.sponsor >= 0 ? soloCifre(pulito(r[c.sponsor])) : "", nome:nomeReport(r[c.nome]), vpp:Math.round(vpp * 100) / 100,
+      vpg:vpg >= 0 ? Math.round(vpg * 100) / 100 : null, perc:isFinite(perc) ? perc : null,
+      dimensione:c.dimensione >= 0 ? Number(soloCifre(pulito(r[c.dimensione]))) || 0 : 0 });
   }
   if(!righe.length) return { errore:"Nel file non c'è nessuna persona." };
   return { mese:`${mm[1]}-${mm[2]}`, righe };
@@ -1554,35 +1595,26 @@ function analizzaReport(rep){
       : `Il report è di ${nomeMese(m)}: nell'app quel mese è già chiuso (si chiude il giorno ${giornoChiusura()} del mese dopo). Scarica il report del mese in corso.` };
   const prima = rep.righe.find(r => r.livello === 1) || rep.righe[0];
   if(io.codice_amway && io.codice_amway !== prima.codice)
-    return { errore:`Questo report è di ${prima.nome} (${prima.codice}), non il tuo (${io.codice_amway}). Ognuno importa il report scaricato dal proprio accesso al sito Amway.` };
+    return { errore:`Questo report è di ${prima.nome} (${prima.codice}), ma il tuo codice nell'app è ${io.codice_amway}. `
+      + `Ognuno importa il report scaricato dal proprio accesso al sito Amway. Se il report è tuo, il codice nell'app è sbagliato: `
+      + (io.is_admin ? "correggilo in fondo alla pagina Io." : "chiedi a Stefano e Alessia di correggerlo.") };
   const perCodice = new Map(rep.righe.map(r => [r.codice, r]));
   const altri = alberoSotto(io.id, 0).map(x => x.p);
   const attivi = new Map(altri.filter(p => p.stato !== "gestito" && p.codice_amway).map(p => [p.codice_amway, p]));
   const mie = altri.filter(p => p.stato === "gestito");
-  const codiciApp = new Set([prima.codice].concat(altri.map(p => p.codice_amway).filter(Boolean)));
-  /* nome → righe del report con un codice che nell'app non c'è ancora (per le persone senza codice) */
-  const perNome = new Map();
-  for(const r of rep.righe) if(!codiciApp.has(r.codice)){
-    const k = chiaveNome(r.nome); perNome.set(k, (perNome.get(k) || []).concat([r]));
-  }
-  const unicoPerNome = p => { const l = perNome.get(chiaveNome(p.nome)) || []; return l.length === 1 ? l[0] : null; };
-  const a = { mese:m, prima, codiceMio:!io.codice_amway, perCodice, aggiorna:[], codiceDiverso:[], abbina:[], senzaCodice:[],
-              mancanti:[], usanoApp:[], usanoAppMancanti:[], spostati:[], nuovi:[], esclusi:[], totale:rep.righe.length };
+  const a = { mese:m, prima, codiceMio:!io.codice_amway, perCodice, aggiorna:[], mancanti:[], usanoApp:[], usanoAppMancanti:[],
+              spostati:[], nuovi:[], esclusi:[], totale:rep.righe.length };
   const usati = new Set([prima.codice]);
   for(const p of altri.filter(p => p.stato !== "gestito")){
     const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
     if(r){ a.usanoApp.push({ p, r }); usati.add(r.codice); }
     else if(p.codice_amway) a.usanoAppMancanti.push(p);
   }
+  /* le mie persone importate: il codice viene dal report, quindi si abbinano sempre per codice */
   for(const p of mie){
     const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
-    if(r){ a.aggiorna.push({ p, r }); usati.add(r.codice); continue; }
-    const n = unicoPerNome(p);
-    if(n && p.codice_amway) a.codiceDiverso.push({ p, r:n });
-    else if(n) a.abbina.push({ p, r:n });
+    if(r){ a.aggiorna.push({ p, r }); usati.add(r.codice); }
     else if(p.codice_amway) a.mancanti.push(p);
-    else a.senzaCodice.push(p);
-    if(n) usati.add(n.codice);
   }
   for(const r of rep.righe) if(!usati.has(r.codice)) (st.esclusi.has(r.codice) ? a.esclusi : a.nuovi).push(r);
   /* chi usa l'app va sotto il primo antenato del report che usa l'app (o sotto di me) */
@@ -1647,14 +1679,6 @@ function vImporta(){
         <span>Ho il consenso delle persone che spunto a inserire il loro nome e i loro numeri nell'app.</span></label>` : ""}
     ${sezione(`Si aggiornano i VPP · ${aggiorna.length}`, `<ul class="imp">${aggiorna.map(x => `<li>${riga(x.io ? { nome:`${st.profilo.nome} (tu)` } : x.p,
         x.io && a.codiceMio ? `il tuo codice ${esc(x.r.codice)} viene salvato` : "")}<b class="num">${num(x.r.vpp)} VP</b></li>`).join("")}</ul>`)}
-    ${a.codiceDiverso.length ? sezione(`Nome uguale, codice diverso · ${a.codiceDiverso.length}`,
-      `<div class="scelte">${a.codiceDiverso.map(x => `<label><input type="checkbox" name="correggi" value="${esc(x.p.id)}">
-        <span>${esc(x.p.nome)}: nell'app <b>${esc(x.p.codice_amway)}</b>, nel report <b>${esc(x.r.codice)}</b> · ${num(x.r.vpp)} VP</span></label>`).join("")}</div>`,
-      "Spunta chi va corretto con il codice del report: poi si aggiornano anche i suoi VPP.") : ""}
-    ${a.abbina.length ? sezione(`Senza codice, trovati per nome · ${a.abbina.length}`,
-      `<div class="scelte">${a.abbina.map(x => `<label><input type="checkbox" name="abbina" value="${esc(x.p.id)}" checked>
-        <span>${esc(x.p.nome)} = <b>${esc(x.r.nome)} ${esc(x.r.codice)}</b> · ${num(x.r.vpp)} VP</span></label>`).join("")}</div>`,
-      "Il codice del report viene salvato nell'app. Togli la spunta se non è la stessa persona.") : ""}
     ${a.mancanti.length ? sezione(`Non più nel report · ${a.mancanti.length}`,
       `${a.troppiMancanti ? `<p class="avviso">Mancano molte persone insieme: controlla di aver esportato <b>l'intera linea senza filtri</b>.
         Le caselle non sono spuntate: spunta solo chi sai che non c'è più.</p>` : ""}
@@ -1665,8 +1689,6 @@ function vImporta(){
       `<p class="small">${plur(a.usanoApp.length, "persona trovata", "persone trovate")} nel report.
         ${a.spostati.length ? `<br>Vanno sotto il loro sponsor del report: ${a.spostati.map(x => `<b>${esc(x.p.nome)}</b> (da ${esc(x.da)} a ${esc(x.a)})`).join(", ")}.` : ""}
         ${a.usanoAppMancanti.length ? `<br>Non sono nel report: ${a.usanoAppMancanti.map(p => esc(p.nome)).join(", ")}.` : ""}</p>`) : ""}
-    ${a.senzaCodice.length ? sezione(`Senza codice e non trovati · ${a.senzaCodice.length}`,
-      `<p class="small">${a.senzaCodice.map(p => esc(p.nome)).join(", ")}. Scrivi il loro codice nella scheda e reimporta.</p>`) : ""}
     <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
       <button class="btn primary grow"${st.occupato ? " disabled" : ""}>Importa</button></div>
   </form>`;
@@ -1697,23 +1719,28 @@ async function leggiFileReport(file){
 async function eseguiImport(f){
   const a = st.imp, io = st.profilo;
   const scelti = nome => new Set([...f.querySelectorAll(`input[name=${nome}]:checked`)].map(i => i.value));
-  const correggi = scelti("correggi"), abbina = scelti("abbina"), cancella = scelti("cancella"), aggiungi = scelti("aggiungi");
+  const cancella = scelti("cancella"), aggiungi = scelti("aggiungi");
   if(aggiungi.size && !f.consenso.checked){ mostraErroreForm(f, "Conferma di avere il consenso delle persone che aggiungi."); return; }
-  const daCodificare = a.codiceDiverso.filter(x => correggi.has(x.p.id)).concat(a.abbina.filter(x => abbina.has(x.p.id)));
-  /* le mie persone dopo l'import: già importate (anche quelle appena abbinate) e quelle spuntate */
-  const mie = a.aggiorna.concat(daCodificare).map(x => x.r).concat(a.nuovi.concat(a.esclusi).filter(r => aggiungi.has(r.codice)));
+  /* le mie persone dopo l'import: quelle già importate e quelle spuntate */
+  const mie = a.aggiorna.map(x => x.r).concat(a.nuovi.concat(a.esclusi).filter(r => aggiungi.has(r.codice)));
+  /* i numeri ufficiali di ognuno: VPP, VPG, percentuale e i VPG delle sue linee frontali del report
+     (se il report non mostra il suo gruppo, come per i Platino, le linee sono "nascoste") */
+  const figliReport = new Map();
+  for(const r of a.perCodice.values()) if(r.sponsor) figliReport.set(r.sponsor, (figliReport.get(r.sponsor) || []).concat([r]));
+  const numeri = r => r.vpg == null ? {} : { vpg:r.vpg, percentuale:r.perc,
+    linee:(figliReport.get(r.codice) || []).map(x => ({ codice:x.codice, vpg:x.vpg || 0 })),
+    nascoste:!figliReport.has(r.codice) && r.dimensione > 1 };
   const codiciMie = new Set(mie.map(r => r.codice));
   const attivi = new Set(a.usanoApp.map(x => x.r.codice));
   const profondita = r => { let n = 0; for(let c = r.sponsor; c && a.perCodice.has(c) && n < 200; c = a.perCodice.get(c).sponsor) n++; return n; };
-  const persone = mie.slice().sort((x, y) => profondita(x) - profondita(y)).map(r => ({ codice:r.codice, nome:r.nome, vpp:r.vpp,
-    sponsor:antenatoNelReport(r, a.perCodice, c => c === a.prima.codice || attivi.has(c) || codiciMie.has(c)) }));
-  const usanoApp = a.usanoApp.map(({ r }) => ({ codice:r.codice,
-    sponsor:antenatoNelReport(r, a.perCodice, c => c === a.prima.codice || attivi.has(c)) }));
+  const persone = mie.slice().sort((x, y) => profondita(x) - profondita(y)).map(r => Object.assign({ codice:r.codice, nome:r.nome, vpp:r.vpp,
+    sponsor:antenatoNelReport(r, a.perCodice, c => c === a.prima.codice || attivi.has(c) || codiciMie.has(c)) }, numeri(r)));
+  const usanoApp = a.usanoApp.map(({ r }) => Object.assign({ codice:r.codice, vpp:r.vpp,
+    sponsor:antenatoNelReport(r, a.perCodice, c => c === a.prima.codice || attivi.has(c)) }, numeri(r)));
   const esclusi = a.nuovi.filter(r => !aggiungi.has(r.codice)).map(r => r.codice);
   st.occupato = true;
   try{
-    for(const x of daCodificare) await api.impostaCodice(x.p.id, x.r.codice);
-    const esito = await api.importaRete({ p_mese:a.mese + "-01", p_io:{ codice:a.prima.codice, vpp:a.prima.vpp }, p_persone:persone,
+    const esito = await api.importaRete({ p_mese:a.mese + "-01", p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp }, numeri(a.prima)), p_persone:persone,
       p_attivi:usanoApp, p_esclusi:esclusi, p_cancella:a.mancanti.filter(p => cancella.has(p.id)).map(p => p.id) }) || {};
     if(a.codiceMio) st.profilo = Object.assign({}, io, { codice_amway:a.prima.codice });
     await caricaStruttura();
@@ -1770,6 +1797,25 @@ function vSheet(){
   }
   if(s === "storico") return vStorico();
   if(s === "importa") return vImporta();
+  if(s === "invito-sopra"){
+    const x = st.struttura.find(y => y.id === st.invitoSopra.id);
+    if(!x) return "";
+    if(st.invitoSopra.codice) return `<h2>Link per chi manca sopra di ${esc(nomeSaluto(x.nome))}</h2>
+      <p class="small">Mandalo alla persona che deve entrare tra ${esc(x.sponsor_id === st.profilo.id ? "voi" : nomeDi(x.sponsor_id))} e
+        ${esc(x.nome)}. Vale una volta sola.</p>
+      ${bottoniLink(base() + "#" + st.invitoSopra.codice)}
+      <button class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
+    const fratelli = st.struttura.filter(y => y.sponsor_id === x.sponsor_id && y.id !== x.id);
+    return `<h2>Chi manca sopra di ${esc(nomeSaluto(x.nome))}?</h2>
+    <p class="small">L'app crea un link valido una volta sola: chi lo apre entra tra ${esc(x.sponsor_id === st.profilo.id ? "voi" : nomeDi(x.sponsor_id))}
+      e ${esc(x.nome)}, che passa sotto di lui con tutto il suo gruppo.</p>
+    <form data-form="invito-sopra" novalidate>
+      ${fratelli.length ? `<div class="field" style="margin-top:14px"><span class="small">Facoltativo: anche altri sono in realtà suoi? Spunta solo se è così.</span>
+        <div class="scelte">${fratelli.map(y => `<label><input type="checkbox" name="altri" value="${esc(y.id)}"> ${esc(y.nome)}</label>`).join("")}</div></div>` : ""}
+      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
+        <button class="btn primary grow">Crea il link</button></div>${err}
+    </form>`;
+  }
   if(s === "nascoste") return `<h2>Nascoste dalla tua struttura</h2>
     <p class="small">Le vedi solo tu così: per gli altri non cambia niente, e i loro VP contano nel tuo gruppo.</p>
     <ul class="imp">${[...st.nascosti].filter(id => nomeDi(id)).map(id => `<li><span class="grow">${esc(nomeDi(id))}</span>
@@ -1779,9 +1825,9 @@ function vSheet(){
     const p = st.codiceId === st.profilo.id ? st.profilo : st.struttura.find(x => x.id === st.codiceId);
     if(!p) return "";
     const mio = p.id === st.profilo.id;
-    return `<h2>Codice Amway ${mio ? "Partner" : `di ${esc(nomeSaluto(p.nome))}`}</h2>
-    <p class="small">${mio ? "È il numero del tuo accesso al sito Amway." : "Lo trovi nel report della Linea di Sponsorizzazione sul sito Amway."}
-      Serve ad abbinare le persone quando importi il report.</p>
+    return `<h2>Correggi il codice Amway${mio ? "" : ` di ${esc(nomeSaluto(p.nome))}`}</h2>
+    <p class="small">Solo per un errore di battitura all'ingresso: il codice giusto è quello del report della
+      Linea di Sponsorizzazione sul sito Amway. Serve ad abbinare le persone quando si importa il report.</p>
     <form data-form="codice" novalidate>
       ${campoCodice(true, p.codice_amway)}
       ${piede}${err}
@@ -1930,6 +1976,8 @@ const AZIONI = {
   "totale-mese"(){ st.errore = ""; st.meseTotale = meseDi(oggi()); st.sheet = "totale-mese"; render(); focusSheet(); },
   "scegli-mese"(el){ st.meseTotale = el.value; render(); },
   importa(){ st.imp = null; st.errore = ""; st.sheet = "importa"; render(); },
+  "invito-sopra"(el){ st.invitoSopra = { id:el.dataset.id, codice:null }; st.errore = ""; st.sheet = "invito-sopra"; render(); },
+  "copia-link"(el){ copiaTesto(el.dataset.link, "Link copiato"); },
   /* pulsanti rapidi dell'import: agiscono sulle caselle "Non ancora nell'app" senza ridisegnare il foglio;
      il pulsante usato resta acceso finché non si cambia una casella a mano */
   "spunta-vpp"(el){ sceltaRapida(el, i => i.dataset.vpp === "1"); },
@@ -2131,6 +2179,11 @@ const AZIONI = {
 function focusSheet(){ const i = document.querySelector(".sheet input"); if(i) setTimeout(() => i.focus(), 30); }
 
 const MODULI = {
+  async "invito-sopra"(f){
+    const altri = [...f.querySelectorAll("input[name=altri]:checked")].map(i => i.value);
+    try{ st.invitoSopra.codice = await api.creaInvitoSopra(st.invitoSopra.id, altri); render(); }
+    catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
   importa(f){ return eseguiImport(f); },
   async codice(f){
     const codice = soloCifre(f.codice_amway.value);

@@ -251,6 +251,25 @@ Formato del CSV Amway: UTF-8 con BOM, virgole; riga 1 avviso di riservatezza; ri
 riga 3 le intestazioni; colonne usate "Qualifica Amway Partner" (= livello), "Codice Amway Partner Sponsor",
 "Codice Amway Partner", "Nome", "VPP"; numeri "9.282,49" o "20996.38" con l'apostrofo davanti.
 
+## Platino, inviti degli admin e numeri ufficiali (17 ottobre, dopo il primo import vero)
+
+Decisioni di Stefano:
+- **Gruppi dei Platino**: il report Amway non mostra chi sta sotto un Platino (es. Barbara Chiarle). Solo gli admin
+  hanno nella scheda **Invita sotto questa persona** (link d'invito di quella persona, anche se importata) e
+  **Invita chi manca sopra** (link speciale monouso: chi entra va tra lo sponsor e la persona, che passa sotto di lui).
+- **Numeri ufficiali dal report per tutti gli importati** (e per sé): VPP, VPG, percentuale e i VPG delle linee frontali;
+  pagina Io, struttura, scheda e storico usano questi; **la qualifica si calcola sulla struttura del report**.
+  Barbara aveva VPG 0 nell'app perché il suo gruppo non è nel report: ora mostra 5.226,77 e 15%.
+- **Codice Amway**: nessuno lo modifica (viene dal report o dall'ingresso); solo gli admin lo **correggono** dalla scheda
+  (errore di battitura all'ingresso); l'import lo segnala ("chiedi a Stefano e Alessia di correggerlo").
+- Tolti dall'import gli abbinamenti per nome (servivano solo per le persone inserite a mano, cancellate da Stefano).
+- Il pulsante di scelta rapida usato resta acceso (PR #39); ricerca per nome o codice anche tra le escluse (PR #40).
+- **`ADMIN.md`**: elenco di tutto quello che può fare un admin e come si nomina un nuovo admin.
+
+Com'è fatto: migrazione `017_inviti_e_numeri_report.sql` (tabelle `inviti_admin` e `numeri_report`, `struttura_visibile()`
+"ricucita", `calcola_mese` sulla struttura ricucita, `qualifica_report`, `riepilogo_mese` con i numeri del report,
+`crea_invito_sopra`, `imposta_codice_amway` solo admin). **Da incollare nell'SQL Editor** insieme all'unione della PR.
+
 ## Proposte in sospeso (Stefano non ha ancora risposto)
 
 - Captcha prima del lancio (punto 4 sopra).
