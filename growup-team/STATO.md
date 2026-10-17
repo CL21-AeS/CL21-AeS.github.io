@@ -11,9 +11,8 @@ GitHub ripulita dai dati reali, codice d'invito della radice rigenerato. Protezi
 Turnstile** (nell'app e acceso in Supabase, provato sul telefono), limite 30 accessi anonimi/ora per rete, provider
 Email spento in Supabase. Account Cloudflare di Stefano con verifica in due passaggi. Ultime PR unite: #44, #45, #46.
 
-**Da verificare con Stefano alla ripresa** (non confermati in chat):
-- migrazione `018_niente_cancellazioni.sql` incollata nell'SQL Editor e CSV reimportato;
-- app che funziona sul telefono con la Content Security Policy (PR #43) — il captcha visto sul telefono fa pensare di sì.
+**Confermato da Stefano**: migrazione `018_niente_cancellazioni.sql` applicata; l'app funziona sul telefono con la
+Content Security Policy e il captcha.
 
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
