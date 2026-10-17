@@ -50,12 +50,13 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 9. `supabase/012_preferiti.sql` — le persone che ognuno segna come preferite per seguirle da vicino
 10. `supabase/013_obiettivo.sql` — il primo obiettivo di ognuno (cifra al mese, entro quando, perché)
 11. `supabase/014_copia_dati.sql` — la copia di sicurezza dei dati (solo admin)
-12. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
-13. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
-14. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
+12. `supabase/015_codice_amway.sql` — il codice Amway Partner di ognuno e l'import dei VPP dal report Amway (CSV)
+13. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+14. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
+15. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
 
-In alternativa ai punti 1-12: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
+In alternativa ai punti 1-13: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
 I file `004_*` e `005_*` servono solo al progetto già installato: il loro contenuto è già dentro 001-003.
 
 ## 3. Attivare l'accesso senza email
@@ -130,6 +131,21 @@ gratuito **non fa copie automatiche**. Per questo, una volta al mese:
 ripristinare i dati in Supabase. Ogni tabella del file corrisponde a una tabella del database (le migrazioni in
 `supabase/` ricreano la struttura vuota). I telefoni si ricollegano aprendo i link personali, che restano validi
 perché nella copia c'è l'impronta delle chiavi.
+
+## Importare i VPP dal report Amway
+
+Ognuno importa il report della **propria** linea, quando vuole (pagina Io → Il mio mese → **Importa dal report Amway**).
+1. Sul sito Amway: Business Centre → **Linea di Sponsorizzazione (LOS)** → togliere i filtri → pulsante di download →
+   **Intera Linea di Sponsorizzazione con tutti i KPI disponibili** → formato **CSV**.
+2. Nell'app scegliere il file: l'anteprima mostra chi si aggiorna (tu e le persone senza app che gestisci), chi ha
+   lo stesso nome ma un codice diverso (si spunta per correggere), chi è senza codice ma trovato per nome, chi non è
+   più nel report (già spuntato per la cancellazione; non spuntato se mancano molte persone insieme), chi usa l'app
+   (mai toccato) e chi è nel report ma non nell'app (solo informazione).
+3. **Importa**. Si importa il mese scritto nel file: quello in corso (anche più volte, i valori si sostituiscono) o il
+   precedente fino al giorno 5. Il file resta sul telefono: al database arrivano solo codice e VPP.
+
+Il codice Amway Partner è obbligatorio quando si aggiunge una persona a mano, facoltativo all'ingresso dal link d'invito;
+si corregge dalla scheda (persone senza app) o in fondo alla pagina Io (il proprio).
 
 ## Com'è fatta
 
