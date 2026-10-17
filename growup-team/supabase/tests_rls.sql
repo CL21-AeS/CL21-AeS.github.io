@@ -407,6 +407,61 @@ begin
                          'con D spariscono attività, storico e telefoni collegati');
   k := e;
 
+  -- ---- Numeri ufficiali dal report e Platino (017) ----
+  perform growup_test.come(u1);  -- R importa: P (Platino, gruppo nascosto) sotto A
+  perform public.importa_rete(current_date,
+    '{"codice":"1000000","vpp":120,"vpg":9282.49,"percentuale":18,"linee":[{"codice":"2000001","vpg":3173},{"codice":"2000003","vpg":2905},{"codice":"9000001","vpg":1528}]}',
+    '[{"codice":"4000001","nome":"Barbara Platino","sponsor":"2000001","vpp":0,"vpg":5226.77,"percentuale":15,"linee":[],"nascoste":true}]',
+    '[{"codice":"2000001","sponsor":"1000000","vpg":3173,"percentuale":12,"linee":[]}]', '{}', '{}');
+  h := (select id from public.partners where codice_amway = '4000001');
+  select * into x from public.riepilogo_mese(current_date) where partner_id = r;
+  perform growup_test.ok(x.da_report and x.vp_gruppo = 9282.49 and x.percentuale = 18 and x.linee_attive = 3,
+                         'R: VPG, percentuale e linee dal report');
+  perform growup_test.ok(x.qualifica = 'foundation_12', 'R: qualifica calcolata sulla struttura del report (' || coalesce(x.qualifica, '-') || ')');
+  select * into x from public.riepilogo_mese(current_date) where partner_id = h;
+  perform growup_test.ok(x.vp_gruppo = 5226.77 and x.percentuale = 15 and x.linee_nascoste, 'Platino: VPG ufficiale, linee nascoste');
+  select * into x from public.riepilogo_mese(current_date) where partner_id = a;
+  perform growup_test.ok(x.vp_gruppo = 3173 and x.percentuale = 12, 'R vede i numeri ufficiali di A');
+  perform growup_test.come(u5);  -- A non ha importato quei numeri: per lei restano i suoi
+  perform growup_test.ok(not (select da_report from public.riepilogo_mese(current_date) where partner_id = a), 'A: numeri calcolati, il report è di R');
+  perform growup_test.ok((select count(*) from public.numeri_report) = 0, 'A non legge i numeri importati da R');
+
+  -- ---- Inviti degli admin: sotto una persona importata, e "chi manca sopra" ----
+  perform growup_test.come(u1);
+  k_e := (select codice_invito from public.partners where id = h);
+  execute 'reset role';
+  insert into auth.users (id, aud, role) select ('00000000-0000-0000-0000-0000000000c' || i)::uuid, 'authenticated', 'authenticated'
+  from generate_series(1, 3) i;
+  perform growup_test.come('00000000-0000-0000-0000-0000000000c1');
+  f := (public.entra_con_invito(k_e, 'Nora Sotto', '4000002')->'profilo'->>'id')::uuid;
+  execute 'reset role';
+  perform growup_test.ok((select sponsor_id from public.partners where id = f) = h, 'N entra sotto il Platino importato da R');
+  perform growup_test.come(u1);
+  perform growup_test.ok((select sponsor_id from public.struttura_visibile() where id = f) = h, 'R vede N sotto il Platino');
+  perform growup_test.come(u5);  -- A non vede il Platino (importato da R): N è sotto A
+  perform growup_test.ok((select sponsor_id from public.struttura_visibile() where id = f) = a
+                         and not exists (select 1 from public.struttura_visibile() where id = h), 'A vede N sotto di sé, struttura ricucita');
+  perform growup_test.ok(exists (select 1 from public.riepilogo_mese(current_date) where partner_id = f and sponsor_id = a), 'i numeri di A contano N');
+  perform growup_test.deve_fallire(format('select public.crea_invito_sopra(%L)', f), 'A non crea inviti speciali (non è admin)');
+  perform growup_test.come(u1);
+  k_e := public.crea_invito_sopra(f);
+  perform growup_test.come(null);
+  perform growup_test.ok(public.sponsor_da_codice(k_e) = 'Barbara Platino', 'il link speciale mostra lo sponsor');
+  perform growup_test.come('00000000-0000-0000-0000-0000000000c2');
+  g := (public.entra_con_invito(k_e, 'Mirco Mezzo', '4000003')->'profilo'->>'id')::uuid;
+  execute 'reset role';
+  perform growup_test.ok((select sponsor_id from public.partners where id = g) = h and (select sponsor_id from public.partners where id = f) = g,
+                         'M entra tra il Platino e N');
+  perform growup_test.come('00000000-0000-0000-0000-0000000000c3');
+  perform growup_test.deve_fallire(format($q$select public.entra_con_invito(%L, 'Altro', '4000004')$q$, k_e), 'il link speciale vale una volta sola');
+
+  -- ---- Il codice Amway lo corregge solo un admin ----
+  perform growup_test.come(u5);  -- A
+  perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', a, '2000011'), 'A non cambia il suo codice');
+  perform growup_test.come(u1);  -- R admin
+  perform growup_test.ok(public.imposta_codice_amway(a, '2000011')->>'codice_amway' = '2000011', 'l''admin corregge il codice di A');
+  perform public.imposta_codice_amway(a, '2000001');
+
   -- ---- Preferiti: solo persone del proprio gruppo, visibili solo a chi li ha segnati ----
   perform growup_test.come(u5);  -- A
   insert into public.preferiti (partner_id, preferito_id) values (a, b);
@@ -444,7 +499,7 @@ begin
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');
   perform growup_test.come(u1);  -- R admin
-  perform growup_test.ok((select count(*) from jsonb_object_keys(public.copia_dati()->'tabelle')) = 12
+  perform growup_test.ok((select count(*) from jsonb_object_keys(public.copia_dati()->'tabelle')) = 14
                          and jsonb_array_length(public.copia_dati()->'tabelle'->'partners') >= 3, 'l''admin scarica la copia con tutte le tabelle');
   execute 'reset role';
 
