@@ -660,8 +660,8 @@ function vPrivacyPrimo(){
 /* Due pagine, scelte dal selettore in alto a destra: "Io" e "Gruppo". */
 function vSelettore(){
   return `<div class="schede" role="tablist" aria-label="Pagina">
-    <button role="tab" aria-selected="${st.vista === "io"}" class="${st.vista === "io" ? "on" : ""}" data-act="vista-io">Io</button>
     <button role="tab" aria-selected="${st.vista === "obiettivo"}" class="${st.vista === "obiettivo" ? "on" : ""}" data-act="vista-obiettivo">Obiettivo</button>
+    <button role="tab" aria-selected="${st.vista === "io"}" class="${st.vista === "io" ? "on" : ""}" data-act="vista-io">Io</button>
     <button role="tab" aria-selected="${st.vista === "gruppo" || st.vista === "scheda"}" class="${st.vista === "gruppo" || st.vista === "scheda" ? "on" : ""}" data-act="vista-gruppo">Gruppo</button>
   </div>`;
 }
@@ -2057,10 +2057,11 @@ document.addEventListener("touchend", e => {
   const t = e.changedTouches[0], dx = t.clientX - tocco.x, dy = t.clientY - tocco.y, ms = Date.now() - tocco.quando;
   tocco = null;
   if(Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8 || ms > 800) return;
-  if(dx < 0 && st.vista === "io") scorri("vista-obiettivo", "da-destra");
-  else if(dx < 0 && st.vista === "obiettivo") scorri("vista-gruppo", "da-destra");
-  else if(dx > 0 && st.vista === "obiettivo") scorri("vista-io", "da-sinistra");
-  else if(dx > 0 && st.vista === "gruppo") scorri("vista-obiettivo", "da-sinistra");
+  /* ordine delle pagine: Obiettivo | Io | Gruppo */
+  if(dx < 0 && st.vista === "obiettivo") scorri("vista-io", "da-destra");
+  else if(dx < 0 && st.vista === "io") scorri("vista-gruppo", "da-destra");
+  else if(dx > 0 && st.vista === "io") scorri("vista-obiettivo", "da-sinistra");
+  else if(dx > 0 && st.vista === "gruppo") scorri("vista-io", "da-sinistra");
   else if(dx > 0 && st.vista === "scheda") scorri("vista-gruppo", "da-sinistra");
 }, { passive:true });
 function scorri(azione, verso){
