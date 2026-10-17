@@ -432,6 +432,24 @@ begin
   delete from public.preferiti where preferito_id = b;
   perform growup_test.ok((select count(*) from public.preferiti) = 0, 'A toglie B dai preferiti');
 
+  -- ---- Il primo obiettivo: lo scrive solo la persona; l'upline vede cifra e data, non il perché ----
+  perform growup_test.come(u3);  -- B
+  insert into public.obiettivi (partner_id, cifra_mese, entro, perche) values (b, 360, current_date + 180, 'Per la famiglia');
+  perform growup_test.ok((select perche from public.obiettivi) = 'Per la famiglia', 'B scrive e legge il suo obiettivo');
+  update public.obiettivi set cifra_mese = 400 where partner_id = b;
+  perform growup_test.ok((select cifra_mese from public.obiettivi) = 400, 'B corregge il suo obiettivo');
+  perform growup_test.come(u5);  -- A, sponsor di B
+  perform growup_test.ok((select count(*) from public.obiettivi) = 0, 'A non legge la tabella degli obiettivi di B');
+  perform growup_test.ok((select cifra_mese from public.obiettivi_gruppo() where partner_id = b) = 400, 'A vede la cifra di B con obiettivi_gruppo()');
+  perform growup_test.deve_fallire(format('insert into public.obiettivi (partner_id, cifra_mese, entro) values (%L, 100, current_date)', b), 'A non scrive l''obiettivo di B');
+  update public.obiettivi set cifra_mese = 1 where partner_id = b;
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.ok(not exists (select 1 from public.obiettivi_gruppo() where partner_id = b), 'C non vede l''obiettivo di B');
+  execute 'reset role';
+  perform growup_test.ok((select cifra_mese from public.obiettivi where partner_id = b) = 400, 'A non ha cambiato l''obiettivo di B');
+  perform growup_test.ok(not exists (select 1 from pg_proc where proname = 'obiettivi_gruppo' and 'perche' = any(proargnames)),
+                         'obiettivi_gruppo non restituisce il perché');
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),
