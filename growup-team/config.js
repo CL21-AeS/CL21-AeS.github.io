@@ -5,5 +5,8 @@
    MAI la chiave service_role o qualsiasi altra chiave segreta: il repository è pubblico. */
 window.GROWUP_CONFIG = {
   supabaseUrl: "https://mxpuvmggexjyieylmfss.supabase.co",
-  supabaseKey: "sb_publishable_4OGHTbJBMGDoonaKsDp_HQ_b3eCkAfo"
+  supabaseKey: "sb_publishable_4OGHTbJBMGDoonaKsDp_HQ_b3eCkAfo",
+  /* captcha Cloudflare Turnstile: la "Site Key" è pubblica, fatta per stare nel browser.
+     La "Secret Key" sta solo in Supabase (Authentication → Attack Protection), mai qui. */
+  turnstileSiteKey: "0x4AAAAAAFZnCfIFUCJqHKad"
 };

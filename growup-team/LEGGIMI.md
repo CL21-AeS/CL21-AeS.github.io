@@ -70,10 +70,14 @@ I file `004_*` e `005_*` servono solo al progetto già installato: il loro conte
 **Authentication → Sign In / Providers**:
 
 - **Allow anonymous sign-ins: ON** (è quello che permette di entrare con il solo link)
-- Le email non servono: non c'è niente da configurare per l'invio di email.
+- Le email non servono: provider **Email spento** (nessuno può creare account con email e password).
 
 **Authentication → Rate Limits**: il limite *anonymous sign-ins* è per indirizzo IP, di default 30 all'ora.
 Se fate entrare molte persone insieme alla stessa serata, sulla stessa rete Wi-Fi, alzatelo (per esempio a 100).
+
+**Authentication → Attack Protection → Captcha protection**: Cloudflare Turnstile. Nell'app c'è la *Site Key*
+(pubblica, in `config.js`); in Supabase va la *Secret Key* (dal pannello Turnstile di Cloudflare, widget
+"Growup Team", hostname `cl21-aes.github.io`). Il captcha compare solo al primo ingresso di un telefono.
 
 ## 4. Indirizzi consentiti
 

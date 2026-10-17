@@ -44,7 +44,10 @@ dice diversamente. Gli esempi concreti stanno nei file di `growup-team/` citati 
   ognuno si manda su WhatsApp o Telegram. Supabase con **accessi anonimi** + tabella `accessi` che collega il
   telefono al profilo. Nel database solo l'**impronta** (sha256) della chiave, mai la chiave.
 - Su iPhone l'app sulla Home ha memoria separata da Safari: serve "Incolla il link personale" al primo avvio.
-- Prima del lancio pubblico: captcha (Cloudflare Turnstile) e limite degli accessi anonimi più alto.
+- Prima del lancio pubblico: captcha Cloudflare Turnstile sul primo accesso anonimo (`controlloSicurezza()` in
+  `app.js`: il gettone va a `signInAnonymously({ options:{ captchaToken } })`; CSP con `challenges.cloudflare.com`
+  in `script-src` e `frame-src`), limite degli accessi anonimi, provider Email spento. Ordine: prima la PR con il
+  captcha nell'app, poi lo si accende in Supabase (al contrario nessuno entrerebbe).
 
 ### Sicurezza (non negoziabile)
 - **Row Level Security su ogni tabella**; nel codice **solo la chiave publishable**, mai la secret/service_role.

@@ -8,8 +8,9 @@ al database e prima del lancio a tutto il gruppo.
 | Dove | Protezione |
 |---|---|
 | **Supabase (database, UE)** | Row Level Security attiva su **tutte** le tabelle; chi non ha un profilo non legge niente. Ognuno vede sé, chi usa l'app nella propria downline e le persone importate da lui; mai chi sta sopra o di lato. Le scritture delicate passano solo da funzioni che controllano chi le chiama. Nessuna tabella è leggibile senza accesso; l'unica funzione aperta a chi non è entrato è `sponsor_da_codice` (il nome di chi invita, per la pagina d'ingresso). Nessun file caricato (storage vuoto). |
+| **Captcha** | Cloudflare Turnstile al primo ingresso di un telefono: niente programmi che creano accessi finti a migliaia. La Site Key (pubblica) è in `config.js`; la Secret Key solo in Supabase → Authentication → Attack Protection. Limite di 30 accessi anonimi all'ora per indirizzo; provider Email spento. |
 | **Accesso** | Niente password: link personale con una chiave casuale di 128 bit (nel database solo l'impronta sha256, non reversibile). Il link si toglie dalla barra degli indirizzi appena letto. |
-| **App (GitHub Pages)** | Content Security Policy: il browser esegue solo il codice dell'app e la libreria Supabase (con controllo di integrità) e si collega solo al nostro progetto. Ogni testo che viene dal database è "sterilizzato" prima di essere mostrato (provato con un nome contenente codice HTML). La cache del telefono tiene solo l'app, mai i dati. `no-referrer`: i link non rivelano da dove si arriva. |
+| **App (GitHub Pages)** | Content Security Policy: il browser esegue solo il codice dell'app, la libreria Supabase (con controllo di integrità) e il captcha di Cloudflare, e si collega solo al nostro progetto. Ogni testo che viene dal database è "sterilizzato" prima di essere mostrato (provato con un nome contenente codice HTML). La cache del telefono tiene solo l'app, mai i dati. `no-referrer`: i link non rivelano da dove si arriva. |
 | **Report Amway (CSV)** | Si legge sul telefono, non viene caricato da nessuna parte; al database arrivano solo nome, codice e numeri di chi si importa. |
 | **GitHub (pubblico)** | Contiene solo codice: nessuna chiave segreta (in `config.js` c'è solo la chiave pubblica, fatta per stare nel browser), nessun dato reale nei file (i test usano nomi e codici inventati). |
 | **Niente cancellazioni** | Dall'app nessuno può cancellare persone (neanche gli admin): si possono solo nascondere. La cancellazione per diritto all'oblio si fa dall'SQL Editor (`ADMIN.md`). |
@@ -27,8 +28,9 @@ al database e prima del lancio a tutto il gruppo.
 
 ## Da fare (decisioni e impostazioni)
 
-- [ ] Prima del lancio: **captcha** (Cloudflare Turnstile) sugli accessi anonimi e **limite** "anonymous sign-ins"
-      in Supabase → Authentication → Rate Limits.
+- [x] Limite "anonymous sign-ins" (30/ora per indirizzo) e provider Email spento in Supabase.
+- [x] Captcha nell'app; account Cloudflare con verifica in due passaggi.
+- [ ] Accendere il captcha in Supabase → Authentication → Attack Protection (Turnstile + Secret Key).
 - [ ] **Verifica in due passaggi** sugli account GitHub, Supabase e Google (Drive delle copie).
 - [ ] Copie di sicurezza in una cartella **privata** di Google Drive.
 - Rischio residuo noto: chi ha un link d'invito di qualcuno sopra una persona importata **e** conosce il suo codice

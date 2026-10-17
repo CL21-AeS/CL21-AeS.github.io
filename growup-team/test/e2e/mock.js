@@ -22,7 +22,9 @@
     while(s && s.stato === "gestito" && s.sponsor_id) s = db.partners.find(x => x.id === s.sponsor_id); return s ? s.id : p.sponsor_id; };
   window.GROWUP_API = {
     session: async () => session,
-    signInAnon: async () => { if(db.anonDisattivo) throw new Error("Anonymous sign-ins are disabled");
+    signInAnon: async token => { if(db.anonDisattivo) throw new Error("Anonymous sign-ins are disabled");
+      if(!token) throw new Error("captcha protection: request disallowed (no captcha response)");
+      db.captcha = token;
       session = { user:{ id:"anon-" + uid() } }; localStorage.setItem("mock.session", JSON.stringify(session)); db.anon++; salva(); },
     signOut: async () => { session = null; localStorage.removeItem("mock.session"); },
     sponsorName: async c => { const i = (db.invitiAdmin || []).find(x => x.codice === c && !x.usato);

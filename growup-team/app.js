@@ -34,7 +34,7 @@ function creaApi(){
   const q = async p => { const { data, error } = await p; if(error) throw error; return data; };
   return {
     session:      async () => (await sb.auth.getSession()).data.session,
-    signInAnon:   () => q(sb.auth.signInAnonymously()),
+    signInAnon:   captchaToken => q(sb.auth.signInAnonymously(captchaToken ? { options:{ captchaToken } } : undefined)),
     signOut:      () => sb.auth.signOut(),
     sponsorName:  codice => q(sb.rpc("sponsor_da_codice", { p_codice:codice })),
     collega:      () => q(sb.rpc("collega_profilo")),
@@ -186,6 +186,7 @@ const MESSAGGI_ERRORE = {
 function messaggio(e){
   const m = (e && (e.message || e.error_description || e.msg)) || String(e || "");
   for(const k in MESSAGGI_ERRORE) if(m.includes(k)) return MESSAGGI_ERRORE[k];
+  if(/captcha/i.test(m)) return "Il controllo di sicurezza non è riuscito. Ricarica la pagina e riprova.";
   if(/anonymous/i.test(m)) return "L'accesso senza email non è ancora attivo su Supabase (vedi LEGGIMI, punto 3).";
   if(/rate|too many|seconds/i.test(m)) return "Troppi ingressi ravvicinati dalla stessa rete: aspetta qualche minuto e riprova.";
   if(/fetch|network|failed/i.test(m)) return "Sembra che manchi la connessione. Riprova tra poco.";
@@ -437,8 +438,41 @@ async function aggiornaAttivita(){
 async function sessione(){
   const s = await api.session();
   if(s) return s;
-  await api.signInAnon();
+  await api.signInAnon(await controlloSicurezza());
   return api.session();
+}
+
+/* Captcha Cloudflare Turnstile: solo quando un telefono entra la prima volta (nuovo accesso anonimo).
+   Così nessun programma può creare migliaia di accessi finti. Supabase controlla il gettone. */
+const TURNSTILE = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+let turnstilePronto = null;
+function caricaTurnstile(){
+  if(window.turnstile) return Promise.resolve(window.turnstile);
+  if(!turnstilePronto) turnstilePronto = new Promise((ok, ko) => {
+    const s = document.createElement("script");
+    s.src = TURNSTILE; s.async = true;
+    s.onload = () => window.turnstile ? ok(window.turnstile) : ko(new Error("captcha_non_caricato"));
+    s.onerror = () => { turnstilePronto = null; ko(new Error("captcha_non_caricato")); };
+    document.head.appendChild(s);
+  });
+  return turnstilePronto;
+}
+async function controlloSicurezza(){
+  if(!CFG.turnstileSiteKey) return null;
+  const ts = await caricaTurnstile();
+  return new Promise((ok, ko) => {
+    const velo = document.createElement("div");
+    velo.className = "captcha";
+    velo.innerHTML = '<div class="captcha-box"><b>Un attimo</b><p>Controllo di sicurezza, solo al primo ingresso.</p><div class="captcha-widget"></div></div>';
+    document.body.appendChild(velo);
+    const fine = (f, v) => { velo.remove(); f(v); };
+    ts.render(velo.querySelector(".captcha-widget"), {
+      sitekey: CFG.turnstileSiteKey, language: "it", action: "ingresso",
+      callback: t => fine(ok, t),
+      "error-callback": () => fine(ko, new Error("captcha_non_riuscito")),
+      "expired-callback": () => fine(ko, new Error("captcha_scaduto"))
+    });
+  });
 }
 
 async function vaiHome(profilo){

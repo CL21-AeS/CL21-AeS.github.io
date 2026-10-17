@@ -20,6 +20,9 @@ const browser = await chromium.launch();
 async function apri(ctxOpts, hash){
   const ctx = await browser.newContext(Object.assign({ viewport:{width:390,height:844}, locale:"it-IT", timezoneId:"Europe/Rome", bypassCSP:true }, ctxOpts));
   await ctx.route(/cdn\.jsdelivr\.net/, r => r.abort());
+  /* captcha finto: risponde subito con un gettone di prova (o con un errore se DB.captchaKo) */
+  await ctx.route(/challenges\.cloudflare\.com/, r => r.fulfill({ contentType:"text/javascript", body:
+    "window.turnstile={render:function(el,o){el.textContent='captcha';setTimeout(function(){window.__DB.captchaKo?o['error-callback']():o.callback('tok-prova')},50)}};" }));
   const page = await ctx.newPage();
   page.on("console", m => { if(m.type() === "error" && !/jsdelivr|ERR_FAILED|Failed to load resource/.test(m.text())) errori.push(m.text()); });
   page.on("pageerror", e => errori.push(String(e)));
