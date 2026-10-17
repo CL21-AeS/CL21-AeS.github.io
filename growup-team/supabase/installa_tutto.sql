@@ -1,8 +1,8 @@
 -- ============================================================
--- Growup Team — INSTALLAZIONE COMPLETA (001 + 002 + 003 + 006 + 007 + 008 + 009 + 010 + 011 + 012 + 013 in un file solo)
+-- Growup Team — INSTALLAZIONE COMPLETA (001 + 002 + 003 + 006 + 007 + 008 + 009 + 010 + 011 + 012 + 013 + 014 in un file solo)
 -- Incolla tutto nell'SQL Editor di Supabase e premi Run, una volta sola.
 -- Alla fine compaiono DUE LINK: copiali subito (il link personale si vede solo ora).
--- Generato da 001_schema.sql, 002_rls.sql, 003_seed.sql, 006_fase2_calcoli.sql, 007_fase2_gestiti.sql, 008_inserisci_in_mezzo.sql, 009_cancella_e_sposta.sql, 010_etichette.sql, 011_cambia_sponsor_nel_gruppo.sql, 012_preferiti.sql, 013_obiettivo.sql: si modificano quelli.
+-- Generato da 001_schema.sql, 002_rls.sql, 003_seed.sql, 006_fase2_calcoli.sql, 007_fase2_gestiti.sql, 008_inserisci_in_mezzo.sql, 009_cancella_e_sposta.sql, 010_etichette.sql, 011_cambia_sponsor_nel_gruppo.sql, 012_preferiti.sql, 013_obiettivo.sql, 014_copia_dati.sql: si modificano quelli.
 -- ============================================================
 
 -- ============================================================
@@ -1321,6 +1321,46 @@ $$;
 
 revoke execute on function public.obiettivi_gruppo() from public, anon, authenticated;
 grant execute on function public.obiettivi_gruppo() to authenticated;
+
+-- ============================================================
+-- Growup Team — 014: copia di sicurezza dei dati
+-- Il piano gratuito di Supabase non fa copie automatiche. copia_dati() restituisce in un solo file (JSON)
+-- tutte le tabelle dell'app: dall'app, Stefano e Alessia (admin) la scaricano con "Copia dei dati" una volta
+-- al mese e la conservano (Google Drive). I collegamenti dei telefoni (accessi) non servono: si rientra con i link.
+-- ============================================================
+
+create or replace function public.copia_dati()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not public.sono_admin() then
+    raise exception 'non_autorizzato';
+  end if;
+  return jsonb_build_object(
+    'app', 'Growup Team',
+    'creata_il', now(),
+    'tabelle', jsonb_build_object(
+      'partners',           coalesce((select jsonb_agg(to_jsonb(t) order by t.creato_il) from public.partners t), '[]'),
+      'activities',         coalesce((select jsonb_agg(to_jsonb(t)) from public.activities t), '[]'),
+      'goals',              coalesce((select jsonb_agg(to_jsonb(t)) from public.goals t), '[]'),
+      'monthly_goals',      coalesce((select jsonb_agg(to_jsonb(t)) from public.monthly_goals t), '[]'),
+      'monthly_totals',     coalesce((select jsonb_agg(to_jsonb(t)) from public.monthly_totals t), '[]'),
+      'obiettivi',          coalesce((select jsonb_agg(to_jsonb(t)) from public.obiettivi t), '[]'),
+      'preferiti',          coalesce((select jsonb_agg(to_jsonb(t)) from public.preferiti t), '[]'),
+      'settings',           coalesce((select jsonb_agg(to_jsonb(t)) from public.settings t), '[]'),
+      'stage_requirements', coalesce((select jsonb_agg(to_jsonb(t) order by t.ordine) from public.stage_requirements t), '[]'),
+      'percent_levels',     coalesce((select jsonb_agg(to_jsonb(t)) from public.percent_levels t), '[]')
+    )
+  );
+end;
+$$;
+
+revoke execute on function public.copia_dati() from public, anon, authenticated;
+grant execute on function public.copia_dati() to authenticated;
 
 -- ============================================================
 -- Growup Team — 010: Fase 2, blocco 3 — soglie delle etichette del gruppo

@@ -16,6 +16,7 @@ const CHIAVE_INVITO = "growup-team.invito";
 const CHIAVE_LOCALE = "growup-team.chiave";
 const CHIAVE_SALVATA = "growup-team.chiave-salvata";
 const CHIAVE_INSTALLA_NO = "growup-team.installa-no";
+const CHIAVE_ULTIMA_COPIA = "growup-team.ultima-copia";
 const FORMA_CODICE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
 const FORMA_CHIAVE = /^[0-9a-f]{32}$/;
 const PIN = [3, 6, 9, 12, 15, 18, 21];   // percentuali raggiungibili anche senza qualifica Bronze
@@ -48,6 +49,7 @@ function creaApi(){
     inMezzo:      args => q(sb.rpc("inserisci_in_mezzo", args)),
     cancella:     pid => q(sb.rpc("cancella_partner", { p_partner:pid })),
     preferiti:    () => q(sb.from("preferiti").select("preferito_id")),
+    copiaDati:    () => q(sb.rpc("copia_dati")),
     /* il primo obiettivo: il proprio per intero; del gruppo solo cifra e data (il perché resta personale) */
     obiettivo:    pid => q(sb.from("obiettivi").select("cifra_mese,entro,perche").eq("partner_id", pid).maybeSingle()),
     salvaObiettivo: o => q(sb.from("obiettivi").upsert(o)),
@@ -667,6 +669,15 @@ function vSelettore(){
 }
 
 /* In fondo a ogni pagina: link personale, privacy, uscita (prima stavano nel menu ⋯). */
+/* Copia di sicurezza (solo admin): un file con tutti i dati, da scaricare una volta al mese e tenere su Google Drive */
+function vCopiaDati(){
+  const ultima = leggiLocale(CHIAVE_ULTIMA_COPIA), giorni = ultima ? giorniTra(ultima, oggi()) : null;
+  return `<div class="copia-dati">
+    <button class="btn small" data-act="copia-dati">Scarica la copia dei dati</button>
+    <p class="nota" style="margin:6px 0 0">${ultima ? `Ultima copia da questo telefono: ${dataIt(ultima)}${giorni > 35 ? " · è passato più di un mese" : ""}.`
+      : "Nessuna copia scaricata da questo telefono."} Una volta al mese, dopo la chiusura del giorno 5.</p>
+  </div>`;
+}
 function vFondo(){
   return `<div class="fondo">
     <div class="row wrap" style="justify-content:center">
@@ -675,6 +686,7 @@ function vFondo(){
       ${puoInstallare() && leggiLocale(CHIAVE_INSTALLA_NO) === "1" ? `<button class="btn small ghost" data-act="installa-si">Installa l'app</button>` : ""}
       <button class="btn small ghost" data-act="esci">Esci</button>
     </div>
+    ${st.profilo.is_admin ? vCopiaDati() : ""}
     <p class="nota" style="text-align:center">${esc(st.profilo.nome)} · codice d'invito <b>${esc(st.profilo.codice_invito)}</b><br>
       Per cancellare il profilo e i tuoi dati scrivi a Stefano e Alessia.</p>
   </div>`;
@@ -1687,6 +1699,18 @@ const AZIONI = {
   "vista-obiettivo"(){ st.vista = "obiettivo"; st.target = null; render(); window.scrollTo(0, 0); },
   "obiettivo-modifica"(){ st.errore = ""; st.sheet = "obiettivo"; render(); },
   "obiettivo-dopo"(){ st.fase = "home"; render(); },
+  async "copia-dati"(){
+    try{
+      const dati = await api.copiaDati();
+      const url = URL.createObjectURL(new Blob([JSON.stringify(dati, null, 1)], { type:"application/json" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = `growup-copia-${oggi()}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      salvaLocale(CHIAVE_ULTIMA_COPIA, oggi()); render();
+      toast("Copia scaricata: salvala su Google Drive");
+    }catch(e){ toast(messaggio(e)); }
+  },
   async preferito(el){
     const id = el.dataset.id, era = st.preferiti.has(id), nome = nomeDi(id);
     if(era) st.preferiti.delete(id); else st.preferiti.add(id);

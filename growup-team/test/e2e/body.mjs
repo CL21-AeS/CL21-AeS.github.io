@@ -46,6 +46,7 @@ await page.screenshot({ path: S + "/e2e/25-obiettivo.png", fullPage:true });
 await page.click("button[data-act=vista-io]");
 await page.getByText("Ciao Anna").waitFor();
 check(await page.locator(".obiettivo-breve").getByText("300 €").isVisible(), "su Io: il riquadro del mio obiettivo");
+check(await page.locator("button[data-act=copia-dati]").count() === 0, "chi non è admin non vede la copia dei dati");
 await sync(page);
 const anna = DB.partners.find(p => p.nome === "Anna Bianchi");
 check(anna.sponsor_id === "R", "Anna sotto Stefano e Alessia");
@@ -635,6 +636,16 @@ await page.click("button[data-act=vista-gruppo]");
 check(await page.locator("li.preferito", { hasText:"Cri Crescita" }).getByText("Bronze Builder 15%").isVisible(), "preferiti: obiettivo di Cri (1.000 € → Builder 15%)");
 await page.locator(".albero.struttura li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
 check(await page.getByText("1.000 €/mese").isVisible() && !(await page.locator("#app").innerText()).includes("Segreto di Cri"), "scheda: cifra e tappa, non il perché");
+await ctx.close();
+
+// 17. Copia di sicurezza: solo per gli admin
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+check(await page.getByText("Nessuna copia scaricata da questo telefono.").isVisible(), "admin: pulsante della copia dei dati");
+const [copia] = await Promise.all([page.waitForEvent("download"), page.click("button[data-act=copia-dati]")]);
+const datiCopia = JSON.parse(fs.readFileSync(await copia.path(), "utf8"));
+check(copia.suggestedFilename() === `growup-copia-${oggiStr}.json` && datiCopia.app === "Growup Team" && datiCopia.tabelle.partners.length > 3, "copia scaricata con i dati");
+check(await page.getByText("Ultima copia da questo telefono").isVisible(), "data dell'ultima copia");
 await ctx.close();
 
 await browser.close();
