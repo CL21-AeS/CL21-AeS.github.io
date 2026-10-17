@@ -34,6 +34,12 @@
       return { profilo:pub(p), chiave:p.chiave };
     },
     accettaPrivacy: async pid => { const p = db.partners.find(x => x.id === pid); p.privacy_accettata_il = new Date().toISOString(); salva(); },
+    obiettivo: async pid => (db.obiettivi || []).find(o => o.partner_id === pid) || null,
+    salvaObiettivo: async o => { db.obiettivi = (db.obiettivi || []).filter(x => x.partner_id !== o.partner_id).concat([o]); salva(); },
+    obiettiviGruppo2: async () => { const io = mio(); if(!io) return [];
+      const sotto = id => db.partners.filter(p => p.sponsor_id === id).flatMap(p => [p.id].concat(sotto(p.id)));
+      const ids = sotto(io.id);
+      return (db.obiettivi || []).filter(o => ids.includes(o.partner_id)).map(o => ({ partner_id:o.partner_id, cifra_mese:o.cifra_mese, entro:o.entro })); },
     preferiti: async () => { const io = mio(); return (db.preferiti || []).filter(x => x.partner_id === io.id); },
     aggiungiPreferito: async (io, pid) => { db.preferiti = (db.preferiti || []).concat([{ partner_id:io, preferito_id:pid }]); salva(); },
     togliPreferito: async (io, pid) => { db.preferiti = (db.preferiti || []).filter(x => !(x.partner_id === io && x.preferito_id === pid)); salva(); },
