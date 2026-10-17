@@ -72,7 +72,14 @@ dice diversamente. Gli esempi concreti stanno nei file di `growup-team/` citati 
 Stile **H · Smeraldo e rame**, icona **G Smeraldo**; colori, caratteri e alternative tenute (**B + D**, **E**) in
 `growup-team/design/GRAFICA.md`. Per un'app nuova si può ripartire da questi colori o rifare una tavola di prova.
 
-## 5. Per iniziare un'app nuova (da dire a Claude)
+## 5. La skill
+
+Lo stesso metodo è anche una **skill** di Claude: `growup-team/skill/metodo-app-stefano/` (sorgente; il file da
+caricare nell'account si rigenera da qui). Installata nell'account claude.ai, Claude la usa da solo quando
+Stefano chiede di creare o modificare un'app, anche in altri repository. Quando il metodo cambia, si aggiornano
+insieme questo file e la skill.
+
+## 6. Per iniziare un'app nuova (da dire a Claude)
 
 > «Leggi `growup-team/METODO.md` nel repository CL21-AeS/CL21-AeS.github.io e usa lo stesso metodo
 > per una nuova app che si chiama … e serve a …»
