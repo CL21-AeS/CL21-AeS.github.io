@@ -269,6 +269,8 @@ await scegliFile(page, "radice.csv", reportRadice, true);
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
 check(!(await page.locator(".sheet .imp-sezione", { hasText:"Non ancora nell'app" }).count())
   && await page.locator(".sheet .imp-sezione", { hasText:"Escluse · 1" }).isVisible(), "secondo import: niente da scegliere, Zeno tra le escluse");
+await page.click(".sheet .imp-sezione summary");
+check(await page.locator(".sheet .imp-esclusi label", { hasText:"Zeno Zero" }).getByText("3000000").isVisible(), "Rivedi: le escluse con il codice");
 await page.click(".sheet button[data-act=chiudi]");
 // livelli come nei report Amway, gruppi richiudibili
 const rigaLuca = page.locator(".albero.struttura li", { hasText:"Luca Verdi" });
@@ -734,6 +736,16 @@ await page.click("button[data-act=codice]");
 await page.fill(".sheet input[name=codice_amway]", "3000020");
 await page.click(".sheet button:has-text('Salva')");
 check(await page.locator(".sheet .errore").innerText() === "Questo codice Amway è già di un'altra persona nell'app.", "codice già usato: rifiutato");
+await page.click(".sheet button[data-act=chiudi]");
+// ricerca per nome o per codice tra le persone da scegliere
+await page.click("button.link[data-act=vista-gruppo]");
+const molti = Array.from({ length:12 }, (_, i) => persona(2, "2533783", String(7000000 + i), "PROVA, PERSONA" + i, "0,00"));
+await scegliFile(page, "molti.csv", creaCsv(meseFile, [persona(1, "1", "2533783", "BAZZANO, STEFANO", "1")].concat(molti)), true);
+await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+await page.fill(".sheet input[data-cerca='.imp-nuovi']", "7000005");
+check(await page.locator(".sheet .imp-nuovi label:visible").count() === 1, "ricerca per codice tra le persone da scegliere");
+await page.fill(".sheet input[data-cerca='.imp-nuovi']", "persona1");
+check(await page.locator(".sheet .imp-nuovi label:visible").count() === 3, "ricerca per nome (Persona1, Persona10, Persona11)");
 await ctx.close();
 
 await browser.close();
