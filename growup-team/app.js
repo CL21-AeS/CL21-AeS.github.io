@@ -584,7 +584,7 @@ function campiQualifica(obbligoData, scelta){
         <label class="field"><span>Mese della prima qualifica</span>
           <input type="month" name="mese" max="${meseDi(oggi())}" value="${esc(scelta.mese || "")}"></label>
         <label class="field"><span>Pagamenti già ricevuti (su 12)</span>
-          <input type="number" name="pagamenti" min="0" max="12" inputmode="numeric" value="${Number(scelta.pagamenti) || 0}"></label>
+          <input type="number" name="pagamenti" min="0" max="12" inputmode="numeric" value="" placeholder="${Number(scelta.pagamenti) || 0}" data-vuoto></label>
       </div>
       ${scelta.senzaData ? "" : `<label class="field"><span>Data di iscrizione ad Amway <i data-obbl>${obbligoData ? "(obbligatoria per chi inizia)" : "(facoltativa)"}</i></span>
         <input type="date" name="data" max="${oggi()}"></label>`}
@@ -809,7 +809,7 @@ function campiObiettivo(o){
   o = o || {};
   const min = meseDi(oggi());
   return `<label class="field"><span>Quanto vorresti guadagnare al mese? (€)</span>
-      <input name="cifra" type="text" inputmode="numeric" autocomplete="off" placeholder="es. 400" value="${o.cifra_mese ? esc(String(Number(o.cifra_mese))) : ""}"></label>
+      <input name="cifra" type="text" inputmode="numeric" autocomplete="off" value="" placeholder="${o.cifra_mese ? esc(String(Number(o.cifra_mese))) : "0"}" data-vuoto></label>
     <label class="field"><span>Entro quando?</span>
       <input name="entro" type="month" min="${min}" value="${o.entro ? meseDi(o.entro) : ""}"></label>
     <label class="field"><span>Perché è importante per te? <span class="faint">(lo vedi solo tu)</span></span>
@@ -1436,15 +1436,15 @@ function vSheet(){
   if(s === "ordine") return `<h2>Nuovo ordine${st.target ? ` di ${esc(nomeSaluto(nomeDi(st.target)))}` : ""}</h2>
     <form data-form="ordine" novalidate>
       <label class="field"><span>VP dell'ordine</span>
-        <input name="vp" type="text" inputmode="decimal" autocomplete="off" required autofocus placeholder="es. 60 o 62,5"></label>
+        <input name="vp" type="text" inputmode="decimal" autocomplete="off" required autofocus value="" placeholder="0" data-vuoto></label>
       <label class="field"><span>Data</span><input name="data" type="date" value="${oggi()}" min="${primaDataAperta()}" max="${oggi()}"></label>
       ${piede}${err}
     </form>`;
   if(s === "obiettivi") return `<h2>Obiettivi della settimana</h2>
     <p class="small">Valgono da lunedì ${dataIt(settimana())}. La settimana prossima ripartono da questi.</p>
     <form data-form="obiettivi" novalidate>
-      <label class="field"><span>Nuovi contatti</span><input name="contatti" type="number" inputmode="numeric" min="0" max="1000" value="${Number(st.goal.obiettivo_contatti) || 0}"></label>
-      <label class="field"><span>Piani mostrati</span><input name="piani" type="number" inputmode="numeric" min="0" max="1000" value="${Number(st.goal.obiettivo_piani) || 0}"></label>
+      <label class="field"><span>Nuovi contatti</span><input name="contatti" type="number" inputmode="numeric" min="0" max="1000" value="" placeholder="${Number(st.goal.obiettivo_contatti) || 0}" data-vuoto></label>
+      <label class="field"><span>Piani mostrati</span><input name="piani" type="number" inputmode="numeric" min="0" max="1000" value="" placeholder="${Number(st.goal.obiettivo_piani) || 0}" data-vuoto></label>
       ${piede}${err}
     </form>`;
   if(s === "totale-mese"){
@@ -1460,7 +1460,7 @@ function vSheet(){
     <form data-form="totale-mese" novalidate>
       ${scelta}
       <label class="field"><span>Totale VP del mese</span>
-        <input name="vp" type="text" inputmode="decimal" autocomplete="off" autofocus value="${num(vpMese(m, lista()))}"></label>
+        <input name="vp" type="text" inputmode="decimal" autocomplete="off" autofocus value="" placeholder="${num(vpMese(m, lista()))}" data-vuoto></label>
       ${piede}${err}
     </form>`;
   }
@@ -1469,7 +1469,7 @@ function vSheet(){
   if(s === "obiettivo-mese") return `<h2>Obiettivo del mese</h2>
     <p class="small">VP fatturati in ${nomeMese(meseDi(oggi()))}. Il mese prossimo riparte da questo.</p>
     <form data-form="obiettivo-mese" novalidate>
-      <label class="field"><span>VP fatturati nel mese</span><input name="vp" type="text" inputmode="decimal" autocomplete="off" value="${num(st.goalMese.obiettivo_vp)}"></label>
+      <label class="field"><span>VP fatturati nel mese</span><input name="vp" type="text" inputmode="decimal" autocomplete="off" value="" placeholder="${num(st.goalMese.obiettivo_vp)}" data-vuoto></label>
       ${piede}${err}
     </form>`;
   if(s === "mia-chiave") return `<h2>Il mio link personale</h2>
@@ -2016,8 +2016,14 @@ document.addEventListener("submit", e => {
   if(!f) return;
   e.preventDefault();
   if(st.occupato) return;
+  /* nei campi numerici il valore grigio (0 o quello attuale) vale se non si scrive niente;
+     se il modulo dà un errore, il campo torna vuoto con il grigio */
+  const riempiti = [...f.querySelectorAll("input[data-vuoto]")].filter(i => !i.value.trim());
+  riempiti.forEach(i => { i.value = i.placeholder; });
   const fn = MODULI[f.dataset.form];
-  if(fn) fn(f);
+  if(fn) Promise.resolve(fn(f)).finally(() => {
+    if(f.isConnected && f.querySelector(".errore")) riempiti.forEach(i => { if(i.value === i.placeholder) i.value = ""; });
+  });
 });
 
 /* Qualifica scelta: mostra mese e pagamenti per Foundation e Builder; la data di iscrizione
