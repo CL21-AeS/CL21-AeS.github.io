@@ -47,12 +47,13 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 6. `supabase/008_inserisci_in_mezzo.sql` — inserire una persona mancante in mezzo alla linea
 7. `supabase/009_cancella_e_sposta.sql` — cancellare una persona (il suo gruppo sale) e cambiare sponsor (admin)
 8. `supabase/011_cambia_sponsor_nel_gruppo.sql` — cambiare sponsor anche verso qualcuno del proprio gruppo
-9. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
-10. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
-11. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
+9. `supabase/012_preferiti.sql` — le persone che ognuno segna come preferite per seguirle da vicino
+10. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+11. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
+12. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
 
-In alternativa ai punti 1-9: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
+In alternativa ai punti 1-10: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
 I file `004_*` e `005_*` servono solo al progetto già installato: il loro contenuto è già dentro 001-003.
 
 ## 3. Attivare l'accesso senza email
