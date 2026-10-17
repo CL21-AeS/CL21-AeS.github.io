@@ -108,7 +108,7 @@ check(await page.locator(".albero:not(.seguire) li", { hasText:"Marco Rossi" }).
 // seconda persona sotto Marco
 await page.click("button[data-act=aggiungi]");
 const posti = await page.locator(".sheet select[name=sponsor] option").allInnerTexts();
-check(posti[0] === "Io" && posti.some(x => x === "1 · Marco Rossi"), "sponsor: io o qualcuno del mio gruppo, con il livello");
+check(posti[0] === "Io" && posti.some(x => x === "2 · Marco Rossi"), "sponsor: io o qualcuno del mio gruppo, con il livello");
 await page.fill(".sheet input[name=nome]", "Luca Verdi");
 await page.selectOption(".sheet select[name=sponsor]", { label: posti.find(x => x.includes("Marco")) });
 await page.check(".sheet input[name=consenso]");
@@ -262,8 +262,10 @@ check(DB.partners.find(p => p.nome === "Luca Verdi").sponsor_id === idDi("Marco 
 // livelli come nei report Amway, sponsor accanto al nome, gruppi richiudibili
 await page.click("button.link[data-act=vista-gruppo]");
 const rigaLuca = page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" });
-check(await rigaLuca.locator(".livello").innerText() === "4" && await rigaLuca.getByText("sponsor Marco").isVisible(), "Luca: livello 4, sponsor Marco");
-check(await page.locator(".albero:not(.seguire) li", { hasText:"Anna Bianchi" }).locator(".livello").innerText() === "1", "Anna: livello 1");
+check(await rigaLuca.locator(".livello").innerText() === "5" && !(await rigaLuca.innerText()).includes("sponsor"), "Luca: livello 5, senza la dicitura sponsor");
+check(await page.locator(".albero:not(.seguire) li", { hasText:"Anna Bianchi" }).locator(".livello").innerText() === "2", "Anna, frontale: livello 2");
+check(await page.locator(".albero.struttura li").first().locator(".livello").innerText() === "1"
+  && (await page.locator(".albero.struttura li").first().innerText()).includes("Stefano e Alessia"), "in cima chi usa l'app: livello 1");
 await page.screenshot({ path: S + "/e2e/22-livelli.png", fullPage:true });
 await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=piega]").click();
 check(await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).isHidden() && await page.locator(".albero:not(.seguire) li", { hasText:"Marco Rossi" }).isHidden(),
