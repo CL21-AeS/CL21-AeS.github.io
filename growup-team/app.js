@@ -1097,33 +1097,42 @@ function statoDi(p){
   return g <= 7 ? { txt:"attivo", cl:"v", g } : g <= 14 ? { txt:"rallenta", cl:"g", g } : { txt:"fermo", cl:"r", g };
 }
 function vStruttura(){
-  /* Come nei report Amway: accanto al nome il livello (1 = tuoi diretti, 2 = i loro, …) e lo sponsor;
-     il gruppo di una persona si può richiudere. */
-  /* Tutte le righe sono nella pagina: quelle dei gruppi richiusi sono solo nascoste, così la ricerca le trova. */
-  const righe = alberoSotto(st.profilo.id, 0), sopra = [];
-  for(const r of righe){ sopra.length = r.livello; r.path = sopra.slice(); sopra.push(r.p.id); }
+  /* Come nei report Amway: in cima chi usa l'app (livello 1), poi i suoi frontali (2), i loro (3) e così via;
+     il gruppo di una persona si può richiudere. Tutte le righe sono nella pagina: quelle dei gruppi richiusi
+     sono solo nascoste, così la ricerca le trova. */
+  const io = st.profilo.id;
+  const righe = alberoSotto(io, 0), sopra = [io];
+  for(const r of righe){ sopra.length = r.livello + 1; r.path = sopra.slice(); sopra.push(r.p.id); }
+  const rIo = rigaDi(st.riep, io) || {}, chiusoIo = st.chiusi.has(io);
+  const rigaIo = `<li class="liv io" style="--rientro:0px" data-id="${esc(io)}" data-path="" data-nome="${esc(senzaAccenti(st.profilo.nome))}">
+      <span class="livello l0" title="Livello 1">1</span>
+      <div class="nome"><span>${esc(st.profilo.nome)}</span>
+        <span class="small">${num(rIo.vp_personali)} VP · gruppo ${num(rIo.vp_gruppo)}${rIo.linee_attive ? ` · ${rIo.linee_attive} ${rIo.linee_attive === 1 ? "linea" : "linee"}` : ""}</span></div>
+      <button class="piega" data-act="piega" data-id="${esc(io)}" data-quanti="${righe.length}" aria-expanded="${!chiusoIo}"
+        aria-label="${chiusoIo ? "Mostra" : "Nascondi"} il tuo gruppo">${chiusoIo ? "▸" : "▾"} ${righe.length}</button></li>`;
   return `<div class="card">
     <div class="spread"><span class="eyebrow">La mia struttura</span>
       <button class="btn small" data-act="aggiungi">+ Aggiungi persona</button></div>
     ${righe.length > 1 ? `<input type="search" id="cerca-struttura" class="cerca" placeholder="Cerca un nome nel tuo gruppo…"
         autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Cerca un nome nel tuo gruppo" value="${esc(st.cerca || "")}">
       <p class="small" id="cerca-esito" aria-live="polite" style="margin:6px 0 0"></p>` : ""}
-    ${righe.length ? `<ul class="albero struttura">${righe.map(({ p, livello, path }) => {
+    ${righe.length ? `<ul class="albero struttura">${rigaIo}${righe.map(({ p, livello, path }) => {
       const r = rigaDi(st.riep, p.id) || {}, sp = statoDi(p);
       const quanti = alberoSotto(p.id, 0).length, chiuso = st.chiusi.has(p.id);
       const piegato = path.some(id => st.chiusi.has(id));
-      return `<li class="liv${piegato ? " piegato" : ""}" style="--rientro:${Math.min(livello, 4) * 10}px"
+      return `<li class="liv${piegato ? " piegato" : ""}" style="--rientro:${Math.min(livello + 1, 4) * 10}px"
         data-id="${esc(p.id)}" data-path="${esc(path.join(" "))}" data-nome="${esc(senzaAccenti(p.nome))}">
-      <span class="livello l${livello % 4}" title="Livello ${livello + 1}">${livello + 1}</span>
+      <span class="livello l${(livello + 1) % 4}" title="Livello ${livello + 2}">${livello + 2}</span>
       <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}">
         <span>${esc(p.nome)}</span>
-        <span class="small">${livello ? `sponsor ${esc(nomeSaluto(nomeDi(p.sponsor_id)))} · ` : ""}${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${r.linee_attive ? ` · ${r.linee_attive} ${r.linee_attive === 1 ? "linea" : "linee"}` : ""}</span>
+        <span class="small">${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${r.linee_attive ? ` · ${r.linee_attive} ${r.linee_attive === 1 ? "linea" : "linee"}` : ""}</span>
       </button>
       ${quanti ? `<button class="piega" data-act="piega" data-id="${esc(p.id)}" data-quanti="${quanti}" aria-expanded="${!chiuso}"
         aria-label="${chiuso ? "Mostra" : "Nascondi"} il gruppo di ${esc(p.nome)}">${chiuso ? "▸" : "▾"} ${quanti}</button>` : ""}
       ${p.partenza_confermata_il ? "" : `<span class="pill g" title="Punto di partenza da confermare">!</span>`}
       <span class="pill ${sp.cl}">${sp.txt}</span></li>`; }).join("")}</ul>
-      <p class="nota">Il numero è il livello: 1 i tuoi diretti, 2 i loro, e così via. ▾ chiude o riapre il gruppo di una persona.
+      <p class="nota">Il numero è il livello, come nei report Amway: 1 sei tu, 2 i tuoi frontali, 3 i loro, e così via.
+        ▾ chiude o riapre il gruppo di una persona.
         Tocca un nome per aprire la sua scheda.</p>`
       : `<p class="muted" style="margin:8px 0 0">Ancora nessuno nel tuo gruppo. Invita chi usa il telefono con il link qui sotto,
           oppure aggiungi a mano chi non usa l'app.</p>`}
@@ -1339,7 +1348,7 @@ function vScheda(){
       <button class="stella${st.preferiti.has(p.id) ? " on" : ""}" data-act="preferito" data-id="${esc(p.id)}" aria-pressed="${st.preferiti.has(p.id)}"
         aria-label="${st.preferiti.has(p.id) ? "Togli dai preferiti" : "Aggiungi ai preferiti"}" title="Preferiti">${st.preferiti.has(p.id) ? "★" : "☆"}</button>
       <span class="pill ${sp.cl}">${sp.txt}</span></span></div>
-    <p class="small" style="margin:2px 0 0">${sponsor ? `Sponsor: ${esc(sponsor)} · ` : ""}${gestito ? "non usa l'app: i suoi numeri li aggiorni tu"
+    <p class="small" style="margin:2px 0 0">${gestito ? "non usa l'app: i suoi numeri li aggiorni tu"
       : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</p>
     ${p.stato === "gestito" ? "" : `<p class="small" style="margin:6px 0 0">${rigaObiettivoDi(p.id)}</p>`}
     <div class="dati-scheda">
@@ -1485,7 +1494,8 @@ function vSheet(){
     <p class="nota">Crea un link nuovo se pensi che il tuo sia finito a qualcun altro: quello vecchio smette di funzionare
       e gli altri telefoni dovranno rientrare con il nuovo.</p>`;
   /* Negli elenchi a scelta: livello come nella struttura (1 = diretti) e, dal 2 in giù, lo sponsor */
-  const voce = (p, livello, extra) => `${livello} · ${p.nome}${livello > 1 ? ` (sponsor ${nomeSaluto(nomeDi(p.sponsor_id))})` : ""}${extra || ""}`;
+  /* livelli come nella struttura: 1 sei tu, 2 i frontali, … (livello qui parte da 1 per i frontali) */
+  const voce = (p, livello, extra) => `${livello + 1} · ${p.nome}${livello > 1 ? ` (sponsor ${nomeSaluto(nomeDi(p.sponsor_id))})` : ""}${extra || ""}`;
   if(s === "aggiungi"){
     const posti = [`<option value="${esc(st.profilo.id)}">Io</option>`]
       .concat(alberoSotto(st.profilo.id, 1).map(({ p, livello }) =>
