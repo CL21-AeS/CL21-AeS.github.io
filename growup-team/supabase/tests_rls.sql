@@ -417,6 +417,21 @@ begin
                          and not exists (select 1 from public.accessi where partner_id = g),
                          'con G spariscono attività, storico e telefoni collegati');
 
+  -- ---- Preferiti: solo persone del proprio gruppo, visibili solo a chi li ha segnati ----
+  perform growup_test.come(u5);  -- A
+  insert into public.preferiti (partner_id, preferito_id) values (a, b);
+  perform growup_test.ok((select count(*) from public.preferiti) = 1, 'A segna B tra i preferiti');
+  perform growup_test.deve_fallire(format('insert into public.preferiti (partner_id, preferito_id) values (%L, %L)', a, c), 'A non segna C (altra linea)');
+  perform growup_test.deve_fallire(format('insert into public.preferiti (partner_id, preferito_id) values (%L, %L)', a, a), 'A non segna sé stessa');
+  perform growup_test.deve_fallire(format('insert into public.preferiti (partner_id, preferito_id) values (%L, %L)', b, k), 'A non scrive i preferiti di B');
+  perform growup_test.come(u4);  -- C
+  perform growup_test.ok((select count(*) from public.preferiti) = 0, 'C non vede i preferiti di A');
+  delete from public.preferiti;
+  perform growup_test.come(u5);
+  perform growup_test.ok((select count(*) from public.preferiti) = 1, 'C non cancella i preferiti di A');
+  delete from public.preferiti where preferito_id = b;
+  perform growup_test.ok((select count(*) from public.preferiti) = 0, 'A toglie B dai preferiti');
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),

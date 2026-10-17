@@ -47,6 +47,9 @@ function creaApi(){
     conferma:     args => q(sb.rpc("conferma_partenza", args)),
     inMezzo:      args => q(sb.rpc("inserisci_in_mezzo", args)),
     cancella:     pid => q(sb.rpc("cancella_partner", { p_partner:pid })),
+    preferiti:    () => q(sb.from("preferiti").select("preferito_id")),
+    aggiungiPreferito: (io, pid) => q(sb.from("preferiti").insert({ partner_id:io, preferito_id:pid })),
+    togliPreferito: (io, pid) => q(sb.from("preferiti").delete().eq("partner_id", io).eq("preferito_id", pid)),
     /* ultime 4 settimane di me e della mia downline (la RLS restituisce solo quelle) */
     attivitaGruppo: dal => q(sb.from("activities").select("partner_id,tipo,quantita,vp,data,inserito_il").gte("data", dal)),
     obiettiviGruppo: dal => q(sb.from("goals").select("partner_id,settimana,obiettivo_contatti,obiettivo_piani").gte("settimana", dal)),
@@ -93,6 +96,7 @@ const st = {
   riep: [],               // numeri del mese in corso: io e la mia downline (riepilogo_mese)
   chiusi: new Set(),
   cerca: "",               // ricerca nella struttura
+  preferiti: new Set(),    // persone del gruppo da seguire da vicino
   espansi: new Set(),      // durante la ricerca: persone di cui mostrare anche il gruppo       // nella struttura: persone con il gruppo richiuso
   gruppo4: { att:[], goals:[], mgoals:[] },  // ultime 4 settimane del gruppo: imbuto ed etichette
   riepPrec: [],           // lo stesso per il mese precedente, finché non è chiuso
@@ -409,7 +413,10 @@ async function vaiHome(profilo){
   st.fase = profilo.privacy_accettata_il ? "home" : "privacy_primo";
 }
 
-async function caricaStruttura(){ st.struttura = await api.struttura() || []; }
+async function caricaStruttura(){
+  st.struttura = await api.struttura() || [];
+  try{ st.preferiti = new Set((await api.preferiti() || []).map(r => r.preferito_id)); }catch(e){}
+}
 
 async function entraConChiave(k){
   st.fase = "avvio"; render();
@@ -676,7 +683,7 @@ function vHome(){
   </div>
   ${st.vista === "scheda" ? vScheda() : gruppo ? `
   ${vDaConfermare()}
-  ${vImbuto()}
+  ${vPreferiti()}
   ${vDaSeguire()}
   ${vStruttura()}
   ${vStoricoGruppo()}
@@ -1033,7 +1040,8 @@ function obiettiviDi(pid){
   const pr = proposta();
   const g = st.gruppo4.goals.filter(x => x.partner_id === pid).sort((a, b) => a.settimana < b.settimana ? 1 : -1)[0];
   const m = st.gruppo4.mgoals.filter(x => x.partner_id === pid).sort((a, b) => a.mese < b.mese ? 1 : -1)[0];
-  return { contatti: g ? Number(g.obiettivo_contatti) : pr.contatti, vp: m ? Number(m.obiettivo_vp) : Number(pr.vp_mese) || 100 };
+  return { contatti: g ? Number(g.obiettivo_contatti) : pr.contatti, piani: g ? Number(g.obiettivo_piani) : Number(pr.piani) || 3,
+           vp: m ? Number(m.obiettivo_vp) : Number(pr.vp_mese) || 100 };
 }
 /* L'etichetta dice chi ha bisogno di te adesso e che tipo di aiuto serve */
 function etichettaDi(p){
@@ -1060,45 +1068,37 @@ function elencoUrgenza(){
   return alberoSotto(st.profilo.id, 0).filter(x => x.p.stato !== "gestito").map(x => ({ p:x.p, e:etichettaDi(x.p) }))
     .sort((a, b) => a.e.ordine - b.e.ordine || b.e.giorni - a.e.giorni || a.p.nome.localeCompare(b.p.nome));
 }
-function imbuto(){
-  const persone = alberoSotto(st.profilo.id, 0).map(x => x.p);
-  const t = { contatti:0, piani:0, ordini:0, vp:0 };
-  let obC = 0;
-  for(const p of persone){ const n = numeri4(p.id); t.contatti += n.contatti; t.piani += n.piani; t.ordini += n.ordini; t.vp += n.vp;
-    obC += obiettiviDi(p.id).contatti * 4; }
-  const s = soglieEtichette();
-  const r1 = t.contatti ? t.piani / t.contatti : 0, r2 = t.piani ? t.ordini / t.piani : 0;
-  let collo = null;
-  if(persone.length && t.contatti < obC * s.quota_contatti) collo = "contatti";
-  else if(t.contatti && r1 < s.piani_per_contatti) collo = "piani";
-  else if(t.piani && r2 < s.ordini_per_piani) collo = "ordini";
-  return Object.assign(t, { persone:persone.length, r1, r2, collo, obC });
-}
-function pct(x){ return Math.round(x * 100) + "%"; }
-function vImbuto(){
-  const f = imbuto();
-  if(!f.persone) return "";
-  const max = Math.max(f.contatti, 1);
-  const righe = [
-    { k:"contatti", nome:"Contatti", v:f.contatti, nota:`obiettivo del gruppo ${num(f.obC)}` },
-    { k:"piani", nome:"Piani", v:f.piani, nota: f.contatti ? `${pct(f.r1)} dei contatti` : "" },
-    { k:"ordini", nome:"Ordini", v:f.ordini, nota: f.piani ? `${pct(f.r2)} dei piani · ${num(f.vp)} VP` : `${num(f.vp)} VP` }
-  ];
-  /* solo i dati e la soglia superata, nessun consiglio */
-  const s = soglieEtichette();
-  const frasi = {
-    contatti: `Contatti: ${num(f.contatti)} su ${num(f.obC)} di obiettivo del gruppo (${pct(f.obC ? f.contatti / f.obC : 0)}), sotto la soglia del ${pct(s.quota_contatti)}.`,
-    piani: `Piani: 1 ogni ${Math.round(f.contatti / Math.max(f.piani, 1))} contatti (${pct(f.r1)}), sotto la soglia di 1 ogni ${Math.round(1 / s.piani_per_contatti)}.`,
-    ordini: `Ordini: ${pct(f.r2)} dei piani, sotto la soglia del ${pct(s.ordini_per_piani)}.`
-  };
+/* ---- Preferiti: le persone da seguire da vicino, con i loro numeri rispetto ai loro obiettivi ---- */
+function vPreferiti(){
+  const l = alberoSotto(st.profilo.id, 0).map(x => x.p).filter(p => st.preferiti.has(p.id));
+  const vuoto = `<p class="small" style="margin:6px 0 0">Segna le persone che vuoi seguire da vicino: apri la loro scheda e tocca
+    <b>☆</b> accanto al nome. Qui vedi i loro numeri delle ultime 4 settimane rispetto ai loro obiettivi.</p>`;
+  if(!l.length) return `<div class="card"><span class="eyebrow">Preferiti</span>${vuoto}</div>`;
+  const schede = l.map(p => {
+    const n = numeri4(p.id), o = obiettiviDi(p.id), sp = statoDi(p), r = rigaDi(st.riep, p.id) || {};
+    const e = p.stato === "gestito" ? null : etichettaDi(p);
+    const vp = Number(r.vp_personali) || 0;
+    /* la riga dove sta sotto la soglia è evidenziata, come le etichette (solo per chi usa l'app) */
+    const debole = e ? { lista:"contatti", invito:"piani", followup:"vp" }[e.k] : null;
+    const righe = [
+      { k:"contatti", nome:"Contatti", v:n.contatti, ob:o.contatti * 4, nota:"4 settimane" },
+      { k:"piani", nome:"Piani", v:n.piani, ob:o.piani * 4, nota:"4 settimane" },
+      { k:"vp", nome:"VP del mese", v:vp, ob:o.vp, nota:nomeMese(meseDi(oggi())).split(" ")[0] }
+    ];
+    return { p, e, ordine: e ? e.ordine : 9, html:`<li class="preferito">
+      <div class="spread"><button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}"><span>${esc(p.nome)}</span>
+        <span class="small">${p.stato === "gestito" ? "senza app · numeri inseriti dallo sponsor" : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</span></button>
+        ${e ? `<span class="pill ${e.cl}">${e.nome}</span>` : `<span class="pill ${sp.cl}">${sp.txt}</span>`}</div>
+      ${righe.map(x => `<div class="obiettivo${debole === x.k ? " debole" : ""}"><div class="spread"><span>${x.nome} <span class="small">${x.nota}</span></span>
+        <span class="num">${num(x.v)} / ${num(x.ob)}</span></div>
+        <div class="bar${x.v >= x.ob ? " fatto" : ""}"><i style="width:${Math.min(100, x.ob ? Math.round(x.v / x.ob * 100) : 0)}%"></i></div></div>`).join("")}
+    </li>` };
+  }).sort((a, b) => a.ordine - b.ordine || a.p.nome.localeCompare(b.p.nome));
   return `<div class="card">
-    <div class="spread"><span class="eyebrow">Imbuto del gruppo</span><span class="small">ultime 4 settimane</span></div>
-    <ul class="imbuto">${righe.map(r => `<li class="${f.collo === r.k ? "collo" : ""}" title="${esc(r.nome)}: ${num(r.v)}">
-      <div class="spread"><span>${r.nome}${f.collo === r.k ? ` <span class="pill g">sotto soglia</span>` : ""}</span><b class="num">${num(r.v)}</b></div>
-      <div class="barra-imbuto"><i style="width:${Math.max(r.v ? 3 : 0, Math.round(r.v / max * 100))}%"></i></div>
-      ${r.nota ? `<span class="small">${esc(r.nota)}</span>` : ""}</li>`).join("")}</ul>
-    ${f.collo ? `<p class="avviso">${esc(frasi[f.collo])}</p>` : f.contatti ? `<p class="small" style="margin:8px 0 0">Nessun passaggio sotto soglia.</p>` : ""}
-    <p class="nota">Il tuo gruppo, te escluso: contatti, piani e ordini registrati da tutti, anche quelli inseriti per chi è senza app.</p>
+    <div class="spread"><span class="eyebrow">Preferiti</span><span class="small">${l.length === 1 ? "1 persona" : `${l.length} persone`}</span></div>
+    <ul class="preferiti">${schede.map(x => x.html).join("")}</ul>
+    <p class="nota">Contatti e piani delle ultime 4 settimane rispetto al loro obiettivo settimanale × 4; VP del mese rispetto
+      al loro obiettivo del mese. Evidenziata la parte sotto soglia. Per togliere una persona: ★ nella sua scheda.</p>
   </div>`;
 }
 function vDaSeguire(){
@@ -1223,7 +1223,10 @@ function vScheda(){
   const frontali = st.riep.filter(x => x.sponsor_id === p.id);
   return `<button class="btn link" data-act="vista-gruppo" style="padding:0">‹ Il mio gruppo</button>
   <div class="card">
-    <div class="spread"><h2>${esc(p.nome)}</h2><span class="pill ${sp.cl}">${sp.txt}</span></div>
+    <div class="spread"><h2>${esc(p.nome)}</h2><span class="row" style="gap:8px">
+      <button class="stella${st.preferiti.has(p.id) ? " on" : ""}" data-act="preferito" data-id="${esc(p.id)}" aria-pressed="${st.preferiti.has(p.id)}"
+        aria-label="${st.preferiti.has(p.id) ? "Togli dai preferiti" : "Aggiungi ai preferiti"}" title="Preferiti">${st.preferiti.has(p.id) ? "★" : "☆"}</button>
+      <span class="pill ${sp.cl}">${sp.txt}</span></span></div>
     <p class="small" style="margin:2px 0 0">${sponsor ? `Sponsor: ${esc(sponsor)} · ` : ""}${gestito ? "non usa l'app: i suoi numeri li aggiorni tu"
       : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</p>
     <div class="dati-scheda">
@@ -1556,6 +1559,18 @@ const AZIONI = {
   },
   "vista-io"(){ st.vista = "io"; st.target = null; render(); window.scrollTo(0, 0); },
   "vista-gruppo"(){ st.vista = "gruppo"; st.target = null; st.schedaId = null; render(); window.scrollTo(0, 0); },
+  async preferito(el){
+    const id = el.dataset.id, era = st.preferiti.has(id), nome = nomeDi(id);
+    if(era) st.preferiti.delete(id); else st.preferiti.add(id);
+    render();
+    try{
+      if(era) await api.togliPreferito(st.profilo.id, id); else await api.aggiungiPreferito(st.profilo.id, id);
+      toast(era ? `${nome} tolto dai preferiti` : `${nome} nei preferiti: lo trovi nella pagina Gruppo`);
+    }catch(e){
+      if(era) st.preferiti.add(id); else st.preferiti.delete(id);
+      render(); toast(messaggio(e));
+    }
+  },
   piega(el){
     const id = el.dataset.id, insieme = senzaAccenti(st.cerca) ? st.espansi : st.chiusi;
     if(insieme.has(id)) insieme.delete(id); else insieme.add(id);
