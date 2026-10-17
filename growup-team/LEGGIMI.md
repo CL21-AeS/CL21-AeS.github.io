@@ -49,12 +49,13 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 8. `supabase/011_cambia_sponsor_nel_gruppo.sql` — cambiare sponsor anche verso qualcuno del proprio gruppo
 9. `supabase/012_preferiti.sql` — le persone che ognuno segna come preferite per seguirle da vicino
 10. `supabase/013_obiettivo.sql` — il primo obiettivo di ognuno (cifra al mese, entro quando, perché)
-11. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
-12. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
-13. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
+11. `supabase/014_copia_dati.sql` — la copia di sicurezza dei dati (solo admin)
+12. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+13. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
+14. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
 
-In alternativa ai punti 1-11: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
+In alternativa ai punti 1-12: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
 I file `004_*` e `005_*` servono solo al progetto già installato: il loro contenuto è già dentro 001-003.
 
 ## 3. Attivare l'accesso senza email
@@ -110,6 +111,25 @@ e mettile in `growup-team/config.js` (oppure mandale a Claude Code e lo fa lui).
   e mandategli il link su WhatsApp. I suoi vecchi telefoni vengono scollegati. (In Fase 2 lo farete dall'app.)
 - **Cancellare un partner** (diritto all'oblio): Table editor → `partners` → elimina la riga; le sue attività e i suoi
   obiettivi spariscono con lui. Se ha persone sotto, prima spostatele sotto un altro sponsor.
+
+## Copia di sicurezza dei dati (una volta al mese)
+
+Il codice è al sicuro su GitHub; i **dati** (persone, attività, obiettivi, storico) stanno su Supabase, che nel piano
+gratuito **non fa copie automatiche**. Per questo, una volta al mese:
+
+1. **Quando**: dopo il giorno **5** (il mese precedente è chiuso e congelato nello storico).
+2. **Dall'app**, con il vostro profilo (solo gli admin lo vedono): in fondo a qualsiasi pagina,
+   **Scarica la copia dei dati**. Si scarica il file `growup-copia-AAAA-MM-GG.json` (su Android in *Download*).
+   Sotto il pulsante l'app ricorda la data dell'ultima copia e avvisa se è passato più di un mese.
+3. **Dove tenerla**: carica il file su **Google Drive**, in una cartella "Growup – copie". Tenete almeno le ultime 6.
+   Il file contiene dati personali del gruppo: non inoltratelo e non mettetelo in cartelle condivise.
+
+**Riserva**: Supabase → *Table editor* → per ogni tabella, menu ⋯ → *Export to CSV*.
+
+**Se un giorno servisse ripristinare**: aprite una sessione con Claude, allegate il file della copia e chiedete di
+ripristinare i dati in Supabase. Ogni tabella del file corrisponde a una tabella del database (le migrazioni in
+`supabase/` ricreano la struttura vuota). I telefoni si ricollegano aprendo i link personali, che restano validi
+perché nella copia c'è l'impronta delle chiavi.
 
 ## Com'è fatta
 
