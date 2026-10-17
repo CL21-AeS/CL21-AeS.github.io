@@ -1,7 +1,31 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 16 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 17 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
+
+## Ripartire da qui (fermi la sera del 17 ottobre 2026)
+
+**Fatto oggi**: rete dal report Amway (import sempre completo, nessuno cancella, ognuno nasconde chi vuole: migrazioni
+015–018), inviti da admin, numeri ufficiali del report, controllo di sicurezza completo (`SICUREZZA.md`), storia di
+GitHub ripulita dai dati reali, codice d'invito della radice rigenerato. Protezioni sugli accessi: **captcha Cloudflare
+Turnstile** (nell'app e acceso in Supabase, provato sul telefono), limite 30 accessi anonimi/ora per rete, provider
+Email spento in Supabase. Account Cloudflare di Stefano con verifica in due passaggi. Ultime PR unite: #44, #45, #46.
+
+**Da verificare con Stefano alla ripresa** (non confermati in chat):
+- migrazione `018_niente_cancellazioni.sql` incollata nell'SQL Editor e CSV reimportato;
+- app che funziona sul telefono con la Content Security Policy (PR #43) — il captcha visto sul telefono fa pensare di sì.
+
+**Prima del lancio al gruppo** (Stefano sceglie da dove partire):
+1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
+   import, nascondi, scheda partner).
+2. **Copia di sicurezza** dall'app (in fondo alla pagina) in una cartella privata di Google Drive.
+3. **Gruppo pilota di 2-3 leader** per una settimana: rete grande, appena partito, poco pratico col telefono.
+   Domanda aperta: chi coinvolgere.
+4. **Messaggio per il gruppo** (lo scrive Claude): cos'è l'app, perché, tenere pronto il codice Amway.
+
+**Da fare per Stefano (account)**: verifica in due passaggi su GitHub, Supabase e Google; su GitHub "Keep my email
+addresses private" e "Block command line pushes that expose my email"; GitHub Support per togliere le vecchie
+versioni delle PR chiuse (support.github.com → remove sensitive data / cached views).
 
 ## Fatto
 
