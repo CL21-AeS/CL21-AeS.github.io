@@ -123,7 +123,8 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare la copia di sicurezza** (METODO.md già unito con la PR #35). Poi: **prima copia** dei dati dall'app. se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare la copia di sicurezza e la skill** (METODO.md già unito con la PR #35). Poi: **prima copia** dei dati
+   dall'app e **installare la skill** `metodo-app-stefano` nell'account claude.ai. se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
