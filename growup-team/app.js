@@ -48,6 +48,10 @@ function creaApi(){
     inMezzo:      args => q(sb.rpc("inserisci_in_mezzo", args)),
     cancella:     pid => q(sb.rpc("cancella_partner", { p_partner:pid })),
     preferiti:    () => q(sb.from("preferiti").select("preferito_id")),
+    /* il primo obiettivo: il proprio per intero; del gruppo solo cifra e data (il perché resta personale) */
+    obiettivo:    pid => q(sb.from("obiettivi").select("cifra_mese,entro,perche").eq("partner_id", pid).maybeSingle()),
+    salvaObiettivo: o => q(sb.from("obiettivi").upsert(o)),
+    obiettiviGruppo2: () => q(sb.rpc("obiettivi_gruppo")),
     aggiungiPreferito: (io, pid) => q(sb.from("preferiti").insert({ partner_id:io, preferito_id:pid })),
     togliPreferito: (io, pid) => q(sb.from("preferiti").delete().eq("partner_id", io).eq("preferito_id", pid)),
     /* ultime 4 settimane di me e della mia downline (la RLS restituisce solo quelle) */
@@ -97,6 +101,8 @@ const st = {
   chiusi: new Set(),
   cerca: "",               // ricerca nella struttura
   preferiti: new Set(),    // persone del gruppo da seguire da vicino
+  obiettivo: null,         // il mio primo obiettivo { cifra_mese, entro, perche }
+  obiettiviGruppo: new Map(), // cifra e data degli obiettivi del mio gruppo
   espansi: new Set(),      // durante la ricerca: persone di cui mostrare anche il gruppo       // nella struttura: persone con il gruppo richiuso
   gruppo4: { att:[], goals:[], mgoals:[] },  // ultime 4 settimane del gruppo: imbuto ed etichette
   riepPrec: [],           // lo stesso per il mese precedente, finché non è chiuso
@@ -349,6 +355,8 @@ async function caricaTutto(){
   for(const r of settings || []) st.settings[r.chiave] = r.valore;
   st.att = att || [];
   try{ await caricaStruttura(); }catch(e){ st.struttura = []; }
+  try{ st.obiettivo = await api.obiettivo(p.id) || null; }catch(e){ st.obiettivo = null; }
+  try{ st.obiettiviGruppo = new Map((await api.obiettiviGruppo2() || []).map(o => [o.partner_id, o])); }catch(e){}
   await caricaNumeri();
 
   /* nuova settimana / nuovo mese: si riparte dall'ultimo obiettivo scelto */
@@ -502,7 +510,7 @@ function etichettePiega(inRicerca){
 function render(){
   const app = document.getElementById("app");
   const viste = { avvio:vAvvio, config:vConfig, benvenuto:vBenvenuto, chiave_errata:vChiaveErrata,
-                  ingresso:vIngresso, privacy_primo:vPrivacyPrimo, home:vHome, errore:vErrore };
+                  ingresso:vIngresso, privacy_primo:vPrivacyPrimo, obiettivo_primo:vObiettivoPrimo, home:vHome, errore:vErrore };
   const html = (viste[st.fase] || vAvvio)();
   if(html !== ultimoApp){ app.innerHTML = html; ultimoApp = html; }
   const conAzioni = st.fase === "home" && st.vista === "io";
@@ -653,7 +661,8 @@ function vPrivacyPrimo(){
 function vSelettore(){
   return `<div class="schede" role="tablist" aria-label="Pagina">
     <button role="tab" aria-selected="${st.vista === "io"}" class="${st.vista === "io" ? "on" : ""}" data-act="vista-io">Io</button>
-    <button role="tab" aria-selected="${st.vista !== "io"}" class="${st.vista !== "io" ? "on" : ""}" data-act="vista-gruppo">Gruppo</button>
+    <button role="tab" aria-selected="${st.vista === "obiettivo"}" class="${st.vista === "obiettivo" ? "on" : ""}" data-act="vista-obiettivo">Obiettivo</button>
+    <button role="tab" aria-selected="${st.vista === "gruppo" || st.vista === "scheda"}" class="${st.vista === "gruppo" || st.vista === "scheda" ? "on" : ""}" data-act="vista-gruppo">Gruppo</button>
   </div>`;
 }
 
@@ -675,6 +684,13 @@ function vHome(){
   const p = st.profilo;
   const gruppo = st.vista === "gruppo" || st.vista === "scheda";
   const persone = alberoSotto(p.id, 0).length;
+  if(st.vista === "obiettivo") return `
+  <div class="testata">
+    <div>${marchio()}<h1>Il mio obiettivo</h1></div>
+    ${vSelettore()}
+  </div>
+  ${vObiettivo()}
+  ${vFondo()}`;
   return `
   <div class="testata">
     <div>${marchio()}<h1>${st.vista === "scheda" ? "Scheda partner" : gruppo ? "Il mio gruppo" : `Ciao ${esc(nomeSaluto(p.nome))}`}</h1>
@@ -689,7 +705,7 @@ function vHome(){
   ${vInvita()}` : `
   ${leggiLocale(CHIAVE_SALVATA) === "1" || !st.chiave ? "" : vSalvaChiave()}
   ${vInstalla()}
-  ${vVisione()}
+  ${vObiettivoBreve()}
   ${vTappa()}
   ${vSettimana()}
   ${vMese()}
@@ -751,6 +767,118 @@ function vSalvaChiave(){
     ${bottoniChiave()}
     <button class="btn wide primary" style="margin-top:10px" data-act="chiave-salvata">Fatto, l'ho salvato</button>
   </div>`;
+}
+
+/* ---- Il primo obiettivo: cifra al mese, entro quando, perché ---- */
+/* la prima tappa dal Path to Bronze in su che vale almeno la cifra (oltre Argento: Argento) */
+function tappaPerCifra(cifra){
+  const t = st.stages.filter(s => s.ordine >= 3 && Number(s.guadagno_mese) > 0).sort((a, b) => a.ordine - b.ordine);
+  if(!t.length) return null;
+  const c = t.find(s => Number(s.guadagno_mese) >= Number(cifra));
+  return c ? { tappa:c, oltre:false } : { tappa:t[t.length - 1], oltre:true };
+}
+function mesiAlTraguardo(entro){ return Math.max(0, mesiTra(meseDi(oggi()), meseDi(entro))); }
+function testoTraguardo(entro){
+  const m = mesiAlTraguardo(entro);
+  return `entro ${nomeMese(meseDi(entro))} · ${m === 0 ? "è questo mese" : m === 1 ? "manca 1 mese" : `mancano ${m} mesi`}`;
+}
+/* la riga "Obiettivo: …" di una persona del gruppo (cifra e data, mai il perché) */
+function rigaObiettivoDi(pid){
+  const o = st.obiettiviGruppo.get(pid);
+  if(!o) return "Obiettivo: non ancora scritto";
+  const t = tappaPerCifra(o.cifra_mese);
+  return `Obiettivo: <b>${euro(o.cifra_mese)}/mese</b> ${esc(testoTraguardo(o.entro))}${t ? ` · ${esc(t.tappa.nome)}` : ""}`;
+}
+function vObiettivoBreve(){
+  const o = st.obiettivo;
+  if(!o) return `<div class="card tight visione">
+    <span class="eyebrow">Il mio obiettivo</span>
+    <h2 style="margin-top:2px">Quanto vorresti guadagnare al mese?</h2>
+    <p class="small" style="margin:4px 0 0">Scrivi la cifra e per quando: l'app ti mostra la tappa che la vale e il percorso per arrivarci.</p>
+    <button class="btn wide" style="margin-top:12px" data-act="obiettivo-modifica">Scrivi il tuo obiettivo</button>
+  </div>`;
+  const t = tappaPerCifra(o.cifra_mese);
+  return `<div class="card tight visione obiettivo-breve" data-act="vista-obiettivo" role="button" tabindex="0">
+    <span class="eyebrow">Il mio obiettivo</span>
+    <div class="spread" style="margin-top:2px"><h2><span class="num">${euro(o.cifra_mese)}</span> al mese</h2><span class="small">›</span></div>
+    <p class="small" style="margin:2px 0 0">${esc(testoTraguardo(o.entro))}</p>
+    ${t ? `<p class="small" style="margin:6px 0 0">Tappa: <b>${esc(t.tappa.nome)}</b>${t.oltre ? " e oltre" : ""}</p>` : ""}
+  </div>`;
+}
+function campiObiettivo(o){
+  o = o || {};
+  const min = meseDi(oggi());
+  return `<label class="field"><span>Quanto vorresti guadagnare al mese? (€)</span>
+      <input name="cifra" type="text" inputmode="numeric" autocomplete="off" placeholder="es. 400" value="${o.cifra_mese ? esc(String(Number(o.cifra_mese))) : ""}"></label>
+    <label class="field"><span>Entro quando?</span>
+      <input name="entro" type="month" min="${min}" value="${o.entro ? meseDi(o.entro) : ""}"></label>
+    <label class="field"><span>Perché è importante per te? <span class="faint">(lo vedi solo tu)</span></span>
+      <textarea name="perche" rows="3" maxlength="1000">${esc(o.perche || "")}</textarea></label>`;
+}
+function vObiettivoPrimo(){
+  return `<div>
+    ${marchio()}
+    <h1 style="margin-top:6px">Il tuo primo obiettivo</h1>
+    <p class="muted">Da dove vuoi partire? Scrivi quanto vorresti guadagnare al mese e per quando: l'app ti mostra la tappa
+      che vale quella cifra e il percorso per arrivarci. Puoi cambiarlo quando vuoi.</p>
+    <form data-form="obiettivo" class="card" novalidate>
+      ${campiObiettivo()}
+      <button class="btn primary wide" style="margin-top:16px">Salva il mio obiettivo</button>
+      <button type="button" class="btn ghost wide" style="margin-top:8px" data-act="obiettivo-dopo">Lo scrivo dopo</button>
+    </form>
+  </div>`;
+}
+/* una tappa futura descritta dai suoi requisiti */
+function requisitiTesto(t){
+  const r = [];
+  if(t.clienti) r.push(`i primi ${t.clienti} clienti`);
+  if(Number(t.vp_personali) > 0) r.push(`${num(t.vp_personali)} VP personali`);
+  if(t.linee) r.push(`${t.linee} linee da ${num(Number(t.vp_linea) || soglia())} VP`);
+  if(t.vp_gruppo) r.push(`${num(t.vp_gruppo)} VP di gruppo`);
+  return r.join(" · ");
+}
+function vObiettivo(){
+  const o = st.obiettivo;
+  if(!o) return `<div class="card">
+    <span class="eyebrow">Il mio obiettivo</span>
+    <h2 style="margin-top:4px">Quanto vorresti guadagnare al mese?</h2>
+    <p class="small">Scrivi la cifra e per quando: qui vedrai la tappa che la vale e il percorso per arrivarci.</p>
+    <button class="btn primary wide" style="margin-top:8px" data-act="obiettivo-modifica">Scrivi il tuo obiettivo</button>
+  </div>${vVisione()}`;
+  const t = tappaPerCifra(o.cifra_mese), S = st.stages, { indice } = percorso();
+  const fino = t ? S.findIndex(s => s.chiave === t.tappa.chiave) : -1;
+  const giaFatto = fino >= 0 && indice > fino;
+  const mancano = fino >= indice ? fino - indice + 1 : 0;
+  return `<div class="card tight visione">
+    <span class="eyebrow">Il mio obiettivo</span>
+    <h2 style="margin-top:2px"><span class="num">${euro(o.cifra_mese)}</span> al mese</h2>
+    <p class="small" style="margin:2px 0 0">${esc(testoTraguardo(o.entro))}</p>
+    ${o.perche ? `<p class="perche">«${esc(o.perche)}»</p><p class="nota" style="margin-top:2px">Il perché lo vedi solo tu.</p>` : ""}
+    <button class="btn" style="margin-top:10px;min-height:38px" data-act="obiettivo-modifica">Modifica</button>
+  </div>
+  ${t ? `<div class="card">
+    <span class="eyebrow">La tappa che vale la tua cifra</span>
+    <div class="spread" style="margin-top:4px"><h2>${esc(t.tappa.nome)}</h2><span class="num">${euro(t.tappa.guadagno_mese)}<span class="small"> /mese*</span></span></div>
+    ${t.oltre ? `<p class="small" style="margin:4px 0 0">La tua cifra è oltre Argento: Argento vale circa ${euro(t.tappa.guadagno_mese)} al mese.</p>` : ""}
+    ${t.tappa.struttura_calcolo ? `<p class="small" style="margin:4px 0 0">Calcolato su: ${esc(t.tappa.struttura_calcolo)}</p>` : ""}
+    <p class="small" style="margin:8px 0 0">${giaFatto ? "Hai già raggiunto questa tappa." : mancano === 1 ? "È la tua tappa attuale." : `Da qui: ${mancano} tappe, compresa quella attuale.`}</p>
+    <p class="nota">* ${notaGuadagni()}</p>
+  </div>
+  <div class="card">
+    <span class="eyebrow">Il percorso fino all'obiettivo</span>
+    <ol class="percorso">${S.slice(0, Math.max(fino, indice - 1) + 1).map((s, i) => {
+      const stato = i < indice ? "fatta" : i === indice ? "attuale" : "dopo";
+      const req = stato === "attuale" ? requisiti(s) : [];
+      return `<li class="${stato}${i === fino ? " meta" : ""}">
+        <span class="mark">${stato === "fatta" ? "✓" : i + 1}</span>
+        <div class="grow"><b>${esc(s.nome)}</b>${i === fino ? ` <span class="pill s">obiettivo</span>` : ""}
+          ${stato === "attuale" ? `<span class="pill">tappa attuale</span>` : ""}
+          ${s.guadagno_mese ? `<span class="small"> · ${euro(s.guadagno_mese)}/mese*</span>` : ""}
+          ${stato === "attuale" ? `<ul class="req">${req.map(r => `<li class="${r.ok ? "ok" : ""}"><span class="mark">${r.ok ? "✓" : "○"}</span>
+              <span class="grow">${esc(r.txt)}</span>${r.val ? `<span class="num">${esc(r.val)}</span>` : ""}</li>`).join("")}</ul>`
+            : stato === "dopo" ? `<p class="small" style="margin:2px 0 0">${esc(requisitiTesto(s))}</p>` : ""}</div></li>`; }).join("")}</ol>
+  </div>` : ""}
+  ${vVisione()}`;
 }
 
 function vVisione(){
@@ -1084,6 +1212,7 @@ function vPreferiti(){
       <div class="spread"><button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}"><span>${esc(p.nome)}</span>
         <span class="small">${p.stato === "gestito" ? "senza app · numeri inseriti dallo sponsor" : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</span></button>
         ${e ? `<span class="pill ${e.cl}">${e.nome}</span>` : `<span class="pill ${sp.cl}">${sp.txt}</span>`}</div>
+      ${p.stato === "gestito" ? "" : `<p class="small" style="margin:2px 0 0">${rigaObiettivoDi(p.id)}</p>`}
       ${righe.map(x => `<div class="obiettivo${debole === x.k ? " debole" : ""}"><div class="spread"><span>${x.nome} <span class="small">${x.nota}</span></span>
         <span class="num">${num(x.v)} / ${num(x.ob)}</span></div>
         <div class="bar${x.v >= x.ob ? " fatto" : ""}"><i style="width:${Math.min(100, x.ob ? Math.round(x.v / x.ob * 100) : 0)}%"></i></div></div>`).join("")}
@@ -1212,6 +1341,7 @@ function vScheda(){
       <span class="pill ${sp.cl}">${sp.txt}</span></span></div>
     <p class="small" style="margin:2px 0 0">${sponsor ? `Sponsor: ${esc(sponsor)} · ` : ""}${gestito ? "non usa l'app: i suoi numeri li aggiorni tu"
       : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</p>
+    ${p.stato === "gestito" ? "" : `<p class="small" style="margin:6px 0 0">${rigaObiettivoDi(p.id)}</p>`}
     <div class="dati-scheda">
       <div><span class="small">VP personali</span><b class="num">${num(r.vp_personali)}</b></div>
       <div><span class="small">VP di gruppo</span><b class="num">${num(r.vp_gruppo)}</b></div>
@@ -1371,6 +1501,8 @@ function vSheet(){
       ${piede}${err}
     </form>`;
   }
+  if(s === "obiettivo") return `<h2>Il mio obiettivo</h2>
+    <form data-form="obiettivo" novalidate>${campiObiettivo(st.obiettivo)}${piede}${err}</form>`;
   if(s === "chiamata"){
     const x = st.struttura.find(y => y.id === st.chiamataId);
     if(!x) return "";
@@ -1542,6 +1674,9 @@ const AZIONI = {
   },
   "vista-io"(){ st.vista = "io"; st.target = null; render(); window.scrollTo(0, 0); },
   "vista-gruppo"(){ st.vista = "gruppo"; st.target = null; st.schedaId = null; render(); window.scrollTo(0, 0); },
+  "vista-obiettivo"(){ st.vista = "obiettivo"; st.target = null; render(); window.scrollTo(0, 0); },
+  "obiettivo-modifica"(){ st.errore = ""; st.sheet = "obiettivo"; render(); },
+  "obiettivo-dopo"(){ st.fase = "home"; render(); },
   async preferito(el){
     const id = el.dataset.id, era = st.preferiti.has(id), nome = nomeDi(id);
     if(era) st.preferiti.delete(id); else st.preferiti.add(id);
@@ -1704,12 +1839,27 @@ const MODULI = {
     if(l.chiave){ salvaLocale(CHIAVE_SALVATA, "1"); await entraConChiave(l.chiave); return; }
     await apriInvito(l.invito); render();
   },
+  async obiettivo(f){
+    const cifra = Number(String(f.cifra.value).replace(/[^\d,.]/g, "").replace(/\./g, "").replace(",", "."));
+    const entro = f.entro.value, perche = f.perche.value.trim();
+    if(!(cifra > 0)) return mostraErroreForm(f, "Scrivi quanto vorresti guadagnare al mese, per esempio 400.");
+    if(!/^\d{4}-\d{2}$/.test(entro)) return mostraErroreForm(f, "Scegli il mese entro cui vuoi arrivarci.");
+    if(entro < meseDi(oggi())) return mostraErroreForm(f, "Il mese è già passato: scegline uno da adesso in avanti.");
+    const o = { partner_id:st.profilo.id, cifra_mese:cifra, entro:entro + "-01", perche:perche || null, aggiornato_il:new Date().toISOString() };
+    try{
+      await api.salvaObiettivo(o);
+      st.obiettivo = { cifra_mese:cifra, entro:o.entro, perche:o.perche };
+      if(st.fase === "obiettivo_primo") st.fase = "home";
+      st.sheet = null; st.vista = "obiettivo"; render(); window.scrollTo(0, 0);
+      toast("Obiettivo salvato");
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
   async "privacy-primo"(f){
     if(!f.privacy.checked){ mostraErroreForm(f, "Per iniziare serve accettare l'informativa privacy."); return; }
     try{
       await api.accettaPrivacy(st.profilo.id);
       st.profilo.privacy_accettata_il = new Date().toISOString();
-      st.fase = "home"; render();
+      st.fase = st.obiettivo ? "home" : "obiettivo_primo"; render();
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
   chiamata(f){
@@ -1807,6 +1957,7 @@ const MODULI = {
       ricordaChiave(r.chiave);
       salvaLocale(CHIAVE_SALVATA, null);
       await vaiHome(r.profilo);
+      if(st.fase === "home" && !st.obiettivo) st.fase = "obiettivo_primo";
       st.occupato = false; render();
     }catch(e){
       st.occupato = false; f.querySelector("button.primary").disabled = false;
@@ -1906,8 +2057,10 @@ document.addEventListener("touchend", e => {
   const t = e.changedTouches[0], dx = t.clientX - tocco.x, dy = t.clientY - tocco.y, ms = Date.now() - tocco.quando;
   tocco = null;
   if(Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8 || ms > 800) return;
-  if(dx < 0 && st.vista === "io") scorri("vista-gruppo", "da-destra");
-  else if(dx > 0 && st.vista === "gruppo") scorri("vista-io", "da-sinistra");
+  if(dx < 0 && st.vista === "io") scorri("vista-obiettivo", "da-destra");
+  else if(dx < 0 && st.vista === "obiettivo") scorri("vista-gruppo", "da-destra");
+  else if(dx > 0 && st.vista === "obiettivo") scorri("vista-io", "da-sinistra");
+  else if(dx > 0 && st.vista === "gruppo") scorri("vista-obiettivo", "da-sinistra");
   else if(dx > 0 && st.vista === "scheda") scorri("vista-gruppo", "da-sinistra");
 }, { passive:true });
 function scorri(azione, verso){

@@ -161,6 +161,18 @@ label.check input{width:22px;min-height:22px;height:22px;margin:1px 0 0;flex:non
 .storico li:first-child{border-top:0}
 .storico .dati{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:6px;font-size:14px;color:var(--ink2)}
 .storico .dati b{color:var(--ink)}
+.obiettivo-breve{cursor:pointer}
+.perche{margin:10px 0 0;font-family:var(--f-titoli);font-size:19px;line-height:1.35;font-style:italic}
+.percorso{list-style:none;margin:10px 0 0;padding:0}
+.percorso>li{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.percorso>li:first-child{border-top:0}
+.percorso>li>.mark{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;
+  background:var(--traccia);color:var(--ink2)}
+.percorso>li.fatta>.mark{background:var(--verde);color:#fff}
+.percorso>li.attuale>.mark{background:var(--rame);color:#fff}
+.percorso>li.meta>.mark{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--stella)}
+.percorso>li.fatta{color:var(--ink3)}
+.percorso .pill{margin-left:4px}
 .preferiti{list-style:none;margin:8px 0 0;padding:0}
 .preferiti li{padding:12px 0;border-top:1px solid var(--line)}
 .preferiti li:first-child{border-top:0}
@@ -230,6 +242,10 @@ label.check input{width:22px;min-height:22px;height:22px;margin:1px 0 0;flex:non
   margin:calc(-1 * var(--pad)) calc(-1 * var(--pad)) 4px;padding:calc(18px + env(safe-area-inset-top, 0px)) var(--pad) 20px;
   background:var(--head);color:var(--head-ink);border-radius:0 0 22px 22px}
 .testata .eyebrow{color:var(--head-ink2)}
+/* tre pagine: le schede stanno in una riga sotto il titolo, a tutta larghezza */
+.testata{flex-wrap:wrap;row-gap:14px}
+.testata>.schede{order:2;width:100%}
+.testata>.schede button{flex:1}
 .testata h1{color:var(--head-ink)}
 .testata .small{color:var(--head-ink2)}
 .testata .btn.link{color:var(--oro)}
