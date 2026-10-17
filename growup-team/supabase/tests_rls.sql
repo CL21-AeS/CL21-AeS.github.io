@@ -104,20 +104,20 @@ begin
 
   -- ---- Iscrizioni dai link d'invito ----
   perform growup_test.come(u2);
-  perform growup_test.deve_fallire($q$select public.iscrivi_con_codice('ZZZZ99','A',null)$q$, 'codice inesistente');
-  perform growup_test.deve_fallire($q$select public.iscrivi_con_codice('RRRR22','A', current_date + 5)$q$, 'data di iscrizione nel futuro');
-  k_a := public.iscrivi_con_codice('RRRR22', 'Anna Test', date '2026-07-01')->>'chiave';
+  perform growup_test.deve_fallire($q$select public.entra_con_invito('ZZZZ99','A','2000009')$q$, 'codice inesistente');
+  perform growup_test.deve_fallire($q$select public.entra_con_invito('RRRR22','A','2000009', current_date + 5)$q$, 'data di iscrizione nel futuro');
+  k_a := public.entra_con_invito('RRRR22', 'Anna Test', '2000001', date '2026-07-01')->>'chiave';
   a := (public.collega_profilo()->>'id')::uuid;
   perform growup_test.ok((public.collega_profilo()->>'sponsor_id')::uuid = r, 'A agganciata a R');
-  perform growup_test.deve_fallire($q$select public.iscrivi_con_codice('RRRR22','A',null)$q$, 'secondo profilo dallo stesso telefono');
+  perform growup_test.deve_fallire($q$select public.entra_con_invito('RRRR22','A','2000009')$q$, 'secondo profilo dallo stesso telefono');
   execute 'reset role';
   update public.partners set codice_invito = 'AAAA22' where id = a;
 
   perform growup_test.come(u3);
-  b := (public.iscrivi_con_codice('aaaa22', 'Bruno Test', null, 'path_to_bronze')->'profilo'->>'id')::uuid;
+  b := (public.entra_con_invito('aaaa22', 'Bruno Test', '2000002', null, 'path_to_bronze')->'profilo'->>'id')::uuid;
   perform growup_test.come(u4);
-  perform growup_test.deve_fallire($q$select public.iscrivi_con_codice('RRRR22','C',null,null,null,0,7)$q$, 'pin inesistente');
-  c := (public.iscrivi_con_codice('RRRR22', 'Carla Test', null, null, null, 0, 9)->'profilo'->>'id')::uuid;
+  perform growup_test.deve_fallire($q$select public.entra_con_invito('RRRR22','C','2000003',null,null,null,0,7)$q$, 'pin inesistente');
+  c := (public.entra_con_invito('RRRR22', 'Carla Test', '2000003', null, null, null, 0, 9)->'profilo'->>'id')::uuid;
   perform growup_test.ok((public.collega_profilo()->>'percentuale_iniziale')::int = 9, 'pin 9% registrato senza qualifica Bronze');
   execute 'reset role';
   perform growup_test.ok((select sponsor_id from public.partners where id = b) = a, 'B agganciato ad A');
@@ -185,7 +185,7 @@ begin
   perform growup_test.deve_fallire('update public.partners set is_admin = true where id = public.my_partner_id()', 'A non si fa admin');
   perform growup_test.deve_fallire($q$update public.partners set stato = 'gestito' where id = public.my_partner_id()$q$, 'A non cambia stato');
   perform growup_test.deve_fallire($q$update public.partners set chiave_hash = 'x' where id = public.my_partner_id()$q$, 'A non scrive l''impronta');
-  perform growup_test.deve_fallire($q$insert into public.partners (nome) values ('Fantasma')$q$, 'nessun profilo fuori da iscrivi_con_codice');
+  perform growup_test.deve_fallire($q$insert into public.partners (nome) values ('Fantasma')$q$, 'nessun profilo fuori da entra_con_invito');
   perform growup_test.deve_fallire(format('insert into public.accessi (user_id, partner_id) values (auth.uid(), %L)', r),
                                    'nessuno si collega da solo a un altro profilo');
   perform growup_test.ok(growup_test.righe($q$update public.partners set nome = 'Anna T.' where id = public.my_partner_id()$q$) = 1, 'A cambia il suo nome');
@@ -224,121 +224,134 @@ begin
   perform growup_test.ok((select count(*) from public.activities) = 1, 'D ritrova il suo storico');
   perform growup_test.ok((select count(*) from public.partners) = 1, 'nessun duplicato');
 
-  -- ---- Aggiungere a mano una persona che non usa l'app ----
-  perform growup_test.come(u5);  -- A (dal computer)
-  e := (public.aggiungi_partner('Elena Test', b, null, null, 6)->>'id')::uuid;
+  -- ---- I codici Amway di chi usa l'app (dati all'ingresso; D li riceve qui) ----
   execute 'reset role';
-  perform growup_test.ok((select sponsor_id = b and stato = 'gestito' and gestore_id = a and consenso_confermato_il is not null
-                          from public.partners where id = e), 'E aggiunta sotto B, gestita da A, con consenso');
-  perform growup_test.come(u5);
-  perform growup_test.ok(exists (select 1 from public.partners where id = e), 'A vede E nella sua struttura');
-  perform growup_test.deve_fallire(format($q$select public.aggiungi_partner('X', %L)$q$, r), 'A non aggiunge persone sopra di sé');
-  perform growup_test.deve_fallire(format($q$select public.aggiungi_partner('X', %L)$q$, c), 'A non aggiunge persone in un''altra linea');
-  perform growup_test.deve_fallire(format($q$select public.aggiungi_partner('', %L)$q$, a), 'serve il nome');
-  perform growup_test.deve_fallire(format('select public.link_per_gestito(%L)', b), 'niente link per chi usa già l''app');
-  perform growup_test.come(u4);  -- C, altra linea
-  perform growup_test.deve_fallire(format('select public.link_per_gestito(%L)', e), 'C non genera il link di E');
-  perform growup_test.ok(public.collega_profilo() is not null and not exists (select 1 from public.partners where id = e), 'C non vede E');
-  perform growup_test.come(u1);  -- R, upline di E
-  perform growup_test.ok(length(public.link_per_gestito(e)) = 32, 'chi sta sopra genera il link di E');
-  perform growup_test.come(u5);  -- A, gestore di E
-  k_e := public.link_per_gestito(e);
-  perform growup_test.come(u8);
-  perform growup_test.ok(public.entra_con_chiave(k_e)->>'stato' = 'attivo', 'E apre il suo link e diventa attiva');
-  perform growup_test.come(u5);
-  perform growup_test.deve_fallire(format('select public.link_per_gestito(%L)', e), 'E è attiva: niente più link dal gestore');
+  update public.partners set codice_amway = '2000004' where id = d;
+  update public.partners set codice_invito = 'BBBB22' where id = b;
+  update public.partners set codice_invito = 'CCCC22' where id = c;
+  perform growup_test.ok((select codice_amway from public.partners where id = a) = '2000001'
+                         and (select codice_amway from public.partners where id = b) = '2000002', 'il codice dato all''ingresso è salvato');
+  insert into public.activities (partner_id, tipo, vp) values (r, 'ordine', 120), (b, 'ordine', 150), (c, 'ordine', 100);
 
-  -- ---- Fase 2: i calcoli del mese ----
-  -- R ha tre linee frontali: A (con B, D ed E sotto), C e F.
-  execute 'reset role';
-  insert into public.partners (nome, sponsor_id, stato) values ('Fabio Test', r, 'gestito') returning id into f;
-  insert into public.activities (partner_id, tipo, vp) values
-    (r, 'ordine', 120), (b, 'ordine', 150), (c, 'ordine', 100), (f, 'ordine', 110), (e, 'rettifica', 40);
-  -- personali: R 120, A 60, B 150, E 40, C 100, F 110, D 0
-  -- gruppo:    B 190, A 250, C 100, F 110, R 580
-  perform growup_test.come(u1);  -- R
-  perform growup_test.ok((select count(*) from public.riepilogo_mese(current_date)) = 7, 'R vede 7 righe nel riepilogo');
-  select * into x from public.riepilogo_mese(current_date) where partner_id = r;
-  perform growup_test.ok(x.vp_personali = 120 and x.vp_gruppo = 580, 'VP personali e di gruppo di R');
-  perform growup_test.ok(x.linee_attive = 3, 'R ha 3 linee attive (A 250, C 100, F 110)');
-  perform growup_test.ok(x.percentuale = 3, 'R: 580 VP di gruppo = 3%');
-  perform growup_test.ok(x.qualifica = 'path_to_bronze', 'R qualifica Path to Bronze nel mese');
-  perform growup_test.ok(x.chiuso = false, 'il mese in corso è dal vivo');
+  -- ---- Le funzioni degli inserimenti a mano sono chiuse ----
+  perform growup_test.come(u1);  -- R admin
+  perform growup_test.deve_fallire(format($q$select public.aggiungi_partner('X', %L)$q$, a), 'niente più inserimenti a mano');
+  perform growup_test.deve_fallire(format($q$select public.aggiungi_con_codice('X', %L, '5555555')$q$, a), 'niente più inserimenti a mano con codice');
+  perform growup_test.deve_fallire(format('select public.inserisci_in_mezzo(%L, array[%L]::uuid[])', 'X', b), 'niente più "manca qualcuno sopra"');
+  perform growup_test.deve_fallire(format('select public.cambia_sponsor(%L, %L)', d, c), 'niente più "cambia sponsor", neanche per l''admin');
+  perform growup_test.deve_fallire(format('select public.link_per_gestito(%L)', d), 'niente più link per le persone senza app');
+  perform growup_test.deve_fallire($q$select public.iscrivi_con_codice('RRRR22', 'X', null)$q$, 'niente più ingresso senza codice Amway');
+
+  -- ---- Import della rete: le persone importate le vede solo chi le importa ----
   perform growup_test.come(u5);  -- A
-  perform growup_test.ok((select count(*) from public.riepilogo_mese(current_date)) = 4, 'A vede solo sé, B, D ed E');
-  perform growup_test.ok(not exists (select 1 from public.riepilogo_mese(current_date) where partner_id in (r, c, f)), 'A non vede sponsor né colleghi');
+  perform growup_test.deve_fallire($q$select public.importa_rete(current_date, '{"codice":"9999999","vpp":0}', '[]', '[]', '{}', '{}')$q$,
+                                   'il report di un altro partner è rifiutato');
+  x := null;
+  perform growup_test.ok((public.importa_rete(current_date, '{"codice":"2000001","vpp":60}',
+      '[{"codice":"3000001","nome":"Elena Test","sponsor":"2000002","vpp":40},{"codice":"3000002","nome":"Fabio Test","sponsor":null,"vpp":0}]',
+      '[{"codice":"2000002","sponsor":"2000001"}]', '{3999999}', '{}')->>'aggiunte')::int = 2, 'A importa E (sotto B) e F (sotto di lei)');
+  e := (select id from public.partners where codice_amway = '3000001');
+  f := (select id from public.partners where codice_amway = '3000002');
+  perform growup_test.ok((select count(*) from public.partners where id in (e, f)) = 2, 'A vede le sue persone importate');
+  perform growup_test.ok((select esclusi from (select count(*) as esclusi from public.esclusi_import) z) = 1, 'A ha un codice escluso');
+  execute 'reset role';
+  perform growup_test.ok((select sponsor_id = b and stato = 'gestito' and gestore_id = a from public.partners where id = e),
+                         'E è sotto B, senza app, importata da A');
+  perform growup_test.come(u3);  -- B
+  perform growup_test.come(u1);  -- B era stato scollegato dalla chiave rigenerata: l'admin gliene dà una nuova
+  k_e := public.nuova_chiave_per(b);
+  perform growup_test.come(u3);
+  perform public.entra_con_chiave(k_e);
+  perform growup_test.ok(not exists (select 1 from public.partners where id = e), 'B non vede E, anche se è sotto di lui: l''ha importata A');
+  perform growup_test.come(u1);  -- R
+  perform growup_test.ok(not exists (select 1 from public.partners where id in (e, f)), 'R non vede le persone importate da A');
+  perform growup_test.ok((select count(*) from public.esclusi_import) = 0, 'R non vede gli esclusi di A');
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'contatto')$q$, e), 'R non scrive per E');
+  -- R importa anche lui E: la sua copia
+  perform growup_test.ok((public.importa_rete(current_date, '{"codice":"1000000","vpp":120}',
+      '[{"codice":"3000001","nome":"Elena copia di R","sponsor":"2000002","vpp":45}]', '[]', '{}', '{}')->>'aggiunte')::int = 1,
+      'R importa la sua copia di E');
+  perform growup_test.ok((select codice_amway from public.partners where id = r) = '1000000', 'il codice di R viene dalla prima riga');
+  perform growup_test.come(u5);  -- A
+  perform growup_test.ok((select count(*) from public.partners where codice_amway = '3000001') = 1, 'A vede solo la sua copia di E');
+  perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', f, '3000001'), 'tra le mie importate il codice è unico');
+  perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', b, '2222222'), 'A non cambia il codice di B, che usa l''app');
+
+  -- ---- Calcoli per chi guarda: nessun doppio conteggio ----
+  -- vista di A: A 60, B 150, E 40 (copia di A), F 0, D 0 → A 250
+  -- vista di R: R 120, A 60, B 150, E 45 (copia di R), D 0, C 100 → A 255, R 475
+  perform growup_test.come(u5);  -- A
   select * into x from public.riepilogo_mese(current_date) where partner_id = a;
-  perform growup_test.ok(x.vp_gruppo = 250 and x.linee_attive = 1 and x.percentuale = 3 and x.qualifica is null,
-                         'A: 250 di gruppo, 1 linea attiva, 3%, nessuna qualifica (manca la terza linea)');
+  perform growup_test.ok(x.vp_gruppo = 250, 'A: VP di gruppo con le sue persone importate (' || x.vp_gruppo || ')');
+  perform growup_test.ok((select count(*) from public.riepilogo_mese(current_date)) = 5, 'A: riepilogo di sé, B, D, E, F');
+  perform growup_test.come(u1);  -- R
+  select * into x from public.riepilogo_mese(current_date) where partner_id = a;
+  perform growup_test.ok(x.vp_gruppo = 255, 'R vede il gruppo di A con la propria copia di E (' || x.vp_gruppo || ')');
+  select * into x from public.riepilogo_mese(current_date) where partner_id = r;
+  perform growup_test.ok(x.vp_gruppo = 475 and x.linee_attive = 2, 'R: 475 di gruppo, 2 linee attive (' || x.vp_gruppo || ')');
   perform growup_test.come(u4);  -- C
   perform growup_test.ok((select count(*) from public.riepilogo_mese(current_date)) = 1, 'C vede solo sé');
-  perform growup_test.come(null);
-  perform growup_test.deve_fallire('select * from public.riepilogo_mese(current_date)', 'anon non vede i riepiloghi');
 
-  -- mesi chiusi: si registra nel mese in corso e, fino al giorno 5, nel precedente
-  perform growup_test.come(u5);  -- A
-  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, vp, data) values (%L, 'ordine', 10, current_date - 70)$q$, a),
-                                   'niente registrazioni in un mese chiuso');
-  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, data) values (%L, 'contatto', current_date + 3)$q$, a),
-                                   'niente registrazioni nel futuro');
-  mese_prec := (date_trunc('month', current_date) - interval '1 day')::date;
-  if extract(day from (now() at time zone 'Europe/Rome')) > 5 then
-    perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, vp, data) values (%L, 'rettifica', 10, %L)$q$, a, mese_prec),
-                                     'dopo il giorno 5 il mese precedente è chiuso');
-  else
-    insert into public.activities (partner_id, tipo, vp, data) values (a, 'rettifica', 10, mese_prec);
-  end if;
-  perform growup_test.ok(not public.mese_aperto(current_date - 70), 'mese_aperto: due mesi fa no');
-  perform growup_test.ok(public.mese_aperto(current_date), 'mese_aperto: oggi sì');
-
-  -- storico: chiusura del mese precedente
+  -- ---- Ingresso con il codice: chi è già importato prende il suo profilo ----
   execute 'reset role';
-  perform growup_test.ok(public.chiudi_mese(mese_prec) >= 7, 'chiusura del mese precedente');
-  perform growup_test.come(u5);  -- A
-  perform growup_test.ok((select count(*) from public.riepilogo_mese(mese_prec) where chiuso) = 4, 'A legge il mese chiuso, solo il suo gruppo');
-  perform growup_test.ok((select count(*) from public.monthly_totals) = 4, 'A legge lo storico, solo il suo gruppo');
-  perform growup_test.deve_fallire(format($q$insert into public.monthly_totals (partner_id, mese) values (%L, date '2026-01-01')$q$, a),
-                                   'lo storico non si scrive dal telefono');
-  perform growup_test.deve_fallire('update public.monthly_totals set vp_gruppo = 99999', 'lo storico non si modifica');
-  perform growup_test.deve_fallire('select public.chiudi_mese(current_date)', 'la chiusura non si lancia dal telefono');
-  perform growup_test.ok((select count(*) from public.percent_levels) = 7, 'tutti leggono le soglie delle percentuali');
-  perform growup_test.ok(growup_test.righe('update public.percent_levels set vp_gruppo = 1') = 0, 'A non modifica le soglie');
-
-  -- ---- Fase 2, blocco 2: numeri per chi non usa l'app ----
-  perform growup_test.come(u5);  -- A aggiunge G sotto B
-  g := (public.aggiungi_partner('Gino Test', b)->>'id')::uuid;
-  execute 'reset role';
-  perform growup_test.ok((select partenza_confermata_il is not null and partenza_confermata_da = a from public.partners where id = g),
-                         'chi è aggiunto a mano ha il punto di partenza già confermato');
-  perform growup_test.come(u5);  -- A, gestore di G
-  insert into public.activities (partner_id, tipo) values (g, 'contatto');
-  insert into public.activities (partner_id, tipo, vp) values (g, 'rettifica', 80);
-  perform growup_test.ok((select inserito_da from public.activities where partner_id = g and tipo = 'contatto') = a,
-                         'il dato di G registra che l''ha inserito A');
-  insert into public.monthly_goals (partner_id, mese, obiettivo_vp) values (g, date_trunc('month', current_date)::date, 100);
-  perform growup_test.ok(growup_test.righe(format($q$delete from public.activities where partner_id = %L and tipo = 'contatto'$q$, g)) = 1,
-                         'A cancella un dato che ha inserito per G');
-  perform growup_test.come(u1);  -- R, upline di G
-  insert into public.activities (partner_id, tipo) values (g, 'piano');
-  perform growup_test.ok((select vp_personali from public.riepilogo_mese(current_date) where partner_id = g) = 80,
-                         'i VP inseriti per G contano nei numeri');
-  perform growup_test.come(u4);  -- C, altra linea
-  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'contatto')$q$, g),
-                                   'C non scrive per G (altra linea)');
-  perform growup_test.come(u5);  -- A
-  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'contatto')$q$, b),
-                                   'A non scrive per B (B usa l''app)');
-  perform growup_test.ok(growup_test.righe(format($q$update public.activities set quantita = 2 where partner_id = %L$q$, b)) = 0,
-                         'A non modifica i dati di B');
-  -- G prende possesso del profilo: da lì nessun upline scrive per lui
-  k_e := public.link_per_gestito(g);
-  execute 'reset role';
-  insert into auth.users (id, aud, role) values ('00000000-0000-0000-0000-0000000000b1', 'authenticated', 'authenticated');
+  insert into auth.users (id, aud, role) select ('00000000-0000-0000-0000-0000000000b' || i)::uuid, 'authenticated', 'authenticated'
+  from generate_series(1, 4) i;
   perform growup_test.come('00000000-0000-0000-0000-0000000000b1');
-  perform public.entra_con_chiave(k_e);
+  perform growup_test.deve_fallire($q$select public.entra_con_invito('BBBB22', 'Elena', '')$q$, 'il codice Amway è obbligatorio');
+  perform growup_test.deve_fallire($q$select public.entra_con_invito('RRRR22', 'Anna bis', '2000001')$q$, 'codice di chi usa già l''app: rifiutato');
+  perform growup_test.deve_fallire($q$select public.entra_con_invito('CCCC22', 'Fabio', '3000002')$q$, 'codice importato in un''altra linea: rifiutato');
+  perform growup_test.ok(public.entra_con_invito('BBBB22', 'Elena Vera', '3000001')->'profilo'->>'id' = e::text,
+                         'E entra dal link di B con il suo codice e prende il profilo importato da A');
+  execute 'reset role';
+  perform growup_test.ok((select stato = 'attivo' and sponsor_id = b and gestore_id is null and nome = 'Elena Vera' from public.partners where id = e),
+                         'E ora usa l''app, sotto B');
+  perform growup_test.ok((select count(*) from public.partners where codice_amway = '3000001') = 1, 'la copia di R è sparita');
+  perform growup_test.ok((select sum(vp) from public.activities where partner_id = e) = 40, 'E ritrova i VPP importati');
+  perform growup_test.come(u1);  -- R
+  perform growup_test.ok(exists (select 1 from public.partners where id = e), 'ora R vede E');
+  perform growup_test.come(u3);  -- B
+  perform growup_test.ok(exists (select 1 from public.partners where id = e), 'ora B vede E');
   perform growup_test.come(u5);  -- A
-  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'contatto')$q$, g),
-                                   'G ora usa l''app: A non scrive più per lui');
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'contatto')$q$, e),
+                                   'E usa l''app: A non scrive più per lei');
+  -- un codice nuovo: profilo nuovo sotto chi invita
+  perform growup_test.come('00000000-0000-0000-0000-0000000000b2');
+  perform growup_test.ok((public.entra_con_invito('CCCC22', 'Gino Test', '3000005')->'profilo'->>'sponsor_id')::uuid = c, 'codice nuovo: sotto chi invita');
+  g := public.my_partner_id();
+
+  -- ---- L'import mette chi usa l'app sotto il suo sponsor del report ----
+  perform growup_test.come(u5);  -- A: D (usa l'app, sotto A) secondo il report è di B
+  perform growup_test.ok((public.importa_rete(current_date, '{"codice":"2000001","vpp":60}', '[]',
+      '[{"codice":"2000004","sponsor":"2000002"},{"codice":"2000002","sponsor":"2000004"}]', '{}', '{}')->>'spostate')::int = 1,
+      'A importa: D va sotto B; il giro B sotto D viene ignorato');
+  execute 'reset role';
+  perform growup_test.ok((select sponsor_id from public.partners where id = d) = b and (select sponsor_id from public.partners where id = b) = a,
+                         'D sotto B, B resta sotto A');
+  perform growup_test.come(u4);  -- C: chi non vede non sposta
+  perform public.importa_rete(current_date, '{"codice":"2000003","vpp":100}',
+      '[{"codice":"3000009","nome":"Ivo Test","sponsor":"2000001","vpp":0}]', '[{"codice":"2000004","sponsor":"2000003"}]', '{}', '{}');
+  execute 'reset role';
+  perform growup_test.ok((select sponsor_id from public.partners where id = d) = b, 'C non sposta D (non è nel suo gruppo)');
+  perform growup_test.ok((select sponsor_id from public.partners where codice_amway = '3000009') = c,
+                         'uno sponsor che C non vede: la persona va sotto C');
+
+  -- ---- Non più nel report: le mie importate si cancellano e diventano escluse ----
+  perform growup_test.come(u1);  -- R
+  perform growup_test.deve_fallire(format($q$select public.importa_rete(current_date, '{"codice":"1000000","vpp":120}', '[]', '[]', '{}', '{%s}')$q$, f),
+                                   'R non cancella le persone importate da A');
+  perform growup_test.come(u5);  -- A
+  perform growup_test.ok((public.importa_rete(current_date, '{"codice":"2000001","vpp":60}', '[]', '[]', '{}', array[f])->>'cancellate')::int = 1,
+                         'A cancella F, non più nel report');
+  perform growup_test.ok(not exists (select 1 from public.partners where id = f)
+                         and exists (select 1 from public.esclusi_import where codice = '3000002'), 'F cancellata ed esclusa');
+
+  -- ---- Nascoste: solo per chi le nasconde ----
+  insert into public.nascosti (partner_id, nascosto_id) values (a, b);
+  perform growup_test.deve_fallire(format('insert into public.nascosti (partner_id, nascosto_id) values (%L, %L)', a, c), 'A non nasconde chi non vede');
+  perform growup_test.deve_fallire(format('insert into public.nascosti (partner_id, nascosto_id) values (%L, %L)', b, d), 'A non scrive le nascoste di B');
+  perform growup_test.ok((select vp_gruppo from public.riepilogo_mese(current_date) where partner_id = a) >= 210, 'B nascosto conta ancora nel VP di A');
+  perform growup_test.come(u1);  -- R
+  perform growup_test.ok((select count(*) from public.nascosti) = 0, 'R non vede le nascoste di A');
 
   -- ---- Fase 2, blocco 2: conferma del punto di partenza ----
   execute 'reset role';
@@ -355,67 +368,44 @@ begin
   execute 'reset role';
   perform growup_test.ok((select partenza_confermata_da = r from public.partners where id = c), 'la conferma registra chi l''ha data');
 
-  -- ---- Inserire una persona in mezzo alla linea ----
-  perform growup_test.come(u5);  -- A: tra lei e B c'era H, mai inserito
-  h := (public.inserisci_in_mezzo('Ugo Test', array[b])->>'id')::uuid;
-  execute 'reset role';
-  perform growup_test.ok((select sponsor_id = a and stato = 'gestito' and gestore_id = a from public.partners where id = h),
-                         'H inserito sotto A, senza app, gestito da A');
-  perform growup_test.ok((select sponsor_id from public.partners where id = b) = h, 'B ora sta sotto H');
-  perform growup_test.come(u5);
-  perform growup_test.ok(exists (select 1 from public.partners where id = h) and exists (select 1 from public.partners where id = g),
-                         'A vede H e, più in basso, tutto il gruppo di B');
-  perform growup_test.deve_fallire(format('select public.inserisci_in_mezzo(%L, array[%L]::uuid[])', 'X', a), 'nessuno si inserisce sopra di sé');
-  perform growup_test.deve_fallire(format('select public.inserisci_in_mezzo(%L, array[%L, %L]::uuid[])', 'X', h, e), 'tutti devono avere lo stesso sponsor');
-  perform growup_test.deve_fallire(format('select public.inserisci_in_mezzo(%L, array[]::uuid[])', 'X'), 'serve almeno una persona');
-  perform growup_test.come(u4);  -- C, altra linea
-  perform growup_test.deve_fallire(format('select public.inserisci_in_mezzo(%L, array[%L]::uuid[])', 'X', b), 'C non tocca la linea di A');
-  -- B era stato scollegato dalla chiave rigenerata: la radice (admin) gliene dà una nuova
-  perform growup_test.come(u1);
-  k_e := public.nuova_chiave_per(b);
-  perform growup_test.come(u3);
-  perform public.entra_con_chiave(k_e);
-  k := (public.inserisci_in_mezzo('Kevin Test', array[e, g])->>'id')::uuid;  -- B inserisce K sopra E e G, suoi diretti
-  execute 'reset role';
-  perform growup_test.ok((select count(*) from public.partners where sponsor_id = k) = 2, 'K ha sotto E e G');
+  -- ---- Mesi chiusi e storico per chi guarda ----
   perform growup_test.come(u5);  -- A
-  perform growup_test.ok((select count(*) from public.riepilogo_mese(current_date) where partner_id in (h, k, e, g)) = 4,
-                         'i numeri del mese seguono la struttura corretta');
-
-  -- ---- Cambiare sponsor: solo admin ----
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, vp, data) values (%L, 'ordine', 10, current_date - 70)$q$, a),
+                                   'niente registrazioni in un mese chiuso');
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, data) values (%L, 'contatto', current_date + 3)$q$, a),
+                                   'niente registrazioni nel futuro');
+  perform growup_test.deve_fallire(format($q$select public.importa_rete(current_date - 100, '{"codice":"2000001","vpp":1}', '[]', '[]', '{}', '{}')$q$),
+                                   'un mese chiuso non si importa');
+  mese_prec := (date_trunc('month', current_date) - interval '1 day')::date;
+  perform growup_test.ok(not public.mese_aperto(current_date - 70), 'mese_aperto: due mesi fa no');
+  perform growup_test.ok(public.mese_aperto(current_date), 'mese_aperto: oggi sì');
+  execute 'reset role';
+  perform growup_test.ok(public.chiudi_mese(mese_prec) > 0, 'chiusura del mese precedente');
   perform growup_test.come(u5);  -- A
-  perform growup_test.deve_fallire(format('select public.cambia_sponsor(%L, %L)', d, a), 'A non cambia sponsor (non è admin)');
-  perform growup_test.come(u1);  -- R admin
-  perform growup_test.ok((public.cambia_sponsor(d, c)->>'sponsor_id')::uuid = c, 'l''admin sposta D sotto C');
-  -- A sotto B, che sta nel gruppo di A (A → H → B): B sale sotto R, A passa sotto B, H resta con A
-  perform growup_test.ok((public.cambia_sponsor(a, b)->>'sponsor_id')::uuid = b, 'l''admin mette A sotto B, che era nel suo gruppo');
-  perform growup_test.ok((select sponsor_id from public.partners where id = b) = r
-                         and (select sponsor_id from public.partners where id = h) = a, 'B sale al posto di A, H resta con A: niente giri');
-  perform public.cambia_sponsor(a, r);
-  perform public.cambia_sponsor(b, h);
-  perform growup_test.ok((select sponsor_id from public.partners where id = a) = r
-                         and (select sponsor_id from public.partners where id = b) = h, 'struttura rimessa com''era');
-  perform growup_test.deve_fallire(format('select public.cambia_sponsor(%L, %L)', r, a), 'la radice non si sposta');
-  perform growup_test.ok(public.cambia_sponsor(d, a) is not null, 'l''admin rimette D sotto A');
+  perform growup_test.ok((select count(*) from public.riepilogo_mese(mese_prec) where chiuso) = (select count(*) from public.monthly_totals)
+                         and (select count(*) from public.monthly_totals) > 0, 'A legge il mese chiuso come lo vedeva lei');
+  perform growup_test.ok(not exists (select 1 from public.monthly_totals where visto_da <> a), 'A legge solo il suo storico');
+  perform growup_test.deve_fallire(format($q$insert into public.monthly_totals (visto_da, partner_id, mese) values (%L, %L, date '2026-01-01')$q$, a, a),
+                                   'lo storico non si scrive dal telefono');
+  perform growup_test.deve_fallire('update public.monthly_totals set vp_gruppo = 99999', 'lo storico non si modifica');
+  perform growup_test.deve_fallire('select public.chiudi_mese(current_date)', 'la chiusura non si lancia dal telefono');
+  perform growup_test.ok((select count(*) from public.percent_levels) = 7, 'tutti leggono le soglie delle percentuali');
+  perform growup_test.ok(growup_test.righe('update public.percent_levels set vp_gruppo = 1') = 0, 'A non modifica le soglie');
 
-  -- ---- Cancellare una persona: sponsor e upline; chi stava sotto sale ----
+  -- ---- Cancellare chi usa l'app (codice non rinnovato): sponsor e upline; chi stava sotto sale ----
   perform growup_test.come(u4);  -- C, altra linea
-  perform growup_test.deve_fallire(format('select public.cancella_partner(%L)', h), 'C non cancella nella linea di A');
+  perform growup_test.deve_fallire(format('select public.cancella_partner(%L)', d), 'C non cancella nella linea di A');
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire(format('select public.cancella_partner(%L)', a), 'nessuno cancella sé stesso');
   perform growup_test.deve_fallire(format('select public.cancella_partner(%L)', r), 'nessuno cancella chi sta sopra');
-  perform growup_test.ok(public.cancella_partner(h) = 1, 'A cancella H: una persona sale');
+  perform growup_test.ok(public.cancella_partner(d) = 0, 'A cancella D (usa l''app, codice non rinnovato)');
   execute 'reset role';
-  perform growup_test.ok(not exists (select 1 from public.partners where id = h), 'H non c''è più');
-  perform growup_test.ok((select sponsor_id from public.partners where id = b) = a, 'B è salito sotto A, con il suo gruppo');
-  perform growup_test.ok((select sponsor_id from public.partners where id = k) = b, 'il gruppo di B è rimasto intatto');
-  perform growup_test.come(u3);  -- B cancella G (usa l'app, ha attività)
-  perform growup_test.ok(public.cancella_partner(g) = 0, 'B cancella G');
-  execute 'reset role';
-  perform growup_test.ok(not exists (select 1 from public.activities where partner_id = g)
-                         and not exists (select 1 from public.monthly_totals where partner_id = g)
-                         and not exists (select 1 from public.accessi where partner_id = g),
-                         'con G spariscono attività, storico e telefoni collegati');
+  perform growup_test.ok(not exists (select 1 from public.partners where id = d)
+                         and not exists (select 1 from public.activities where partner_id = d)
+                         and not exists (select 1 from public.monthly_totals where partner_id = d)
+                         and not exists (select 1 from public.accessi where partner_id = d),
+                         'con D spariscono attività, storico e telefoni collegati');
+  k := e;
 
   -- ---- Preferiti: solo persone del proprio gruppo, visibili solo a chi li ha segnati ----
   perform growup_test.come(u5);  -- A
@@ -454,44 +444,9 @@ begin
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');
   perform growup_test.come(u1);  -- R admin
-  perform growup_test.ok((select count(*) from jsonb_object_keys(public.copia_dati()->'tabelle')) = 10
+  perform growup_test.ok((select count(*) from jsonb_object_keys(public.copia_dati()->'tabelle')) = 12
                          and jsonb_array_length(public.copia_dati()->'tabelle'->'partners') >= 3, 'l''admin scarica la copia con tutte le tabelle');
   execute 'reset role';
-
-  -- ---- Codice Amway e import dei VPP: per me e per chi gestisco, mai per chi usa l'app ----
-  perform growup_test.come(u5);  -- A
-  perform growup_test.ok(public.imposta_codice_amway(a, '#2533783')->>'codice_amway' = '2533783', 'A scrive il suo codice (solo cifre)');
-  perform growup_test.ok(public.imposta_codice_amway(k, '1111111')->>'codice_amway' = '1111111', 'A scrive il codice di K, che gestisce (senza app)');
-  perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', b, '2222222'), 'A non scrive il codice di B, che usa l''app');
-  perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', k, '2533783'), 'lo stesso codice non vale per due persone');
-  perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', k, '12'), 'codice troppo corto');
-  perform growup_test.deve_fallire(format('update public.partners set codice_amway = %L where id = %L', '3333333', a), 'il codice non si scrive direttamente');
-  perform growup_test.deve_fallire(format('select public.aggiungi_con_codice(%L, %L, %L)', 'Senza Codice', b, ''), 'a mano serve il codice');
-  perform growup_test.deve_fallire(format('select public.aggiungi_con_codice(%L, %L, %L)', 'Doppio', b, '1111111'), 'a mano non si riusa un codice');
-  execute 'reset role';
-  perform growup_test.ok(not exists (select 1 from public.partners where nome in ('Senza Codice', 'Doppio')), 'con il codice sbagliato non si crea nessuno');
-  perform growup_test.come(u5);
-  f := (public.aggiungi_con_codice('Franca Test', b, '4444444')->>'id')::uuid;
-  perform growup_test.ok((select codice_amway = '4444444' and stato = 'gestito' from public.partners where id = f), 'F aggiunta a mano con il codice');
-  perform growup_test.ok(public.inserisci_in_mezzo_con_codice('Mezzo Test', array[f], '5555555')->>'codice_amway' = '5555555',
-                         'persona inserita in mezzo con il codice');
-  perform growup_test.come(u4);  -- C, altra linea
-  perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', k, '6666666'), 'C non scrive codici nella linea di A');
-  perform growup_test.deve_fallire(format($q$select public.importa_vpp(current_date, '[{"partner_id":"%s","vpp":10}]')$q$, k), 'C non importa VPP per K');
-  perform growup_test.come(u5);  -- A
-  perform growup_test.ok(public.importa_vpp(current_date, format('[{"partner_id":"%s","vpp":120.5},{"partner_id":"%s","vpp":80}]', a, k)::jsonb)->>'aggiornati' = '2',
-                         'A importa i VPP per sé e per K');
-  perform growup_test.ok((select sum(vp) from public.activities where partner_id = a and tipo in ('ordine','rettifica')
-                          and date_trunc('month', data) = date_trunc('month', current_date)) = 120.5, 'i VPP del mese di A sono quelli del report');
-  perform growup_test.ok(public.importa_vpp(current_date, format('[{"partner_id":"%s","vpp":150}]', a)::jsonb)->>'aggiornati' = '1', 'A reimporta il mese');
-  perform growup_test.ok((select sum(vp) from public.activities where partner_id = a and tipo in ('ordine','rettifica')
-                          and date_trunc('month', data) = date_trunc('month', current_date)) = 150, 'reimportare sostituisce il valore');
-  perform growup_test.ok(public.importa_vpp(current_date, format('[{"partner_id":"%s","vpp":150}]', a)::jsonb)->>'invariati' = '1', 'stesso valore: niente da registrare');
-  perform growup_test.deve_fallire(format($q$select public.importa_vpp(current_date, '[{"partner_id":"%s","vpp":10}]')$q$, b), 'A non importa i VPP di B, che usa l''app');
-  perform growup_test.deve_fallire(format($q$select public.importa_vpp(current_date - 100, '[{"partner_id":"%s","vpp":10}]')$q$, a), 'un mese chiuso non si importa');
-  perform growup_test.deve_fallire(format($q$select public.importa_vpp(current_date, '[{"partner_id":"%s","vpp":-5}]')$q$, a), 'VPP negativi rifiutati');
-  execute 'reset role';
-  perform growup_test.ok((select sum(vp) from public.activities where partner_id = b and tipo = 'rettifica') is null, 'i numeri di B non sono stati toccati');
 
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
