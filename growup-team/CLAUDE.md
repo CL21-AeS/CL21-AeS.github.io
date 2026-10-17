@@ -5,4 +5,6 @@
 - Tutto in italiano. Prima il piano e l'ok di Stefano, poi il codice; una PR per consegna, la unisce Stefano.
 - Lavora solo in `growup-team/`: le altre cartelle del repository non si toccano.
 - Sicurezza: RLS su ogni tabella, nel codice solo la chiave publishable, ogni regola nuova in `supabase/tests_rls.sql`.
+- Il repository è pubblico: mai dati reali (nomi, codici Amway, numeri, codici d'invito) in file, test, commit o PR.
+  Controlli di sicurezza in `SICUREZZA.md`.
 - L'app non dà suggerimenti: mostra dati, percorso e mancanze.

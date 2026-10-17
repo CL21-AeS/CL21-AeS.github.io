@@ -691,7 +691,7 @@ check(await page.locator(".sheet .errore").getByText("sul sito Amway scegli il f
 await page.setInputFiles("#file-report", { name:"los.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, righeCsv)) });
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
 const sez = t => page.locator(".sheet .imp-sezione", { hasText:t });
-check(await sez("Si aggiornano i VPP").locator("li", { hasText:"Stefano e Alessia (tu)" }).getByText("400,00 VP").isVisible()
+check(await sez("Si aggiornano i VPP").locator("li", { hasText:"Stefano e Alessia (tu)" }).getByText("400 VP").isVisible()
   && await sez("Si aggiornano i VPP").getByText("il tuo codice 1234567 viene salvato").isVisible(), "anteprima: i miei VPP e il mio codice dalla prima riga");
 check(await sez("Si aggiornano i VPP").locator("li", { hasText:"Gino Gestito" }).getByText("1.055,5 VP").isVisible(), "anteprima: Gino, abbinato per codice");
 check(!(await sez("Nome uguale, codice diverso").count()) && !(await sez("trovati per nome").count()), "niente più abbinamenti per nome");
@@ -755,38 +755,38 @@ const csv2 = righe => "﻿" + [csvRiga(["Amway","CONFIDENZIALE"]), csvRiga(["Mes
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.click("button[data-act=vista-gruppo]");
 await scegliFile(page, "platino.csv", csv2([riga2(1, "1", "1234567", "ROSSI, MARIO", "120,00", "9.500,00", 18, 163),
-  riga2(2, "1234567", "4000001", "PLATINI, BIANCA", "0,00", "5.300,00", 15, 191),
+  riga2(2, "1234567", "4100001", "PLATINI, BIANCA", "0,00", "5.300,00", 15, 191),
   riga2(2, "1234567", "4000011", "UNO, LINEA", "0,00", "700,00", 3, 4), riga2(2, "1234567", "4000012", "DUE, LINEA", "0,00", "650,00", 3, 3)]), true);
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
-await page.check(".sheet input[name=aggiungi][value='4000001']");
+await page.check(".sheet input[name=aggiungi][value='4100001']");
 await page.check(".sheet input[name=consenso]");
 await page.click(".sheet button:has-text('Importa')");
 await page.getByText(/1 persona aggiunta/).waitFor();
-check(await page.locator(".albero.struttura li", { hasText:"Bianca Platini" }).getByText("gruppo 5.300,00").isVisible(), "Platino: VP di gruppo dal report");
+check(await page.locator(".albero.struttura li", { hasText:"Bianca Platini" }).getByText("gruppo 5.300").isVisible(), "Platino: VP di gruppo dal report");
 await page.locator(".albero.struttura li", { hasText:"Bianca Platini" }).locator("button[data-act=apri-scheda]").click();
 check(await page.getByText("Linee non visibili nel report").isVisible() && await page.locator(".dati-scheda").getByText("15%").isVisible(), "scheda del Platino: 15%, linee non visibili");
 check(await page.locator(".card", { hasText:"Inviti · solo admin" }).isVisible(), "admin: inviti nella scheda");
 await sync(page);
-const barbara = DB.partners.find(p => p.codice_amway === "4000001");
-check((await page.locator(".card", { hasText:"Inviti · solo admin" }).locator(".linkbox").innerText()).endsWith("#" + barbara.codice_invito), "link d'invito sotto Barbara");
+const bianca = DB.partners.find(p => p.codice_amway === "4100001");
+check((await page.locator(".card", { hasText:"Inviti · solo admin" }).locator(".linkbox").innerText()).endsWith("#" + bianca.codice_invito), "link d'invito sotto Bianca");
 await page.screenshot({ path: S + "/e2e/28-platino.png", fullPage:true });
 await page.click("button[data-act=vista-io]");
 check(await page.getByText("dal report Amway").first().isVisible() && await page.getByText("18% questo mese").isVisible(), "pagina Io: percentuale ufficiale dal report");
 await ctx.close();
-// Nora entra con il link sotto Barbara
-({ ctx, page } = await apri({}, "#" + barbara.codice_invito));
+// Nora entra con il link sotto Bianca
+({ ctx, page } = await apri({}, "#" + bianca.codice_invito));
 await page.getByText("Ti ha invitato Bianca Platini").waitFor();
 await page.fill("input[name=nome]", "Nora Sotto"); await page.fill("input[name=codice_amway]", "4000002");
 await page.fill("input[name=data]", oggiStr); await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor();
 await sync(page); await ctx.close();
 const nora = DB.partners.find(p => p.nome === "Nora Sotto");
-check(nora.sponsor_id === barbara.id && nora.stato === "attivo", "Nora sotto Barbara, usa l'app");
-// la radice crea il link per chi manca tra Barbara e Nora
+check(nora.sponsor_id === bianca.id && nora.stato === "attivo", "Nora sotto Bianca, usa l'app");
+// la radice crea il link per chi manca tra Bianca e Nora
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.click("button[data-act=vista-gruppo]");
-check(await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator(".livello").innerText() === "3", "Nora sotto Barbara nella struttura della radice");
+check(await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator(".livello").innerText() === "3", "Nora sotto Bianca nella struttura della radice");
 await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator("button[data-act=apri-scheda]").click();
 await page.click("button[data-act=invito-sopra]");
 await page.click(".sheet button:has-text('Crea il link')");
@@ -800,10 +800,27 @@ await page.fill("input[name=data]", oggiStr); await page.check("input[name=priva
 await page.getByText("Il tuo primo obiettivo").waitFor();
 await sync(page); await ctx.close();
 const mirco = DB.partners.find(p => p.nome === "Mirco Mezzo");
-check(mirco.sponsor_id === barbara.id && DB.partners.find(p => p.nome === "Nora Sotto").sponsor_id === mirco.id, "Mirco entra tra Barbara e Nora");
+check(mirco.sponsor_id === bianca.id && DB.partners.find(p => p.nome === "Nora Sotto").sponsor_id === mirco.id, "Mirco entra tra Bianca e Nora");
 ({ ctx, page } = await apri({}, "#" + linkSopra.split("#")[1]));
 await page.getByText(/link d'invito non è valido|Entra in Growup|Benvenuto/).first().waitFor();
 check(!(await page.getByText("Ti ha invitato Bianca Platini").count()), "il link speciale vale una volta sola");
+await ctx.close();
+
+// 20. Sicurezza: un nome malevolo non diventa codice; la pagina ha la Content Security Policy
+DB.partners.push({ id:"xss1", nome:'<img src=x onerror="window.__xss=1">', sponsor_id:"R", stato:"attivo", codice_invito:"XSSAAA",
+  codice_amway:"6000001", creato_il:new Date().toISOString(), partenza_confermata_il:new Date().toISOString() });
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.click("button[data-act=vista-gruppo]");
+await page.locator(".albero.struttura li", { hasText:"<img" }).locator("button[data-act=apri-scheda]").click();
+await page.getByText("Scheda partner").waitFor();
+await page.locator("button[data-act=preferito]").click();
+await page.click("button.link[data-act=vista-gruppo]");
+await page.fill("#cerca-struttura", "img");
+check(await page.evaluate(() => window.__xss === undefined) && await page.locator(".albero.struttura li", { hasText:"<img src=x" }).isVisible(),
+  "un nome con codice HTML si vede come testo e non viene eseguito");
+check(/script-src 'self' https:\/\/cdn\.jsdelivr\.net;/.test(await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content")),
+  "la pagina ha la Content Security Policy");
 await ctx.close();
 
 await browser.close();

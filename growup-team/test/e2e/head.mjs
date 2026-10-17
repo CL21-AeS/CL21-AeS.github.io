@@ -18,7 +18,7 @@ const errori = [];
 let ok = 0; const check = (c, m) => { if(!c){ console.log("FAIL:", m); process.exitCode = 1; } else { ok++; } };
 const browser = await chromium.launch();
 async function apri(ctxOpts, hash){
-  const ctx = await browser.newContext(Object.assign({ viewport:{width:390,height:844}, locale:"it-IT", timezoneId:"Europe/Rome" }, ctxOpts));
+  const ctx = await browser.newContext(Object.assign({ viewport:{width:390,height:844}, locale:"it-IT", timezoneId:"Europe/Rome", bypassCSP:true }, ctxOpts));
   await ctx.route(/cdn\.jsdelivr\.net/, r => r.abort());
   const page = await ctx.newPage();
   page.on("console", m => { if(m.type() === "error" && !/jsdelivr|ERR_FAILED|Failed to load resource/.test(m.text())) errori.push(m.text()); });

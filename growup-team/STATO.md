@@ -10,7 +10,7 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 - **Database**: progetto Supabase **Growup-Team** (`mxpuvmggexjyieylmfss`), organizzazione "CL21-AeS's Org",
   regione Central EU (Francoforte). Installati schema, RLS, 8 tappe e impostazioni; i controlli dei permessi
   (`supabase/tests_rls.sql`) sono passati sul progetto.
-- **Profilo radice**: un solo profilo **"Stefano e Alessia"** (admin), codice d'invito **ABCDEF**.
+- **Profilo radice**: un solo profilo **"Stefano e Alessia"** (admin). Il codice d'invito non si scrive qui: il repository è pubblico.
   Il link personale è stato salvato da Stefano su WhatsApp (non è in nessun file: nel database c'è solo l'impronta).
 - **Accesso anonimo** attivo in Supabase (Authentication → Sign In / Providers).
 - `config.js` contiene URL e chiave publishable del progetto.
@@ -254,12 +254,12 @@ riga 3 le intestazioni; colonne usate "Qualifica Amway Partner" (= livello), "Co
 ## Platino, inviti degli admin e numeri ufficiali (17 ottobre, dopo il primo import vero)
 
 Decisioni di Stefano:
-- **Gruppi dei Platino**: il report Amway non mostra chi sta sotto un Platino (es. Bianca Platini). Solo gli admin
+- **Gruppi dei Platino**: il report Amway non mostra chi sta sotto un Platino (per esempio una Platino del gruppo). Solo gli admin
   hanno nella scheda **Invita sotto questa persona** (link d'invito di quella persona, anche se importata) e
   **Invita chi manca sopra** (link speciale monouso: chi entra va tra lo sponsor e la persona, che passa sotto di lui).
 - **Numeri ufficiali dal report per tutti gli importati** (e per sé): VPP, VPG, percentuale e i VPG delle linee frontali;
   pagina Io, struttura, scheda e storico usano questi; **la qualifica si calcola sulla struttura del report**.
-  Un Platino aveva VPG 0 nell'app perché il suo gruppo non è nel report: ora mostra 5.300,00 e 15%.
+  Prima un Platino aveva VPG 0 nell'app perché il suo gruppo non è nel report: ora mostra il VPG e la percentuale ufficiali.
 - **Codice Amway**: nessuno lo modifica (viene dal report o dall'ingresso); solo gli admin lo **correggono** dalla scheda
   (errore di battitura all'ingresso); l'import lo segnala ("chiedi a Stefano e Alessia di correggerlo").
 - Tolti dall'import gli abbinamenti per nome (servivano solo per le persone inserite a mano, cancellate da Stefano).

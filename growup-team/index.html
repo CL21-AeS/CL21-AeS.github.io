@@ -2,6 +2,10 @@
 <html lang="it">
 <head>
 <meta charset="utf-8">
+<!-- Sicurezza: il browser esegue solo il codice dell'app (e la libreria Supabase con il controllo di integrità)
+     e si collega solo al nostro progetto Supabase. Un testo malevolo nei dati non può diventare codice. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://mxpuvmggexjyieylmfss.supabase.co wss://mxpuvmggexjyieylmfss.supabase.co; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Growup Team</title>
 <meta name="description" content="Pianifica la settimana e segui il tuo percorso fino ad Argento.">
