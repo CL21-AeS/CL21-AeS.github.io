@@ -217,8 +217,9 @@ dall'SQL Editor perché contiene un `delete`):
   - schermata d'ingresso: pulsante **Incolla il link personale** (legge il link copiato); nell'app installata
     spiega che la prima volta serve il link. Perché: su iPhone l'app sulla Home ha una memoria separata da Safari.
   - Ordine giusto per un nuovo partner su iPhone: prima entra dal link d'invito, poi installa.
-4. **Prima del lancio a tutto il gruppo**: captcha (Cloudflare Turnstile) sugli accessi anonimi e limite
-   "anonymous sign-ins" più alto in Authentication → Rate Limits.
+4. **Prima del lancio a tutto il gruppo**: captcha (Cloudflare Turnstile) nell'app (PR del 17 ottobre): Stefano
+   lo accende in Supabase con la Secret Key dopo aver unito la PR. Limite "anonymous sign-ins" a 30/ora, provider
+   Email spento (fatto).
 5. Dopo la Fase 2: Fase 3 (presa in carico dopo 14 giorni, avvisi) e Fase 4 (diagnosi, serie di settimane, 90 giorni).
 
 ## La rete dal report Amway (17 ottobre: import dei VPP con la PR #37; struttura flessibile in questa PR)
@@ -280,12 +281,13 @@ Com'è fatto: migrazione `017_inviti_e_numeri_report.sql` (tabelle `inviti_admin
   Nascondi tutti · Mostra tutti*); chi non è più nel report resta, segnato "non più nel report" e nascosto; ognuno
   nasconde chi vuole (anche le persone importate) e i VP contano sempre. Gli esclusi di prima diventano nascoste al
   primo import. Cancellazione solo per diritto all'oblio, dall'SQL Editor (`ADMIN.md`).
-- Restano da fare per Stefano: verifica in due passaggi (GitHub, Supabase, Google), captcha e limite degli accessi
-  anonimi prima del lancio, email privata su GitHub.
+- **Captcha Cloudflare Turnstile** al primo ingresso di un telefono (account Cloudflare di Stefano, con verifica in
+  due passaggi; Site Key in `config.js`, Secret Key solo in Supabase). Provider Email spento in Supabase.
+- Restano da fare per Stefano: accendere il captcha in Supabase (Attack Protection), verifica in due passaggi
+  (GitHub, Supabase, Google), email privata su GitHub.
 
 ## Proposte in sospeso (Stefano non ha ancora risposto)
 
-- Captcha prima del lancio (punto 4 sopra).
 
 ## Domande aperte
 

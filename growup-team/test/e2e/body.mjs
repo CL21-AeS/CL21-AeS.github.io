@@ -827,9 +827,26 @@ await page.click("button.link[data-act=vista-gruppo]");
 await page.fill("#cerca-struttura", "img");
 check(await page.evaluate(() => window.__xss === undefined) && await page.locator(".albero.struttura li", { hasText:"<img src=x" }).isVisible(),
   "un nome con codice HTML si vede come testo e non viene eseguito");
-check(/script-src 'self' https:\/\/cdn\.jsdelivr\.net;/.test(await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content")),
+check(/script-src 'self' https:\/\/cdn\.jsdelivr\.net https:\/\/challenges\.cloudflare\.com; frame-src https:\/\/challenges\.cloudflare\.com;/.test(await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content")),
   "la pagina ha la Content Security Policy");
 await ctx.close();
+
+// 21. Captcha al primo ingresso: il gettone arriva a Supabase; se il controllo fallisce, un messaggio chiaro
+DB.captcha = null; DB.captchaKo = false;
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await sync(page);
+check(DB.captcha === "tok-prova" && !(await page.locator(".captcha").count()), "primo ingresso: captcha superato, gettone passato all'accesso");
+const stato = await ctx.storageState(); await ctx.close(); DB.captcha = null;
+({ ctx, page } = await apri({ storageState:stato }));
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await sync(page);
+check(DB.captcha === null, "chi è già dentro non rifà il captcha");
+await ctx.close();
+DB.captchaKo = true;
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Il controllo di sicurezza non è riuscito").waitFor();
+check(!(await page.locator(".captcha").count()), "captcha fallito: messaggio chiaro e nessun accesso");
+await ctx.close(); DB.captchaKo = false;
 
 await browser.close();
 console.log(`controlli superati: ${ok}`);
