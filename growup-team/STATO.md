@@ -122,7 +122,7 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare la struttura "come Amway"** (campi con lo 0 grigio già uniti con la PR #32) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare le frecce a ogni livello durante la ricerca** (struttura "come Amway" già unita con la PR #33) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
@@ -168,7 +168,8 @@ dall'SQL Editor perché contiene un `delete`):
 - **Ricerca nella struttura** (17 ottobre): casella "Cerca un nome nel tuo gruppo…" sopra la struttura; filtra mentre
   si scrive (senza badare agli accenti), mostra le persone trovate in rame con la loro linea fino a te, trova anche
   dentro i gruppi richiusi; svuotandola torna tutto com'era. Durante la ricerca **▸ N** sulla persona trovata (o su
-  chiunque della sua linea) apre anche il suo gruppo; ▾ N lo richiude.
+  chiunque della sua linea) apre i suoi frontali, e ognuno ha la sua freccia per scendere di un livello alla volta;
+  ▾ N richiude.
 - **Preferiti al posto dell'imbuto** (17 ottobre, decisione di Stefano: l'imbuto sommava gli obiettivi di tutta la rete,
   ma solo pochi lavorano attivamente, quindi non sarebbe mai stato realistico). Nella scheda partner la stella **☆/★**
   segna una persona come preferita (tabella `preferiti`, migrazione `012_preferiti.sql` già applicata; RLS: solo

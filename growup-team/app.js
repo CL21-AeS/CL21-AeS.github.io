@@ -489,10 +489,10 @@ function applicaRicerca(){
   if(!q){ lis.forEach(li => li.classList.remove("fuori", "trovato")); if(esito) esito.textContent = ""; st.espansi.clear(); etichettePiega(false); return; }
   const trovati = lis.filter(li => li.dataset.nome.includes(q)), visibili = new Set();
   for(const li of trovati){ visibili.add(li.dataset.id); li.dataset.path.split(" ").filter(Boolean).forEach(id => visibili.add(id)); }
-  /* ▸ N su una persona visibile apre anche il suo gruppo */
+  /* ▸ N su una persona visibile apre i suoi frontali; ognuno ha la sua freccia per scendere ancora */
   for(const li of lis){
-    const sopra = li.dataset.path.split(" ").filter(Boolean);
-    if(sopra.some(id => st.espansi.has(id) && visibili.has(id))) visibili.add(li.dataset.id);
+    const sopra = li.dataset.path.split(" ").filter(Boolean), sponsor = sopra[sopra.length - 1];
+    if(sponsor && st.espansi.has(sponsor) && visibili.has(sponsor)) visibili.add(li.dataset.id);
   }
   for(const li of lis){ li.classList.toggle("fuori", !visibili.has(li.dataset.id)); li.classList.toggle("trovato", trovati.includes(li)); }
   etichettePiega(true);
