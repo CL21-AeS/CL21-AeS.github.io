@@ -249,11 +249,11 @@ begin
   x := null;
   perform growup_test.ok((public.importa_rete(current_date, '{"codice":"2000001","vpp":60}',
       '[{"codice":"3000001","nome":"Elena Test","sponsor":"2000002","vpp":40},{"codice":"3000002","nome":"Fabio Test","sponsor":null,"vpp":0}]',
-      '[{"codice":"2000002","sponsor":"2000001"}]', '{3999999}', '{}')->>'aggiunte')::int = 2, 'A importa E (sotto B) e F (sotto di lei)');
+      '[{"codice":"2000002","sponsor":"2000001"}]', '{3000002}', '{}')->>'aggiunte')::int = 2, 'A importa E (sotto B) e F (sotto di lei)');
   e := (select id from public.partners where codice_amway = '3000001');
   f := (select id from public.partners where codice_amway = '3000002');
   perform growup_test.ok((select count(*) from public.partners where id in (e, f)) = 2, 'A vede le sue persone importate');
-  perform growup_test.ok((select esclusi from (select count(*) as esclusi from public.esclusi_import) z) = 1, 'A ha un codice escluso');
+  perform growup_test.ok((select count(*) from public.nascosti where nascosto_id = f) = 1, 'F importata e già nascosta, come scelto nell''anteprima');
   execute 'reset role';
   perform growup_test.ok((select sponsor_id = b and stato = 'gestito' and gestore_id = a from public.partners where id = e),
                          'E è sotto B, senza app, importata da A');
@@ -265,7 +265,7 @@ begin
   perform growup_test.ok(not exists (select 1 from public.partners where id = e), 'B non vede E, anche se è sotto di lui: l''ha importata A');
   perform growup_test.come(u1);  -- R
   perform growup_test.ok(not exists (select 1 from public.partners where id in (e, f)), 'R non vede le persone importate da A');
-  perform growup_test.ok((select count(*) from public.esclusi_import) = 0, 'R non vede gli esclusi di A');
+  perform growup_test.ok((select count(*) from public.nascosti) = 0, 'R non vede le persone nascoste da A');
   perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'contatto')$q$, e), 'R non scrive per E');
   -- R importa anche lui E: la sua copia
   perform growup_test.ok((public.importa_rete(current_date, '{"codice":"1000000","vpp":120}',
@@ -335,15 +335,18 @@ begin
   perform growup_test.ok((select sponsor_id from public.partners where codice_amway = '3000009') = c,
                          'uno sponsor che C non vede: la persona va sotto C');
 
-  -- ---- Non più nel report: le mie importate si cancellano e diventano escluse ----
+  -- ---- Non più nel report: nessuno si cancella, resta segnato e nascosto ----
   perform growup_test.come(u1);  -- R
   perform growup_test.deve_fallire(format($q$select public.importa_rete(current_date, '{"codice":"1000000","vpp":120}', '[]', '[]', '{}', '{%s}')$q$, f),
-                                   'R non cancella le persone importate da A');
+                                   'R non segna le persone importate da A');
   perform growup_test.come(u5);  -- A
-  perform growup_test.ok((public.importa_rete(current_date, '{"codice":"2000001","vpp":60}', '[]', '[]', '{}', array[f])->>'cancellate')::int = 1,
-                         'A cancella F, non più nel report');
-  perform growup_test.ok(not exists (select 1 from public.partners where id = f)
-                         and exists (select 1 from public.esclusi_import where codice = '3000002'), 'F cancellata ed esclusa');
+  perform growup_test.ok((public.importa_rete(current_date, '{"codice":"2000001","vpp":60}', '[]', '[]', '{}', array[f])->>'fuori')::int = 1,
+                         'A: F non è più nel report');
+  perform growup_test.ok(exists (select 1 from public.partners where id = f and fuori_report_dal is not null)
+                         and exists (select 1 from public.nascosti where nascosto_id = f), 'F resta, segnata e nascosta');
+  perform growup_test.ok((public.importa_rete(current_date, '{"codice":"2000001","vpp":60}',
+      '[{"codice":"3000002","nome":"Fabio Test","sponsor":null,"vpp":0}]', '[]', '{}', '{}')->>'aggiunte')::int = 0, 'F torna nel report: niente doppioni');
+  perform growup_test.ok(exists (select 1 from public.partners where id = f and fuori_report_dal is null), 'F torna nel report: segno tolto');
 
   -- ---- Nascoste: solo per chi le nasconde ----
   insert into public.nascosti (partner_id, nascosto_id) values (a, b);
@@ -392,19 +395,15 @@ begin
   perform growup_test.ok((select count(*) from public.percent_levels) = 7, 'tutti leggono le soglie delle percentuali');
   perform growup_test.ok(growup_test.righe('update public.percent_levels set vp_gruppo = 1') = 0, 'A non modifica le soglie');
 
-  -- ---- Cancellare chi usa l'app (codice non rinnovato): sponsor e upline; chi stava sotto sale ----
-  perform growup_test.come(u4);  -- C, altra linea
-  perform growup_test.deve_fallire(format('select public.cancella_partner(%L)', d), 'C non cancella nella linea di A');
+  -- ---- Nessuno cancella: né sponsor e upline, né l'admin ----
   perform growup_test.come(u5);  -- A
-  perform growup_test.deve_fallire(format('select public.cancella_partner(%L)', a), 'nessuno cancella sé stesso');
-  perform growup_test.deve_fallire(format('select public.cancella_partner(%L)', r), 'nessuno cancella chi sta sopra');
-  perform growup_test.ok(public.cancella_partner(d) = 0, 'A cancella D (usa l''app, codice non rinnovato)');
+  perform growup_test.deve_fallire(format('select public.cancella_partner(%L)', d), 'A non cancella D');
+  perform growup_test.deve_fallire(format('select public.cancella_partner(%L)', f), 'A non cancella F, che ha importato');
+  perform growup_test.come(u1);  -- R admin
+  perform growup_test.deve_fallire(format('select public.cancella_partner(%L)', d), 'neanche l''admin cancella');
+  perform growup_test.deve_fallire(format('delete from public.partners where id = %L', d), 'niente cancellazioni dirette');
   execute 'reset role';
-  perform growup_test.ok(not exists (select 1 from public.partners where id = d)
-                         and not exists (select 1 from public.activities where partner_id = d)
-                         and not exists (select 1 from public.monthly_totals where partner_id = d)
-                         and not exists (select 1 from public.accessi where partner_id = d),
-                         'con D spariscono attività, storico e telefoni collegati');
+  perform growup_test.ok(exists (select 1 from public.partners where id = d), 'D c''è ancora');
   k := e;
 
   -- ---- Numeri ufficiali dal report e Platino (017) ----

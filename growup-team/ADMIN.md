@@ -27,6 +27,26 @@ da loro. Le persone importate dagli altri le trovano solo nella copia di sicurez
 | Migrazioni nuove (`supabase/0NN_*.sql`) | SQL Editor: quelle con cancellazioni il connettore di Claude non riesce ad applicarle, si incollano a mano |
 | Link personale perso dell'admin stesso | `select public.nuova_chiave_per(id) from public.partners where is_admin;` (SQL Editor) |
 
+## Cosa NON può fare nessuno, neanche un admin
+
+**Cancellare persone dall'app.** La struttura rispecchia il report Amway: chi non c'è più resta segnato "non più nel
+report" e nascosto. Ognuno può solo nascondere chi vuole dalla propria struttura (i VP contano lo stesso).
+
+## Richiesta di cancellazione dei dati (diritto all'oblio)
+
+È l'unico caso in cui si cancella, e lo fa un admin dall'SQL Editor di Supabase dopo una richiesta scritta della persona.
+Prima scaricare la copia di sicurezza. Sostituire il codice Amway della persona:
+
+```sql
+-- chi stava sotto passa al suo sponsor; con la persona spariscono le sue attività, obiettivi, storico e telefoni collegati
+with t as (select id, sponsor_id from public.partners where codice_amway = '0000000')
+update public.partners p set sponsor_id = t.sponsor_id from t where p.sponsor_id = t.id;
+delete from public.partners where codice_amway = '0000000';
+```
+
+Se la persona era stata importata da più partner (copie), il comando le toglie tutte. Ai prossimi import tornerebbe
+dal report: in quel caso va avvisato chi la importa.
+
 ## Come si nomina un nuovo admin
 
 Nell'SQL Editor di Supabase (sostituire il nome):

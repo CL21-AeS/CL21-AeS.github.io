@@ -55,12 +55,14 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     ingresso con il codice Amway, calcoli e storico per chi guarda, persone nascoste; niente più inserimenti a mano
 14. `supabase/017_inviti_e_numeri_report.sql` — inviti degli admin (sotto una persona, chi manca sopra), struttura
     "ricucita", numeri ufficiali dal report Amway (VPG, percentuale, linee) e qualifica calcolata su quelli
-15. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
-16. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
-17. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
+15. `supabase/018_niente_cancellazioni.sql` — nessuno cancella dall'app; import sempre completo; chi non è più nel
+    report resta segnato e nascosto
+16. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+17. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
+18. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
 
-In alternativa ai punti 1-15: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
+In alternativa ai punti 1-16: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
 I file `004_*` e `005_*` servono solo al progetto già installato: il loro contenuto è già dentro 001-003.
 
 ## 3. Attivare l'accesso senza email
@@ -114,8 +116,8 @@ e mettile in `growup-team/config.js` (oppure mandale a Claude Code e lo fa lui).
   ```
 
   e mandategli il link su WhatsApp. I suoi vecchi telefoni vengono scollegati. (In Fase 2 lo farete dall'app.)
-- **Cancellare un partner** (diritto all'oblio): Table editor → `partners` → elimina la riga; le sue attività e i suoi
-  obiettivi spariscono con lui. Se ha persone sotto, prima spostatele sotto un altro sponsor.
+- **Cancellare un partner** (solo per una richiesta di cancellazione dei dati, diritto all'oblio): dall'app nessuno
+  cancella; si fa dall'SQL Editor, vedi `ADMIN.md` → "Richiesta di cancellazione dei dati".
 
 ## Copia di sicurezza dei dati (una volta al mese)
 
@@ -149,10 +151,10 @@ struttura → **Importa dal report Amway**).
 1. Sul sito Amway: Business Centre → **Linea di Sponsorizzazione (LOS)** → togliere i filtri → pulsante di download →
    **Intera Linea di Sponsorizzazione con tutti i KPI disponibili** → formato **CSV**.
 2. Nell'app scegliere il file. L'anteprima mostra:
-   - **Non ancora nell'app**: nessuno spuntato; pulsanti *Spunta chi ha VPP · Spunta tutti · Togli tutti* e ricerca.
-     Chi resta senza spunta diventa **escluso** e non viene più riproposto (sezione "Escluse · Rivedi");
-   - chi si aggiorna (io e le mie persone importate), nome uguale ma codice diverso, senza codice ma trovato per nome;
-   - **non più nel report**: già spuntati per la cancellazione (non spuntati se ne mancano molti insieme);
+   - **Nuovi nel report**: entrano **tutti** (l'import è sempre completo); si spunta chi **nascondere**, con i pulsanti
+     *Nascondi chi ha 0 VP · Nascondi tutti · Mostra tutti* e la ricerca per nome o codice;
+   - chi si aggiorna (io e le mie persone importate);
+   - **non più nel report**: nessuno si cancella; restano con il segno "non più nel report" e vanno tra le nascoste;
    - **usano l'app**: non vengono toccati; se il report dice che il loro sponsor è un altro, vanno sotto di lui.
 3. **Importa**. Si importa il mese scritto nel file: quello in corso (anche più volte, i valori si sostituiscono) o il
    precedente fino al giorno 5. Il file resta sul telefono: si salvano solo nome, codice e VPP di chi si importa.
@@ -164,9 +166,9 @@ sono, le linee no ("linee non visibili nel report"). Chi non importa vede i nume
 più le proprie persone importate); lo storico dei mesi chiusi si congela allo stesso modo.
 
 Cosa possono fare in più gli admin (inviti sotto una persona o "chi manca sopra", correzione del codice Amway, …):
-vedi `ADMIN.md`. Dalla scheda: **Nascondi dalla mia struttura** (chi usa l'app;
-sparisce solo per me, i suoi VP contano) e **Cancella dalla struttura** (le mie importate: cancellate ed escluse; chi usa
-l'app: cancellato per tutti, per i codici non rinnovati).
+vedi `ADMIN.md`. Dalla scheda di chiunque: **Nascondi dalla mia struttura** (sparisce solo per me, con il suo gruppo; i suoi VP contano
+sempre nei numeri personali e di gruppo). Le nascoste si rivedono da "N persone nascoste · Rivedi" nella struttura.
+**Nell'app nessuno cancella niente**, neanche gli admin.
 
 ## Com'è fatta
 

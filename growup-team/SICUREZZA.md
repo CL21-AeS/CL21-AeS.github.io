@@ -12,6 +12,8 @@ al database e prima del lancio a tutto il gruppo.
 | **App (GitHub Pages)** | Content Security Policy: il browser esegue solo il codice dell'app e la libreria Supabase (con controllo di integrità) e si collega solo al nostro progetto. Ogni testo che viene dal database è "sterilizzato" prima di essere mostrato (provato con un nome contenente codice HTML). La cache del telefono tiene solo l'app, mai i dati. `no-referrer`: i link non rivelano da dove si arriva. |
 | **Report Amway (CSV)** | Si legge sul telefono, non viene caricato da nessuna parte; al database arrivano solo nome, codice e numeri di chi si importa. |
 | **GitHub (pubblico)** | Contiene solo codice: nessuna chiave segreta (in `config.js` c'è solo la chiave pubblica, fatta per stare nel browser), nessun dato reale nei file (i test usano nomi e codici inventati). |
+| **Niente cancellazioni** | Dall'app nessuno può cancellare persone (neanche gli admin): si possono solo nascondere. La cancellazione per diritto all'oblio si fa dall'SQL Editor (`ADMIN.md`). |
+| **GitHub, storia** | 17 ottobre 2026: la storia del repository è stata riscritta per togliere ogni dato reale (nomi, codici Amway, numeri, codice d'invito, email dell'autore dei commit). |
 | **Copia di sicurezza** | La scarica solo un admin; contiene tutti i dati: va tenuta in una cartella privata di Google Drive. |
 
 ## Controlli fatti
