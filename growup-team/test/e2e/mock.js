@@ -8,6 +8,12 @@
   const mio = () => { const a = session && db.accessi.find(x => x.user_id === session.user.id); return a ? db.partners.find(p => p.id === a.partner_id) : null; };
   const pub = p => { if(!p) return null; const c = Object.assign({}, p); delete c.chiave; return c; };
   const salva = () => { window.__DBOUT = db; };
+  /* come nel database: vedo me, chi usa l'app nel mio gruppo e le persone che ho importato io */
+  const sotto = id => db.partners.filter(p => p.sponsor_id === id).flatMap(p => [p].concat(sotto(p.id)));
+  const vedo = (io, p) => p.id === io.id || (sotto(io.id).some(x => x.id === p.id) && (p.stato !== "gestito" || p.gestore_id === io.id));
+  const visibili = io => [io].concat(sotto(io.id).filter(p => vedo(io, p)));
+  const antenatoConApp = p => { let s = db.partners.find(x => x.id === p.sponsor_id);
+    while(s && s.stato === "gestito" && s.sponsor_id) s = db.partners.find(x => x.id === s.sponsor_id); return s ? s.id : p.sponsor_id; };
   window.GROWUP_API = {
     session: async () => session,
     signInAnon: async () => { if(db.anonDisattivo) throw new Error("Anonymous sign-ins are disabled");
@@ -25,12 +31,26 @@
       if(!session) throw new Error("non_autenticato");
       const sp = db.partners.find(p => p.codice_invito === a.p_codice);
       if(!sp) throw new Error("codice_non_valido");
-      const p = { id:uid(), nome:a.p_nome, sponsor_id:sp.id, chiave:hex(),
-        codice_invito:"N" + Math.random().toString(36).slice(2,7).toUpperCase(), stato:"attivo", data_iscrizione:a.p_data_iscrizione,
+      if(!a.p_codice_amway) throw new Error("codice_amway_mancante");
+      if(db.partners.some(p => p.codice_amway === a.p_codice_amway && p.stato !== "gestito")) throw new Error("codice_amway_attivo");
+      const dati = { nome:a.p_nome, chiave:hex(), stato:"attivo", data_iscrizione:a.p_data_iscrizione,
         qualifica_iniziale:a.p_qualifica, qualifica_iniziale_mese:a.p_qualifica_mese, pagamenti_iniziali:a.p_pagamenti,
         percentuale_iniziale:a.p_percentuale, privacy_accettata_il:new Date().toISOString(),
         partenza_confermata_il:(a.p_qualifica || a.p_percentuale) ? null : new Date().toISOString() };
-      db.partners.push(p); db.accessi.push({ user_id:session.user.id, partner_id:p.id }); db.joins.push(a); salva();
+      const copie = db.partners.filter(p => p.codice_amway === a.p_codice_amway && p.stato === "gestito");
+      let p;
+      if(copie.length){
+        const sotto = copie.filter(c => { for(let x = db.partners.find(y => y.id === c.sponsor_id); x; x = db.partners.find(y => y.id === x.sponsor_id)) if(x.id === sp.id) return true; return false; });
+        if(!sotto.length) throw new Error("codice_amway_altra_linea");
+        p = sotto.find(c => c.gestore_id === sp.id) || sotto[0];
+        for(const c of copie) if(c !== p){ db.partners.filter(x => x.sponsor_id === c.id).forEach(x => { x.sponsor_id = p.id; }); db.partners = db.partners.filter(x => x !== c); }
+        Object.assign(p, dati, { gestore_id:null, sponsor_id:antenatoConApp(p) });
+      }else{
+        p = Object.assign({ id:uid(), sponsor_id:sp.id, codice_amway:a.p_codice_amway,
+          codice_invito:"N" + Math.random().toString(36).slice(2,7).toUpperCase() }, dati);
+        db.partners.push(p);
+      }
+      db.accessi.push({ user_id:session.user.id, partner_id:p.id }); db.joins.push(a); salva();
       return { profilo:pub(p), chiave:p.chiave };
     },
     accettaPrivacy: async pid => { const p = db.partners.find(x => x.id === pid); p.privacy_accettata_il = new Date().toISOString(); salva(); },
@@ -45,22 +65,17 @@
     preferiti: async () => { const io = mio(); return (db.preferiti || []).filter(x => x.partner_id === io.id); },
     aggiungiPreferito: async (io, pid) => { db.preferiti = (db.preferiti || []).concat([{ partner_id:io, preferito_id:pid }]); salva(); },
     togliPreferito: async (io, pid) => { db.preferiti = (db.preferiti || []).filter(x => !(x.partner_id === io && x.preferito_id === pid)); salva(); },
-    struttura: async () => { const io = mio(); if(!io) return [];
-      const sotto = id => db.partners.filter(p => p.sponsor_id === id).flatMap(p => [p].concat(sotto(p.id)));
-      return [io].concat(sotto(io.id)).map(pub); },
-    aggiungi: async a => { const io = mio();
-      if(!a.p_codice_amway) throw new Error("codice_amway_mancante");
-      if(db.partners.some(x => x.codice_amway === a.p_codice_amway)) throw new Error("codice_amway_usato");
-      const p = { id:uid(), nome:a.p_nome, sponsor_id:a.p_sponsor, stato:"gestito", gestore_id:io.id, codice_amway:a.p_codice_amway, codice_invito:"G" + uid().slice(2,7).toUpperCase(),
-        data_iscrizione:a.p_data_iscrizione, qualifica_iniziale:a.p_qualifica, percentuale_iniziale:a.p_percentuale, privacy_accettata_il:null,
-        partenza_confermata_il:new Date().toISOString() };
-      db.partners.push(p); db.aggiunti.push(a); salva(); return pub(p); },
-    linkGestito: async pid => { const p = db.partners.find(x => x.id === pid); if(p.stato !== "gestito") throw new Error("non_gestito"); p.chiave = hex(); salva(); return p.chiave; },
+    struttura: async () => { const io = mio(); if(!io) return []; return visibili(io).map(pub); },
+    esclusi: async () => (db.esclusi || []).filter(x => x.partner_id === mio().id),
+    nascosti: async () => (db.nascosti || []).filter(x => x.partner_id === mio().id),
+    nascondi: async (io, pid) => { db.nascosti = (db.nascosti || []).concat([{ partner_id:io, nascosto_id:pid }]); salva(); },
+    mostra: async (io, pid) => { db.nascosti = (db.nascosti || []).filter(x => !(x.partner_id === io && x.nascosto_id === pid)); salva(); },
     riepilogo: async mese => { const io = mio(); if(!io) return []; const m = mese.slice(0, 7);
-      const sotto = id => db.partners.filter(p => p.sponsor_id === id).flatMap(p => [p].concat(sotto(p.id)));
+      const vis = new Set(visibili(io).map(p => p.id));
+      const figliVis = id => db.partners.filter(p => p.sponsor_id === id && vis.has(p.id));
       const pers = id => db.activities.filter(a => a.partner_id === id && (a.tipo === "ordine" || a.tipo === "rettifica") && a.data.slice(0, 7) === m).reduce((t, a) => t + Number(a.vp), 0);
-      const grp = id => pers(id) + db.partners.filter(p => p.sponsor_id === id).reduce((t, p) => t + grp(p.id), 0);
-      return [io].concat(sotto(io.id)).map(p => ({ partner_id:p.id, sponsor_id:p.sponsor_id || null, vp_personali:pers(p.id), vp_gruppo:grp(p.id),
+      const grp = id => pers(id) + figliVis(id).reduce((t, p) => t + grp(p.id), 0);
+      return visibili(io).map(p => ({ partner_id:p.id, sponsor_id:p.sponsor_id || null, vp_personali:pers(p.id), vp_gruppo:grp(p.id),
         linee_attive:0, percentuale:null, qualifica:null, chiuso:false })); },
     storico: async pid => (db.storico || []).filter(r => r.partner_id === pid),
     livelli: async () => [[3,200],[6,600],[9,1200],[12,2400],[15,4000],[18,7000],[21,10000]].map(([percentuale, vp_gruppo]) => ({ percentuale, vp_gruppo })),
@@ -69,46 +84,62 @@
         pagamenti_iniziali:a.p_pagamenti, partenza_confermata_il:new Date().toISOString() }); db.conferme = (db.conferme || []).concat([a]); salva(); return pub(p); },
     nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid); p.chiave = hex();
       db.accessi = db.accessi.filter(a => a.partner_id !== pid); salva(); return p.chiave; },
-    inMezzo: async a => { const io = mio(); const sp = db.partners.find(x => x.id === a.p_sotto[0]).sponsor_id;
-      if(!a.p_codice_amway) throw new Error("codice_amway_mancante");
-      const p = { id:uid(), nome:a.p_nome, sponsor_id:sp, stato:"gestito", gestore_id:io.id, codice_amway:a.p_codice_amway, codice_invito:"M" + uid().slice(2,7).toUpperCase(),
-        qualifica_iniziale:a.p_qualifica, percentuale_iniziale:a.p_percentuale, partenza_confermata_il:new Date().toISOString() };
-      db.partners.push(p); for(const id of a.p_sotto) db.partners.find(x => x.id === id).sponsor_id = p.id; salva(); return pub(p); },
-    cancella: async pid => { const t = db.partners.find(x => x.id === pid); let n = 0;
+    cancella: async pid => { const t = db.partners.find(x => x.id === pid); let n = 0; const io = mio();
+      if(t.stato === "gestito" && t.codice_amway) db.esclusi = (db.esclusi || []).concat([{ partner_id:io.id, codice:t.codice_amway }]);
       for(const x of db.partners) if(x.sponsor_id === pid){ x.sponsor_id = t.sponsor_id; n++; }
       db.partners = db.partners.filter(x => x.id !== pid); db.activities = db.activities.filter(a => a.partner_id !== pid); salva(); return n; },
-    /* come nel database: il mio codice o quello di una persona senza app del mio gruppo; import solo per me e per loro */
+    /* come nel database: il mio codice o quello di una persona che ho importato; unico tra chi usa l'app, e tra le mie importate */
     impostaCodice: async (pid, codice) => { const io = mio();
-      const sotto = id => db.partners.filter(p => p.sponsor_id === id).flatMap(p => [p.id].concat(sotto(p.id)));
       const p = db.partners.find(x => x.id === pid);
-      if(!p || (pid !== io.id && !(p.stato === "gestito" && sotto(io.id).includes(pid)))) throw new Error("non_autorizzato");
-      if(db.partners.some(x => x.id !== pid && x.codice_amway === codice)) throw new Error("codice_amway_usato");
+      if(!p || (pid !== io.id && !(p.stato === "gestito" && p.gestore_id === io.id))) throw new Error("non_autorizzato");
+      if(db.partners.some(x => x.id !== pid && x.codice_amway === codice && (p.stato === "gestito" ? x.stato === "gestito" && x.gestore_id === p.gestore_id : x.stato !== "gestito")))
+        throw new Error("codice_amway_usato");
       p.codice_amway = codice; salva(); return pub(p); },
-    importaVpp: async (mese, righe) => { const io = mio();
-      const sotto = id => db.partners.filter(p => p.sponsor_id === id).flatMap(p => [p.id].concat(sotto(p.id)));
+    importaRete: async a => { const io = mio();
+      if(io.codice_amway && io.codice_amway !== a.p_io.codice) throw new Error("import_di_altri");
+      io.codice_amway = a.p_io.codice;
+      const attivo = c => visibili(io).find(x => x.stato !== "gestito" && x.codice_amway === c);
+      const mia = c => db.partners.find(x => x.stato === "gestito" && x.gestore_id === io.id && x.codice_amway === c);
+      const giu = id => [id].concat(sotto(id).map(x => x.id));
+      let aggiunte = 0, spostate = 0, cancellate = 0;
+      const righe = [{ partner_id:io.id, vpp:a.p_io.vpp }];
+      for(const r of a.p_persone){
+        const sp = (r.sponsor && r.sponsor !== io.codice_amway && ((attivo(r.sponsor) || mia(r.sponsor) || {}).id)) || io.id;
+        let x = mia(r.codice);
+        if(x){ if(x.sponsor_id !== sp && !giu(x.id).includes(sp)){ x.sponsor_id = sp; spostate++; } }
+        else{
+          if(attivo(r.codice)) continue;
+          x = { id:uid(), nome:r.nome, sponsor_id:sp, stato:"gestito", gestore_id:io.id, codice_amway:r.codice, codice_invito:"I" + uid().slice(2,7).toUpperCase(),
+            partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() };
+          db.partners.push(x); aggiunte++;
+        }
+        db.esclusi = (db.esclusi || []).filter(e => !(e.partner_id === io.id && e.codice === r.codice));
+        righe.push({ partner_id:x.id, vpp:r.vpp });
+      }
+      for(const r of a.p_attivi){
+        const x = attivo(r.codice); if(!x || x.id === io.id) continue;
+        const sp = !r.sponsor || r.sponsor === io.codice_amway ? io.id : (attivo(r.sponsor) || {}).id;
+        if(!sp || sp === x.sponsor_id || giu(x.id).includes(sp)) continue;
+        x.sponsor_id = sp; spostate++;
+      }
+      for(const pid of a.p_cancella){ await window.GROWUP_API.cancella(pid); cancellate++; }
+      db.esclusi = (db.esclusi || []).concat(a.p_esclusi.map(codice => ({ partner_id:io.id, codice })));
       const oggi = new Intl.DateTimeFormat("en-CA", { timeZone:"Europe/Rome" }).format(new Date());
-      const m = mese.slice(0, 7), fine = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).toISOString().slice(0, 10);
+      const m = a.p_mese.slice(0, 7), fine = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).toISOString().slice(0, 10);
       const giorno = m === oggi.slice(0, 7) ? oggi : fine;
       let aggiornati = 0, invariati = 0;
       for(const r of righe){
-        const p = db.partners.find(x => x.id === r.partner_id);
-        if(!p || (p.id !== io.id && !(p.stato === "gestito" && sotto(io.id).includes(p.id)))) throw new Error("non_autorizzato");
-        const ora = db.activities.filter(a => a.partner_id === p.id && (a.tipo === "ordine" || a.tipo === "rettifica") && a.data.slice(0, 7) === m)
-          .reduce((t, a) => t + Number(a.vp), 0);
+        const ora = db.activities.filter(x => x.partner_id === r.partner_id && (x.tipo === "ordine" || x.tipo === "rettifica") && x.data.slice(0, 7) === m)
+          .reduce((t, x) => t + Number(x.vp), 0);
         const diff = Math.round((r.vpp - ora) * 100) / 100;
         if(!diff){ invariati++; continue; }
-        db.activities.push({ id:uid(), partner_id:p.id, tipo:"rettifica", vp:diff, quantita:1, data:giorno, inserito_da:io.id, inserito_il:new Date().toISOString() });
+        db.activities.push({ id:uid(), partner_id:r.partner_id, tipo:"rettifica", vp:diff, quantita:1, data:giorno, inserito_da:io.id, inserito_il:new Date().toISOString() });
         aggiornati++;
       }
-      db.importi = (db.importi || 0) + 1; salva(); return { aggiornati, invariati }; },
-    cambiaSponsor: async (pid, sp) => { if(!mio().is_admin) throw new Error("non_autorizzato");
-      const x = db.partners.find(y => y.id === pid);
-      const s = db.partners.find(y => y.id === sp);
-      for(let u = s; u; u = db.partners.find(y => y.id === u.sponsor_id)) if(u.sponsor_id === pid){ s.sponsor_id = x.sponsor_id; break; }
-      x.sponsor_id = sp; salva(); return {}; },
+      db.importi = (db.importi || 0) + 1; salva();
+      return { aggiornati, invariati, aggiunte, spostate, cancellate }; },
     attivitaGruppo: async dal => { const io = mio(); if(!io) return [];
-      const sotto = id => db.partners.filter(p => p.sponsor_id === id).flatMap(p => [p.id].concat(sotto(p.id)));
-      const ids = new Set([io.id].concat(sotto(io.id))); return db.activities.filter(a => ids.has(a.partner_id) && a.data >= dal); },
+      const ids = new Set(visibili(io).map(p => p.id)); return db.activities.filter(a => ids.has(a.partner_id) && a.data >= dal); },
     obiettiviGruppo: async () => db.goals,
     obiettiviMeseGruppo: async () => db.mgoals,
     cambiaChiave: async () => { const p = mio(); p.chiave = hex();

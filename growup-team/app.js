@@ -39,14 +39,13 @@ function creaApi(){
     sponsorName:  codice => q(sb.rpc("sponsor_da_codice", { p_codice:codice })),
     collega:      () => q(sb.rpc("collega_profilo")),
     entra:        chiave => q(sb.rpc("entra_con_chiave", { p_chiave:chiave })),
-    join:         args => q(sb.rpc("iscrivi_con_codice", args)),
+    join:         args => q(sb.rpc("entra_con_invito", args)),
     cambiaChiave: () => q(sb.rpc("cambia_chiave")),
     accettaPrivacy: pid => q(sb.from("partners").update({ privacy_accettata_il:new Date().toISOString() }).eq("id", pid)),
     /* io e tutta la mia downline: la RLS restituisce solo quella */
     struttura:    () => q(sb.from("partners").select("id,nome,sponsor_id,stato,gestore_id,creato_il,ultimo_aggiornamento,codice_amway,"
                     + "qualifica_iniziale,percentuale_iniziale,qualifica_iniziale_mese,pagamenti_iniziali,partenza_confermata_il").order("creato_il")),
     conferma:     args => q(sb.rpc("conferma_partenza", args)),
-    inMezzo:      args => q(sb.rpc("inserisci_in_mezzo_con_codice", args)),
     cancella:     pid => q(sb.rpc("cancella_partner", { p_partner:pid })),
     preferiti:    () => q(sb.from("preferiti").select("preferito_id")),
     copiaDati:    () => q(sb.rpc("copia_dati")),
@@ -60,13 +59,16 @@ function creaApi(){
     attivitaGruppo: dal => q(sb.from("activities").select("partner_id,tipo,quantita,vp,data,inserito_il").gte("data", dal)),
     obiettiviGruppo: dal => q(sb.from("goals").select("partner_id,settimana,obiettivo_contatti,obiettivo_piani").gte("settimana", dal)),
     obiettiviMeseGruppo: dal => q(sb.from("monthly_goals").select("partner_id,mese,obiettivo_vp").gte("mese", dal)),
-    cambiaSponsor: (pid, sp) => q(sb.rpc("cambia_sponsor", { p_partner:pid, p_sponsor:sp })),
     nuovaChiavePer: pid => q(sb.rpc("nuova_chiave_per", { p_partner:pid })),
-    aggiungi:     args => q(sb.rpc("aggiungi_con_codice", args)),
-    /* codice Amway Partner: il mio o di chi gestisco; import dei VPP del report Amway (solo me e chi gestisco) */
+    /* codice Amway Partner: il mio o di una persona che ho importato */
     impostaCodice: (pid, codice) => q(sb.rpc("imposta_codice_amway", { p_partner:pid, p_codice:codice })),
-    importaVpp:   (mese, righe) => q(sb.rpc("importa_vpp", { p_mese:mese, p_righe:righe })),
-    linkGestito:  pid => q(sb.rpc("link_per_gestito", { p_partner:pid })),
+    /* import della rete dal report Amway: le persone importate le vede solo chi le importa */
+    importaRete:  a => q(sb.rpc("importa_rete", a)),
+    esclusi:      () => q(sb.from("esclusi_import").select("codice")),
+    /* persone nascoste dalla mia struttura (i loro VP contano lo stesso) */
+    nascosti:     () => q(sb.from("nascosti").select("nascosto_id")),
+    nascondi:     (io, pid) => q(sb.from("nascosti").insert({ partner_id:io, nascosto_id:pid })),
+    mostra:       (io, pid) => q(sb.from("nascosti").delete().eq("partner_id", io).eq("nascosto_id", pid)),
     stages:       () => q(sb.from("stage_requirements").select("*").order("ordine")),
     settings:     () => q(sb.from("settings").select("chiave,valore")),
     /* la settimana e il mese in corso per intero; ordini e clienti di sempre (servono alle tappe) */
@@ -101,7 +103,9 @@ const st = {
   invito: null,           // codice dello sponsor dal link d'invito
   invitoRiserva: null,    // l'invito lasciato per "entra con il tuo link": si può tornare indietro
   struttura: [],          // io e la mia downline
-  linkGestito: null,      // { nome, chiave } da mandare a una persona aggiunta a mano
+  linkGestito: null,      // { nome, chiave }: nuovo link personale creato dall'admin per chi l'ha perso
+  nascosti: new Set(),    // persone nascoste dalla mia struttura (con il loro gruppo)
+  esclusi: new Set(),     // codici esclusi dagli import
   riep: [],               // numeri del mese in corso: io e la mia downline (riepilogo_mese)
   chiusi: new Set(),
   cerca: "",               // ricerca nella struttura
@@ -174,6 +178,9 @@ const MESSAGGI_ERRORE = {
   codice_amway_non_valido: "Il codice Amway è fatto di sole cifre (es. 2533783).",
   codice_amway_mancante: "Scrivi il codice Amway Partner della persona.",
   import_non_valido: "Il file non è stato letto bene: scaricalo di nuovo dal sito Amway e riprova.",
+  import_di_altri: "Questo report non è il tuo: ognuno importa il report scaricato dal proprio accesso al sito Amway.",
+  codice_amway_attivo: "Con questo codice Amway c'è già qualcuno che usa l'app: entra con il tuo link personale (quello che ti eri salvato).",
+  codice_amway_altra_linea: "Questo codice Amway è nella struttura di un altro gruppo: chiedi il link d'invito al tuo sponsor.",
   non_autenticato: "Sessione scaduta: apri di nuovo il tuo link personale."
 };
 function messaggio(e){
@@ -433,6 +440,7 @@ async function vaiHome(profilo){
 async function caricaStruttura(){
   st.struttura = await api.struttura() || [];
   try{ st.preferiti = new Set((await api.preferiti() || []).map(r => r.preferito_id)); }catch(e){}
+  try{ st.nascosti = new Set((await api.nascosti() || []).map(r => r.nascosto_id)); }catch(e){}
 }
 
 async function entraConChiave(k){
@@ -632,8 +640,9 @@ function vIngresso(){
     <form data-form="ingresso" class="card" novalidate>
       <label class="field" style="margin-top:0"><span>Nome e cognome</span>
         <input name="nome" autocomplete="name" required maxlength="80"></label>
-      ${campoCodice(false)}
-      <p class="nota" style="margin-top:6px">È il numero del tuo accesso al sito Amway. Puoi scriverlo anche dopo.</p>
+      ${campoCodice(true)}
+      <p class="nota" style="margin-top:6px">È il numero del tuo accesso al sito Amway. Se il tuo sponsor ti ha già nella sua
+        struttura, con il codice ritrovi il tuo profilo con i tuoi numeri.</p>
       ${campiQualifica(true)}
       <p class="nota">Il punto di partenza lo conferma poi il tuo sponsor, così i numeri del gruppo restano affidabili.</p>
 
@@ -1133,8 +1142,11 @@ function vStruttura(){
      il gruppo di una persona si può richiudere. Tutte le righe sono nella pagina: quelle dei gruppi richiusi
      sono solo nascoste, così la ricerca le trova. */
   const io = st.profilo.id;
-  const righe = alberoSotto(io, 0), sopra = [io];
-  for(const r of righe){ sopra.length = r.livello + 1; r.path = sopra.slice(); sopra.push(r.p.id); }
+  const tutte = alberoSotto(io, 0), sopra = [io];
+  for(const r of tutte){ sopra.length = r.livello + 1; r.path = sopra.slice(); sopra.push(r.p.id); }
+  /* le persone nascoste spariscono con il loro gruppo (solo per me) */
+  const righe = tutte.filter(r => !r.path.concat([r.p.id]).some(id => st.nascosti.has(id)));
+  const nascoste = [...st.nascosti].filter(id => nomeDi(id)).length;
   const rIo = rigaDi(st.riep, io) || {}, chiusoIo = st.chiusi.has(io);
   const rigaIo = `<li class="liv io" style="--rientro:0px" data-id="${esc(io)}" data-path="" data-nome="${esc(senzaAccenti(st.profilo.nome))}">
       <span class="livello l0" title="Livello 1">1</span>
@@ -1144,11 +1156,11 @@ function vStruttura(){
         aria-label="${chiusoIo ? "Mostra" : "Nascondi"} il tuo gruppo">${chiusoIo ? "▸" : "▾"} ${righe.length}</button></li>`;
   return `<div class="card">
     <div class="spread"><span class="eyebrow">La mia struttura</span>
-      <button class="btn small" data-act="aggiungi">+ Aggiungi persona</button></div>
+      <button class="btn small" data-act="importa">Importa dal report Amway</button></div>
     ${righe.length > 1 ? `<input type="search" id="cerca-struttura" class="cerca" placeholder="Cerca un nome nel tuo gruppo…"
         autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Cerca un nome nel tuo gruppo" value="${esc(st.cerca || "")}">
       <p class="small" id="cerca-esito" aria-live="polite" style="margin:6px 0 0"></p>` : ""}
-    ${righe.length ? `<ul class="albero struttura">${rigaIo}${righe.map(({ p, livello, path }) => {
+    ${tutte.length ? `<ul class="albero struttura">${rigaIo}${righe.map(({ p, livello, path }) => {
       const r = rigaDi(st.riep, p.id) || {}, sp = statoDi(p);
       const quanti = alberoSotto(p.id, 0).length, chiuso = st.chiusi.has(p.id);
       const piegato = path.some(id => st.chiusi.has(id));
@@ -1165,9 +1177,11 @@ function vStruttura(){
       <span class="pill ${sp.cl}">${sp.txt}</span></li>`; }).join("")}</ul>
       <p class="nota">Il numero è il livello, come nei report Amway: 1 sei tu, 2 i tuoi frontali, 3 i loro, e così via.
         ▾ chiude o riapre il gruppo di una persona.
-        Tocca un nome per aprire la sua scheda.</p>`
-      : `<p class="muted" style="margin:8px 0 0">Ancora nessuno nel tuo gruppo. Invita chi usa il telefono con il link qui sotto,
-          oppure aggiungi a mano chi non usa l'app.</p>`}
+        Tocca un nome per aprire la sua scheda.</p>
+      ${nascoste ? `<p class="small" style="margin:6px 0 0">${plur(nascoste, "persona nascosta", "persone nascoste")}
+        <button class="btn link small" data-act="nascoste" style="min-height:0;padding:0 4px">Rivedi</button></p>` : ""}`
+      : `<p class="muted" style="margin:8px 0 0">Ancora nessuno nel tuo gruppo. Invita chi vuole usare l'app con il link qui sotto,
+          oppure importa il report Amway per vedere anche chi non la usa.</p>`}
   </div>`;
 }
 
@@ -1380,7 +1394,7 @@ function vScheda(){
       <button class="stella${st.preferiti.has(p.id) ? " on" : ""}" data-act="preferito" data-id="${esc(p.id)}" aria-pressed="${st.preferiti.has(p.id)}"
         aria-label="${st.preferiti.has(p.id) ? "Togli dai preferiti" : "Aggiungi ai preferiti"}" title="Preferiti">${st.preferiti.has(p.id) ? "★" : "☆"}</button>
       <span class="pill ${sp.cl}">${sp.txt}</span></span></div>
-    <p class="small" style="margin:2px 0 0">${gestito ? "non usa l'app: i suoi numeri li aggiorni tu"
+    <p class="small" style="margin:2px 0 0">${gestito ? "importata da te dal report Amway: la vedi solo tu, i suoi numeri li aggiorni tu"
       : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</p>
     ${p.stato === "gestito" ? "" : `<p class="small" style="margin:6px 0 0">${rigaObiettivoDi(p.id)}</p>`}
     <p class="small" style="margin:6px 0 0">${p.codice_amway ? `Codice Amway <b>${esc(p.codice_amway)}</b>` : "Codice Amway non scritto"}
@@ -1397,10 +1411,6 @@ function vScheda(){
       ${p.partenza_confermata_il ? `<span class="pill v">confermato</span>`
         : `<button class="btn link small" data-act="conferma" data-id="${esc(p.id)}">Conferma</button>`}</p>
     <button class="btn wide" style="margin-top:12px" data-act="chiamata" data-id="${esc(p.id)}">Fissa una chiamata</button>
-    <div class="spread" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)">
-      <span class="small">Il suo sponsor vero non è ${p.sponsor_id === st.profilo.id ? "te" : esc(sponsor || "nell'app")}?</span>
-      <button class="btn small" data-act="in-mezzo" data-id="${esc(p.id)}" style="white-space:nowrap">Manca qualcuno sopra?</button>
-    </div>
   </div>
   ${vConfronto(p)}
   ${gestito ? `<div class="card">
@@ -1417,8 +1427,8 @@ function vScheda(){
         <br><span class="small">${dataIt(a.data)}${inseritoDa(a, p) ? " · " + esc(inseritoDa(a, p)) : ""}</span></span>
       ${String(a.id).startsWith("tmp") ? "" : `<button class="x" data-act="elimina" data-id="${esc(a.id)}" aria-label="Elimina">×</button>`}</li>`).join("")}</ul>`
       : `<p class="muted" style="margin:8px 0 0">Ancora niente questo mese.</p>`}
-    <button class="btn wide" style="margin-top:12px" data-act="manda-link" data-id="${esc(p.id)}">Manda il suo link personale</button>
-    <p class="nota">Quando apre il suo link prende in mano il profilo: da lì i suoi numeri li aggiorna lui.</p>
+    <p class="nota">Se vuole usare l'app, mandale il tuo link d'invito: scrivendo il suo codice Amway ritrova il suo profilo
+      e da lì i suoi numeri li aggiorna lei.</p>
   </div>` : `<div class="card">
     <p class="small" style="margin:0">Usa l'app: i suoi numeri li aggiorna lui.</p>
     ${st.profilo.is_admin ? `<button class="btn wide" style="margin-top:12px" data-act="nuovo-link" data-id="${esc(p.id)}">Nuovo link personale</button>
@@ -1426,10 +1436,13 @@ function vScheda(){
   </div>`}
   <div class="card">
     <span class="eyebrow">Struttura</span>
-    ${st.profilo.is_admin ? `<button class="btn wide" style="margin-top:10px" data-act="cambia-sponsor" data-id="${esc(p.id)}">Cambia sponsor</button>` : ""}
+    ${gestito ? "" : `<button class="btn wide" style="margin-top:10px" data-act="nascondi" data-id="${esc(p.id)}">Nascondi dalla mia struttura</button>
+    <p class="nota">Sparisce solo per te, con il suo gruppo; i suoi VP contano lo stesso. La rimetti quando vuoi da «Nascoste».</p>`}
     <button class="btn wide pericolo" style="margin-top:10px" data-act="cancella" data-id="${esc(p.id)}">Cancella dalla struttura</button>
-    <p class="nota">Per i codici che Amway non rinnova. Chi è nel suo gruppo passa a ${esc(sponsor || "il suo sponsor")};
-      i suoi dati vengono cancellati.</p>
+    <p class="nota">${gestito ? `La togli dalla tua struttura con i suoi dati; agli import non ti verrà più proposta.
+      Chi è nel suo gruppo passa a ${esc(sponsor || "il suo sponsor")}.`
+      : `Per i codici che Amway non rinnova: la cancella per tutti, con la sua app e i suoi dati.
+      Chi è nel suo gruppo passa a ${esc(sponsor || "il suo sponsor")}.`}</p>
   </div>`;
 }
 
@@ -1438,7 +1451,7 @@ function testoInvito(){
   const n = nomeSaluto(st.profilo && st.profilo.nome), noi = / e /i.test(n);
   return `Ciao! ${n ? `${noi ? "Siamo" : "Sono"} ${n}: ` : ""}${noi ? "ti mandiamo" : "ti mando"} Growup, l'app del nostro gruppo A&S `
        + `per pianificare la settimana e seguire il percorso fino ad Argento.\n\n`
-       + `1. Apri il link qui sotto e scrivi nome e qualifica: in un minuto sei dentro, senza registrazione.\n`
+       + `1. Apri il link qui sotto e scrivi nome, codice Amway e qualifica: in un minuto sei dentro, senza registrazione.\n`
        + `2. L'app ti dà il tuo link personale: mandalo a te stesso su WhatsApp e tienilo, è la tua chiave.\n`
        + `3. Installa l'app: su Android menu ⋮ → Installa app; su iPhone Condividi → Aggiungi alla schermata Home.`;
 }
@@ -1532,7 +1545,8 @@ function leggiReport(testo){
   return { mese:`${mm[1]}-${mm[2]}`, righe };
 }
 
-/* Confronta il report con la struttura dell'app e prepara l'anteprima. */
+/* Confronta il report con la struttura dell'app e prepara l'anteprima.
+   Nell'app: io, chi usa l'app nel mio gruppo, le persone che ho importato io. */
 function analizzaReport(rep){
   const io = st.profilo, m = rep.mese;
   if(m !== meseDi(oggi()) && !(m === mesePrecedente() && precedenteAperto()))
@@ -1543,23 +1557,25 @@ function analizzaReport(rep){
     return { errore:`Questo report è di ${prima.nome} (${prima.codice}), non il tuo (${io.codice_amway}). Ognuno importa il report scaricato dal proprio accesso al sito Amway.` };
   const perCodice = new Map(rep.righe.map(r => [r.codice, r]));
   const altri = alberoSotto(io.id, 0).map(x => x.p);
-  const codiciApp = new Set([io.codice_amway || prima.codice].concat(altri.map(p => p.codice_amway).filter(Boolean)));
-  /* nome → righe del report con un codice che nell'app non c'è ancora */
+  const attivi = new Map(altri.filter(p => p.stato !== "gestito" && p.codice_amway).map(p => [p.codice_amway, p]));
+  const mie = altri.filter(p => p.stato === "gestito");
+  const codiciApp = new Set([prima.codice].concat(altri.map(p => p.codice_amway).filter(Boolean)));
+  /* nome → righe del report con un codice che nell'app non c'è ancora (per le persone senza codice) */
   const perNome = new Map();
   for(const r of rep.righe) if(!codiciApp.has(r.codice)){
     const k = chiaveNome(r.nome); perNome.set(k, (perNome.get(k) || []).concat([r]));
   }
   const unicoPerNome = p => { const l = perNome.get(chiaveNome(p.nome)) || []; return l.length === 1 ? l[0] : null; };
-  const a = { mese:m, prima, codiceMio:!io.codice_amway, aggiorna:[], codiceDiverso:[], abbina:[], senzaCodice:[],
-              mancanti:[], usanoApp:0, usanoAppMancanti:[], nuovi:[], totale:rep.righe.length };
+  const a = { mese:m, prima, codiceMio:!io.codice_amway, perCodice, aggiorna:[], codiceDiverso:[], abbina:[], senzaCodice:[],
+              mancanti:[], usanoApp:[], usanoAppMancanti:[], spostati:[], nuovi:[], esclusi:[], totale:rep.righe.length };
   const usati = new Set([prima.codice]);
-  for(const p of altri){
+  for(const p of altri.filter(p => p.stato !== "gestito")){
     const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
-    if(p.stato !== "gestito"){
-      if(r){ a.usanoApp++; usati.add(r.codice); }
-      else if(p.codice_amway) a.usanoAppMancanti.push(p);
-      continue;
-    }
+    if(r){ a.usanoApp.push({ p, r }); usati.add(r.codice); }
+    else if(p.codice_amway) a.usanoAppMancanti.push(p);
+  }
+  for(const p of mie){
+    const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
     if(r){ a.aggiorna.push({ p, r }); usati.add(r.codice); continue; }
     const n = unicoPerNome(p);
     if(n && p.codice_amway) a.codiceDiverso.push({ p, r:n });
@@ -1568,11 +1584,27 @@ function analizzaReport(rep){
     else a.senzaCodice.push(p);
     if(n) usati.add(n.codice);
   }
-  a.nuovi = rep.righe.filter(r => !usati.has(r.codice));
+  for(const r of rep.righe) if(!usati.has(r.codice)) (st.esclusi.has(r.codice) ? a.esclusi : a.nuovi).push(r);
+  /* chi usa l'app va sotto il primo antenato del report che usa l'app (o sotto di me) */
+  for(const { p, r } of a.usanoApp){
+    const sopra = antenatoNelReport(r, perCodice, c => c === prima.codice || attivi.has(c));
+    const nuovo = !sopra || sopra === prima.codice ? io.id : attivi.get(sopra).id;
+    if(nuovo !== p.sponsor_id && !alberoSotto(p.id, 0).some(x => x.p.id === nuovo))
+      a.spostati.push({ p, da:p.sponsor_id === io.id ? "te" : nomeDi(p.sponsor_id), a:nuovo === io.id ? "te" : nomeDi(nuovo) });
+  }
   /* tante persone che mancano insieme: forse il file è parziale (filtri, "Vista corrente") */
-  const conCodice = altri.filter(p => p.codice_amway).length;
+  const conCodice = mie.filter(p => p.codice_amway).length;
   a.troppiMancanti = a.mancanti.length > Math.max(3, Math.round(conCodice * 0.1));
   return a;
+}
+/* risale la catena degli sponsor del report fino al primo codice che soddisfa la condizione */
+function antenatoNelReport(r, perCodice, va){
+  const visti = new Set();
+  for(let c = r.sponsor; c && !visti.has(c); c = perCodice.has(c) ? perCodice.get(c).sponsor : null){
+    if(va(c)) return c;
+    visti.add(c);
+  }
+  return null;
 }
 
 function vImporta(){
@@ -1581,18 +1613,36 @@ function vImporta(){
   if(!a || a.errore) return `<h2>Importa dal report Amway</h2>
     <p class="small">Sul sito Amway: <b>Linea di Sponsorizzazione (LOS)</b> → pulsante di download →
       <b>Intera Linea di Sponsorizzazione con tutti i KPI disponibili</b>, formato <b>CSV</b>. Prima togli i filtri.</p>
-    <p class="small">L'app aggiorna i VPP del mese <b>tuoi</b> e delle persone <b>senza app</b> che gestisci.
-      Chi usa l'app non viene toccato: i suoi numeri li aggiorna lui. Il file resta sul telefono: si salvano solo codice e VPP.</p>
+    <p class="small">Scegli tu chi mettere nell'app tra chi non la usa: lo vedrai solo tu. L'app aggiorna i VPP del mese tuoi e
+      delle persone che hai importato; chi usa l'app non viene toccato, i suoi numeri li aggiorna lui.
+      Il file resta sul telefono: si salvano solo nome, codice e VPP di chi importi.</p>
     <label class="btn primary wide" style="margin-top:12px">Scegli il file CSV
       <input type="file" id="file-report" accept=".csv,text/csv,text/comma-separated-values" hidden></label>
     ${a && a.errore ? `<p class="errore">${esc(a.errore)}</p>` : ""}
     ${chiudi}`;
   const riga = (p, extra) => `<span class="grow">${esc(p.nome)}${extra ? `<br><span class="small">${extra}</span>` : ""}</span>`;
-  const sezione = (titolo, corpo, nota) => `<div class="imp-sezione"><h3>${titolo}</h3>${nota ? `<p class="small">${nota}</p>` : ""}${corpo}</div>`;
+  const sezione = (titolo, corpo, nota, cl) => `<div class="imp-sezione${cl ? " " + cl : ""}"><h3>${titolo}</h3>${nota ? `<p class="small">${nota}</p>` : ""}${corpo}</div>`;
+  const sponsorDi = r => { const s = a.perCodice.get(r.sponsor); return s ? `sponsor ${esc(s.nome)}` : ""; };
+  const scelta = r => `<label data-nome="${esc(senzaAccenti(r.nome))}"><input type="checkbox" name="aggiungi" value="${esc(r.codice)}" data-vpp="${r.vpp > 0 ? 1 : 0}">
+      <span>${esc(r.nome)} · <b>${num(r.vpp)} VP</b><br><span class="small">${esc(r.codice)}${sponsorDi(r) ? " · " + sponsorDi(r) : ""}</span></span></label>`;
   const aggiorna = [{ p:st.profilo, r:a.prima, io:true }].concat(a.aggiorna);
   return `<h2>Report di ${nomeMese(a.mese)}</h2>
   <p class="small">${plur(a.totale, "persona", "persone")} nel file${a.mese === meseDi(oggi()) ? " · mese in corso: puoi reimportarlo quando vuoi, i valori si sostituiscono" : ""}.</p>
   <form data-form="importa" novalidate>
+    ${a.nuovi.length ? sezione(`Non ancora nell'app · ${a.nuovi.length}`,
+      `<div class="row wrap" style="gap:6px;margin-top:8px">
+        <button type="button" class="btn small" data-act="spunta-vpp">Spunta chi ha VPP</button>
+        <button type="button" class="btn small" data-act="spunta-tutti">Spunta tutti</button>
+        <button type="button" class="btn small" data-act="togli-tutti">Togli tutti</button></div>
+      ${a.nuovi.length > 8 ? `<input type="search" id="cerca-import" class="cerca" placeholder="Cerca un nome…" autocomplete="off" aria-label="Cerca un nome">` : ""}
+      <div class="scelte imp-nuovi">${a.nuovi.map(scelta).join("")}</div>`,
+      "Spunta chi vuoi seguire: lo vedrai solo tu, nella sua posizione del report. Chi resta senza spunta non ti verrà più proposto.",
+      "imp-da-scegliere") : ""}
+    ${a.esclusi.length ? sezione(`Escluse · ${a.esclusi.length}`,
+      `<details><summary class="small">Rivedi</summary><div class="scelte">${a.esclusi.map(scelta).join("")}</div></details>`,
+      "Le hai lasciate fuori negli import precedenti. Spunta chi vuoi aggiungere adesso.") : ""}
+    ${a.nuovi.length || a.esclusi.length ? `<label class="check"><input type="checkbox" name="consenso">
+        <span>Ho il consenso delle persone che spunto a inserire il loro nome e i loro numeri nell'app.</span></label>` : ""}
     ${sezione(`Si aggiornano i VPP · ${aggiorna.length}`, `<ul class="imp">${aggiorna.map(x => `<li>${riga(x.io ? { nome:`${st.profilo.nome} (tu)` } : x.p,
         x.io && a.codiceMio ? `il tuo codice ${esc(x.r.codice)} viene salvato` : "")}<b class="num">${num(x.r.vpp)} VP</b></li>`).join("")}</ul>`)}
     ${a.codiceDiverso.length ? sezione(`Nome uguale, codice diverso · ${a.codiceDiverso.length}`,
@@ -1608,15 +1658,13 @@ function vImporta(){
         Le caselle non sono spuntate: spunta solo chi sai che non c'è più.</p>` : ""}
       <div class="scelte">${a.mancanti.map(p => `<label><input type="checkbox" name="cancella" value="${esc(p.id)}"${a.troppiMancanti ? "" : " checked"}>
         <span>${esc(p.nome)} · ${esc(p.codice_amway)}</span></label>`).join("")}</div>`,
-      "Codici che Amway non ha più (per esempio non rinnovati). Le persone spuntate vengono <b>cancellate dall'app</b> con i loro dati; chi stava sotto passa al loro sponsor. Non si può annullare.") : ""}
-    ${a.usanoApp || a.usanoAppMancanti.length ? sezione("Usano l'app: non vengono toccati",
-      `<p class="small">${plur(a.usanoApp, "persona trovata", "persone trovate")} nel report: i loro numeri li aggiornano loro.
+      "Codici che Amway non ha più (per esempio non rinnovati). Le persone spuntate vengono <b>cancellate dalla tua struttura</b> con i loro dati. Non si può annullare.") : ""}
+    ${a.usanoApp.length || a.usanoAppMancanti.length ? sezione("Usano l'app: i loro numeri li aggiornano loro",
+      `<p class="small">${plur(a.usanoApp.length, "persona trovata", "persone trovate")} nel report.
+        ${a.spostati.length ? `<br>Vanno sotto il loro sponsor del report: ${a.spostati.map(x => `<b>${esc(x.p.nome)}</b> (da ${esc(x.da)} a ${esc(x.a)})`).join(", ")}.` : ""}
         ${a.usanoAppMancanti.length ? `<br>Non sono nel report: ${a.usanoAppMancanti.map(p => esc(p.nome)).join(", ")}.` : ""}</p>`) : ""}
     ${a.senzaCodice.length ? sezione(`Senza codice e non trovati · ${a.senzaCodice.length}`,
       `<p class="small">${a.senzaCodice.map(p => esc(p.nome)).join(", ")}. Scrivi il loro codice nella scheda e reimporta.</p>`) : ""}
-    ${a.nuovi.length ? sezione(`Nel report ma non nell'app · ${a.nuovi.length}`,
-      `<details><summary class="small">Mostra i nomi</summary><p class="small">${a.nuovi.map(r => `${esc(r.nome)} (${num(r.vpp)} VP)`).join(", ")}</p></details>`,
-      "Solo un'informazione: l'app non aggiunge nessuno da sola.") : ""}
     <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
       <button class="btn primary grow"${st.occupato ? " disabled" : ""}>Importa</button></div>
   </form>`;
@@ -1629,6 +1677,7 @@ async function leggiFileReport(file){
   else{
     try{
       const rep = leggiReport(await file.text());
+      if(!rep.errore) try{ st.esclusi = new Set((await api.esclusi() || []).map(x => x.codice)); }catch(e){}
       a = rep.errore ? rep : analizzaReport(rep);
     }catch(e){ a = { errore:"Non riesco a leggere il file: scaricalo di nuovo dal sito Amway." }; }
   }
@@ -1638,23 +1687,33 @@ async function leggiFileReport(file){
 async function eseguiImport(f){
   const a = st.imp, io = st.profilo;
   const scelti = nome => new Set([...f.querySelectorAll(`input[name=${nome}]:checked`)].map(i => i.value));
-  const correggi = scelti("correggi"), abbina = scelti("abbina"), cancella = scelti("cancella");
+  const correggi = scelti("correggi"), abbina = scelti("abbina"), cancella = scelti("cancella"), aggiungi = scelti("aggiungi");
+  if(aggiungi.size && !f.consenso.checked){ mostraErroreForm(f, "Conferma di avere il consenso delle persone che aggiungi."); return; }
   const daCodificare = a.codiceDiverso.filter(x => correggi.has(x.p.id)).concat(a.abbina.filter(x => abbina.has(x.p.id)));
+  /* le mie persone dopo l'import: già importate (anche quelle appena abbinate) e quelle spuntate */
+  const mie = a.aggiorna.concat(daCodificare).map(x => x.r).concat(a.nuovi.concat(a.esclusi).filter(r => aggiungi.has(r.codice)));
+  const codiciMie = new Set(mie.map(r => r.codice));
+  const attivi = new Set(a.usanoApp.map(x => x.r.codice));
+  const profondita = r => { let n = 0; for(let c = r.sponsor; c && a.perCodice.has(c) && n < 200; c = a.perCodice.get(c).sponsor) n++; return n; };
+  const persone = mie.slice().sort((x, y) => profondita(x) - profondita(y)).map(r => ({ codice:r.codice, nome:r.nome, vpp:r.vpp,
+    sponsor:antenatoNelReport(r, a.perCodice, c => c === a.prima.codice || attivi.has(c) || codiciMie.has(c)) }));
+  const usanoApp = a.usanoApp.map(({ r }) => ({ codice:r.codice,
+    sponsor:antenatoNelReport(r, a.perCodice, c => c === a.prima.codice || attivi.has(c)) }));
+  const esclusi = a.nuovi.filter(r => !aggiungi.has(r.codice)).map(r => r.codice);
   st.occupato = true;
   try{
-    if(a.codiceMio) st.profilo = Object.assign({}, io, await api.impostaCodice(io.id, a.prima.codice));
     for(const x of daCodificare) await api.impostaCodice(x.p.id, x.r.codice);
-    const righe = [{ partner_id:io.id, vpp:a.prima.vpp }]
-      .concat(a.aggiorna.concat(daCodificare).map(x => ({ partner_id:x.p.id, vpp:x.r.vpp })));
-    const esito = await api.importaVpp(a.mese + "-01", righe) || {};
-    let cancellati = 0;
-    for(const p of a.mancanti) if(cancella.has(p.id)){ await api.cancella(p.id); cancellati++; }
+    const esito = await api.importaRete({ p_mese:a.mese + "-01", p_io:{ codice:a.prima.codice, vpp:a.prima.vpp }, p_persone:persone,
+      p_attivi:usanoApp, p_esclusi:esclusi, p_cancella:a.mancanti.filter(p => cancella.has(p.id)).map(p => p.id) }) || {};
+    if(a.codiceMio) st.profilo = Object.assign({}, io, { codice_amway:a.prima.codice });
     await caricaStruttura();
     st.att = await api.activities(io.id, [settimana(), primoDelMese()].sort()[0]) || [];
     await caricaNumeri();
     st.sheet = null; st.imp = null; st.occupato = false; render();
-    toast(`VPP di ${nomeMese(a.mese).split(" ")[0]} importati: ${plur(Number(esito.aggiornati) || 0, "aggiornato", "aggiornati")}`
-      + (cancellati ? `, ${plur(cancellati, "persona cancellata", "persone cancellate")}` : ""));
+    const n = k => Number(esito[k]) || 0;
+    toast(`Import di ${nomeMese(a.mese).split(" ")[0]}: ${[n("aggiunte") ? plur(n("aggiunte"), "persona aggiunta", "persone aggiunte") : "",
+      plur(n("aggiornati"), "VPP aggiornato", "VPP aggiornati"), n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
+      n("cancellate") ? plur(n("cancellate"), "persona cancellata", "persone cancellate") : ""].filter(Boolean).join(", ")}`);
   }catch(e){
     st.occupato = false;
     try{ await caricaStruttura(); }catch(x){}
@@ -1701,6 +1760,11 @@ function vSheet(){
   }
   if(s === "storico") return vStorico();
   if(s === "importa") return vImporta();
+  if(s === "nascoste") return `<h2>Nascoste dalla tua struttura</h2>
+    <p class="small">Le vedi solo tu così: per gli altri non cambia niente, e i loro VP contano nel tuo gruppo.</p>
+    <ul class="imp">${[...st.nascosti].filter(id => nomeDi(id)).map(id => `<li><span class="grow">${esc(nomeDi(id))}</span>
+      <button class="btn small" data-act="mostra" data-id="${esc(id)}">Mostra di nuovo</button></li>`).join("")}</ul>
+    <button class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
   if(s === "codice"){
     const p = st.codiceId === st.profilo.id ? st.profilo : st.struttura.find(x => x.id === st.codiceId);
     if(!p) return "";
@@ -1732,25 +1796,6 @@ function vSheet(){
     </div>
     <p class="nota">Crea un link nuovo se pensi che il tuo sia finito a qualcun altro: quello vecchio smette di funzionare
       e gli altri telefoni dovranno rientrare con il nuovo.</p>`;
-  /* Negli elenchi a scelta: livello come nella struttura (1 = diretti) e, dal 2 in giù, lo sponsor */
-  /* livelli come nella struttura: 1 sei tu, 2 i frontali, … (livello qui parte da 1 per i frontali) */
-  const voce = (p, livello, extra) => `${livello + 1} · ${p.nome}${livello > 1 ? ` (sponsor ${nomeSaluto(nomeDi(p.sponsor_id))})` : ""}${extra || ""}`;
-  if(s === "aggiungi"){
-    const posti = [`<option value="${esc(st.profilo.id)}">Io</option>`]
-      .concat(alberoSotto(st.profilo.id, 1).map(({ p, livello }) =>
-        `<option value="${esc(p.id)}">${esc(voce(p, livello))}</option>`)).join("");
-    return `<h2>Aggiungi una persona</h2>
-    <p class="small">Per chi non usa l'app. Se un giorno vorrà usarla, le mandi il suo link e troverà già il suo profilo.</p>
-    <form data-form="aggiungi" novalidate>
-      <label class="field"><span>Nome e cognome</span><input name="nome" autocomplete="off" maxlength="80" required></label>
-      ${campoCodice(true)}
-      <label class="field"><span>Chi è il suo sponsor?</span><select name="sponsor">${posti}</select></label>
-      ${campiQualifica(false)}
-      <label class="check"><input type="checkbox" name="consenso" required>
-        <span>Ho il suo consenso (a voce o per messaggio) a inserire il suo nome e i suoi numeri nell'app.</span></label>
-      ${piede}${err}
-    </form>`;
-  }
   if(s === "obiettivo") return `<h2>Il mio obiettivo</h2>
     <form data-form="obiettivo" novalidate>${campiObiettivo(st.obiettivo)}${piede}${err}</form>`;
   if(s === "chiamata"){
@@ -1780,45 +1825,6 @@ function vSheet(){
       <p class="nota">Su WhatsApp parte un messaggio già scritto, per esempio: "${esc(testoChiamata(x.nome, piuGiorni(oggi(), 1), "21:00"))}".
         Scegli tu a chi mandarlo.</p>
       <button type="button" class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>${err}
-    </form>`;
-  }
-  if(s === "cambia-sponsor"){
-    const x = st.struttura.find(y => y.id === st.spostaId);
-    if(!x) return "";
-    const suoGruppo = new Set(alberoSotto(x.id, 0).map(z => z.p.id));
-    const esclusi = new Set([x.id, x.sponsor_id]);
-    const posti = [{ p:st.profilo, livello:0 }].concat(alberoSotto(st.profilo.id, 1)).filter(z => !esclusi.has(z.p.id));
-    const sopra = x.sponsor_id === st.profilo.id ? "voi" : nomeDi(x.sponsor_id);
-    return `<h2>Cambia sponsor di ${esc(nomeSaluto(x.nome))}</h2>
-    <p class="small">${esc(x.nome)} passa sotto il nuovo sponsor con tutto il suo gruppo. Lo storico dei mesi chiusi non cambia.</p>
-    ${suoGruppo.size ? `<p class="small">Puoi scegliere anche qualcuno <b>del suo gruppo</b>: quella persona, con il suo gruppo, sale al posto
-      di ${esc(nomeSaluto(x.nome))} sotto ${esc(sopra)}, e ${esc(nomeSaluto(x.nome))} passa sotto di lei.</p>` : ""}
-    <form data-form="cambia-sponsor" novalidate>
-      <label class="field"><span>Nuovo sponsor</span><select name="sponsor">${posti.map(({ p, livello }) =>
-        `<option value="${esc(p.id)}">${esc(p.id === st.profilo.id ? p.nome + " (noi)" : voce(p, livello, suoGruppo.has(p.id) ? " · nel suo gruppo" : ""))}</option>`).join("")}</select></label>
-      ${piede}${err}
-    </form>`;
-  }
-  if(s === "in-mezzo"){
-    const x = st.struttura.find(y => y.id === st.inMezzoId);
-    if(!x) return "";
-    const sopra = x.sponsor_id === st.profilo.id ? "te" : nomeDi(x.sponsor_id);
-    const fratelli = st.struttura.filter(y => y.sponsor_id === x.sponsor_id && y.id !== x.id);
-    return `<h2>Manca qualcuno sopra ${esc(nomeSaluto(x.nome))}?</h2>
-    <p class="small">Inserisci la persona che manca tra <b>${esc(sopra)}</b> e <b>${esc(x.nome)}</b>. Entra come
-      "senza app": puoi inserire i suoi numeri o mandarle il suo link.</p>
-    <form data-form="in-mezzo" novalidate>
-      <input type="hidden" name="sotto" value="${esc(x.id)}">
-      <label class="field"><span>Nome e cognome</span><input name="nome" autocomplete="off" maxlength="80" required></label>
-      ${campoCodice(true)}
-      <p class="avviso">${esc(x.nome)} e tutto il suo gruppo passano sotto questa persona.</p>
-      ${fratelli.length ? `<div class="field" style="margin-top:14px"><span class="small">Facoltativo: anche altri di ${esc(sopra)} sono in realtà suoi?
-        Spunta solo se è così.</span>
-        <div class="scelte">${fratelli.map(y => `<label><input type="checkbox" name="sotto" value="${esc(y.id)}"> ${esc(y.nome)}</label>`).join("")}</div></div>` : ""}
-      ${campiQualifica(false)}
-      <label class="check"><input type="checkbox" name="consenso" required>
-        <span>Ho il suo consenso (a voce o per messaggio) a inserire il suo nome e i suoi numeri nell'app.</span></label>
-      ${piede}${err}
     </form>`;
   }
   if(s === "conferma"){
@@ -1914,6 +1920,10 @@ const AZIONI = {
   "totale-mese"(){ st.errore = ""; st.meseTotale = meseDi(oggi()); st.sheet = "totale-mese"; render(); focusSheet(); },
   "scegli-mese"(el){ st.meseTotale = el.value; render(); },
   importa(){ st.imp = null; st.errore = ""; st.sheet = "importa"; render(); },
+  /* pulsanti rapidi dell'import: agiscono sulle caselle "Non ancora nell'app" senza ridisegnare il foglio */
+  "spunta-vpp"(){ document.querySelectorAll(".imp-da-scegliere input[name=aggiungi]").forEach(i => { i.checked = i.dataset.vpp === "1"; }); },
+  "spunta-tutti"(){ document.querySelectorAll(".imp-da-scegliere input[name=aggiungi]").forEach(i => { i.checked = true; }); },
+  "togli-tutti"(){ document.querySelectorAll(".imp-da-scegliere input[name=aggiungi]").forEach(i => { i.checked = false; }); },
   codice(el){ st.codiceId = el.dataset.id; st.errore = ""; st.sheet = "codice"; render(); focusSheet(); },
   storico(){ st.sheet = "storico"; render(); },
   async "mese-gruppo"(el){
@@ -1983,13 +1993,14 @@ const AZIONI = {
     if(err){ mostraErroreForm(f, err); return; }
     window.open("https://wa.me/?text=" + encodeURIComponent(testoChiamata(x.nome, c.data, c.ora)), "_blank", "noopener");
   },
-  "cambia-sponsor"(el){ st.spostaId = el.dataset.id; st.errore = ""; st.sheet = "cambia-sponsor"; render(); },
   async cancella(el){
     const p = st.struttura.find(x => x.id === el.dataset.id);
     if(!p) return;
     const sopra = p.sponsor_id === st.profilo.id ? "te" : nomeDi(p.sponsor_id);
     const sotto = figli(p.id).length;
-    if(!confirm(`Cancellare ${p.nome} dalla struttura?\n\nI suoi dati (attività, obiettivi, storico) vengono cancellati.`
+    if(!confirm(`Cancellare ${p.nome} dalla struttura?\n\n` + (p.stato === "gestito"
+        ? "I suoi dati vengono cancellati e agli import non ti verrà più proposta."
+        : "Usa l'app: viene cancellata per tutti, con la sua app e i suoi dati (attività, obiettivi, storico).")
       + (sotto ? `\n${sotto === 1 ? "La persona del suo gruppo passa" : `Le ${sotto} persone dirette del suo gruppo passano`} a ${sopra}, con tutto il loro gruppo.` : "")
       + "\n\nNon si può annullare.")) return;
     try{
@@ -1999,7 +2010,25 @@ const AZIONI = {
       toast(`${p.nome} cancellato${sotto ? `: il suo gruppo ora è di ${sopra}` : ""}`);
     }catch(e){ toast(messaggio(e)); }
   },
-  "in-mezzo"(el){ st.inMezzoId = el.dataset.id; st.errore = ""; st.sheet = "in-mezzo"; render(); },
+  async nascondi(el){
+    const p = st.struttura.find(x => x.id === el.dataset.id);
+    if(!p) return;
+    try{
+      await api.nascondi(st.profilo.id, p.id);
+      st.nascosti.add(p.id);
+      st.vista = "gruppo"; st.schedaId = null; st.target = null; render(); window.scrollTo(0, 0);
+      toast(`${p.nome} nascosto dalla tua struttura`);
+    }catch(e){ toast(messaggio(e)); }
+  },
+  nascoste(){ st.sheet = "nascoste"; render(); },
+  async mostra(el){
+    try{
+      await api.mostra(st.profilo.id, el.dataset.id);
+      st.nascosti.delete(el.dataset.id);
+      if(!st.nascosti.size) st.sheet = null;
+      render(); toast(`${nomeDi(el.dataset.id)} di nuovo nella tua struttura`);
+    }catch(e){ toast(messaggio(e)); }
+  },
   async "nuovo-link"(el){
     const p = st.struttura.find(x => x.id === el.dataset.id);
     if(!p || !confirm(`Creare un nuovo link personale per ${p.nome}? Quello vecchio smetterà di funzionare.`)) return;
@@ -2011,13 +2040,6 @@ const AZIONI = {
   chiudi(){ st.sheet = null; render(); },
   "ho-gia"(){ st.invitoRiserva = st.invito; st.invito = null; st.fase = "benvenuto"; render(); },
   "torna-invito"(){ st.invito = st.invitoRiserva; st.invitoRiserva = null; st.fase = "ingresso"; render(); },
-  aggiungi(){ st.errore = ""; st.sheet = "aggiungi"; render(); },
-  async "manda-link"(el){
-    const p = st.struttura.find(x => x.id === el.dataset.id);
-    if(!p) return;
-    try{ st.linkGestito = { nome:p.nome, chiave: await api.linkGestito(p.id) }; st.sheet = "link-gestito"; render(); }
-    catch(e){ toast(messaggio(e)); }
-  },
   "copia-gestito"(){ copiaTesto(base() + "#chiave=" + st.linkGestito.chiave, "Link copiato"); },
   async installa(){
     if(!promptInstalla) return;
@@ -2148,43 +2170,6 @@ const MODULI = {
     apriIcs(creaIcs(dati), x.nome);
     if(!suIos()) toast("Apri il file per aggiungere la chiamata al calendario");
   },
-  async "cambia-sponsor"(f){
-    const x = st.struttura.find(y => y.id === st.spostaId);
-    try{
-      const scambio = alberoSotto(st.spostaId, 0).some(z => z.p.id === f.sponsor.value);
-      await api.cambiaSponsor(st.spostaId, f.sponsor.value);
-      await caricaStruttura(); await caricaNumeri();
-      st.sheet = null; render();
-      toast(`${x ? x.nome : ""} ora è ${f.sponsor.value === st.profilo.id ? "nel vostro gruppo diretto" : "nel gruppo di " + nomeDi(f.sponsor.value)}`
-        + (scambio ? `, che è salito al suo posto` : ""));
-    }catch(e){ mostraErroreForm(f, messaggio(e)); }
-  },
-  async "in-mezzo"(f){
-    const nome = f.nome.value.trim();
-    const sotto = Array.from(f.querySelectorAll("input[name=sotto][type=hidden], input[name=sotto]:checked")).map(i => i.value);
-    const q = leggiQualifica(f);
-    let err = "";
-    const codice = soloCifre(f.codice_amway.value);
-    if(!nome) err = "Scrivi il nome della persona.";
-    else if(!codice) err = "Scrivi il suo codice Amway Partner.";
-    else if(!codiceValido(codice)) err = MESSAGGI_ERRORE.codice_amway_non_valido;
-    else if(!sotto.length) err = "Spunta almeno una persona che sta sotto di lei.";
-    else if(q.data && q.data > oggi()) err = "La data di iscrizione non può essere nel futuro.";
-    else if(q.mancaMese) err = "Indica il mese della prima qualifica.";
-    else if(!f.consenso.checked) err = "Serve il suo consenso per inserirla nell'app.";
-    if(err){ mostraErroreForm(f, err); return; }
-    st.occupato = true;
-    try{
-      await api.inMezzo({ p_nome:nome, p_sotto:sotto, p_codice_amway:codice, p_data_iscrizione:q.data, p_qualifica:q.qualifica,
-        p_percentuale:q.percentuale, p_qualifica_mese:q.mese, p_pagamenti:q.pagamenti });
-      await caricaStruttura(); await caricaNumeri();
-      st.sheet = null; st.vista = "gruppo"; st.target = null; st.schedaId = null;
-      render(); window.scrollTo(0, 0);
-      const nomi = sotto.map(nomeDi).map(nomeSaluto).join(", ");
-      toast(`${nome} inserito: ora ${nomi} ${sotto.length === 1 ? "è" : "sono"} nel suo gruppo`);
-    }catch(e){ mostraErroreForm(f, messaggio(e)); }
-    st.occupato = false;
-  },
   async conferma(f){
     const q = leggiQualifica(f);
     if(q.mancaMese){ mostraErroreForm(f, "Indica il mese della prima qualifica."); return; }
@@ -2195,29 +2180,6 @@ const MODULI = {
       st.sheet = null; render(); toast("Punto di partenza confermato");
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
-  async aggiungi(f){
-    const nome = f.nome.value.trim();
-    const q = leggiQualifica(f);
-    const codice = soloCifre(f.codice_amway.value);
-    let err = "";
-    if(!nome) err = "Scrivi il nome della persona.";
-    else if(!codice) err = "Scrivi il suo codice Amway Partner.";
-    else if(!codiceValido(codice)) err = MESSAGGI_ERRORE.codice_amway_non_valido;
-    else if(q.data && q.data > oggi()) err = "La data di iscrizione non può essere nel futuro.";
-    else if(q.mancaMese) err = "Indica il mese della prima qualifica.";
-    else if(!f.consenso.checked) err = "Serve il suo consenso per inserirla nell'app.";
-    if(err){ mostraErroreForm(f, err); return; }
-    const sotto = st.struttura.find(p => p.id === f.sponsor.value);
-    st.occupato = true;
-    try{
-      await api.aggiungi({ p_nome:nome, p_sponsor:f.sponsor.value, p_codice_amway:codice, p_data_iscrizione:q.data, p_qualifica:q.qualifica,
-        p_percentuale:q.percentuale, p_qualifica_mese:q.mese, p_pagamenti:q.pagamenti });
-      await caricaStruttura();
-      st.sheet = null; render();
-      toast(`${nome} aggiunto ${sotto && sotto.id !== st.profilo.id ? "al gruppo di " + sotto.nome : "al tuo gruppo"}`);
-    }catch(e){ mostraErroreForm(f, messaggio(e)); }
-    st.occupato = false;
-  },
   async ingresso(f){
     const nome = f.nome.value.trim();
     const q = leggiQualifica(f);
@@ -2225,7 +2187,8 @@ const MODULI = {
     let err = "";
     const codice = soloCifre(f.codice_amway.value);
     if(!nome) err = "Scrivi il tuo nome.";
-    else if(codice && !codiceValido(codice)) err = MESSAGGI_ERRORE.codice_amway_non_valido;
+    else if(!codice) err = "Scrivi il tuo codice Amway Partner.";
+    else if(!codiceValido(codice)) err = MESSAGGI_ERRORE.codice_amway_non_valido;
     else if(!qual && !q.percentuale && !data) err = "Se stai iniziando serve la data di iscrizione: fa partire il conto alla rovescia del primo ordine.";
     else if(data && data > oggi()) err = "La data di iscrizione non può essere nel futuro.";
     else if(q.mancaMese) err = "Indica il mese della prima qualifica.";
@@ -2235,16 +2198,12 @@ const MODULI = {
     try{
       await sessione();
       const r = await api.join({
-        p_codice: st.invito, p_nome: nome, p_data_iscrizione: data, p_qualifica: qual,
+        p_codice: st.invito, p_nome: nome, p_codice_amway: codice, p_data_iscrizione: data, p_qualifica: qual,
         p_qualifica_mese: q.mese, p_pagamenti: q.pagamenti, p_percentuale: q.percentuale
       });
       ricordaChiave(r.chiave);
       salvaLocale(CHIAVE_SALVATA, null);
-      /* il codice è facoltativo: se è già usato da un'altra persona si entra lo stesso e si corregge dopo */
-      let codiceNo = "";
-      if(codice) try{ r.profilo = await api.impostaCodice(r.profilo.id, codice); }catch(e){ codiceNo = messaggio(e); }
       await vaiHome(r.profilo);
-      if(codiceNo) toast(codiceNo + " Puoi correggerlo in fondo alla pagina Io.");
       if(st.fase === "home" && !st.obiettivo) st.fase = "obiettivo_primo";
       st.occupato = false; render();
     }catch(e){
@@ -2329,6 +2288,11 @@ document.addEventListener("change", e => {
 /* Appena si corregge un campo, l'errore del modulo sparisce. */
 document.addEventListener("input", e => {
   if(e.target.id === "cerca-struttura"){ st.cerca = e.target.value; applicaRicerca(); return; }
+  if(e.target.id === "cerca-import"){
+    const q = senzaAccenti(e.target.value);
+    document.querySelectorAll(".imp-nuovi label").forEach(l => { l.style.display = q && !l.dataset.nome.includes(q) ? "none" : ""; });
+    return;
+  }
   const err = e.target.form && e.target.form.querySelector(".errore");
   if(err) err.remove();
 });

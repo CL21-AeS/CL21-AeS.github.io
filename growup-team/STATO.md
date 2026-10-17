@@ -125,9 +125,9 @@ dall'SQL Editor perché contiene un `delete`):
 
 1. **Copia di sicurezza e skill pubblicate** (PR #36 unita il 17 ottobre). Da fare per Stefano: **prima copia** dei
    dati dall'app e **installare la skill** `metodo-app-stefano` nell'account claude.ai.
-   **Import dei VPP dal report Amway: fatto il 17 ottobre** (migrazione `015_codice_amway.sql` già applicata),
-   da pubblicare e collaudare con il CSV vero (vedi la sezione qui sotto). Verifica con l'upline: ok per Stefano
-   (l'import mostra gli stessi dati che ognuno vede già sul sito e non tocca i dati degli altri).
+   **Import dei VPP: PR #37 unita.** **Rete dal report Amway** (struttura flessibile, vedi la sezione qui sotto):
+   PR da unire + migrazione 016 da incollare nell'SQL Editor; poi primo import con il CSV vero.
+   Verifica con l'upline: ok per Stefano (l'import mostra gli stessi dati che ognuno vede già sul sito).
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
    scheda partner, partner senza app, Da confermare, in mezzo / cancella / cambia sponsor, imbuto ed etichette),
    del confronto col mese prima, di "Fissa una chiamata" e dello storico del gruppo
@@ -221,38 +221,35 @@ dall'SQL Editor perché contiene un `delete`):
    "anonymous sign-ins" più alto in Authentication → Rate Limits.
 5. Dopo la Fase 2: Fase 3 (presa in carico dopo 14 giorni, avvisi) e Fase 4 (diagnosi, serie di settimane, 90 giorni).
 
-## Importare i VPP dal report Amway (fatto il 17 ottobre, da collaudare con il CSV vero)
+## La rete dal report Amway (17 ottobre: import dei VPP con la PR #37; struttura flessibile in questa PR)
 
-Niente collegamento diretto al sito Amway (nessuna API ufficiale, password su un server, regole IBO/GDPR):
-si importa il **CSV** che ognuno scarica da Business Centre → Linea di Sponsorizzazione (LOS) → Esporta →
-**"Intera Linea di Sponsorizzazione con tutti i KPI disponibili"**, **senza filtri attivi**.
-- **Formato del file** (visto su un export vero, non salvato nel repository): UTF-8 con BOM, virgole; riga 1 avviso di
-  riservatezza; riga 2 `"Mese di competenza","AAAAMM"`; riga 3 le 26 intestazioni; poi una riga per persona.
-  Colonne usate: "Qualifica Amway Partner" (= livello, 1 = chi scarica), "Codice Amway Partner Sponsor",
-  "Codice Amway Partner", "Nome" ("COGNOME, NOME"), "VPP". Valori con apostrofo davanti, numeri sia "9.282,49" sia
-  "20996.38". Telefono, email, indirizzo e il resto si ignorano. Per i test: file finto con lo stesso formato.
-- **Decisioni di Stefano**:
-  - ognuno importa il **proprio** CSV: aggiorna i propri VPP (riga di livello 1, controllata col proprio codice) e
-    quelli delle persone **senza app che gestisce**; **chi usa l'app non viene mai toccato** dall'import di altri;
-  - si importa il mese scritto nel file, **sia chiuso sia in corso**; reimportare lo stesso mese sostituisce i valori;
-  - **niente data di rinnovo**: chi **non è più nel report** (codici tolti da Amway) si cancella all'import successivo
-    (questo sostituisce la vecchia proposta della schermata "Rinnovi");
-  - **codice Amway obbligatorio** quando si aggiunge una persona a mano; **facoltativo** per chi entra dal link
-    d'invito (si può aggiungere dopo o lo prende l'app dal suo primo import);
-  - all'import, **nome uguale ma codice diverso** → segnalato, con conferma per correggere il codice.
-- **Proposte di Claude approvate da Stefano**: anteprima in 4 gruppi (aggiornati · codice diverso · nel file
-  ma non nell'app, solo informazione · non più nel file); cancellazione con elenco già spuntato e un tocco su
-  "Cancella", solo per persone senza app gestite da chi importa; **blocco delle cancellazioni** se il file sembra
-  parziale (riga 1 non è chi importa, filtri o "Vista corrente", mancano molti codici conosciuti). Persone già
-  nell'app senza codice: abbinamento proposto per nome al primo import.
-- **Com'è fatto**: migrazione `015_codice_amway.sql` (colonna `codice_amway` unica in `partners`;
-  `imposta_codice_amway` per sé o per chi `posso_gestire`; `aggiungi_con_codice` e `inserisci_in_mezzo_con_codice`
-  con il codice obbligatorio; `importa_vpp` che registra la differenza come rettifica, solo per sé e per i gestiti,
-  nel mese aperto). Nell'app: "Importa dal report Amway" nel riquadro Il mio mese, anteprima in un foglio,
-  codice in scheda (gestiti) e in fondo alla pagina Io (il proprio), campo codice nei moduli. Il CSV si legge nel
-  browser (`leggiReport`, `analizzaReport` in `app.js`); test con un CSV finto nello stesso formato.
-  "Troppi mancanti" = più di 3 e più del 10% delle persone con codice: allora le caselle non sono spuntate.
-  Un mese già chiuso (dopo il giorno 5) non si importa più.
+Decisioni di Stefano:
+- **Niente più inserimenti a mano**: tolti "+ Aggiungi persona", "Manca qualcuno sopra?", "Cambia sponsor" e
+  "Manda il suo link personale". La rete rispecchia sempre quella di Amway.
+- **Codice Amway obbligatorio** all'ingresso dal link d'invito. Codice già importato da qualcuno sopra → si entra nel
+  proprio profilo (posizione e VPP); codice importato in un'altra linea → "chiedi il link al tuo sponsor"; codice di chi
+  usa già l'app → "entra con il tuo link personale".
+- **Chi usa l'app lo vede tutta la sua upline; le persone importate le vede solo chi le importa.** Così ognuno decide
+  se importare tutta la rete (anche chi fa 0) o solo gli attivi.
+- Chi usa l'app sta sempre sotto qualcuno che usa l'app: a ogni import va sotto il suo sponsor del report (o il primo
+  antenato che usa l'app). Esempio di Stefano: chi è sponsorizzato da lui ma collegato in profondità entra con il suo
+  link (sotto di lui) e al primo import va sotto lo sponsor vero.
+- **VP di gruppo, linee, percentuale per chi guarda** (chi usa l'app + le proprie importate); storico congelato per chi
+  guarda (`monthly_totals.visto_da`).
+- Import: chi non è nell'app compare **non spuntato** (pulsanti Spunta chi ha VPP / tutti / Togli tutti, ricerca); chi
+  resta senza spunta è **escluso** e non si ripropone ("Escluse · Rivedi"); agli import successivi solo i nuovi.
+- **Nascondi dalla mia struttura** (chi usa l'app): solo per me, con il suo gruppo; **i VP contano lo stesso**.
+- **Cancella dalla struttura** resta: le mie importate (cancellate ed escluse, anche "non fa più niente e non la voglio
+  vedere"); chi usa l'app (per tutti, codici non rinnovati).
+- Gli admin vedono come tutti (le importate degli altri solo nella copia di sicurezza).
+
+Com'è fatto: migrazione `016_rete_da_amway.sql` (`vedo()`, `posso_gestire` = importate da me, `entra_con_invito`,
+`diventa_attivo`, `importa_rete`, `calcola_mese(mese, radice, chi_guarda)`, tabelle `esclusi_import` e `nascosti`,
+funzioni degli inserimenti a mano chiuse). **Da incollare nell'SQL Editor** (il connettore chiede una conferma che
+scade, perché le funzioni contengono cancellazioni): subito prima o subito dopo l'unione della PR.
+Formato del CSV Amway: UTF-8 con BOM, virgole; riga 1 avviso di riservatezza; riga 2 `"Mese di competenza","AAAAMM"`;
+riga 3 le intestazioni; colonne usate "Qualifica Amway Partner" (= livello), "Codice Amway Partner Sponsor",
+"Codice Amway Partner", "Nome", "VPP"; numeri "9.282,49" o "20996.38" con l'apostrofo davanti.
 
 ## Proposte in sospeso (Stefano non ha ancora risposto)
 
