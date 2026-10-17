@@ -123,10 +123,10 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare la copia di sicurezza e la skill** (METODO.md già unito con la PR #35). Poi: **prima copia** dei dati
-   dall'app e **installare la skill** `metodo-app-stefano` nell'account claude.ai. se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
-   PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
-   ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
+1. **Copia di sicurezza e skill pubblicate** (PR #36 unita il 17 ottobre). Da fare per Stefano: **prima copia** dei
+   dati dall'app e **installare la skill** `metodo-app-stefano` nell'account claude.ai.
+   **Prossimo lavoro: importare i VPP dal report Amway** (vedi la sezione qui sotto), **dopo l'ok scritto
+   dell'upline/supporto Amway** (il report si dichiara confidenziale). Nessun codice prima.
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
    scheda partner, partner senza app, Da confermare, in mezzo / cancella / cambia sponsor, imbuto ed etichette),
    del confronto col mese prima, di "Fissa una chiamata" e dello storico del gruppo
@@ -220,9 +220,36 @@ dall'SQL Editor perché contiene un `delete`):
    "anonymous sign-ins" più alto in Authentication → Rate Limits.
 5. Dopo la Fase 2: Fase 3 (presa in carico dopo 14 giorni, avvisi) e Fase 4 (diagnosi, serie di settimane, 90 giorni).
 
+## Importare i VPP dal report Amway (progetto deciso il 17 ottobre, in attesa dell'ok Amway)
+
+Niente collegamento diretto al sito Amway (nessuna API ufficiale, password su un server, regole IBO/GDPR):
+si importa il **CSV** che ognuno scarica da Business Centre → Linea di Sponsorizzazione (LOS) → Esporta →
+**"Intera Linea di Sponsorizzazione con tutti i KPI disponibili"**, **senza filtri attivi**.
+- **Formato del file** (visto su un export vero, non salvato nel repository): UTF-8 con BOM, virgole; riga 1 avviso di
+  riservatezza; riga 2 `"Mese di competenza","AAAAMM"`; riga 3 le 26 intestazioni; poi una riga per persona.
+  Colonne usate: "Qualifica Amway Partner" (= livello, 1 = chi scarica), "Codice Amway Partner Sponsor",
+  "Codice Amway Partner", "Nome" ("COGNOME, NOME"), "VPP". Valori con apostrofo davanti, numeri sia "9.282,49" sia
+  "20996.38". Telefono, email, indirizzo e il resto si ignorano. Per i test: file finto con lo stesso formato.
+- **Decisioni di Stefano**:
+  - ognuno importa il **proprio** CSV: aggiorna i propri VPP (riga di livello 1, controllata col proprio codice) e
+    quelli delle persone **senza app che gestisce**; **chi usa l'app non viene mai toccato** dall'import di altri;
+  - si importa il mese scritto nel file, **sia chiuso sia in corso**; reimportare lo stesso mese sostituisce i valori;
+  - **niente data di rinnovo**: chi **non è più nel report** (codici tolti da Amway) si cancella all'import successivo
+    (questo sostituisce la vecchia proposta della schermata "Rinnovi");
+  - **codice Amway obbligatorio** quando si aggiunge una persona a mano; **facoltativo** per chi entra dal link
+    d'invito (si può aggiungere dopo o lo prende l'app dal suo primo import);
+  - all'import, **nome uguale ma codice diverso** → segnalato, con conferma per correggere il codice.
+- **Proposte di Claude (da confermare con Stefano)**: anteprima in 4 gruppi (aggiornati · codice diverso · nel file
+  ma non nell'app, solo informazione · non più nel file); cancellazione con elenco già spuntato e un tocco su
+  "Cancella", solo per persone senza app gestite da chi importa; **blocco delle cancellazioni** se il file sembra
+  parziale (riga 1 non è chi importa, filtri o "Vista corrente", mancano molti codici conosciuti). Persone già
+  nell'app senza codice: abbinamento proposto per nome al primo import.
+- **Tecnica prevista**: migrazione `015_codice_amway.sql` (colonna `codice_amway` unica in `partners`,
+  `aggiungi_partner` la richiede, funzione `importa_report` security definer che scrive solo per sé e per chi
+  `posso_gestire`); il file si legge nel browser e non lascia il telefono; si salvano solo codice e VPP.
+
 ## Proposte in sospeso (Stefano non ha ancora risposto)
 
-- Schermata **"Rinnovi"** per fine anno: elenco di chi non ha rinnovato il codice Amway da cancellare in blocco.
 - Captcha prima del lancio (punto 4 sopra).
 
 ## Domande aperte
