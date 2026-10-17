@@ -217,9 +217,9 @@ dall'SQL Editor perché contiene un `delete`):
   - schermata d'ingresso: pulsante **Incolla il link personale** (legge il link copiato); nell'app installata
     spiega che la prima volta serve il link. Perché: su iPhone l'app sulla Home ha una memoria separata da Safari.
   - Ordine giusto per un nuovo partner su iPhone: prima entra dal link d'invito, poi installa.
-4. **Prima del lancio a tutto il gruppo**: captcha (Cloudflare Turnstile) nell'app (PR del 17 ottobre): Stefano
-   lo accende in Supabase con la Secret Key dopo aver unito la PR. Limite "anonymous sign-ins" a 30/ora, provider
-   Email spento (fatto).
+4. **Prima del lancio a tutto il gruppo**: captcha (Cloudflare Turnstile) nell'app e acceso in Supabase, limite
+   "anonymous sign-ins" a 30/ora, provider Email spento (fatto, 17 ottobre). Restano: prova su iPhone con Alessia,
+   copia di sicurezza, gruppo pilota di 2-3 leader, messaggio per il gruppo.
 5. Dopo la Fase 2: Fase 3 (presa in carico dopo 14 giorni, avvisi) e Fase 4 (diagnosi, serie di settimane, 90 giorni).
 
 ## La rete dal report Amway (17 ottobre: import dei VPP con la PR #37; struttura flessibile in questa PR)
@@ -283,8 +283,8 @@ Com'è fatto: migrazione `017_inviti_e_numeri_report.sql` (tabelle `inviti_admin
   primo import. Cancellazione solo per diritto all'oblio, dall'SQL Editor (`ADMIN.md`).
 - **Captcha Cloudflare Turnstile** al primo ingresso di un telefono (account Cloudflare di Stefano, con verifica in
   due passaggi; Site Key in `config.js`, Secret Key solo in Supabase). Provider Email spento in Supabase.
-- Restano da fare per Stefano: accendere il captcha in Supabase (Attack Protection), verifica in due passaggi
-  (GitHub, Supabase, Google), email privata su GitHub.
+- Captcha acceso anche in Supabase e provato sul telefono (17 ottobre).
+- Restano da fare per Stefano: verifica in due passaggi (GitHub, Supabase, Google), email privata su GitHub.
 
 ## Proposte in sospeso (Stefano non ha ancora risposto)
 
