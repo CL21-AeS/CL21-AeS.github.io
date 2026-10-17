@@ -125,8 +125,9 @@ dall'SQL Editor perché contiene un `delete`):
 
 1. **Copia di sicurezza e skill pubblicate** (PR #36 unita il 17 ottobre). Da fare per Stefano: **prima copia** dei
    dati dall'app e **installare la skill** `metodo-app-stefano` nell'account claude.ai.
-   **Prossimo lavoro: importare i VPP dal report Amway** (vedi la sezione qui sotto), **dopo l'ok scritto
-   dell'upline/supporto Amway** (il report si dichiara confidenziale). Nessun codice prima.
+   **Import dei VPP dal report Amway: fatto il 17 ottobre** (migrazione `015_codice_amway.sql` già applicata),
+   da pubblicare e collaudare con il CSV vero (vedi la sezione qui sotto). Verifica con l'upline: ok per Stefano
+   (l'import mostra gli stessi dati che ognuno vede già sul sito e non tocca i dati degli altri).
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
    scheda partner, partner senza app, Da confermare, in mezzo / cancella / cambia sponsor, imbuto ed etichette),
    del confronto col mese prima, di "Fissa una chiamata" e dello storico del gruppo
@@ -220,7 +221,7 @@ dall'SQL Editor perché contiene un `delete`):
    "anonymous sign-ins" più alto in Authentication → Rate Limits.
 5. Dopo la Fase 2: Fase 3 (presa in carico dopo 14 giorni, avvisi) e Fase 4 (diagnosi, serie di settimane, 90 giorni).
 
-## Importare i VPP dal report Amway (progetto deciso il 17 ottobre, in attesa dell'ok Amway)
+## Importare i VPP dal report Amway (fatto il 17 ottobre, da collaudare con il CSV vero)
 
 Niente collegamento diretto al sito Amway (nessuna API ufficiale, password su un server, regole IBO/GDPR):
 si importa il **CSV** che ognuno scarica da Business Centre → Linea di Sponsorizzazione (LOS) → Esporta →
@@ -239,14 +240,19 @@ si importa il **CSV** che ognuno scarica da Business Centre → Linea di Sponsor
   - **codice Amway obbligatorio** quando si aggiunge una persona a mano; **facoltativo** per chi entra dal link
     d'invito (si può aggiungere dopo o lo prende l'app dal suo primo import);
   - all'import, **nome uguale ma codice diverso** → segnalato, con conferma per correggere il codice.
-- **Proposte di Claude (da confermare con Stefano)**: anteprima in 4 gruppi (aggiornati · codice diverso · nel file
+- **Proposte di Claude approvate da Stefano**: anteprima in 4 gruppi (aggiornati · codice diverso · nel file
   ma non nell'app, solo informazione · non più nel file); cancellazione con elenco già spuntato e un tocco su
   "Cancella", solo per persone senza app gestite da chi importa; **blocco delle cancellazioni** se il file sembra
   parziale (riga 1 non è chi importa, filtri o "Vista corrente", mancano molti codici conosciuti). Persone già
   nell'app senza codice: abbinamento proposto per nome al primo import.
-- **Tecnica prevista**: migrazione `015_codice_amway.sql` (colonna `codice_amway` unica in `partners`,
-  `aggiungi_partner` la richiede, funzione `importa_report` security definer che scrive solo per sé e per chi
-  `posso_gestire`); il file si legge nel browser e non lascia il telefono; si salvano solo codice e VPP.
+- **Com'è fatto**: migrazione `015_codice_amway.sql` (colonna `codice_amway` unica in `partners`;
+  `imposta_codice_amway` per sé o per chi `posso_gestire`; `aggiungi_con_codice` e `inserisci_in_mezzo_con_codice`
+  con il codice obbligatorio; `importa_vpp` che registra la differenza come rettifica, solo per sé e per i gestiti,
+  nel mese aperto). Nell'app: "Importa dal report Amway" nel riquadro Il mio mese, anteprima in un foglio,
+  codice in scheda (gestiti) e in fondo alla pagina Io (il proprio), campo codice nei moduli. Il CSV si legge nel
+  browser (`leggiReport`, `analizzaReport` in `app.js`); test con un CSV finto nello stesso formato.
+  "Troppi mancanti" = più di 3 e più del 10% delle persone con codice: allora le caselle non sono spuntate.
+  Un mese già chiuso (dopo il giorno 5) non si importa più.
 
 ## Proposte in sospeso (Stefano non ha ancora risposto)
 
