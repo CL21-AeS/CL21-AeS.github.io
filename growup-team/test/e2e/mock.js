@@ -49,7 +49,9 @@
       const sotto = id => db.partners.filter(p => p.sponsor_id === id).flatMap(p => [p].concat(sotto(p.id)));
       return [io].concat(sotto(io.id)).map(pub); },
     aggiungi: async a => { const io = mio();
-      const p = { id:uid(), nome:a.p_nome, sponsor_id:a.p_sponsor, stato:"gestito", gestore_id:io.id, codice_invito:"G" + uid().slice(2,7).toUpperCase(),
+      if(!a.p_codice_amway) throw new Error("codice_amway_mancante");
+      if(db.partners.some(x => x.codice_amway === a.p_codice_amway)) throw new Error("codice_amway_usato");
+      const p = { id:uid(), nome:a.p_nome, sponsor_id:a.p_sponsor, stato:"gestito", gestore_id:io.id, codice_amway:a.p_codice_amway, codice_invito:"G" + uid().slice(2,7).toUpperCase(),
         data_iscrizione:a.p_data_iscrizione, qualifica_iniziale:a.p_qualifica, percentuale_iniziale:a.p_percentuale, privacy_accettata_il:null,
         partenza_confermata_il:new Date().toISOString() };
       db.partners.push(p); db.aggiunti.push(a); salva(); return pub(p); },
@@ -68,12 +70,37 @@
     nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid); p.chiave = hex();
       db.accessi = db.accessi.filter(a => a.partner_id !== pid); salva(); return p.chiave; },
     inMezzo: async a => { const io = mio(); const sp = db.partners.find(x => x.id === a.p_sotto[0]).sponsor_id;
-      const p = { id:uid(), nome:a.p_nome, sponsor_id:sp, stato:"gestito", gestore_id:io.id, codice_invito:"M" + uid().slice(2,7).toUpperCase(),
+      if(!a.p_codice_amway) throw new Error("codice_amway_mancante");
+      const p = { id:uid(), nome:a.p_nome, sponsor_id:sp, stato:"gestito", gestore_id:io.id, codice_amway:a.p_codice_amway, codice_invito:"M" + uid().slice(2,7).toUpperCase(),
         qualifica_iniziale:a.p_qualifica, percentuale_iniziale:a.p_percentuale, partenza_confermata_il:new Date().toISOString() };
       db.partners.push(p); for(const id of a.p_sotto) db.partners.find(x => x.id === id).sponsor_id = p.id; salva(); return pub(p); },
     cancella: async pid => { const t = db.partners.find(x => x.id === pid); let n = 0;
       for(const x of db.partners) if(x.sponsor_id === pid){ x.sponsor_id = t.sponsor_id; n++; }
       db.partners = db.partners.filter(x => x.id !== pid); db.activities = db.activities.filter(a => a.partner_id !== pid); salva(); return n; },
+    /* come nel database: il mio codice o quello di una persona senza app del mio gruppo; import solo per me e per loro */
+    impostaCodice: async (pid, codice) => { const io = mio();
+      const sotto = id => db.partners.filter(p => p.sponsor_id === id).flatMap(p => [p.id].concat(sotto(p.id)));
+      const p = db.partners.find(x => x.id === pid);
+      if(!p || (pid !== io.id && !(p.stato === "gestito" && sotto(io.id).includes(pid)))) throw new Error("non_autorizzato");
+      if(db.partners.some(x => x.id !== pid && x.codice_amway === codice)) throw new Error("codice_amway_usato");
+      p.codice_amway = codice; salva(); return pub(p); },
+    importaVpp: async (mese, righe) => { const io = mio();
+      const sotto = id => db.partners.filter(p => p.sponsor_id === id).flatMap(p => [p.id].concat(sotto(p.id)));
+      const oggi = new Intl.DateTimeFormat("en-CA", { timeZone:"Europe/Rome" }).format(new Date());
+      const m = mese.slice(0, 7), fine = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).toISOString().slice(0, 10);
+      const giorno = m === oggi.slice(0, 7) ? oggi : fine;
+      let aggiornati = 0, invariati = 0;
+      for(const r of righe){
+        const p = db.partners.find(x => x.id === r.partner_id);
+        if(!p || (p.id !== io.id && !(p.stato === "gestito" && sotto(io.id).includes(p.id)))) throw new Error("non_autorizzato");
+        const ora = db.activities.filter(a => a.partner_id === p.id && (a.tipo === "ordine" || a.tipo === "rettifica") && a.data.slice(0, 7) === m)
+          .reduce((t, a) => t + Number(a.vp), 0);
+        const diff = Math.round((r.vpp - ora) * 100) / 100;
+        if(!diff){ invariati++; continue; }
+        db.activities.push({ id:uid(), partner_id:p.id, tipo:"rettifica", vp:diff, quantita:1, data:giorno, inserito_da:io.id, inserito_il:new Date().toISOString() });
+        aggiornati++;
+      }
+      db.importi = (db.importi || 0) + 1; salva(); return { aggiornati, invariati }; },
     cambiaSponsor: async (pid, sp) => { if(!mio().is_admin) throw new Error("non_autorizzato");
       const x = db.partners.find(y => y.id === pid);
       const s = db.partners.find(y => y.id === sp);

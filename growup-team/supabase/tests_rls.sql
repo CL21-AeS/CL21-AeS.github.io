@@ -458,6 +458,41 @@ begin
                          and jsonb_array_length(public.copia_dati()->'tabelle'->'partners') >= 3, 'l''admin scarica la copia con tutte le tabelle');
   execute 'reset role';
 
+  -- ---- Codice Amway e import dei VPP: per me e per chi gestisco, mai per chi usa l'app ----
+  perform growup_test.come(u5);  -- A
+  perform growup_test.ok(public.imposta_codice_amway(a, '#2533783')->>'codice_amway' = '2533783', 'A scrive il suo codice (solo cifre)');
+  perform growup_test.ok(public.imposta_codice_amway(k, '1111111')->>'codice_amway' = '1111111', 'A scrive il codice di K, che gestisce (senza app)');
+  perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', b, '2222222'), 'A non scrive il codice di B, che usa l''app');
+  perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', k, '2533783'), 'lo stesso codice non vale per due persone');
+  perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', k, '12'), 'codice troppo corto');
+  perform growup_test.deve_fallire(format('update public.partners set codice_amway = %L where id = %L', '3333333', a), 'il codice non si scrive direttamente');
+  perform growup_test.deve_fallire(format('select public.aggiungi_con_codice(%L, %L, %L)', 'Senza Codice', b, ''), 'a mano serve il codice');
+  perform growup_test.deve_fallire(format('select public.aggiungi_con_codice(%L, %L, %L)', 'Doppio', b, '1111111'), 'a mano non si riusa un codice');
+  execute 'reset role';
+  perform growup_test.ok(not exists (select 1 from public.partners where nome in ('Senza Codice', 'Doppio')), 'con il codice sbagliato non si crea nessuno');
+  perform growup_test.come(u5);
+  f := (public.aggiungi_con_codice('Franca Test', b, '4444444')->>'id')::uuid;
+  perform growup_test.ok((select codice_amway = '4444444' and stato = 'gestito' from public.partners where id = f), 'F aggiunta a mano con il codice');
+  perform growup_test.ok(public.inserisci_in_mezzo_con_codice('Mezzo Test', array[f], '5555555')->>'codice_amway' = '5555555',
+                         'persona inserita in mezzo con il codice');
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', k, '6666666'), 'C non scrive codici nella linea di A');
+  perform growup_test.deve_fallire(format($q$select public.importa_vpp(current_date, '[{"partner_id":"%s","vpp":10}]')$q$, k), 'C non importa VPP per K');
+  perform growup_test.come(u5);  -- A
+  perform growup_test.ok(public.importa_vpp(current_date, format('[{"partner_id":"%s","vpp":120.5},{"partner_id":"%s","vpp":80}]', a, k)::jsonb)->>'aggiornati' = '2',
+                         'A importa i VPP per sé e per K');
+  perform growup_test.ok((select sum(vp) from public.activities where partner_id = a and tipo in ('ordine','rettifica')
+                          and date_trunc('month', data) = date_trunc('month', current_date)) = 120.5, 'i VPP del mese di A sono quelli del report');
+  perform growup_test.ok(public.importa_vpp(current_date, format('[{"partner_id":"%s","vpp":150}]', a)::jsonb)->>'aggiornati' = '1', 'A reimporta il mese');
+  perform growup_test.ok((select sum(vp) from public.activities where partner_id = a and tipo in ('ordine','rettifica')
+                          and date_trunc('month', data) = date_trunc('month', current_date)) = 150, 'reimportare sostituisce il valore');
+  perform growup_test.ok(public.importa_vpp(current_date, format('[{"partner_id":"%s","vpp":150}]', a)::jsonb)->>'invariati' = '1', 'stesso valore: niente da registrare');
+  perform growup_test.deve_fallire(format($q$select public.importa_vpp(current_date, '[{"partner_id":"%s","vpp":10}]')$q$, b), 'A non importa i VPP di B, che usa l''app');
+  perform growup_test.deve_fallire(format($q$select public.importa_vpp(current_date - 100, '[{"partner_id":"%s","vpp":10}]')$q$, a), 'un mese chiuso non si importa');
+  perform growup_test.deve_fallire(format($q$select public.importa_vpp(current_date, '[{"partner_id":"%s","vpp":-5}]')$q$, a), 'VPP negativi rifiutati');
+  execute 'reset role';
+  perform growup_test.ok((select sum(vp) from public.activities where partner_id = b and tipo = 'rettifica') is null, 'i numeri di B non sono stati toccati');
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),
