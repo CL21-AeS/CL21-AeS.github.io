@@ -1923,7 +1923,7 @@ end;
 $$;
 
 -- ---- Import della rete dal report Amway ----
--- p_io:       { "codice": "2533783", "vpp": 416.83 }       (il mio codice si salva se non c'è)
+-- p_io:       { "codice": "1234567", "vpp": 400 }       (il mio codice si salva se non c'è)
 -- p_persone:  [{ "codice", "nome", "sponsor", "vpp" }]     le mie persone importate (nuove o già presenti),
 --             nell'ordine del report (prima lo sponsor); "sponsor" = codice della prima persona sopra di lei
 --             presente nell'app (io, chi usa l'app, mie importate); null = sotto di me

@@ -241,7 +241,7 @@ check(!(await page.locator(".card", { hasText:"Da confermare" }).locator("li", {
 await sync(page);
 check(DB.partners.find(p => p.nome === "Bea Verdi").percentuale_iniziale === 9, "correzione salvata (12% -> 9%)");
 // la radice importa la sua rete: Paolo e Luca (con VPP) sì, Zeno (0 VP) no; Bea è di Ciro secondo il report
-const reportRadice = creaCsv(meseFile, [persona(1, "9", "1111111", "BAZZANO, STEFANO", "120,00"),
+const reportRadice = creaCsv(meseFile, [persona(1, "9", "1111111", "ROSSI, MARIO", "120,00"),
   persona(2, "1111111", "2000001", "BIANCHI, ANNA", "80,00"), persona(3, "2000001", "1000003", "NERI, PAOLO", "10,00"),
   persona(4, "1000003", "1000001", "ROSSI, MARCO", "150,00"), persona(5, "1000001", "1000002", "VERDI, LUCA", "5,00"),
   persona(2, "1111111", "2000006", "NERI, CIRO", "0,00"), persona(3, "2000006", "2000005", "VERDI, BEA", "0,00"),
@@ -673,14 +673,14 @@ for(const [id, nome, codice] of [["imp-gino","Gino Gestito","3000001"],["imp-ugo
     partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() });
 const altriGestiti = DB.partners.filter(p => p.stato === "gestito" && p.gestore_id === "R" && p.codice_amway && !["imp-gino","imp-ugo"].includes(p.id));
 const usanoApp = DB.partners.filter(p => p.stato !== "gestito" && p.codice_amway);
-const righeCsv = [persona(1, "1384542", "2533783", "BAZZANO, STEFANO", "416,83"), persona(2, "2533783", "3000001", "GESTITO, GINO", "1.055,50"),
+const righeCsv = [persona(1, "7654321", "1234567", "ROSSI, MARIO", "400,00"), persona(2, "1234567", "3000001", "GESTITO, GINO", "1.055,50"),
   persona(3, "3000001", "3000099", "NUOVO, NINO", "7,00")]
-  .concat(altriGestiti.concat(usanoApp).map(p => persona(3, "2533783", p.codice_amway, p.nome.toUpperCase(), "1,00")));
+  .concat(altriGestiti.concat(usanoApp).map(p => persona(3, "1234567", p.codice_amway, p.nome.toUpperCase(), "1,00")));
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await scegliFile(page, "altro.csv", "nome,cognome\nMario,Rossi\n");
 check(await page.locator(".sheet .errore").getByText("non sembra il report").isVisible(), "import: file sbagliato riconosciuto");
-await page.setInputFiles("#file-report", { name:"altri.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, [persona(1, "1", "2533783", "BAZZANO, STEFANO", "1"), persona(2, "2533783", "9999999", "ALTRO, ALDO", "1")])) });
+await page.setInputFiles("#file-report", { name:"altri.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, [persona(1, "1", "1234567", "ROSSI, MARIO", "1"), persona(2, "1234567", "9999999", "ALTRO, ALDO", "1")])) });
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
 await page.click(".sheet button[data-act=chiudi]");
 const meseVecchio = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - 3); return d.toISOString().slice(0, 7).replace("-", ""); })();
@@ -691,8 +691,8 @@ check(await page.locator(".sheet .errore").getByText("sul sito Amway scegli il f
 await page.setInputFiles("#file-report", { name:"los.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, righeCsv)) });
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
 const sez = t => page.locator(".sheet .imp-sezione", { hasText:t });
-check(await sez("Si aggiornano i VPP").locator("li", { hasText:"Stefano e Alessia (tu)" }).getByText("416,83 VP").isVisible()
-  && await sez("Si aggiornano i VPP").getByText("il tuo codice 2533783 viene salvato").isVisible(), "anteprima: i miei VPP e il mio codice dalla prima riga");
+check(await sez("Si aggiornano i VPP").locator("li", { hasText:"Stefano e Alessia (tu)" }).getByText("400 VP").isVisible()
+  && await sez("Si aggiornano i VPP").getByText("il tuo codice 1234567 viene salvato").isVisible(), "anteprima: i miei VPP e il mio codice dalla prima riga");
 check(await sez("Si aggiornano i VPP").locator("li", { hasText:"Gino Gestito" }).getByText("1.055,5 VP").isVisible(), "anteprima: Gino, abbinato per codice");
 check(!(await sez("Nome uguale, codice diverso").count()) && !(await sez("trovati per nome").count()), "niente più abbinamenti per nome");
 check(await sez("Non più nel report").getByText("Ugo Uscito · 3000004").isVisible() && await page.isChecked(".sheet input[name=cancella]"),
@@ -705,7 +705,7 @@ await page.getByText(/2 VPP aggiornati, 1 persona cancellata/).waitFor(); check(
 await sync(page);
 const vppDi = id => DB.activities.filter(a => a.partner_id === id && ["ordine","rettifica"].includes(a.tipo) && a.data.slice(0, 7) === oggiStr.slice(0, 7))
   .reduce((t, a) => t + Number(a.vp), 0);
-check(DB.partners.find(p => p.id === "R").codice_amway === "2533783" && Math.abs(vppDi("R") - 416.83) < 0.001, "i miei VPP del mese sono quelli del report");
+check(DB.partners.find(p => p.id === "R").codice_amway === "1234567" && Math.abs(vppDi("R") - 400) < 0.001, "i miei VPP del mese sono quelli del report");
 check(vppDi("imp-gino") === 1055.5, "VPP delle persone importate");
 check(!DB.partners.some(p => p.id === "imp-ugo"), "Ugo cancellato");
 check(!DB.activities.some(a => a.tipo === "rettifica" && a.inserito_da === "R" && usanoApp.some(p => p.id === a.partner_id)), "nessun dato di chi usa l'app toccato");
@@ -719,7 +719,7 @@ await page.getByText(/0 VPP aggiornati/).waitFor();
 await sync(page);
 check(DB.activities.filter(a => a.tipo === "rettifica").length === nRett, "reimport dello stesso file: nessun dato nuovo");
 await scegliFile(page, "di-altri.csv", creaCsv(meseFile, [persona(1, "1", "7777777", "ALTRO, ALDO", "1")]));
-check(await page.locator(".sheet .errore").getByText("il tuo codice nell'app è 2533783").isVisible()
+check(await page.locator(".sheet .errore").getByText("il tuo codice nell'app è 1234567").isVisible()
   && await page.locator(".sheet .errore").getByText("correggilo in fondo alla pagina Io").isVisible(), "import: il report di un altro partner è rifiutato (admin: correggi)");
 await page.click(".sheet button[data-act=chiudi]");
 await page.click("button[data-act=vista-gruppo]");
@@ -730,14 +730,14 @@ check(testoScheda.includes("Codice Amway 3000001") && !(await page.locator(".car
 await page.click("button.link[data-act=vista-gruppo]");
 await page.locator(".albero.struttura li", { hasText:"Ivo Attivo" }).locator("button[data-act=apri-scheda]").click();
 await page.click(".card button[data-act=codice]");
-await page.fill(".sheet input[name=codice_amway]", "2533783");
+await page.fill(".sheet input[name=codice_amway]", "1234567");
 await page.click(".sheet button:has-text('Salva')");
 check(await page.locator(".sheet .errore").innerText() === "Questo codice Amway è già di un'altra persona nell'app.", "codice già usato: rifiutato");
 await page.click(".sheet button[data-act=chiudi]");
 // ricerca per nome o per codice tra le persone da scegliere
 await page.click("button.link[data-act=vista-gruppo]");
-const molti = Array.from({ length:12 }, (_, i) => persona(2, "2533783", String(7000000 + i), "PROVA, PERSONA" + i, "0,00"));
-await scegliFile(page, "molti.csv", creaCsv(meseFile, [persona(1, "1", "2533783", "BAZZANO, STEFANO", "1")].concat(molti)), true);
+const molti = Array.from({ length:12 }, (_, i) => persona(2, "1234567", String(7000000 + i), "PROVA, PERSONA" + i, "0,00"));
+await scegliFile(page, "molti.csv", creaCsv(meseFile, [persona(1, "1", "1234567", "ROSSI, MARIO", "1")].concat(molti)), true);
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
 await page.fill(".sheet input[data-cerca='.imp-nuovi']", "7000005");
 check(await page.locator(".sheet .imp-nuovi label:visible").count() === 1, "ricerca per codice tra le persone da scegliere");
@@ -754,39 +754,39 @@ const csv2 = righe => "﻿" + [csvRiga(["Amway","CONFIDENZIALE"]), csvRiga(["Mes
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.click("button[data-act=vista-gruppo]");
-await scegliFile(page, "platino.csv", csv2([riga2(1, "1", "2533783", "BAZZANO, STEFANO", "120,00", "9.282,49", 18, 163),
-  riga2(2, "2533783", "4000001", "CHIARLE, BARBARA", "0,00", "5.226,77", 15, 191),
-  riga2(2, "2533783", "4000011", "UNO, LINEA", "0,00", "700,00", 3, 4), riga2(2, "2533783", "4000012", "DUE, LINEA", "0,00", "650,00", 3, 3)]), true);
+await scegliFile(page, "platino.csv", csv2([riga2(1, "1", "1234567", "ROSSI, MARIO", "120,00", "9.500,00", 18, 163),
+  riga2(2, "1234567", "4100001", "PLATINI, BIANCA", "0,00", "5.300,00", 15, 191),
+  riga2(2, "1234567", "4000011", "UNO, LINEA", "0,00", "700,00", 3, 4), riga2(2, "1234567", "4000012", "DUE, LINEA", "0,00", "650,00", 3, 3)]), true);
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
-await page.check(".sheet input[name=aggiungi][value='4000001']");
+await page.check(".sheet input[name=aggiungi][value='4100001']");
 await page.check(".sheet input[name=consenso]");
 await page.click(".sheet button:has-text('Importa')");
 await page.getByText(/1 persona aggiunta/).waitFor();
-check(await page.locator(".albero.struttura li", { hasText:"Barbara Chiarle" }).getByText("gruppo 5.226,77").isVisible(), "Platino: VP di gruppo dal report");
-await page.locator(".albero.struttura li", { hasText:"Barbara Chiarle" }).locator("button[data-act=apri-scheda]").click();
+check(await page.locator(".albero.struttura li", { hasText:"Bianca Platini" }).getByText("gruppo 5.300").isVisible(), "Platino: VP di gruppo dal report");
+await page.locator(".albero.struttura li", { hasText:"Bianca Platini" }).locator("button[data-act=apri-scheda]").click();
 check(await page.getByText("Linee non visibili nel report").isVisible() && await page.locator(".dati-scheda").getByText("15%").isVisible(), "scheda del Platino: 15%, linee non visibili");
 check(await page.locator(".card", { hasText:"Inviti · solo admin" }).isVisible(), "admin: inviti nella scheda");
 await sync(page);
-const barbara = DB.partners.find(p => p.codice_amway === "4000001");
-check((await page.locator(".card", { hasText:"Inviti · solo admin" }).locator(".linkbox").innerText()).endsWith("#" + barbara.codice_invito), "link d'invito sotto Barbara");
+const bianca = DB.partners.find(p => p.codice_amway === "4100001");
+check((await page.locator(".card", { hasText:"Inviti · solo admin" }).locator(".linkbox").innerText()).endsWith("#" + bianca.codice_invito), "link d'invito sotto Bianca");
 await page.screenshot({ path: S + "/e2e/28-platino.png", fullPage:true });
 await page.click("button[data-act=vista-io]");
 check(await page.getByText("dal report Amway").first().isVisible() && await page.getByText("18% questo mese").isVisible(), "pagina Io: percentuale ufficiale dal report");
 await ctx.close();
-// Nora entra con il link sotto Barbara
-({ ctx, page } = await apri({}, "#" + barbara.codice_invito));
-await page.getByText("Ti ha invitato Barbara Chiarle").waitFor();
+// Nora entra con il link sotto Bianca
+({ ctx, page } = await apri({}, "#" + bianca.codice_invito));
+await page.getByText("Ti ha invitato Bianca Platini").waitFor();
 await page.fill("input[name=nome]", "Nora Sotto"); await page.fill("input[name=codice_amway]", "4000002");
 await page.fill("input[name=data]", oggiStr); await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor();
 await sync(page); await ctx.close();
 const nora = DB.partners.find(p => p.nome === "Nora Sotto");
-check(nora.sponsor_id === barbara.id && nora.stato === "attivo", "Nora sotto Barbara, usa l'app");
-// la radice crea il link per chi manca tra Barbara e Nora
+check(nora.sponsor_id === bianca.id && nora.stato === "attivo", "Nora sotto Bianca, usa l'app");
+// la radice crea il link per chi manca tra Bianca e Nora
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.click("button[data-act=vista-gruppo]");
-check(await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator(".livello").innerText() === "3", "Nora sotto Barbara nella struttura della radice");
+check(await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator(".livello").innerText() === "3", "Nora sotto Bianca nella struttura della radice");
 await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator("button[data-act=apri-scheda]").click();
 await page.click("button[data-act=invito-sopra]");
 await page.click(".sheet button:has-text('Crea il link')");
@@ -794,16 +794,33 @@ const linkSopra = await page.locator(".sheet .linkbox").innerText();
 check(/#S[A-Z0-9]{5}$/.test(linkSopra), "link speciale creato");
 await sync(page); await ctx.close();
 ({ ctx, page } = await apri({}, "#" + linkSopra.split("#")[1]));
-await page.getByText("Ti ha invitato Barbara Chiarle").waitFor();
+await page.getByText("Ti ha invitato Bianca Platini").waitFor();
 await page.fill("input[name=nome]", "Mirco Mezzo"); await page.fill("input[name=codice_amway]", "4000003");
 await page.fill("input[name=data]", oggiStr); await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor();
 await sync(page); await ctx.close();
 const mirco = DB.partners.find(p => p.nome === "Mirco Mezzo");
-check(mirco.sponsor_id === barbara.id && DB.partners.find(p => p.nome === "Nora Sotto").sponsor_id === mirco.id, "Mirco entra tra Barbara e Nora");
+check(mirco.sponsor_id === bianca.id && DB.partners.find(p => p.nome === "Nora Sotto").sponsor_id === mirco.id, "Mirco entra tra Bianca e Nora");
 ({ ctx, page } = await apri({}, "#" + linkSopra.split("#")[1]));
 await page.getByText(/link d'invito non è valido|Entra in Growup|Benvenuto/).first().waitFor();
-check(!(await page.getByText("Ti ha invitato Barbara Chiarle").count()), "il link speciale vale una volta sola");
+check(!(await page.getByText("Ti ha invitato Bianca Platini").count()), "il link speciale vale una volta sola");
+await ctx.close();
+
+// 20. Sicurezza: un nome malevolo non diventa codice; la pagina ha la Content Security Policy
+DB.partners.push({ id:"xss1", nome:'<img src=x onerror="window.__xss=1">', sponsor_id:"R", stato:"attivo", codice_invito:"XSSAAA",
+  codice_amway:"6000001", creato_il:new Date().toISOString(), partenza_confermata_il:new Date().toISOString() });
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.click("button[data-act=vista-gruppo]");
+await page.locator(".albero.struttura li", { hasText:"<img" }).locator("button[data-act=apri-scheda]").click();
+await page.getByText("Scheda partner").waitFor();
+await page.locator("button[data-act=preferito]").click();
+await page.click("button.link[data-act=vista-gruppo]");
+await page.fill("#cerca-struttura", "img");
+check(await page.evaluate(() => window.__xss === undefined) && await page.locator(".albero.struttura li", { hasText:"<img src=x" }).isVisible(),
+  "un nome con codice HTML si vede come testo e non viene eseguito");
+check(/script-src 'self' https:\/\/cdn\.jsdelivr\.net;/.test(await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content")),
+  "la pagina ha la Content Security Policy");
 await ctx.close();
 
 await browser.close();

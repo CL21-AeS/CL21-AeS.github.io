@@ -1,0 +1,48 @@
+# Growup Team — sicurezza dei dati
+
+Controllo approfondito del 17 ottobre 2026 (app, Supabase, GitHub). Da ripetere dopo ogni modifica importante
+al database e prima del lancio a tutto il gruppo.
+
+## Come sono protetti i dati
+
+| Dove | Protezione |
+|---|---|
+| **Supabase (database, UE)** | Row Level Security attiva su **tutte** le tabelle; chi non ha un profilo non legge niente. Ognuno vede sé, chi usa l'app nella propria downline e le persone importate da lui; mai chi sta sopra o di lato. Le scritture delicate passano solo da funzioni che controllano chi le chiama. Nessuna tabella è leggibile senza accesso; l'unica funzione aperta a chi non è entrato è `sponsor_da_codice` (il nome di chi invita, per la pagina d'ingresso). Nessun file caricato (storage vuoto). |
+| **Accesso** | Niente password: link personale con una chiave casuale di 128 bit (nel database solo l'impronta sha256, non reversibile). Il link si toglie dalla barra degli indirizzi appena letto. |
+| **App (GitHub Pages)** | Content Security Policy: il browser esegue solo il codice dell'app e la libreria Supabase (con controllo di integrità) e si collega solo al nostro progetto. Ogni testo che viene dal database è "sterilizzato" prima di essere mostrato (provato con un nome contenente codice HTML). La cache del telefono tiene solo l'app, mai i dati. `no-referrer`: i link non rivelano da dove si arriva. |
+| **Report Amway (CSV)** | Si legge sul telefono, non viene caricato da nessuna parte; al database arrivano solo nome, codice e numeri di chi si importa. |
+| **GitHub (pubblico)** | Contiene solo codice: nessuna chiave segreta (in `config.js` c'è solo la chiave pubblica, fatta per stare nel browser), nessun dato reale nei file (i test usano nomi e codici inventati). |
+| **Copia di sicurezza** | La scarica solo un admin; contiene tutti i dati: va tenuta in una cartella privata di Google Drive. |
+
+## Controlli fatti
+
+- Supabase Security Advisor: nessun problema reale (gli avvisi sulle funzioni sono voluti: ognuna controlla chi la
+  chiama; quelli su `cron` riguardano tabelle interne non esposte).
+- Permessi di ogni tabella e funzione per "anon" (chi non è entrato) e "authenticated": vedi la query in fondo.
+- `supabase/tests_rls.sql`: visibilità, scritture, funzioni da admin, import, inviti → TUTTI I CONTROLLI SUPERATI.
+- Test dell'interfaccia: nome con codice HTML mostrato come testo, Content Security Policy presente.
+- Repository: nessun file CSV/Excel/JSON di dati nella storia; dati reali tolti dai file (sostituiti con dati inventati).
+
+## Da fare (decisioni e impostazioni)
+
+- [ ] Prima del lancio: **captcha** (Cloudflare Turnstile) sugli accessi anonimi e **limite** "anonymous sign-ins"
+      in Supabase → Authentication → Rate Limits.
+- [ ] **Verifica in due passaggi** sugli account GitHub, Supabase e Google (Drive delle copie).
+- [ ] Copie di sicurezza in una cartella **privata** di Google Drive.
+- Rischio residuo noto: chi ha un link d'invito di qualcuno sopra una persona importata **e** conosce il suo codice
+  Amway potrebbe entrare al suo posto. Si accorge subito la persona vera ("con questo codice c'è già qualcuno"):
+  l'admin rigenera il link personale dalla scheda e glielo dà.
+
+## Query di controllo dei permessi (SQL Editor)
+
+```sql
+select p.proname, has_function_privilege('anon', p.oid, 'execute') as anon,
+       has_function_privilege('authenticated', p.oid, 'execute') as utenti
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' order by anon desc, utenti desc, proname;
+
+select c.relname, c.relrowsecurity as rls, has_table_privilege('anon', c.oid, 'select') as anon_legge
+from pg_class c join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and c.relkind = 'r' order by c.relname;
+```
+Risultato atteso: `anon` solo su `sponsor_da_codice`; `rls` vero e `anon_legge` falso su tutte le tabelle.

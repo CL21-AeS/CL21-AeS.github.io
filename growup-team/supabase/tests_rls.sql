@@ -410,16 +410,16 @@ begin
   -- ---- Numeri ufficiali dal report e Platino (017) ----
   perform growup_test.come(u1);  -- R importa: P (Platino, gruppo nascosto) sotto A
   perform public.importa_rete(current_date,
-    '{"codice":"1000000","vpp":120,"vpg":9282.49,"percentuale":18,"linee":[{"codice":"2000001","vpg":3173},{"codice":"2000003","vpg":2905},{"codice":"9000001","vpg":1528}]}',
-    '[{"codice":"4000001","nome":"Barbara Platino","sponsor":"2000001","vpp":0,"vpg":5226.77,"percentuale":15,"linee":[],"nascoste":true}]',
+    '{"codice":"1000000","vpp":120,"vpg":9500,"percentuale":18,"linee":[{"codice":"2000001","vpg":3173},{"codice":"2000003","vpg":2905},{"codice":"9000001","vpg":1528}]}',
+    '[{"codice":"4100001","nome":"Bianca Platini","sponsor":"2000001","vpp":0,"vpg":5300,"percentuale":15,"linee":[],"nascoste":true}]',
     '[{"codice":"2000001","sponsor":"1000000","vpg":3173,"percentuale":12,"linee":[]}]', '{}', '{}');
-  h := (select id from public.partners where codice_amway = '4000001');
+  h := (select id from public.partners where codice_amway = '4100001');
   select * into x from public.riepilogo_mese(current_date) where partner_id = r;
-  perform growup_test.ok(x.da_report and x.vp_gruppo = 9282.49 and x.percentuale = 18 and x.linee_attive = 3,
+  perform growup_test.ok(x.da_report and x.vp_gruppo = 9500 and x.percentuale = 18 and x.linee_attive = 3,
                          'R: VPG, percentuale e linee dal report');
   perform growup_test.ok(x.qualifica = 'foundation_12', 'R: qualifica calcolata sulla struttura del report (' || coalesce(x.qualifica, '-') || ')');
   select * into x from public.riepilogo_mese(current_date) where partner_id = h;
-  perform growup_test.ok(x.vp_gruppo = 5226.77 and x.percentuale = 15 and x.linee_nascoste, 'Platino: VPG ufficiale, linee nascoste');
+  perform growup_test.ok(x.vp_gruppo = 5300 and x.percentuale = 15 and x.linee_nascoste, 'Platino: VPG ufficiale, linee nascoste');
   select * into x from public.riepilogo_mese(current_date) where partner_id = a;
   perform growup_test.ok(x.vp_gruppo = 3173 and x.percentuale = 12, 'R vede i numeri ufficiali di A');
   perform growup_test.come(u5);  -- A non ha importato quei numeri: per lei restano i suoi
@@ -446,7 +446,7 @@ begin
   perform growup_test.come(u1);
   k_e := public.crea_invito_sopra(f);
   perform growup_test.come(null);
-  perform growup_test.ok(public.sponsor_da_codice(k_e) = 'Barbara Platino', 'il link speciale mostra lo sponsor');
+  perform growup_test.ok(public.sponsor_da_codice(k_e) = 'Bianca Platini', 'il link speciale mostra lo sponsor');
   perform growup_test.come('00000000-0000-0000-0000-0000000000c2');
   g := (public.entra_con_invito(k_e, 'Mirco Mezzo', '4000003')->'profilo'->>'id')::uuid;
   execute 'reset role';

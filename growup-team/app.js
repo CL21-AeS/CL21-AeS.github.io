@@ -176,7 +176,7 @@ const MESSAGGI_ERRORE = {
   partner_inesistente: "Questa persona non c'è più nella struttura.",
   mese_chiuso: "Quel mese è già chiuso: si registrano il mese in corso e, fino al giorno 5, il mese precedente.",
   codice_amway_usato: "Questo codice Amway è già di un'altra persona nell'app.",
-  codice_amway_non_valido: "Il codice Amway è fatto di sole cifre (es. 2533783).",
+  codice_amway_non_valido: "Il codice Amway è fatto di sole cifre (es. 1234567).",
   codice_amway_mancante: "Scrivi il codice Amway Partner della persona.",
   import_non_valido: "Il file non è stato letto bene: scaricalo di nuovo dal sito Amway e riprova.",
   import_di_altri: "Questo report non è il tuo: ognuno importa il report scaricato dal proprio accesso al sito Amway.",
@@ -623,7 +623,7 @@ function campiQualifica(obbligoData, scelta){
 /* Codice Amway Partner (il numero IBO): solo cifre. Serve ad abbinare le persone del report Amway. */
 function campoCodice(obbligatorio, valore){
   return `<label class="field"><span>Codice Amway Partner${obbligatorio ? "" : ` <i>(facoltativo)</i>`}</span>
-        <input name="codice_amway" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="es. 2533783" value="${esc(valore || "")}"></label>`;
+        <input name="codice_amway" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="es. 1234567" value="${esc(valore || "")}"></label>`;
 }
 function soloCifre(v){ return String(v || "").replace(/\D/g, ""); }
 function codiceValido(c){ return /^\d{4,12}$/.test(c); }
@@ -1546,7 +1546,7 @@ function righeCsv(testo){
   if(campo || riga.length){ riga.push(campo); righe.push(riga); }
   return righe;
 }
-/* i valori del report hanno spesso un apostrofo davanti; i numeri sono "9.282,49" oppure "20996.38" */
+/* i valori del report hanno spesso un apostrofo davanti; i numeri sono "9.500,00" oppure "20996.38" */
 function pulito(v){ return String(v == null ? "" : v).trim().replace(/^'/, "").trim(); }
 function numReport(v){
   v = pulito(v).replace(/\s/g, "");
