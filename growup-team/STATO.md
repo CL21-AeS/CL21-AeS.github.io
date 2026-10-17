@@ -123,7 +123,8 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare METODO.md e CLAUDE.md** (frecce durante la ricerca già unite con la PR #34) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare la copia di sicurezza e la skill** (METODO.md già unito con la PR #35). Poi: **prima copia** dei dati
+   dall'app e **installare la skill** `metodo-app-stefano` nell'account claude.ai. se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
@@ -192,6 +193,9 @@ dall'SQL Editor perché contiene un `delete`):
 - **Struttura come nei report Amway** (17 ottobre): in cima chi usa l'app (livello **1**, con i suoi numeri e ▾ per
   richiudere tutto), i frontali sono **2**, i loro **3**, e così via; anche negli elenchi a scelta i frontali sono 2.
   Tolta la dicitura "sponsor …" dalle righe della struttura e "Sponsor: …" dalla scheda partner (resta negli elenchi a scelta).
+- **Copia di sicurezza** (17 ottobre; migrazione `014_copia_dati.sql` già applicata): funzione `copia_dati()` solo per
+  admin, pulsante **Scarica la copia dei dati** in fondo alle pagine (solo admin), file `growup-copia-AAAA-MM-GG.json`
+  da tenere su Google Drive; procedura mensile e ripristino in `LEGGIMI.md`.
 - **Campi numerici** (17 ottobre): si aprono vuoti con lo 0 grigio (o il valore attuale in grigio, es. obiettivi e
   totale del mese); se non si scrive niente vale quello grigio; dopo un errore il campo torna vuoto.
 - **Trascinare il dito** (17 ottobre): verso sinistra da Io a Gruppo, verso destra da Gruppo a Io (e da una scheda

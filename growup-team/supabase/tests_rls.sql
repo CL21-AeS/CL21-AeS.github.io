@@ -450,6 +450,14 @@ begin
   perform growup_test.ok(not exists (select 1 from pg_proc where proname = 'obiettivi_gruppo' and 'perche' = any(proargnames)),
                          'obiettivi_gruppo non restituisce il perché');
 
+  -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
+  perform growup_test.come(u5);  -- A
+  perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');
+  perform growup_test.come(u1);  -- R admin
+  perform growup_test.ok((select count(*) from jsonb_object_keys(public.copia_dati()->'tabelle')) = 10
+                         and jsonb_array_length(public.copia_dati()->'tabelle'->'partners') >= 3, 'l''admin scarica la copia con tutte le tabelle');
+  execute 'reset role';
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),
