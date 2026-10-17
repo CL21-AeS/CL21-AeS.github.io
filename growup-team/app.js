@@ -1630,10 +1630,10 @@ function vImporta(){
   <p class="small">${plur(a.totale, "persona", "persone")} nel file${a.mese === meseDi(oggi()) ? " · mese in corso: puoi reimportarlo quando vuoi, i valori si sostituiscono" : ""}.</p>
   <form data-form="importa" novalidate>
     ${a.nuovi.length ? sezione(`Non ancora nell'app · ${a.nuovi.length}`,
-      `<div class="row wrap" style="gap:6px;margin-top:8px">
-        <button type="button" class="btn small" data-act="spunta-vpp">Spunta chi ha VPP</button>
-        <button type="button" class="btn small" data-act="spunta-tutti">Spunta tutti</button>
-        <button type="button" class="btn small" data-act="togli-tutti">Togli tutti</button></div>
+      `<div class="row wrap scelte-rapide" style="gap:6px;margin-top:8px">
+        <button type="button" class="btn small" data-act="spunta-vpp" aria-pressed="false">Spunta chi ha VPP</button>
+        <button type="button" class="btn small" data-act="spunta-tutti" aria-pressed="false">Spunta tutti</button>
+        <button type="button" class="btn small" data-act="togli-tutti" aria-pressed="false">Togli tutti</button></div>
       ${a.nuovi.length > 8 ? `<input type="search" id="cerca-import" class="cerca" placeholder="Cerca un nome…" autocomplete="off" aria-label="Cerca un nome">` : ""}
       <div class="scelte imp-nuovi">${a.nuovi.map(scelta).join("")}</div>`,
       "Spunta chi vuoi seguire: lo vedrai solo tu, nella sua posizione del report. Chi resta senza spunta non ti verrà più proposto.",
@@ -1668,6 +1668,14 @@ function vImporta(){
     <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
       <button class="btn primary grow"${st.occupato ? " disabled" : ""}>Importa</button></div>
   </form>`;
+}
+
+function accendiRapida(el){
+  document.querySelectorAll(".scelte-rapide .btn").forEach(b => { const on = b === el; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+}
+function sceltaRapida(el, spunta){
+  document.querySelectorAll(".imp-da-scegliere input[name=aggiungi]").forEach(i => { i.checked = spunta(i); });
+  accendiRapida(el);
 }
 
 async function leggiFileReport(file){
@@ -1920,10 +1928,11 @@ const AZIONI = {
   "totale-mese"(){ st.errore = ""; st.meseTotale = meseDi(oggi()); st.sheet = "totale-mese"; render(); focusSheet(); },
   "scegli-mese"(el){ st.meseTotale = el.value; render(); },
   importa(){ st.imp = null; st.errore = ""; st.sheet = "importa"; render(); },
-  /* pulsanti rapidi dell'import: agiscono sulle caselle "Non ancora nell'app" senza ridisegnare il foglio */
-  "spunta-vpp"(){ document.querySelectorAll(".imp-da-scegliere input[name=aggiungi]").forEach(i => { i.checked = i.dataset.vpp === "1"; }); },
-  "spunta-tutti"(){ document.querySelectorAll(".imp-da-scegliere input[name=aggiungi]").forEach(i => { i.checked = true; }); },
-  "togli-tutti"(){ document.querySelectorAll(".imp-da-scegliere input[name=aggiungi]").forEach(i => { i.checked = false; }); },
+  /* pulsanti rapidi dell'import: agiscono sulle caselle "Non ancora nell'app" senza ridisegnare il foglio;
+     il pulsante usato resta acceso finché non si cambia una casella a mano */
+  "spunta-vpp"(el){ sceltaRapida(el, i => i.dataset.vpp === "1"); },
+  "spunta-tutti"(el){ sceltaRapida(el, () => true); },
+  "togli-tutti"(el){ sceltaRapida(el, () => false); },
   codice(el){ st.codiceId = el.dataset.id; st.errore = ""; st.sheet = "codice"; render(); focusSheet(); },
   storico(){ st.sheet = "storico"; render(); },
   async "mese-gruppo"(el){
@@ -2277,6 +2286,7 @@ document.addEventListener("submit", e => {
    è obbligatoria solo per chi inizia (nel modulo d'ingresso). */
 document.addEventListener("change", e => {
   if(e.target.id === "file-report"){ leggiFileReport(e.target.files && e.target.files[0]); return; }
+  if(e.target.name === "aggiungi" && e.target.closest(".imp-da-scegliere")){ accendiRapida(null); return; }
   if(e.target.name !== "qualifica") return;
   const f = e.target.form;
   const t = st.stages.find(s => s.chiave === f.qualifica.value);
