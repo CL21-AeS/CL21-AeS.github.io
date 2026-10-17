@@ -55,7 +55,12 @@ check(await page.getByText(/Mancano \d+ giorni per non pagare/).isVisible(), "co
 // 2. Attività (regressione)
 await page.click("button[data-act=contatto]"); await page.getByText("Contatto registrato").waitFor();
 check(await page.locator("button[data-act=contatto] b").innerText() === "1 questa sett.", "contatto +1");
-await page.click("button[data-act=ordine]"); await page.fill("input[name=vp]", "62,5");
+await page.click("button[data-act=ordine]");
+check(await page.inputValue(".sheet input[name=vp]") === "" && await page.getAttribute(".sheet input[name=vp]", "placeholder") === "0", "ordine: campo vuoto con lo 0 grigio");
+await page.click(".sheet button:has-text('Salva')");
+await page.locator(".sheet .errore").waitFor();
+check(await page.inputValue(".sheet input[name=vp]") === "", "ordine senza VP: errore e il campo resta vuoto");
+await page.fill("input[name=vp]", "62,5");
 await page.click(".sheet button:has-text('Salva')"); await page.getByText("Ordine da 62,5 VP registrato").waitFor();
 check(await page.getByText("Primi clienti").first().isVisible(), "primo ordine fatto -> tappa 2");
 
@@ -63,7 +68,7 @@ check(await page.getByText("Primi clienti").first().isVisible(), "primo ordine f
 check(await page.locator(".card", { hasText:"Il mio mese" }).locator("button[data-act=ordine]").isVisible(), "+ VP nel mio mese");
 // Aggiorna il totale del mese: su a 100, poi giù a 80
 await page.click("button[data-act=totale-mese]");
-check(await page.inputValue(".sheet input[name=vp]") === "62,5", "totale proposto = VP già registrati");
+check(await page.inputValue(".sheet input[name=vp]") === "" && await page.getAttribute(".sheet input[name=vp]", "placeholder") === "62,5", "totale proposto in grigio = VP già registrati");
 await page.fill(".sheet input[name=vp]", "100");
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("aggiornato: 100 VP").waitFor();
