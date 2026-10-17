@@ -17,6 +17,8 @@ await page.getByText("Entra in Growup").waitFor();
 await page.click("button[data-act=torna-invito]");
 await page.getByText("Due informazioni e iniziamo").waitFor(); check(true, "si torna all'invito");
 await page.fill("input[name=nome]", "Anna Bianchi");
+check(await page.getByText("Codice Amway Partner (facoltativo)").isVisible(), "ingresso: codice Amway facoltativo");
+await page.fill("input[name=codice_amway]", "2000001");
 await page.click("form button.primary");
 check(await page.getByText("serve la data di iscrizione").isVisible(), "data obbligatoria per chi inizia");
 await page.fill("input[name=data]", "2026-10-01");
@@ -100,6 +102,9 @@ await page.getByText("Aggiungi una persona").waitFor();
 await page.fill(".sheet input[name=nome]", "Marco Rossi");
 await page.selectOption(".sheet select[name=qualifica]", "pin:6");
 await page.click(".sheet button:has-text('Salva')");
+check(await page.locator(".sheet .errore").innerText() === "Scrivi il suo codice Amway Partner.", "a mano il codice Amway è obbligatorio");
+await page.fill(".sheet input[name=codice_amway]", "1000001");
+await page.click(".sheet button:has-text('Salva')");
 check(await page.getByText("Serve il suo consenso").isVisible(), "consenso obbligatorio");
 await page.check(".sheet input[name=consenso]");
 await page.click(".sheet button:has-text('Salva')");
@@ -111,6 +116,7 @@ await page.click("button[data-act=aggiungi]");
 const posti = await page.locator(".sheet select[name=sponsor] option").allInnerTexts();
 check(posti[0] === "Io" && posti.some(x => x === "2 · Marco Rossi"), "sponsor: io o qualcuno del mio gruppo, con il livello");
 await page.fill(".sheet input[name=nome]", "Luca Verdi");
+await page.fill(".sheet input[name=codice_amway]", "1000002");
 await page.selectOption(".sheet select[name=sponsor]", { label: posti.find(x => x.includes("Marco")) });
 await page.check(".sheet input[name=consenso]");
 await page.click(".sheet button:has-text('Salva')");
@@ -119,6 +125,7 @@ check(await page.getByText("2 persone", { exact:true }).isVisible(), "conteggio 
 await sync(page);
 const marco = DB.partners.find(p => p.nome === "Marco Rossi"), luca = DB.partners.find(p => p.nome === "Luca Verdi");
 check(marco.sponsor_id === anna.id && luca.sponsor_id === marco.id && marco.percentuale_iniziale === 6, "posizioni e pin salvati");
+check(anna.codice_amway === "2000001" && marco.codice_amway === "1000001" && luca.codice_amway === "1000002", "codici Amway salvati");
 await page.screenshot({ path: S + "/e2e/2-struttura.png", fullPage:true });
 // scheda di Marco: inserisco i suoi numeri
 await page.locator(".albero:not(.seguire) li", { hasText:"Marco Rossi" }).locator("button[data-act=apri-scheda]").click();
@@ -217,6 +224,7 @@ await page.getByText("Manca qualcuno sopra Marco?").waitFor();
 check(await page.getByText("Marco Rossi e tutto il suo gruppo passano sotto questa persona").isVisible(), "spiegazione chiara: il gruppo passa da solo");
 check(await page.locator(".sheet input[name=sotto]:checked").count() === 0, "niente da spuntare di default");
 await page.fill(".sheet input[name=nome]", "Paolo Neri");
+await page.fill(".sheet input[name=codice_amway]", "1000003");
 await page.check(".sheet input[name=consenso]");
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("Paolo Neri inserito: ora Marco è nel suo gruppo").waitFor();
@@ -646,6 +654,90 @@ const [copia] = await Promise.all([page.waitForEvent("download"), page.click("bu
 const datiCopia = JSON.parse(fs.readFileSync(await copia.path(), "utf8"));
 check(copia.suggestedFilename() === `growup-copia-${oggiStr}.json` && datiCopia.app === "Growup Team" && datiCopia.tabelle.partners.length > 3, "copia scaricata con i dati");
 check(await page.getByText("Ultima copia da questo telefono").isVisible(), "data dell'ultima copia");
+await ctx.close();
+
+// 18. Import dal report Amway (CSV finto con lo stesso formato del vero)
+await sync(page).catch(() => {});
+for(const [id, nome, codice] of [["imp-gino","Gino Gestito","3000001"],["imp-dora","Dora Diversa","3000002"],["imp-nadia","Nadia Nocodice",null],["imp-ugo","Ugo Uscito","3000004"],["imp-ivo","Ivo Attivo","3000005"]])
+  DB.partners.push({ id, nome, sponsor_id:"R", stato:id === "imp-ivo" ? "attivo" : "gestito", gestore_id:"R", codice_amway:codice, codice_invito:"X" + id.toUpperCase(),
+    partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() });
+const meseFile = oggiStr.slice(0, 4) + oggiStr.slice(5, 7);
+const csvRiga = v => v.map(x => `"${x}"`).join(",");
+const testaCsv = ["Qualifica Amway Partner","Codice Amway Partner Sponsor","Codice Amway Partner","Paese","Nome","Data di ingresso","Telefono","Email",
+  "Indirizzo","Data di rinnovo","VPG","VPP","VP reso","Percentuale di bonus","VVG","VP Cliente","VP Rubino"," Clienti"];
+const persona = (liv, sp, cod, nome, vpp) => [String(liv), "'" + sp, "'" + cod, "'Italia", "'" + nome, "'01 gennaio 2020", "'Principale: +39 000", "'x@esempio.it",
+  "'Citta | XX | 00000 | Italia", "'31 dicembre 2026", "'1.234,56", "'" + vpp, "0", "'0%", "1234.56", "'0,00", "0", "'0"];
+const creaCsv = (mese, righe) => "﻿" + [csvRiga(["Amway","CONFIDENZIALE - REPORT DI PROVA"]), csvRiga(["Mese di competenza", mese]), csvRiga(testaCsv)]
+  .concat(righe.map(csvRiga)).join("\n");
+const altriGestiti = DB.partners.filter(p => p.stato === "gestito" && p.codice_amway && !["imp-gino","imp-dora","imp-ugo"].includes(p.id));
+const usanoApp = DB.partners.filter(p => p.stato !== "gestito" && p.codice_amway);
+const righeCsv = [persona(1, "7654321", "1234567", "ROSSI, MARIO", "400,00"), persona(2, "1234567", "3000001", "GESTITO, GINO", "1.055,50"),
+  persona(2, "1234567", "3000020", "DIVERSA, DORA", "12,00"), persona(2, "1234567", "3000003", "NOCODICE, NADIA", "5,00"),
+  persona(3, "3000001", "3000099", "NUOVO, NINO", "7,00")]
+  .concat(altriGestiti.concat(usanoApp).map(p => persona(3, "1234567", p.codice_amway, p.nome.toUpperCase(), "1,00")));
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+const scegliFile = async (nome, testo) => {
+  await page.click("button[data-act=importa]");
+  await page.locator(".sheet").getByText("Intera Linea di Sponsorizzazione con tutti i KPI disponibili").waitFor();
+  await page.setInputFiles("#file-report", { name:nome, mimeType:"text/csv", buffer:Buffer.from(testo) });
+};
+await scegliFile("altro.csv", "nome,cognome\nMario,Rossi\n");
+check(await page.locator(".sheet .errore").getByText("non sembra il report").isVisible(), "import: file sbagliato riconosciuto");
+await page.setInputFiles("#file-report", { name:"altri.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, [persona(1, "1", "1234567", "ROSSI, MARIO", "1"), persona(2, "1234567", "9999999", "ALTRO, ALDO", "1")])) });
+await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+await page.click(".sheet button[data-act=chiudi]");
+const meseVecchio = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - 3); return d.toISOString().slice(0, 7).replace("-", ""); })();
+await scegliFile("vecchio.csv", creaCsv(meseVecchio, righeCsv));
+check(await page.locator(".sheet .errore").getByText("quel mese è già chiuso").isVisible(), "import: mese chiuso rifiutato");
+await page.setInputFiles("#file-report", { name:"report.xlsx", mimeType:"application/octet-stream", buffer:Buffer.from("PK") });
+check(await page.locator(".sheet .errore").getByText("sul sito Amway scegli il formato CSV").isVisible(), "import: il file Excel non va, serve il CSV");
+await page.setInputFiles("#file-report", { name:"los.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, righeCsv)) });
+await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+const sez = t => page.locator(".sheet .imp-sezione", { hasText:t });
+check(await sez("Si aggiornano i VPP").locator("li", { hasText:"Stefano e Alessia (tu)" }).getByText("400,00 VP").isVisible()
+  && await sez("Si aggiornano i VPP").getByText("il tuo codice 1234567 viene salvato").isVisible(), "anteprima: i miei VPP e il mio codice dalla prima riga");
+check(await sez("Si aggiornano i VPP").locator("li", { hasText:"Gino Gestito" }).getByText("1.055,5 VP").isVisible(), "anteprima: Gino, abbinato per codice");
+check(await sez("Nome uguale, codice diverso").getByText("nell'app 3000002, nel report 3000020").isVisible()
+  && !(await page.isChecked(".sheet input[name=correggi]")), "anteprima: Dora, codice diverso da confermare (non spuntata)");
+check(await sez("Senza codice, trovati per nome").getByText("Nadia Nocodice = Nadia Nocodice 3000003 · 5 VP").isVisible()
+  && await page.isChecked(".sheet input[name=abbina]"), "anteprima: Nadia senza codice, trovata per nome");
+check(await sez("Non più nel report").getByText("Ugo Uscito · 3000004").isVisible() && await page.isChecked(".sheet input[name=cancella]"),
+  "anteprima: Ugo non più nel report, già spuntato");
+check(await sez("Usano l'app: non vengono toccati").isVisible(), "anteprima: chi usa l'app non viene toccato");
+check(await sez("Nel report ma non nell'app · 1").isVisible(), "anteprima: Nino solo come informazione");
+await page.screenshot({ path: S + "/e2e/26-importa.png", fullPage:true });
+await page.check(".sheet input[name=correggi]");
+await page.click(".sheet button:has-text('Importa')");
+await page.getByText(/VPP di \w+ importati: 4 aggiornati, 1 persona cancellata/).waitFor(); check(true, "import fatto");
+await sync(page);
+const vppDi = id => DB.activities.filter(a => a.partner_id === id && ["ordine","rettifica"].includes(a.tipo) && a.data.slice(0, 7) === oggiStr.slice(0, 7))
+  .reduce((t, a) => t + Number(a.vp), 0);
+check(DB.partners.find(p => p.id === "R").codice_amway === "1234567" && Math.abs(vppDi("R") - 400) < 0.001, "i miei VPP del mese sono quelli del report");
+check(vppDi("imp-gino") === 1055.5 && vppDi("imp-dora") === 12 && DB.partners.find(p => p.id === "imp-dora").codice_amway === "3000020", "VPP dei gestiti e codice di Dora corretto");
+check(DB.partners.find(p => p.id === "imp-nadia").codice_amway === "3000003", "codice di Nadia salvato");
+check(!DB.partners.some(p => p.id === "imp-ugo"), "Ugo cancellato");
+check(!DB.activities.some(a => a.tipo === "rettifica" && a.inserito_da === "R" && usanoApp.some(p => p.id === a.partner_id)), "nessun dato di chi usa l'app toccato");
+const nRett = DB.activities.filter(a => a.tipo === "rettifica").length;
+await scegliFile("los.csv", creaCsv(meseFile, righeCsv));
+await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+check(!(await sez("Non più nel report").count()) && !(await page.getByText("viene salvato").count()), "reimport: niente più da confermare");
+await page.click(".sheet button:has-text('Importa')");
+await page.getByText(/importati: 0 aggiornati/).waitFor();
+await sync(page);
+check(DB.activities.filter(a => a.tipo === "rettifica").length === nRett, "reimport dello stesso file: nessun dato nuovo");
+await scegliFile("di-altri.csv", creaCsv(meseFile, [persona(1, "1", "7777777", "ALTRO, ALDO", "1")]));
+check(await page.locator(".sheet .errore").getByText("non il tuo (1234567)").isVisible(), "import: il report di un altro partner è rifiutato");
+await page.click(".sheet button[data-act=chiudi]");
+await page.click("button[data-act=vista-gruppo]");
+await page.locator(".albero.struttura li", { hasText:"Gino Gestito" }).locator("button[data-act=apri-scheda]").click();
+await page.getByText("Scheda partner").waitFor();
+const testoScheda = await page.locator("#app").innerText();
+check(testoScheda.includes("Codice Amway 3000001"), "scheda: codice Amway");
+await page.click("button[data-act=codice]");
+await page.fill(".sheet input[name=codice_amway]", "3000020");
+await page.click(".sheet button:has-text('Salva')");
+check(await page.locator(".sheet .errore").innerText() === "Questo codice Amway è già di un'altra persona nell'app.", "codice già usato: rifiutato");
 await ctx.close();
 
 await browser.close();

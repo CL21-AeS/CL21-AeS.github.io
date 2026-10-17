@@ -43,10 +43,10 @@ function creaApi(){
     cambiaChiave: () => q(sb.rpc("cambia_chiave")),
     accettaPrivacy: pid => q(sb.from("partners").update({ privacy_accettata_il:new Date().toISOString() }).eq("id", pid)),
     /* io e tutta la mia downline: la RLS restituisce solo quella */
-    struttura:    () => q(sb.from("partners").select("id,nome,sponsor_id,stato,gestore_id,creato_il,ultimo_aggiornamento,"
+    struttura:    () => q(sb.from("partners").select("id,nome,sponsor_id,stato,gestore_id,creato_il,ultimo_aggiornamento,codice_amway,"
                     + "qualifica_iniziale,percentuale_iniziale,qualifica_iniziale_mese,pagamenti_iniziali,partenza_confermata_il").order("creato_il")),
     conferma:     args => q(sb.rpc("conferma_partenza", args)),
-    inMezzo:      args => q(sb.rpc("inserisci_in_mezzo", args)),
+    inMezzo:      args => q(sb.rpc("inserisci_in_mezzo_con_codice", args)),
     cancella:     pid => q(sb.rpc("cancella_partner", { p_partner:pid })),
     preferiti:    () => q(sb.from("preferiti").select("preferito_id")),
     copiaDati:    () => q(sb.rpc("copia_dati")),
@@ -62,7 +62,10 @@ function creaApi(){
     obiettiviMeseGruppo: dal => q(sb.from("monthly_goals").select("partner_id,mese,obiettivo_vp").gte("mese", dal)),
     cambiaSponsor: (pid, sp) => q(sb.rpc("cambia_sponsor", { p_partner:pid, p_sponsor:sp })),
     nuovaChiavePer: pid => q(sb.rpc("nuova_chiave_per", { p_partner:pid })),
-    aggiungi:     args => q(sb.rpc("aggiungi_partner", args)),
+    aggiungi:     args => q(sb.rpc("aggiungi_con_codice", args)),
+    /* codice Amway Partner: il mio o di chi gestisco; import dei VPP del report Amway (solo me e chi gestisco) */
+    impostaCodice: (pid, codice) => q(sb.rpc("imposta_codice_amway", { p_partner:pid, p_codice:codice })),
+    importaVpp:   (mese, righe) => q(sb.rpc("importa_vpp", { p_mese:mese, p_righe:righe })),
     linkGestito:  pid => q(sb.rpc("link_per_gestito", { p_partner:pid })),
     stages:       () => q(sb.from("stage_requirements").select("*").order("ordine")),
     settings:     () => q(sb.from("settings").select("chiave,valore")),
@@ -167,6 +170,10 @@ const MESSAGGI_ERRORE = {
   non_autorizzato: "Non puoi farlo per questa persona.",
   partner_inesistente: "Questa persona non c'è più nella struttura.",
   mese_chiuso: "Quel mese è già chiuso: si registrano il mese in corso e, fino al giorno 5, il mese precedente.",
+  codice_amway_usato: "Questo codice Amway è già di un'altra persona nell'app.",
+  codice_amway_non_valido: "Il codice Amway è fatto di sole cifre (es. 1234567).",
+  codice_amway_mancante: "Scrivi il codice Amway Partner della persona.",
+  import_non_valido: "Il file non è stato letto bene: scaricalo di nuovo dal sito Amway e riprova.",
   non_autenticato: "Sessione scaduta: apri di nuovo il tuo link personale."
 };
 function messaggio(e){
@@ -592,6 +599,13 @@ function campiQualifica(obbligoData, scelta){
         <input type="date" name="data" max="${oggi()}"></label>`}
       ${obbligoData ? `<p class="nota" style="margin-top:6px">Serve al conto alla rovescia dei 30 giorni per il primo ordine.</p>` : ""}`;
 }
+/* Codice Amway Partner (il numero IBO): solo cifre. Serve ad abbinare le persone del report Amway. */
+function campoCodice(obbligatorio, valore){
+  return `<label class="field"><span>Codice Amway Partner${obbligatorio ? "" : ` <i>(facoltativo)</i>`}</span>
+        <input name="codice_amway" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="es. 1234567" value="${esc(valore || "")}"></label>`;
+}
+function soloCifre(v){ return String(v || "").replace(/\D/g, ""); }
+function codiceValido(c){ return /^\d{4,12}$/.test(c); }
 function valoreQualifica(p){ return p.qualifica_iniziale || (p.percentuale_iniziale ? "pin:" + p.percentuale_iniziale : ""); }
 function testoPartenza(p){
   const t = st.stages.find(x => x.chiave === p.qualifica_iniziale);
@@ -618,6 +632,8 @@ function vIngresso(){
     <form data-form="ingresso" class="card" novalidate>
       <label class="field" style="margin-top:0"><span>Nome e cognome</span>
         <input name="nome" autocomplete="name" required maxlength="80"></label>
+      ${campoCodice(false)}
+      <p class="nota" style="margin-top:6px">È il numero del tuo accesso al sito Amway. Puoi scriverlo anche dopo.</p>
       ${campiQualifica(true)}
       <p class="nota">Il punto di partenza lo conferma poi il tuo sponsor, così i numeri del gruppo restano affidabili.</p>
 
@@ -688,6 +704,8 @@ function vFondo(){
     </div>
     ${st.profilo.is_admin ? vCopiaDati() : ""}
     <p class="nota" style="text-align:center">${esc(st.profilo.nome)} · codice d'invito <b>${esc(st.profilo.codice_invito)}</b><br>
+      ${st.profilo.codice_amway ? `Codice Amway Partner <b>${esc(st.profilo.codice_amway)}</b>` : "Codice Amway Partner non scritto"}
+      <button class="btn link small" data-act="codice" data-id="${esc(st.profilo.id)}" style="min-height:0;padding:0 4px">${st.profilo.codice_amway ? "Modifica" : "Aggiungi"}</button><br>
       Per cancellare il profilo e i tuoi dati scrivi a Stefano e Alessia.</p>
   </div>`;
 }
@@ -996,7 +1014,9 @@ function vMese(){
       <button class="btn small grow" data-act="ordine">+ Ordine</button>
       <button class="btn small grow" data-act="totale-mese">Aggiorna il totale</button>
     </div>
-    <p class="small" style="margin:6px 0 0">Registra ogni ordine, oppure scrivi il totale del mese (per esempio dall'ufficio virtuale Amway).
+    <button class="btn small wide" style="margin-top:8px" data-act="importa">Importa dal report Amway</button>
+    <p class="small" style="margin:6px 0 0">Registra ogni ordine, oppure scrivi il totale del mese (per esempio dall'ufficio virtuale Amway),
+      oppure importa il file CSV della tua linea scaricato dal sito Amway.
       ${precedenteAperto() ? `Fino al ${giornoChiusura()} puoi ancora correggere ${nomeMese(mesePrecedente()).split(" ")[0]}.` : ""}</p>
     ${(() => { const n = numeriMese(m); return n.gruppo > n.personali || n.linee.length
       ? `<div class="spread" style="margin-top:12px"><span>VP di gruppo</span><b class="num">${num(n.gruppo)}</b></div>` : ""; })()}
@@ -1363,6 +1383,8 @@ function vScheda(){
     <p class="small" style="margin:2px 0 0">${gestito ? "non usa l'app: i suoi numeri li aggiorni tu"
       : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</p>
     ${p.stato === "gestito" ? "" : `<p class="small" style="margin:6px 0 0">${rigaObiettivoDi(p.id)}</p>`}
+    <p class="small" style="margin:6px 0 0">${p.codice_amway ? `Codice Amway <b>${esc(p.codice_amway)}</b>` : "Codice Amway non scritto"}
+      ${gestito ? `<button class="btn link small" data-act="codice" data-id="${esc(p.id)}" style="min-height:0;padding:0 4px">${p.codice_amway ? "Modifica" : "Aggiungi"}</button>` : ""}</p>
     <div class="dati-scheda">
       <div><span class="small">VP personali</span><b class="num">${num(r.vp_personali)}</b></div>
       <div><span class="small">VP di gruppo</span><b class="num">${num(r.vp_gruppo)}</b></div>
@@ -1448,6 +1470,198 @@ function vAzioni(){
   </div></div>`;
 }
 
+/* ---- 9b. Import dal report Amway ----
+   Ognuno importa il CSV della propria linea (Business Centre → Linea di Sponsorizzazione → Esporta →
+   "Intera Linea di Sponsorizzazione con tutti i KPI", senza filtri). Il file si legge qui, sul telefono:
+   al database arrivano solo persona e VPP, per me e per le persone senza app che gestisco.
+   Chi usa l'app non viene mai toccato. */
+function righeCsv(testo){
+  const righe = []; let riga = [], campo = "", virg = false;
+  testo = String(testo || "").replace(/^﻿/, "");
+  for(let i = 0; i < testo.length; i++){
+    const c = testo[i];
+    if(virg){
+      if(c === '"' && testo[i + 1] === '"'){ campo += '"'; i++; }
+      else if(c === '"') virg = false;
+      else campo += c;
+    }else if(c === '"') virg = true;
+    else if(c === "," || c === ";"){ riga.push(campo); campo = ""; }
+    else if(c === "\n" || c === "\r"){
+      if(c === "\r" && testo[i + 1] === "\n") i++;
+      riga.push(campo); righe.push(riga); riga = []; campo = "";
+    }else campo += c;
+  }
+  if(campo || riga.length){ riga.push(campo); righe.push(riga); }
+  return righe;
+}
+/* i valori del report hanno spesso un apostrofo davanti; i numeri sono "9.500,00" oppure "20996.38" */
+function pulito(v){ return String(v == null ? "" : v).trim().replace(/^'/, "").trim(); }
+function numReport(v){
+  v = pulito(v).replace(/\s/g, "");
+  if(!v) return 0;
+  if(v.includes(",")) v = v.replace(/\./g, "").replace(",", ".");
+  const n = Number(v);
+  return isFinite(n) ? n : NaN;
+}
+/* "ROSSI, MARIO" e "Mario Rossi" diventano la stessa chiave */
+function chiaveNome(n){ return senzaAccenti(n).replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean).sort().join(" "); }
+function maiuscole(n){ return n.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (x, a, b) => a + b.toUpperCase()); }
+function nomeReport(n){ const [cognome, nome] = pulito(n).split(/,\s*/); return maiuscole(nome ? `${nome} ${cognome}` : cognome); }
+
+function leggiReport(testo){
+  const tutte = righeCsv(testo);
+  const iMese = tutte.findIndex(r => /mese di competenza/i.test(pulito(r[0])));
+  const mm = iMese >= 0 ? pulito(tutte[iMese][1]).match(/^(\d{4})(\d{2})$/) : null;
+  const iTesta = tutte.findIndex(r => r.some(x => pulito(x) === "Codice Amway Partner"));
+  if(iTesta < 0) return { errore:"Questo file non sembra il report della Linea di Sponsorizzazione di Amway. Scegli il file CSV esportato con «Intera Linea di Sponsorizzazione con tutti i KPI»." };
+  if(!mm) return { errore:"Nel file non c'è il mese di competenza: scaricalo di nuovo dal sito Amway." };
+  const testa = tutte[iTesta].map(pulito), col = n => testa.indexOf(n);
+  const c = { livello:col("Qualifica Amway Partner"), sponsor:col("Codice Amway Partner Sponsor"),
+              codice:col("Codice Amway Partner"), nome:col("Nome"), vpp:col("VPP") };
+  if(c.codice < 0 || c.nome < 0 || c.vpp < 0) return { errore:"Nel file mancano le colonne del codice, del nome o dei VPP: esporta «con tutti i KPI disponibili»." };
+  const righe = [];
+  for(const r of tutte.slice(iTesta + 1)){
+    const codice = soloCifre(pulito(r[c.codice]));
+    if(!codice) continue;
+    const vpp = numReport(r[c.vpp]);
+    if(!(vpp >= 0)) return { errore:`I VPP di ${nomeReport(r[c.nome])} non sono un numero: scarica di nuovo il file.` };
+    righe.push({ codice, livello:c.livello >= 0 ? Number(pulito(r[c.livello])) || 0 : 0,
+      sponsor:c.sponsor >= 0 ? soloCifre(pulito(r[c.sponsor])) : "", nome:nomeReport(r[c.nome]), vpp:Math.round(vpp * 100) / 100 });
+  }
+  if(!righe.length) return { errore:"Nel file non c'è nessuna persona." };
+  return { mese:`${mm[1]}-${mm[2]}`, righe };
+}
+
+/* Confronta il report con la struttura dell'app e prepara l'anteprima. */
+function analizzaReport(rep){
+  const io = st.profilo, m = rep.mese;
+  if(m !== meseDi(oggi()) && !(m === mesePrecedente() && precedenteAperto()))
+    return { errore: m > meseDi(oggi()) ? `Il report è di ${nomeMese(m)}, un mese che non è ancora iniziato.`
+      : `Il report è di ${nomeMese(m)}: nell'app quel mese è già chiuso (si chiude il giorno ${giornoChiusura()} del mese dopo). Scarica il report del mese in corso.` };
+  const prima = rep.righe.find(r => r.livello === 1) || rep.righe[0];
+  if(io.codice_amway && io.codice_amway !== prima.codice)
+    return { errore:`Questo report è di ${prima.nome} (${prima.codice}), non il tuo (${io.codice_amway}). Ognuno importa il report scaricato dal proprio accesso al sito Amway.` };
+  const perCodice = new Map(rep.righe.map(r => [r.codice, r]));
+  const altri = alberoSotto(io.id, 0).map(x => x.p);
+  const codiciApp = new Set([io.codice_amway || prima.codice].concat(altri.map(p => p.codice_amway).filter(Boolean)));
+  /* nome → righe del report con un codice che nell'app non c'è ancora */
+  const perNome = new Map();
+  for(const r of rep.righe) if(!codiciApp.has(r.codice)){
+    const k = chiaveNome(r.nome); perNome.set(k, (perNome.get(k) || []).concat([r]));
+  }
+  const unicoPerNome = p => { const l = perNome.get(chiaveNome(p.nome)) || []; return l.length === 1 ? l[0] : null; };
+  const a = { mese:m, prima, codiceMio:!io.codice_amway, aggiorna:[], codiceDiverso:[], abbina:[], senzaCodice:[],
+              mancanti:[], usanoApp:0, usanoAppMancanti:[], nuovi:[], totale:rep.righe.length };
+  const usati = new Set([prima.codice]);
+  for(const p of altri){
+    const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
+    if(p.stato !== "gestito"){
+      if(r){ a.usanoApp++; usati.add(r.codice); }
+      else if(p.codice_amway) a.usanoAppMancanti.push(p);
+      continue;
+    }
+    if(r){ a.aggiorna.push({ p, r }); usati.add(r.codice); continue; }
+    const n = unicoPerNome(p);
+    if(n && p.codice_amway) a.codiceDiverso.push({ p, r:n });
+    else if(n) a.abbina.push({ p, r:n });
+    else if(p.codice_amway) a.mancanti.push(p);
+    else a.senzaCodice.push(p);
+    if(n) usati.add(n.codice);
+  }
+  a.nuovi = rep.righe.filter(r => !usati.has(r.codice));
+  /* tante persone che mancano insieme: forse il file è parziale (filtri, "Vista corrente") */
+  const conCodice = altri.filter(p => p.codice_amway).length;
+  a.troppiMancanti = a.mancanti.length > Math.max(3, Math.round(conCodice * 0.1));
+  return a;
+}
+
+function vImporta(){
+  const a = st.imp;
+  const chiudi = `<button type="button" class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
+  if(!a || a.errore) return `<h2>Importa dal report Amway</h2>
+    <p class="small">Sul sito Amway: <b>Linea di Sponsorizzazione (LOS)</b> → pulsante di download →
+      <b>Intera Linea di Sponsorizzazione con tutti i KPI disponibili</b>, formato <b>CSV</b>. Prima togli i filtri.</p>
+    <p class="small">L'app aggiorna i VPP del mese <b>tuoi</b> e delle persone <b>senza app</b> che gestisci.
+      Chi usa l'app non viene toccato: i suoi numeri li aggiorna lui. Il file resta sul telefono: si salvano solo codice e VPP.</p>
+    <label class="btn primary wide" style="margin-top:12px">Scegli il file CSV
+      <input type="file" id="file-report" accept=".csv,text/csv,text/comma-separated-values" hidden></label>
+    ${a && a.errore ? `<p class="errore">${esc(a.errore)}</p>` : ""}
+    ${chiudi}`;
+  const riga = (p, extra) => `<span class="grow">${esc(p.nome)}${extra ? `<br><span class="small">${extra}</span>` : ""}</span>`;
+  const sezione = (titolo, corpo, nota) => `<div class="imp-sezione"><h3>${titolo}</h3>${nota ? `<p class="small">${nota}</p>` : ""}${corpo}</div>`;
+  const aggiorna = [{ p:st.profilo, r:a.prima, io:true }].concat(a.aggiorna);
+  return `<h2>Report di ${nomeMese(a.mese)}</h2>
+  <p class="small">${plur(a.totale, "persona", "persone")} nel file${a.mese === meseDi(oggi()) ? " · mese in corso: puoi reimportarlo quando vuoi, i valori si sostituiscono" : ""}.</p>
+  <form data-form="importa" novalidate>
+    ${sezione(`Si aggiornano i VPP · ${aggiorna.length}`, `<ul class="imp">${aggiorna.map(x => `<li>${riga(x.io ? { nome:`${st.profilo.nome} (tu)` } : x.p,
+        x.io && a.codiceMio ? `il tuo codice ${esc(x.r.codice)} viene salvato` : "")}<b class="num">${num(x.r.vpp)} VP</b></li>`).join("")}</ul>`)}
+    ${a.codiceDiverso.length ? sezione(`Nome uguale, codice diverso · ${a.codiceDiverso.length}`,
+      `<div class="scelte">${a.codiceDiverso.map(x => `<label><input type="checkbox" name="correggi" value="${esc(x.p.id)}">
+        <span>${esc(x.p.nome)}: nell'app <b>${esc(x.p.codice_amway)}</b>, nel report <b>${esc(x.r.codice)}</b> · ${num(x.r.vpp)} VP</span></label>`).join("")}</div>`,
+      "Spunta chi va corretto con il codice del report: poi si aggiornano anche i suoi VPP.") : ""}
+    ${a.abbina.length ? sezione(`Senza codice, trovati per nome · ${a.abbina.length}`,
+      `<div class="scelte">${a.abbina.map(x => `<label><input type="checkbox" name="abbina" value="${esc(x.p.id)}" checked>
+        <span>${esc(x.p.nome)} = <b>${esc(x.r.nome)} ${esc(x.r.codice)}</b> · ${num(x.r.vpp)} VP</span></label>`).join("")}</div>`,
+      "Il codice del report viene salvato nell'app. Togli la spunta se non è la stessa persona.") : ""}
+    ${a.mancanti.length ? sezione(`Non più nel report · ${a.mancanti.length}`,
+      `${a.troppiMancanti ? `<p class="avviso">Mancano molte persone insieme: controlla di aver esportato <b>l'intera linea senza filtri</b>.
+        Le caselle non sono spuntate: spunta solo chi sai che non c'è più.</p>` : ""}
+      <div class="scelte">${a.mancanti.map(p => `<label><input type="checkbox" name="cancella" value="${esc(p.id)}"${a.troppiMancanti ? "" : " checked"}>
+        <span>${esc(p.nome)} · ${esc(p.codice_amway)}</span></label>`).join("")}</div>`,
+      "Codici che Amway non ha più (per esempio non rinnovati). Le persone spuntate vengono <b>cancellate dall'app</b> con i loro dati; chi stava sotto passa al loro sponsor. Non si può annullare.") : ""}
+    ${a.usanoApp || a.usanoAppMancanti.length ? sezione("Usano l'app: non vengono toccati",
+      `<p class="small">${plur(a.usanoApp, "persona trovata", "persone trovate")} nel report: i loro numeri li aggiornano loro.
+        ${a.usanoAppMancanti.length ? `<br>Non sono nel report: ${a.usanoAppMancanti.map(p => esc(p.nome)).join(", ")}.` : ""}</p>`) : ""}
+    ${a.senzaCodice.length ? sezione(`Senza codice e non trovati · ${a.senzaCodice.length}`,
+      `<p class="small">${a.senzaCodice.map(p => esc(p.nome)).join(", ")}. Scrivi il loro codice nella scheda e reimporta.</p>`) : ""}
+    ${a.nuovi.length ? sezione(`Nel report ma non nell'app · ${a.nuovi.length}`,
+      `<details><summary class="small">Mostra i nomi</summary><p class="small">${a.nuovi.map(r => `${esc(r.nome)} (${num(r.vpp)} VP)`).join(", ")}</p></details>`,
+      "Solo un'informazione: l'app non aggiunge nessuno da sola.") : ""}
+    <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
+      <button class="btn primary grow"${st.occupato ? " disabled" : ""}>Importa</button></div>
+  </form>`;
+}
+
+async function leggiFileReport(file){
+  if(!file) return;
+  let a;
+  if(/\.xlsx?$/i.test(file.name)) a = { errore:"Questo è il file Excel: sul sito Amway scegli il formato CSV." };
+  else{
+    try{
+      const rep = leggiReport(await file.text());
+      a = rep.errore ? rep : analizzaReport(rep);
+    }catch(e){ a = { errore:"Non riesco a leggere il file: scaricalo di nuovo dal sito Amway." }; }
+  }
+  st.imp = a; render();
+}
+
+async function eseguiImport(f){
+  const a = st.imp, io = st.profilo;
+  const scelti = nome => new Set([...f.querySelectorAll(`input[name=${nome}]:checked`)].map(i => i.value));
+  const correggi = scelti("correggi"), abbina = scelti("abbina"), cancella = scelti("cancella");
+  const daCodificare = a.codiceDiverso.filter(x => correggi.has(x.p.id)).concat(a.abbina.filter(x => abbina.has(x.p.id)));
+  st.occupato = true;
+  try{
+    if(a.codiceMio) st.profilo = Object.assign({}, io, await api.impostaCodice(io.id, a.prima.codice));
+    for(const x of daCodificare) await api.impostaCodice(x.p.id, x.r.codice);
+    const righe = [{ partner_id:io.id, vpp:a.prima.vpp }]
+      .concat(a.aggiorna.concat(daCodificare).map(x => ({ partner_id:x.p.id, vpp:x.r.vpp })));
+    const esito = await api.importaVpp(a.mese + "-01", righe) || {};
+    let cancellati = 0;
+    for(const p of a.mancanti) if(cancella.has(p.id)){ await api.cancella(p.id); cancellati++; }
+    await caricaStruttura();
+    st.att = await api.activities(io.id, [settimana(), primoDelMese()].sort()[0]) || [];
+    await caricaNumeri();
+    st.sheet = null; st.imp = null; st.occupato = false; render();
+    toast(`VPP di ${nomeMese(a.mese).split(" ")[0]} importati: ${plur(Number(esito.aggiornati) || 0, "aggiornato", "aggiornati")}`
+      + (cancellati ? `, ${plur(cancellati, "persona cancellata", "persone cancellate")}` : ""));
+  }catch(e){
+    st.occupato = false;
+    try{ await caricaStruttura(); }catch(x){}
+    mostraErroreForm(f, messaggio(e));
+  }
+}
+
 /* ---- 10. Fogli in basso ---- */
 function vSheet(){
   const s = st.sheet;
@@ -1486,6 +1700,19 @@ function vSheet(){
     </form>`;
   }
   if(s === "storico") return vStorico();
+  if(s === "importa") return vImporta();
+  if(s === "codice"){
+    const p = st.codiceId === st.profilo.id ? st.profilo : st.struttura.find(x => x.id === st.codiceId);
+    if(!p) return "";
+    const mio = p.id === st.profilo.id;
+    return `<h2>Codice Amway ${mio ? "Partner" : `di ${esc(nomeSaluto(p.nome))}`}</h2>
+    <p class="small">${mio ? "È il numero del tuo accesso al sito Amway." : "Lo trovi nel report della Linea di Sponsorizzazione sul sito Amway."}
+      Serve ad abbinare le persone quando importi il report.</p>
+    <form data-form="codice" novalidate>
+      ${campoCodice(true, p.codice_amway)}
+      ${piede}${err}
+    </form>`;
+  }
   if(s === "mese-gruppo") return vMeseGruppo();
   if(s === "obiettivo-mese") return `<h2>Obiettivo del mese</h2>
     <p class="small">VP fatturati in ${nomeMese(meseDi(oggi()))}. Il mese prossimo riparte da questo.</p>
@@ -1516,6 +1743,7 @@ function vSheet(){
     <p class="small">Per chi non usa l'app. Se un giorno vorrà usarla, le mandi il suo link e troverà già il suo profilo.</p>
     <form data-form="aggiungi" novalidate>
       <label class="field"><span>Nome e cognome</span><input name="nome" autocomplete="off" maxlength="80" required></label>
+      ${campoCodice(true)}
       <label class="field"><span>Chi è il suo sponsor?</span><select name="sponsor">${posti}</select></label>
       ${campiQualifica(false)}
       <label class="check"><input type="checkbox" name="consenso" required>
@@ -1582,6 +1810,7 @@ function vSheet(){
     <form data-form="in-mezzo" novalidate>
       <input type="hidden" name="sotto" value="${esc(x.id)}">
       <label class="field"><span>Nome e cognome</span><input name="nome" autocomplete="off" maxlength="80" required></label>
+      ${campoCodice(true)}
       <p class="avviso">${esc(x.nome)} e tutto il suo gruppo passano sotto questa persona.</p>
       ${fratelli.length ? `<div class="field" style="margin-top:14px"><span class="small">Facoltativo: anche altri di ${esc(sopra)} sono in realtà suoi?
         Spunta solo se è così.</span>
@@ -1684,6 +1913,8 @@ const AZIONI = {
   "obiettivo-mese"(){ st.errore = ""; st.sheet = "obiettivo-mese"; render(); },
   "totale-mese"(){ st.errore = ""; st.meseTotale = meseDi(oggi()); st.sheet = "totale-mese"; render(); focusSheet(); },
   "scegli-mese"(el){ st.meseTotale = el.value; render(); },
+  importa(){ st.imp = null; st.errore = ""; st.sheet = "importa"; render(); },
+  codice(el){ st.codiceId = el.dataset.id; st.errore = ""; st.sheet = "codice"; render(); focusSheet(); },
   storico(){ st.sheet = "storico"; render(); },
   async "mese-gruppo"(el){
     const mese = el.dataset.mese;
@@ -1867,6 +2098,17 @@ const AZIONI = {
 function focusSheet(){ const i = document.querySelector(".sheet input"); if(i) setTimeout(() => i.focus(), 30); }
 
 const MODULI = {
+  importa(f){ return eseguiImport(f); },
+  async codice(f){
+    const codice = soloCifre(f.codice_amway.value);
+    if(!codiceValido(codice)){ mostraErroreForm(f, codice ? MESSAGGI_ERRORE.codice_amway_non_valido : MESSAGGI_ERRORE.codice_amway_mancante); return; }
+    try{
+      const p = await api.impostaCodice(st.codiceId, codice);
+      if(st.codiceId === st.profilo.id) st.profilo = Object.assign({}, st.profilo, { codice_amway:p.codice_amway });
+      await caricaStruttura();
+      st.sheet = null; render(); toast("Codice Amway salvato");
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
   async incolla(f){
     const l = leggiLink(f.link.value);
     if(!l){ mostraErroreForm(f, "Non sembra un link di Growup. Copia tutto il messaggio con il link e riprova."); return; }
@@ -1922,7 +2164,10 @@ const MODULI = {
     const sotto = Array.from(f.querySelectorAll("input[name=sotto][type=hidden], input[name=sotto]:checked")).map(i => i.value);
     const q = leggiQualifica(f);
     let err = "";
+    const codice = soloCifre(f.codice_amway.value);
     if(!nome) err = "Scrivi il nome della persona.";
+    else if(!codice) err = "Scrivi il suo codice Amway Partner.";
+    else if(!codiceValido(codice)) err = MESSAGGI_ERRORE.codice_amway_non_valido;
     else if(!sotto.length) err = "Spunta almeno una persona che sta sotto di lei.";
     else if(q.data && q.data > oggi()) err = "La data di iscrizione non può essere nel futuro.";
     else if(q.mancaMese) err = "Indica il mese della prima qualifica.";
@@ -1930,7 +2175,7 @@ const MODULI = {
     if(err){ mostraErroreForm(f, err); return; }
     st.occupato = true;
     try{
-      await api.inMezzo({ p_nome:nome, p_sotto:sotto, p_data_iscrizione:q.data, p_qualifica:q.qualifica,
+      await api.inMezzo({ p_nome:nome, p_sotto:sotto, p_codice_amway:codice, p_data_iscrizione:q.data, p_qualifica:q.qualifica,
         p_percentuale:q.percentuale, p_qualifica_mese:q.mese, p_pagamenti:q.pagamenti });
       await caricaStruttura(); await caricaNumeri();
       st.sheet = null; st.vista = "gruppo"; st.target = null; st.schedaId = null;
@@ -1953,8 +2198,11 @@ const MODULI = {
   async aggiungi(f){
     const nome = f.nome.value.trim();
     const q = leggiQualifica(f);
+    const codice = soloCifre(f.codice_amway.value);
     let err = "";
     if(!nome) err = "Scrivi il nome della persona.";
+    else if(!codice) err = "Scrivi il suo codice Amway Partner.";
+    else if(!codiceValido(codice)) err = MESSAGGI_ERRORE.codice_amway_non_valido;
     else if(q.data && q.data > oggi()) err = "La data di iscrizione non può essere nel futuro.";
     else if(q.mancaMese) err = "Indica il mese della prima qualifica.";
     else if(!f.consenso.checked) err = "Serve il suo consenso per inserirla nell'app.";
@@ -1962,7 +2210,7 @@ const MODULI = {
     const sotto = st.struttura.find(p => p.id === f.sponsor.value);
     st.occupato = true;
     try{
-      await api.aggiungi({ p_nome:nome, p_sponsor:f.sponsor.value, p_data_iscrizione:q.data, p_qualifica:q.qualifica,
+      await api.aggiungi({ p_nome:nome, p_sponsor:f.sponsor.value, p_codice_amway:codice, p_data_iscrizione:q.data, p_qualifica:q.qualifica,
         p_percentuale:q.percentuale, p_qualifica_mese:q.mese, p_pagamenti:q.pagamenti });
       await caricaStruttura();
       st.sheet = null; render();
@@ -1975,7 +2223,9 @@ const MODULI = {
     const q = leggiQualifica(f);
     const data = q.data, qual = q.qualifica, t = q.tappa;
     let err = "";
+    const codice = soloCifre(f.codice_amway.value);
     if(!nome) err = "Scrivi il tuo nome.";
+    else if(codice && !codiceValido(codice)) err = MESSAGGI_ERRORE.codice_amway_non_valido;
     else if(!qual && !q.percentuale && !data) err = "Se stai iniziando serve la data di iscrizione: fa partire il conto alla rovescia del primo ordine.";
     else if(data && data > oggi()) err = "La data di iscrizione non può essere nel futuro.";
     else if(q.mancaMese) err = "Indica il mese della prima qualifica.";
@@ -1990,7 +2240,11 @@ const MODULI = {
       });
       ricordaChiave(r.chiave);
       salvaLocale(CHIAVE_SALVATA, null);
+      /* il codice è facoltativo: se è già usato da un'altra persona si entra lo stesso e si corregge dopo */
+      let codiceNo = "";
+      if(codice) try{ r.profilo = await api.impostaCodice(r.profilo.id, codice); }catch(e){ codiceNo = messaggio(e); }
       await vaiHome(r.profilo);
+      if(codiceNo) toast(codiceNo + " Puoi correggerlo in fondo alla pagina Io.");
       if(st.fase === "home" && !st.obiettivo) st.fase = "obiettivo_primo";
       st.occupato = false; render();
     }catch(e){
@@ -2063,6 +2317,7 @@ document.addEventListener("submit", e => {
 /* Qualifica scelta: mostra mese e pagamenti per Foundation e Builder; la data di iscrizione
    è obbligatoria solo per chi inizia (nel modulo d'ingresso). */
 document.addEventListener("change", e => {
+  if(e.target.id === "file-report"){ leggiFileReport(e.target.files && e.target.files[0]); return; }
   if(e.target.name !== "qualifica") return;
   const f = e.target.form;
   const t = st.stages.find(s => s.chiave === f.qualifica.value);
