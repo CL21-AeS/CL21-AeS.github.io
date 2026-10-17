@@ -359,16 +359,35 @@ check(!etich.some(t => t.includes("Gino")), "chi è senza app non ha etichetta")
 check(await page.locator(".card", { hasText:"Situazione per persona" }).getByText("1 persona senza app non ha l'etichetta").isVisible(), "nota sulle persone senza app");
 check(await page.locator(".albero:not(.seguire) li", { hasText:"Gino Senza App" }).isVisible(), "Gino resta nella struttura");
 check(etich[0].includes("Rosa") && etich[etich.length - 1].includes("Cri"), "ordinati per urgenza");
-check(await page.locator(".imbuto li", { hasText:"Contatti" }).getByText("75", { exact:true }).isVisible(), "imbuto: 75 contatti");
-check(await page.locator(".imbuto li", { hasText:"dei contatti" }).getByText("14", { exact:true }).isVisible(), "imbuto: 14 piani");
-check(await page.locator(".imbuto li", { hasText:"dei contatti" }).getByText("19% dei contatti").isVisible(), "imbuto: tasso di passaggio");
-check(await page.locator(".imbuto li.collo", { hasText:"Contatti" }).getByText("sotto soglia").isVisible(), "passaggio sotto soglia evidenziato");
-check(await page.locator(".card", { hasText:"Imbuto del gruppo" }).locator(".avviso").innerText() === "Contatti: 75 su 240 di obiettivo del gruppo (31%), sotto la soglia del 50%.", "imbuto: solo dati e soglia");
+check(await page.locator(".card", { hasText:"Preferiti" }).getByText("Segna le persone che vuoi seguire da vicino").isVisible(), "preferiti: vuoto, con la spiegazione");
+check(await page.locator(".imbuto").count() === 0, "l'imbuto non c'è più");
+// segno Ivo (usa l'app) e Gino (senza app) come preferiti dalla loro scheda
+for(const nome of ["Ivo Invito", "Gino Senza App"]){
+  await page.locator(".albero.struttura li", { hasText:nome }).locator("button[data-act=apri-scheda]").click();
+  await page.locator("button[data-act=preferito]").click();
+  await page.getByText(`${nome} nei preferiti`).waitFor();
+  check((await page.locator("button[data-act=preferito]").innerText()).trim() === "★", `${nome}: ★ nella scheda`);
+  await page.click("button.link[data-act=vista-gruppo]");
+}
+await sync(page);
+check(DB.preferiti.length === 2 && DB.preferiti.every(x => x.partner_id === "R"), "preferiti salvati nel database");
+const pref = page.locator(".card", { hasText:"Preferiti" });
+const prefIvo = pref.locator("li.preferito", { hasText:"Ivo Invito" });
+check(await prefIvo.getByText("Piani sotto soglia").isVisible() && await prefIvo.locator(".obiettivo.debole", { hasText:"Piani" }).isVisible()
+  && (await prefIvo.locator(".obiettivo", { hasText:"Contatti" }).locator(".num").innerText()).trim() === "25 / 40", "Ivo nei preferiti: 25 / 40 contatti, piani sotto soglia evidenziati");
+const prefGino = pref.locator("li.preferito", { hasText:"Gino Senza App" });
+check(await prefGino.getByText("senza app · numeri inseriti dallo sponsor").isVisible() && await prefGino.locator(".obiettivo.debole").count() === 0, "Gino nei preferiti: senza etichetta");
+await page.screenshot({ path: S + "/e2e/14-preferiti.png", fullPage:true });
+// tolgo Gino
+await prefGino.locator("button[data-act=apri-scheda]").click();
+await page.locator("button[data-act=preferito]").click();
+await page.getByText("Gino Senza App tolto dai preferiti").waitFor();
+await page.click("button.link[data-act=vista-gruppo]");
+check(await pref.locator("li.preferito").count() === 1, "Gino tolto dai preferiti");
 check(!/allenate|lavorate|costruisci|da chiamare|collo di bottiglia|seguire/i.test(await page.locator("#app").innerText()), "nessun consiglio nella pagina Gruppo");
 await page.locator(".card", { hasText:"Situazione per persona" }).locator("button[data-act=apri-scheda]").first().click();
 await page.getByText("Scheda partner").waitFor(); check(true, "dall'elenco si apre la scheda");
 await page.click("button.link[data-act=vista-gruppo]");
-await page.screenshot({ path: S + "/e2e/14-imbuto.png", fullPage:true });
 await ctx.close();
 
 // 10. Blocco 4: nella scheda, questo mese e il mese prima

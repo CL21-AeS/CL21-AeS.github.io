@@ -1,8 +1,8 @@
 -- ============================================================
--- Growup Team — INSTALLAZIONE COMPLETA (001 + 002 + 003 + 006 + 007 + 008 + 009 + 010 + 011 in un file solo)
+-- Growup Team — INSTALLAZIONE COMPLETA (001 + 002 + 003 + 006 + 007 + 008 + 009 + 010 + 011 + 012 in un file solo)
 -- Incolla tutto nell'SQL Editor di Supabase e premi Run, una volta sola.
 -- Alla fine compaiono DUE LINK: copiali subito (il link personale si vede solo ora).
--- Generato da 001_schema.sql, 002_rls.sql, 003_seed.sql, 006_fase2_calcoli.sql, 007_fase2_gestiti.sql, 008_inserisci_in_mezzo.sql, 009_cancella_e_sposta.sql, 010_etichette.sql, 011_cambia_sponsor_nel_gruppo.sql: si modificano quelli.
+-- Generato da 001_schema.sql, 002_rls.sql, 003_seed.sql, 006_fase2_calcoli.sql, 007_fase2_gestiti.sql, 008_inserisci_in_mezzo.sql, 009_cancella_e_sposta.sql, 010_etichette.sql, 011_cambia_sponsor_nel_gruppo.sql, 012_preferiti.sql: si modificano quelli.
 -- ============================================================
 
 -- ============================================================
@@ -1242,6 +1242,38 @@ $$;
 
 revoke execute on function public.cambia_sponsor(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.cambia_sponsor(uuid, uuid) to authenticated;
+
+-- ============================================================
+-- Growup Team — 012: preferiti
+-- Ognuno segna come preferite alcune persone del proprio gruppo, per seguirle da vicino: compaiono nella
+-- sezione "Preferiti" della pagina Gruppo (al posto dell'imbuto). Sono del profilo, quindi uguali su tutti
+-- i telefoni collegati (Stefano e Alessia vedono gli stessi). Nessuno vede i preferiti degli altri.
+-- ============================================================
+
+create table if not exists public.preferiti (
+  partner_id   uuid not null references public.partners(id) on delete cascade,
+  preferito_id uuid not null references public.partners(id) on delete cascade,
+  creato_il    timestamptz not null default now(),
+  primary key (partner_id, preferito_id),
+  check (partner_id <> preferito_id)
+);
+
+alter table public.preferiti enable row level security;
+
+drop policy if exists preferiti_leggi on public.preferiti;
+create policy preferiti_leggi on public.preferiti for select to authenticated
+  using (partner_id = public.my_partner_id());
+
+drop policy if exists preferiti_aggiungi on public.preferiti;
+create policy preferiti_aggiungi on public.preferiti for insert to authenticated
+  with check (partner_id = public.my_partner_id() and preferito_id <> partner_id and public.is_in_downline(preferito_id));
+
+drop policy if exists preferiti_togli on public.preferiti;
+create policy preferiti_togli on public.preferiti for delete to authenticated
+  using (partner_id = public.my_partner_id());
+
+revoke all on public.preferiti from anon, authenticated;
+grant select, insert, delete on public.preferiti to authenticated;
 
 -- ============================================================
 -- Growup Team — 010: Fase 2, blocco 3 — soglie delle etichette del gruppo
