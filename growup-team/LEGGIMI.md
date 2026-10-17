@@ -53,12 +53,14 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 12. `supabase/015_codice_amway.sql` — il codice Amway Partner di ognuno e l'import dei VPP dal report Amway (CSV)
 13. `supabase/016_rete_da_amway.sql` — la rete dal report Amway: le persone importate le vede solo chi le importa,
     ingresso con il codice Amway, calcoli e storico per chi guarda, persone nascoste; niente più inserimenti a mano
-14. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
-15. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
-16. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
+14. `supabase/017_inviti_e_numeri_report.sql` — inviti degli admin (sotto una persona, chi manca sopra), struttura
+    "ricucita", numeri ufficiali dal report Amway (VPG, percentuale, linee) e qualifica calcolata su quelli
+15. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+16. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
+17. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
 
-In alternativa ai punti 1-14: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
+In alternativa ai punti 1-15: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
 I file `004_*` e `005_*` servono solo al progetto già installato: il loro contenuto è già dentro 001-003.
 
 ## 3. Attivare l'accesso senza email
@@ -155,8 +157,14 @@ struttura → **Importa dal report Amway**).
 3. **Importa**. Si importa il mese scritto nel file: quello in corso (anche più volte, i valori si sostituiscono) o il
    precedente fino al giorno 5. Il file resta sul telefono: si salvano solo nome, codice e VPP di chi si importa.
 
-VP di gruppo, linee e percentuale sono calcolati per chi guarda (chi usa l'app più le proprie persone importate);
-lo storico dei mesi chiusi si congela allo stesso modo. Dalla scheda: **Nascondi dalla mia struttura** (chi usa l'app;
+Con l'import l'app salva anche i **numeri ufficiali** del report (VPP, VPG, percentuale e i VPG delle linee frontali)
+di chi importa e delle persone del report che ha nell'app: pagina Io, struttura, scheda e storico usano quelli, e la
+qualifica si calcola sulla struttura del report. Per i Platino il report non mostra il gruppo: VPG e percentuale ci
+sono, le linee no ("linee non visibili nel report"). Chi non importa vede i numeri calcolati dall'app (chi usa l'app
+più le proprie persone importate); lo storico dei mesi chiusi si congela allo stesso modo.
+
+Cosa possono fare in più gli admin (inviti sotto una persona o "chi manca sopra", correzione del codice Amway, …):
+vedi `ADMIN.md`. Dalla scheda: **Nascondi dalla mia struttura** (chi usa l'app;
 sparisce solo per me, i suoi VP contano) e **Cancella dalla struttura** (le mie importate: cancellate ed escluse; chi usa
 l'app: cancellato per tutti, per i codici non rinnovati).
 
