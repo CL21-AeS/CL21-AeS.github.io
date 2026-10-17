@@ -1623,7 +1623,7 @@ function vImporta(){
   const riga = (p, extra) => `<span class="grow">${esc(p.nome)}${extra ? `<br><span class="small">${extra}</span>` : ""}</span>`;
   const sezione = (titolo, corpo, nota, cl) => `<div class="imp-sezione${cl ? " " + cl : ""}"><h3>${titolo}</h3>${nota ? `<p class="small">${nota}</p>` : ""}${corpo}</div>`;
   const sponsorDi = r => { const s = a.perCodice.get(r.sponsor); return s ? `sponsor ${esc(s.nome)}` : ""; };
-  const scelta = r => `<label data-nome="${esc(senzaAccenti(r.nome))}"><input type="checkbox" name="aggiungi" value="${esc(r.codice)}" data-vpp="${r.vpp > 0 ? 1 : 0}">
+  const scelta = r => `<label data-nome="${esc(senzaAccenti(r.nome) + " " + r.codice)}"><input type="checkbox" name="aggiungi" value="${esc(r.codice)}" data-vpp="${r.vpp > 0 ? 1 : 0}">
       <span>${esc(r.nome)} · <b>${num(r.vpp)} VP</b><br><span class="small">${esc(r.codice)}${sponsorDi(r) ? " · " + sponsorDi(r) : ""}</span></span></label>`;
   const aggiorna = [{ p:st.profilo, r:a.prima, io:true }].concat(a.aggiorna);
   return `<h2>Report di ${nomeMese(a.mese)}</h2>
@@ -1634,12 +1634,14 @@ function vImporta(){
         <button type="button" class="btn small" data-act="spunta-vpp" aria-pressed="false">Spunta chi ha VPP</button>
         <button type="button" class="btn small" data-act="spunta-tutti" aria-pressed="false">Spunta tutti</button>
         <button type="button" class="btn small" data-act="togli-tutti" aria-pressed="false">Togli tutti</button></div>
-      ${a.nuovi.length > 8 ? `<input type="search" id="cerca-import" class="cerca" placeholder="Cerca un nome…" autocomplete="off" aria-label="Cerca un nome">` : ""}
+      ${a.nuovi.length > 8 ? `<input type="search" class="cerca" data-cerca=".imp-nuovi" placeholder="Cerca per nome o codice…" autocomplete="off" aria-label="Cerca per nome o codice">` : ""}
       <div class="scelte imp-nuovi">${a.nuovi.map(scelta).join("")}</div>`,
       "Spunta chi vuoi seguire: lo vedrai solo tu, nella sua posizione del report. Chi resta senza spunta non ti verrà più proposto.",
       "imp-da-scegliere") : ""}
     ${a.esclusi.length ? sezione(`Escluse · ${a.esclusi.length}`,
-      `<details><summary class="small">Rivedi</summary><div class="scelte">${a.esclusi.map(scelta).join("")}</div></details>`,
+      `<details><summary class="small">Rivedi</summary>
+        ${a.esclusi.length > 5 ? `<input type="search" class="cerca" data-cerca=".imp-esclusi" placeholder="Cerca per nome o codice…" autocomplete="off" aria-label="Cerca per nome o codice">` : ""}
+        <div class="scelte imp-esclusi">${a.esclusi.map(scelta).join("")}</div></details>`,
       "Le hai lasciate fuori negli import precedenti. Spunta chi vuoi aggiungere adesso.") : ""}
     ${a.nuovi.length || a.esclusi.length ? `<label class="check"><input type="checkbox" name="consenso">
         <span>Ho il consenso delle persone che spunto a inserire il loro nome e i loro numeri nell'app.</span></label>` : ""}
@@ -2298,9 +2300,10 @@ document.addEventListener("change", e => {
 /* Appena si corregge un campo, l'errore del modulo sparisce. */
 document.addEventListener("input", e => {
   if(e.target.id === "cerca-struttura"){ st.cerca = e.target.value; applicaRicerca(); return; }
-  if(e.target.id === "cerca-import"){
+  /* ricerca nell'import: per nome o per codice, tra i nuovi o tra le escluse */
+  if(e.target.dataset && e.target.dataset.cerca){
     const q = senzaAccenti(e.target.value);
-    document.querySelectorAll(".imp-nuovi label").forEach(l => { l.style.display = q && !l.dataset.nome.includes(q) ? "none" : ""; });
+    document.querySelectorAll(e.target.dataset.cerca + " label").forEach(l => { l.style.display = q && !l.dataset.nome.includes(q) ? "none" : ""; });
     return;
   }
   const err = e.target.form && e.target.form.querySelector(".errore");
