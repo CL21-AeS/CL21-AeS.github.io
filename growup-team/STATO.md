@@ -1,6 +1,7 @@
 # Growup Team — a che punto siamo
 
 Ultimo aggiornamento: 16 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
 ## Fatto
 
@@ -122,7 +123,7 @@ dall'SQL Editor perché contiene un `delete`):
 
 ## Prossimi passi (da qui si riparte)
 
-1. **Pubblicare le frecce a ogni livello durante la ricerca** (struttura "come Amway" già unita con la PR #33) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
+1. **Pubblicare METODO.md e CLAUDE.md** (frecce durante la ricerca già unite con la PR #34) se non è ancora fatto: ramo `claude/fervent-pasteur-kil5mf`,
    PR da unire (controllare su GitHub se è aperta o unita). Nessuna migrazione da lanciare.
    ("Senza app senza etichetta" è già pubblicato: PR CL21-AeS/CL21-AeS.github.io#10 unita.)
 2. **Collaudo dal telefono della Fase 2** (pagina Io con i calcoli, struttura con i numeri,
