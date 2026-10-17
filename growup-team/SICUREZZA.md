@@ -30,7 +30,8 @@ al database e prima del lancio a tutto il gruppo.
 
 - [x] Limite "anonymous sign-ins" (30/ora per indirizzo) e provider Email spento in Supabase.
 - [x] Captcha nell'app; account Cloudflare con verifica in due passaggi.
-- [ ] Accendere il captcha in Supabase → Authentication → Attack Protection (Turnstile + Secret Key).
+- [x] Captcha acceso in Supabase → Authentication → Attack Protection (Turnstile + Secret Key), provato sul
+      telefono in incognito il 17 ottobre 2026.
 - [ ] **Verifica in due passaggi** sugli account GitHub, Supabase e Google (Drive delle copie).
 - [ ] Copie di sicurezza in una cartella **privata** di Google Drive.
 - Rischio residuo noto: chi ha un link d'invito di qualcuno sopra una persona importata **e** conosce il suo codice
