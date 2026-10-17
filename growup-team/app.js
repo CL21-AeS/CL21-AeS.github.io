@@ -47,7 +47,6 @@ function creaApi(){
     struttura:    () => q(sb.rpc("struttura_visibile")),
     creaInvitoSopra: (pid, altri) => q(sb.rpc("crea_invito_sopra", { p_partner:pid, p_altri:altri })),
     conferma:     args => q(sb.rpc("conferma_partenza", args)),
-    cancella:     pid => q(sb.rpc("cancella_partner", { p_partner:pid })),
     preferiti:    () => q(sb.from("preferiti").select("preferito_id")),
     copiaDati:    () => q(sb.rpc("copia_dati")),
     /* il primo obiettivo: il proprio per intero; del gruppo solo cifra e data (il perché resta personale) */
@@ -1188,6 +1187,7 @@ function vStruttura(){
       ${quanti ? `<button class="piega" data-act="piega" data-id="${esc(p.id)}" data-quanti="${quanti}" aria-expanded="${!chiuso}"
         aria-label="${chiuso ? "Mostra" : "Nascondi"} il gruppo di ${esc(p.nome)}">${chiuso ? "▸" : "▾"} ${quanti}</button>` : ""}
       ${p.partenza_confermata_il ? "" : `<span class="pill g" title="Punto di partenza da confermare">!</span>`}
+      ${p.fuori_report_dal ? `<span class="pill g" title="Non più nel report Amway">fuori</span>` : ""}
       <span class="pill ${sp.cl}">${sp.txt}</span></li>`; }).join("")}</ul>
       <p class="nota">Il numero è il livello, come nei report Amway: 1 sei tu, 2 i tuoi frontali, 3 i loro, e così via.
         ▾ chiude o riapre il gruppo di una persona.
@@ -1454,13 +1454,12 @@ function vScheda(){
   ${st.profilo.is_admin ? vInvitiAdmin(p) : ""}
   <div class="card">
     <span class="eyebrow">Struttura</span>
-    ${gestito ? "" : `<button class="btn wide" style="margin-top:10px" data-act="nascondi" data-id="${esc(p.id)}">Nascondi dalla mia struttura</button>
-    <p class="nota">Sparisce solo per te, con il suo gruppo; i suoi VP contano lo stesso. La rimetti quando vuoi da «Nascoste».</p>`}
-    <button class="btn wide pericolo" style="margin-top:10px" data-act="cancella" data-id="${esc(p.id)}">Cancella dalla struttura</button>
-    <p class="nota">${gestito ? `La togli dalla tua struttura con i suoi dati; agli import non ti verrà più proposta.
-      Chi è nel suo gruppo passa a ${esc(sponsor || "il suo sponsor")}.`
-      : `Per i codici che Amway non rinnova: la cancella per tutti, con la sua app e i suoi dati.
-      Chi è nel suo gruppo passa a ${esc(sponsor || "il suo sponsor")}.`}</p>
+    ${p.fuori_report_dal ? `<p class="small" style="margin:6px 0 0"><span class="pill g">non più nel report</span> da ${nomeMese(meseDi(p.fuori_report_dal))}</p>` : ""}
+    ${st.nascosti.has(p.id)
+      ? `<button class="btn wide" style="margin-top:10px" data-act="mostra" data-id="${esc(p.id)}">Mostra di nuovo nella mia struttura</button>`
+      : `<button class="btn wide" style="margin-top:10px" data-act="nascondi" data-id="${esc(p.id)}">Nascondi dalla mia struttura</button>`}
+    <p class="nota">Nascosta sparisce solo per te, con il suo gruppo; i suoi VP contano lo stesso nei numeri personali e di gruppo.
+      La rimetti quando vuoi da «Nascoste». Nell'app nessuno si cancella: la struttura rispecchia il report Amway.</p>
   </div>`;
 }
 
@@ -1603,7 +1602,7 @@ function analizzaReport(rep){
   const attivi = new Map(altri.filter(p => p.stato !== "gestito" && p.codice_amway).map(p => [p.codice_amway, p]));
   const mie = altri.filter(p => p.stato === "gestito");
   const a = { mese:m, prima, codiceMio:!io.codice_amway, perCodice, aggiorna:[], mancanti:[], usanoApp:[], usanoAppMancanti:[],
-              spostati:[], nuovi:[], esclusi:[], totale:rep.righe.length };
+              spostati:[], nuovi:[], totale:rep.righe.length };
   const usati = new Set([prima.codice]);
   for(const p of altri.filter(p => p.stato !== "gestito")){
     const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
@@ -1614,9 +1613,10 @@ function analizzaReport(rep){
   for(const p of mie){
     const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
     if(r){ a.aggiorna.push({ p, r }); usati.add(r.codice); }
-    else if(p.codice_amway) a.mancanti.push(p);
+    else if(p.codice_amway && !p.fuori_report_dal) a.mancanti.push(p);
   }
-  for(const r of rep.righe) if(!usati.has(r.codice)) (st.esclusi.has(r.codice) ? a.esclusi : a.nuovi).push(r);
+  /* l'import è sempre completo: tutte le persone del report entrano nella mia struttura */
+  for(const r of rep.righe) if(!usati.has(r.codice)) a.nuovi.push(r);
   /* chi usa l'app va sotto il primo antenato del report che usa l'app (o sotto di me) */
   for(const { p, r } of a.usanoApp){
     const sopra = antenatoNelReport(r, perCodice, c => c === prima.codice || attivi.has(c));
@@ -1645,9 +1645,9 @@ function vImporta(){
   if(!a || a.errore) return `<h2>Importa dal report Amway</h2>
     <p class="small">Sul sito Amway: <b>Linea di Sponsorizzazione (LOS)</b> → pulsante di download →
       <b>Intera Linea di Sponsorizzazione con tutti i KPI disponibili</b>, formato <b>CSV</b>. Prima togli i filtri.</p>
-    <p class="small">Scegli tu chi mettere nell'app tra chi non la usa: lo vedrai solo tu. L'app aggiorna i VPP del mese tuoi e
-      delle persone che hai importato; chi usa l'app non viene toccato, i suoi numeri li aggiorna lui.
-      Il file resta sul telefono: si salvano solo nome, codice e VPP di chi importi.</p>
+    <p class="small">Tutta la tua linea entra nell'app; chi non la usa lo vedi solo tu, e puoi nascondere chi vuoi (resta nei numeri).
+      L'app aggiorna i VPP del mese tuoi e delle persone importate; chi usa l'app non viene toccato, i suoi numeri li aggiorna lui.
+      Il file resta sul telefono: si salvano solo nome, codice e numeri.</p>
     <label class="btn primary wide" style="margin-top:12px">Scegli il file CSV
       <input type="file" id="file-report" accept=".csv,text/csv,text/comma-separated-values" hidden></label>
     ${a && a.errore ? `<p class="errore">${esc(a.errore)}</p>` : ""}
@@ -1655,36 +1655,29 @@ function vImporta(){
   const riga = (p, extra) => `<span class="grow">${esc(p.nome)}${extra ? `<br><span class="small">${extra}</span>` : ""}</span>`;
   const sezione = (titolo, corpo, nota, cl) => `<div class="imp-sezione${cl ? " " + cl : ""}"><h3>${titolo}</h3>${nota ? `<p class="small">${nota}</p>` : ""}${corpo}</div>`;
   const sponsorDi = r => { const s = a.perCodice.get(r.sponsor); return s ? `sponsor ${esc(s.nome)}` : ""; };
-  const scelta = r => `<label data-nome="${esc(senzaAccenti(r.nome) + " " + r.codice)}"><input type="checkbox" name="aggiungi" value="${esc(r.codice)}" data-vpp="${r.vpp > 0 ? 1 : 0}">
+  const scelta = r => `<label data-nome="${esc(senzaAccenti(r.nome) + " " + r.codice)}"><input type="checkbox" name="nascondi" value="${esc(r.codice)}" data-vpp="${r.vpp > 0 ? 1 : 0}"${st.esclusi.has(r.codice) ? " checked" : ""}>
       <span>${esc(r.nome)} · <b>${num(r.vpp)} VP</b><br><span class="small">${esc(r.codice)}${sponsorDi(r) ? " · " + sponsorDi(r) : ""}</span></span></label>`;
   const aggiorna = [{ p:st.profilo, r:a.prima, io:true }].concat(a.aggiorna);
   return `<h2>Report di ${nomeMese(a.mese)}</h2>
   <p class="small">${plur(a.totale, "persona", "persone")} nel file${a.mese === meseDi(oggi()) ? " · mese in corso: puoi reimportarlo quando vuoi, i valori si sostituiscono" : ""}.</p>
   <form data-form="importa" novalidate>
-    ${a.nuovi.length ? sezione(`Non ancora nell'app · ${a.nuovi.length}`,
+    ${a.nuovi.length ? sezione(`Nuovi nel report · ${a.nuovi.length}`,
       `<div class="row wrap scelte-rapide" style="gap:6px;margin-top:8px">
-        <button type="button" class="btn small" data-act="spunta-vpp" aria-pressed="false">Spunta chi ha VPP</button>
-        <button type="button" class="btn small" data-act="spunta-tutti" aria-pressed="false">Spunta tutti</button>
-        <button type="button" class="btn small" data-act="togli-tutti" aria-pressed="false">Togli tutti</button></div>
+        <button type="button" class="btn small" data-act="nascondi-zero" aria-pressed="false">Nascondi chi ha 0 VP</button>
+        <button type="button" class="btn small" data-act="nascondi-tutti" aria-pressed="false">Nascondi tutti</button>
+        <button type="button" class="btn small" data-act="mostra-tutti" aria-pressed="false">Mostra tutti</button></div>
       ${a.nuovi.length > 8 ? `<input type="search" class="cerca" data-cerca=".imp-nuovi" placeholder="Cerca per nome o codice…" autocomplete="off" aria-label="Cerca per nome o codice">` : ""}
-      <div class="scelte imp-nuovi">${a.nuovi.map(scelta).join("")}</div>`,
-      "Spunta chi vuoi seguire: lo vedrai solo tu, nella sua posizione del report. Chi resta senza spunta non ti verrà più proposto.",
+      <div class="scelte imp-nuovi">${a.nuovi.map(scelta).join("")}</div>
+      <label class="check"><input type="checkbox" name="consenso">
+        <span>Ho il consenso delle persone della mia linea a inserire il loro nome e i loro numeri nell'app.</span></label>`,
+      "Entrano tutti nella tua struttura, nella posizione del report. Spunta chi vuoi <b>nascondere</b>: lo vedi solo nell'elenco «Nascoste» e i suoi VP contano lo stesso.",
       "imp-da-scegliere") : ""}
-    ${a.esclusi.length ? sezione(`Escluse · ${a.esclusi.length}`,
-      `<details><summary class="small">Rivedi</summary>
-        ${a.esclusi.length > 5 ? `<input type="search" class="cerca" data-cerca=".imp-esclusi" placeholder="Cerca per nome o codice…" autocomplete="off" aria-label="Cerca per nome o codice">` : ""}
-        <div class="scelte imp-esclusi">${a.esclusi.map(scelta).join("")}</div></details>`,
-      "Le hai lasciate fuori negli import precedenti. Spunta chi vuoi aggiungere adesso.") : ""}
-    ${a.nuovi.length || a.esclusi.length ? `<label class="check"><input type="checkbox" name="consenso">
-        <span>Ho il consenso delle persone che spunto a inserire il loro nome e i loro numeri nell'app.</span></label>` : ""}
     ${sezione(`Si aggiornano i VPP · ${aggiorna.length}`, `<ul class="imp">${aggiorna.map(x => `<li>${riga(x.io ? { nome:`${st.profilo.nome} (tu)` } : x.p,
         x.io && a.codiceMio ? `il tuo codice ${esc(x.r.codice)} viene salvato` : "")}<b class="num">${num(x.r.vpp)} VP</b></li>`).join("")}</ul>`)}
     ${a.mancanti.length ? sezione(`Non più nel report · ${a.mancanti.length}`,
-      `${a.troppiMancanti ? `<p class="avviso">Mancano molte persone insieme: controlla di aver esportato <b>l'intera linea senza filtri</b>.
-        Le caselle non sono spuntate: spunta solo chi sai che non c'è più.</p>` : ""}
-      <div class="scelte">${a.mancanti.map(p => `<label><input type="checkbox" name="cancella" value="${esc(p.id)}"${a.troppiMancanti ? "" : " checked"}>
-        <span>${esc(p.nome)} · ${esc(p.codice_amway)}</span></label>`).join("")}</div>`,
-      "Codici che Amway non ha più (per esempio non rinnovati). Le persone spuntate vengono <b>cancellate dalla tua struttura</b> con i loro dati. Non si può annullare.") : ""}
+      `${a.troppiMancanti ? `<p class="avviso">Mancano molte persone insieme: controlla di aver esportato <b>l'intera linea senza filtri</b>.</p>` : ""}
+      <p class="small">${a.mancanti.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})`).join(", ")}</p>`,
+      "Codici che Amway non ha più (per esempio non rinnovati). Nessuno si cancella: restano nella tua struttura con il segno «non più nel report» e vanno tra le nascoste. Se tornano nel report, il segno sparisce.") : ""}
     ${a.usanoApp.length || a.usanoAppMancanti.length ? sezione("Usano l'app: i loro numeri li aggiornano loro",
       `<p class="small">${plur(a.usanoApp.length, "persona trovata", "persone trovate")} nel report.
         ${a.spostati.length ? `<br>Vanno sotto il loro sponsor del report: ${a.spostati.map(x => `<b>${esc(x.p.nome)}</b> (da ${esc(x.da)} a ${esc(x.a)})`).join(", ")}.` : ""}
@@ -1698,7 +1691,7 @@ function accendiRapida(el){
   document.querySelectorAll(".scelte-rapide .btn").forEach(b => { const on = b === el; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
 }
 function sceltaRapida(el, spunta){
-  document.querySelectorAll(".imp-da-scegliere input[name=aggiungi]").forEach(i => { i.checked = spunta(i); });
+  document.querySelectorAll(".imp-da-scegliere input[name=nascondi]").forEach(i => { i.checked = spunta(i); });
   accendiRapida(el);
 }
 
@@ -1719,10 +1712,10 @@ async function leggiFileReport(file){
 async function eseguiImport(f){
   const a = st.imp, io = st.profilo;
   const scelti = nome => new Set([...f.querySelectorAll(`input[name=${nome}]:checked`)].map(i => i.value));
-  const cancella = scelti("cancella"), aggiungi = scelti("aggiungi");
-  if(aggiungi.size && !f.consenso.checked){ mostraErroreForm(f, "Conferma di avere il consenso delle persone che aggiungi."); return; }
-  /* le mie persone dopo l'import: quelle già importate e quelle spuntate */
-  const mie = a.aggiorna.map(x => x.r).concat(a.nuovi.concat(a.esclusi).filter(r => aggiungi.has(r.codice)));
+  const nascondi = scelti("nascondi");
+  if(a.nuovi.length && !f.consenso.checked){ mostraErroreForm(f, "Conferma di avere il consenso delle persone della tua linea."); return; }
+  /* l'import è completo: le mie persone sono quelle già importate più tutte le nuove */
+  const mie = a.aggiorna.map(x => x.r).concat(a.nuovi);
   /* i numeri ufficiali di ognuno: VPP, VPG, percentuale e i VPG delle sue linee frontali del report
      (se il report non mostra il suo gruppo, come per i Platino, le linee sono "nascoste") */
   const figliReport = new Map();
@@ -1737,11 +1730,10 @@ async function eseguiImport(f){
     sponsor:antenatoNelReport(r, a.perCodice, c => c === a.prima.codice || attivi.has(c) || codiciMie.has(c)) }, numeri(r)));
   const usanoApp = a.usanoApp.map(({ r }) => Object.assign({ codice:r.codice, vpp:r.vpp,
     sponsor:antenatoNelReport(r, a.perCodice, c => c === a.prima.codice || attivi.has(c)) }, numeri(r)));
-  const esclusi = a.nuovi.filter(r => !aggiungi.has(r.codice)).map(r => r.codice);
   st.occupato = true;
   try{
     const esito = await api.importaRete({ p_mese:a.mese + "-01", p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp }, numeri(a.prima)), p_persone:persone,
-      p_attivi:usanoApp, p_esclusi:esclusi, p_cancella:a.mancanti.filter(p => cancella.has(p.id)).map(p => p.id) }) || {};
+      p_attivi:usanoApp, p_nascondi:[...nascondi], p_fuori:a.mancanti.map(p => p.id) }) || {};
     if(a.codiceMio) st.profilo = Object.assign({}, io, { codice_amway:a.prima.codice });
     await caricaStruttura();
     st.att = await api.activities(io.id, [settimana(), primoDelMese()].sort()[0]) || [];
@@ -1750,7 +1742,7 @@ async function eseguiImport(f){
     const n = k => Number(esito[k]) || 0;
     toast(`Import di ${nomeMese(a.mese).split(" ")[0]}: ${[n("aggiunte") ? plur(n("aggiunte"), "persona aggiunta", "persone aggiunte") : "",
       plur(n("aggiornati"), "VPP aggiornato", "VPP aggiornati"), n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
-      n("cancellate") ? plur(n("cancellate"), "persona cancellata", "persone cancellate") : ""].filter(Boolean).join(", ")}`);
+      n("fuori") ? plur(n("fuori"), "persona non più nel report", "persone non più nel report") : ""].filter(Boolean).join(", ")}`);
   }catch(e){
     st.occupato = false;
     try{ await caricaStruttura(); }catch(x){}
@@ -1816,11 +1808,16 @@ function vSheet(){
         <button class="btn primary grow">Crea il link</button></div>${err}
     </form>`;
   }
-  if(s === "nascoste") return `<h2>Nascoste dalla tua struttura</h2>
-    <p class="small">Le vedi solo tu così: per gli altri non cambia niente, e i loro VP contano nel tuo gruppo.</p>
-    <ul class="imp">${[...st.nascosti].filter(id => nomeDi(id)).map(id => `<li><span class="grow">${esc(nomeDi(id))}</span>
-      <button class="btn small" data-act="mostra" data-id="${esc(id)}">Mostra di nuovo</button></li>`).join("")}</ul>
+  if(s === "nascoste"){
+    const l = [...st.nascosti].map(id => st.struttura.find(x => x.id === id)).filter(Boolean).sort((a, b) => a.nome.localeCompare(b.nome, "it"));
+    return `<h2>Nascoste dalla tua struttura · ${l.length}</h2>
+    <p class="small">Le vedi solo tu così: per gli altri non cambia niente, e i loro VP contano nei tuoi numeri. Tocca un nome per aprire la scheda.</p>
+    ${l.length > 8 ? `<input type="search" class="cerca" data-cerca=".imp-nascoste" placeholder="Cerca per nome o codice…" autocomplete="off" aria-label="Cerca per nome o codice">` : ""}
+    <ul class="imp imp-nascoste">${l.map(p => `<li data-nome="${esc(senzaAccenti(p.nome) + " " + (p.codice_amway || ""))}">
+      <button class="btn link grow" style="text-align:left;padding:0" data-act="apri-nascosta" data-id="${esc(p.id)}">${esc(p.nome)}${p.fuori_report_dal ? ` <span class="pill g">fuori</span>` : ""}</button>
+      <button class="btn small" data-act="mostra" data-id="${esc(p.id)}">Mostra</button></li>`).join("")}</ul>
     <button class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
+  }
   if(s === "codice"){
     const p = st.codiceId === st.profilo.id ? st.profilo : st.struttura.find(x => x.id === st.codiceId);
     if(!p) return "";
@@ -1980,9 +1977,9 @@ const AZIONI = {
   "copia-link"(el){ copiaTesto(el.dataset.link, "Link copiato"); },
   /* pulsanti rapidi dell'import: agiscono sulle caselle "Non ancora nell'app" senza ridisegnare il foglio;
      il pulsante usato resta acceso finché non si cambia una casella a mano */
-  "spunta-vpp"(el){ sceltaRapida(el, i => i.dataset.vpp === "1"); },
-  "spunta-tutti"(el){ sceltaRapida(el, () => true); },
-  "togli-tutti"(el){ sceltaRapida(el, () => false); },
+  "nascondi-zero"(el){ sceltaRapida(el, i => i.dataset.vpp !== "1"); },
+  "nascondi-tutti"(el){ sceltaRapida(el, () => true); },
+  "mostra-tutti"(el){ sceltaRapida(el, () => false); },
   codice(el){ st.codiceId = el.dataset.id; st.errore = ""; st.sheet = "codice"; render(); focusSheet(); },
   storico(){ st.sheet = "storico"; render(); },
   async "mese-gruppo"(el){
@@ -2052,23 +2049,6 @@ const AZIONI = {
     if(err){ mostraErroreForm(f, err); return; }
     window.open("https://wa.me/?text=" + encodeURIComponent(testoChiamata(x.nome, c.data, c.ora)), "_blank", "noopener");
   },
-  async cancella(el){
-    const p = st.struttura.find(x => x.id === el.dataset.id);
-    if(!p) return;
-    const sopra = p.sponsor_id === st.profilo.id ? "te" : nomeDi(p.sponsor_id);
-    const sotto = figli(p.id).length;
-    if(!confirm(`Cancellare ${p.nome} dalla struttura?\n\n` + (p.stato === "gestito"
-        ? "I suoi dati vengono cancellati e agli import non ti verrà più proposta."
-        : "Usa l'app: viene cancellata per tutti, con la sua app e i suoi dati (attività, obiettivi, storico).")
-      + (sotto ? `\n${sotto === 1 ? "La persona del suo gruppo passa" : `Le ${sotto} persone dirette del suo gruppo passano`} a ${sopra}, con tutto il loro gruppo.` : "")
-      + "\n\nNon si può annullare.")) return;
-    try{
-      await api.cancella(p.id);
-      await caricaStruttura(); await caricaNumeri();
-      st.vista = "gruppo"; st.schedaId = null; st.target = null; render(); window.scrollTo(0, 0);
-      toast(`${p.nome} cancellato${sotto ? `: il suo gruppo ora è di ${sopra}` : ""}`);
-    }catch(e){ toast(messaggio(e)); }
-  },
   async nascondi(el){
     const p = st.struttura.find(x => x.id === el.dataset.id);
     if(!p) return;
@@ -2080,6 +2060,7 @@ const AZIONI = {
     }catch(e){ toast(messaggio(e)); }
   },
   nascoste(){ st.sheet = "nascoste"; render(); },
+  "apri-nascosta"(el){ st.sheet = null; AZIONI["apri-scheda"](el); },
   async mostra(el){
     try{
       await api.mostra(st.profilo.id, el.dataset.id);
@@ -2341,7 +2322,7 @@ document.addEventListener("submit", e => {
    è obbligatoria solo per chi inizia (nel modulo d'ingresso). */
 document.addEventListener("change", e => {
   if(e.target.id === "file-report"){ leggiFileReport(e.target.files && e.target.files[0]); return; }
-  if(e.target.name === "aggiungi" && e.target.closest(".imp-da-scegliere")){ accendiRapida(null); return; }
+  if(e.target.name === "nascondi" && e.target.closest(".imp-da-scegliere")){ accendiRapida(null); return; }
   if(e.target.name !== "qualifica") return;
   const f = e.target.form;
   const t = st.stages.find(s => s.chiave === f.qualifica.value);
@@ -2356,7 +2337,7 @@ document.addEventListener("input", e => {
   /* ricerca nell'import: per nome o per codice, tra i nuovi o tra le escluse */
   if(e.target.dataset && e.target.dataset.cerca){
     const q = senzaAccenti(e.target.value);
-    document.querySelectorAll(e.target.dataset.cerca + " label").forEach(l => { l.style.display = q && !l.dataset.nome.includes(q) ? "none" : ""; });
+    document.querySelectorAll(e.target.dataset.cerca + " [data-nome]").forEach(l => { l.style.display = q && !l.dataset.nome.includes(q) ? "none" : ""; });
     return;
   }
   const err = e.target.form && e.target.form.querySelector(".errore");

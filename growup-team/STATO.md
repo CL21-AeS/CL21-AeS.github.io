@@ -270,6 +270,19 @@ Com'è fatto: migrazione `017_inviti_e_numeri_report.sql` (tabelle `inviti_admin
 "ricucita", `calcola_mese` sulla struttura ricucita, `qualifica_report`, `riepilogo_mese` con i numeri del report,
 `crea_invito_sopra`, `imposta_codice_amway` solo admin). **Da incollare nell'SQL Editor** insieme all'unione della PR.
 
+## Sicurezza (17 ottobre, sera)
+
+- Controllo completo (`SICUREZZA.md`): RLS ovunque, nessun dato leggibile senza accesso, Content Security Policy
+  nell'app, dati reali tolti dai file; **storia di GitHub riscritta** (nessun nome, codice, numero o email nei commit);
+  **codice d'invito della radice rigenerato** (il vecchio era finito nella storia pubblica).
+- Decisione di Stefano: **nessuno cancella niente** (migrazione `018_niente_cancellazioni.sql`, da incollare nell'SQL
+  Editor): l'import è **sempre completo** (nell'anteprima si sceglie solo chi nascondere: *Nascondi chi ha 0 VP ·
+  Nascondi tutti · Mostra tutti*); chi non è più nel report resta, segnato "non più nel report" e nascosto; ognuno
+  nasconde chi vuole (anche le persone importate) e i VP contano sempre. Gli esclusi di prima diventano nascoste al
+  primo import. Cancellazione solo per diritto all'oblio, dall'SQL Editor (`ADMIN.md`).
+- Restano da fare per Stefano: verifica in due passaggi (GitHub, Supabase, Google), captcha e limite degli accessi
+  anonimi prima del lancio, email privata su GitHub.
+
 ## Proposte in sospeso (Stefano non ha ancora risposto)
 
 - Captcha prima del lancio (punto 4 sopra).

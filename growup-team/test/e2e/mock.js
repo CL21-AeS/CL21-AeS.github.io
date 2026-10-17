@@ -100,10 +100,6 @@
         pagamenti_iniziali:a.p_pagamenti, partenza_confermata_il:new Date().toISOString() }); db.conferme = (db.conferme || []).concat([a]); salva(); return pub(p); },
     nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid); p.chiave = hex();
       db.accessi = db.accessi.filter(a => a.partner_id !== pid); salva(); return p.chiave; },
-    cancella: async pid => { const t = db.partners.find(x => x.id === pid); let n = 0; const io = mio();
-      if(t.stato === "gestito" && t.codice_amway) db.esclusi = (db.esclusi || []).concat([{ partner_id:io.id, codice:t.codice_amway }]);
-      for(const x of db.partners) if(x.sponsor_id === pid){ x.sponsor_id = t.sponsor_id; n++; }
-      db.partners = db.partners.filter(x => x.id !== pid); db.activities = db.activities.filter(a => a.partner_id !== pid); salva(); return n; },
     /* come nel database: il mio codice o quello di una persona che ho importato; unico tra chi usa l'app, e tra le mie importate */
     impostaCodice: async (pid, codice) => { const io = mio();
       const p = db.partners.find(x => x.id === pid);
@@ -121,7 +117,9 @@
       const attivo = c => visibili(io).find(x => x.stato !== "gestito" && x.codice_amway === c);
       const mia = c => db.partners.find(x => x.stato === "gestito" && x.gestore_id === io.id && x.codice_amway === c);
       const giu = id => [id].concat(sotto(id).map(x => x.id));
-      let aggiunte = 0, spostate = 0, cancellate = 0;
+      let aggiunte = 0, spostate = 0, fuori = 0;
+      const nascondi = id => { if(!(db.nascosti || []).some(n => n.partner_id === io.id && n.nascosto_id === id))
+        db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:id }]); };
       const righe = [{ partner_id:io.id, vpp:a.p_io.vpp }];
       for(const r of a.p_persone){
         const sp = (r.sponsor && r.sponsor !== io.codice_amway && ((attivo(r.sponsor) || mia(r.sponsor) || {}).id)) || io.id;
@@ -132,8 +130,10 @@
           x = { id:uid(), nome:r.nome, sponsor_id:sp, stato:"gestito", gestore_id:io.id, codice_amway:r.codice, codice_invito:codiceInvito(),
             partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() };
           db.partners.push(x); aggiunte++;
+          if(a.p_nascondi.includes(r.codice) || (db.esclusi || []).some(e => e.partner_id === io.id && e.codice === r.codice)) nascondi(x.id);
         }
         db.esclusi = (db.esclusi || []).filter(e => !(e.partner_id === io.id && e.codice === r.codice));
+        x.fuori_report_dal = null;
         righe.push({ partner_id:x.id, vpp:r.vpp }); salvaNumeri(x.id, r);
       }
       for(const r of a.p_attivi){
@@ -143,8 +143,9 @@
         if(!sp || sp === x.sponsor_id || giu(x.id).includes(sp)) continue;
         x.sponsor_id = sp; spostate++;
       }
-      for(const pid of a.p_cancella){ await window.GROWUP_API.cancella(pid); cancellate++; }
-      db.esclusi = (db.esclusi || []).concat(a.p_esclusi.map(codice => ({ partner_id:io.id, codice })));
+      for(const pid of a.p_fuori){ const x = db.partners.find(y => y.id === pid);
+        if(!x || x.stato !== "gestito" || x.gestore_id !== io.id) throw new Error("non_autorizzato");
+        if(!x.fuori_report_dal){ x.fuori_report_dal = a.p_mese; nascondi(x.id); fuori++; } }
       const oggi = new Intl.DateTimeFormat("en-CA", { timeZone:"Europe/Rome" }).format(new Date());
       const m = a.p_mese.slice(0, 7), fine = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).toISOString().slice(0, 10);
       const giorno = m === oggi.slice(0, 7) ? oggi : fine;
@@ -158,7 +159,7 @@
         aggiornati++;
       }
       db.importi = (db.importi || 0) + 1; salva();
-      return { aggiornati, invariati, aggiunte, spostate, cancellate }; },
+      return { aggiornati, invariati, aggiunte, spostate, fuori }; },
     attivitaGruppo: async dal => { const io = mio(); if(!io) return [];
       const ids = new Set(visibili(io).map(p => p.id)); return db.activities.filter(a => ids.has(a.partner_id) && a.data >= dal); },
     obiettiviGruppo: async () => db.goals,
