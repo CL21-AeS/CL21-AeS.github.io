@@ -27,7 +27,9 @@ approfondimento e le idee da esperto del settore (network marketing), ma le deci
    verificato. **Stefano unisce lui** le PR. Dopo l'unione, il ramo riparte dal principale.
 5. **Diario del progetto**: un file `STATO.md` nella cartella dell'app (fatto, decisioni, prossimi passi),
    aggiornato a ogni consegna e letto per primo a ogni nuova sessione; il piano di una fase in un file a parte.
-   Un `CLAUDE.md` nella cartella con le regole essenziali.
+   Un `CLAUDE.md` nella cartella con le regole essenziali. Se l'app ha un ruolo **admin**, un file `ADMIN.md` elenca
+   tutto quello che può fare un admin e come si nomina (esempio: `growup-team/ADMIN.md`); si aggiorna a ogni funzione
+   da admin aggiunta o tolta, così un giorno si può dare il ruolo a un'altra persona sapendo cosa le si affida.
 6. **Risposte**: brevi, concrete, con un consiglio da esperto quando serve e una domanda per il passo successivo.
    Niente gergo tecnico non spiegato.
 7. **Collaudo dal telefono**: Stefano usa Android con Google Calendar, Alessia iPhone. Ricorda le differenze
