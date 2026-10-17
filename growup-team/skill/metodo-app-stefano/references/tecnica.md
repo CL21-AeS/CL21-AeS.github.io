@@ -31,6 +31,10 @@ File di riferimento nel repository `CL21-AeS/CL21-AeS.github.io`, cartella `grow
   Attenzione: le istruzioni con `delete`/`drop` dal connettore chiedono una conferma che scade; quelle parti
   le incolla Stefano nell'SQL Editor. Per evitare i `drop`, si rinomina o si usa `create or replace`.
 - Calcoli mensili nel database; storico congelato da un'attività pianificata (pg_cron).
+- **Admin**: colonna `is_admin` (non scrivibile dal telefono) e funzione `sono_admin()` dentro le funzioni riservate;
+  l'elenco di cosa può fare un admin sta in `ADMIN.md`.
+- **Dati da un gestionale esterno** (es. il report Amway in CSV): si leggono nel browser, al database arrivano solo
+  i campi che servono; la struttura e i numeri ufficiali vengono da lì (`growup-team/supabase/016_*`, `017_*`).
 - **Copia di sicurezza**: il piano gratuito non fa backup; funzione `copia_dati()` solo admin + pulsante
   nell'app che scarica un JSON da tenere su Google Drive ogni mese.
 
