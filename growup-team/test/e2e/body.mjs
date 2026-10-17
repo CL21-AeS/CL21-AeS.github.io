@@ -17,7 +17,8 @@ await page.getByText("Entra in Growup").waitFor();
 await page.click("button[data-act=torna-invito]");
 await page.getByText("Due informazioni e iniziamo").waitFor(); check(true, "si torna all'invito");
 await page.fill("input[name=nome]", "Anna Bianchi");
-check(await page.getByText("Codice Amway Partner (facoltativo)").isVisible(), "ingresso: codice Amway facoltativo");
+check(await page.getByText("Codice Amway Partner", { exact:true }).isVisible() && !(await page.getByText("Codice Amway Partner (facoltativo)").count()),
+  "ingresso: codice Amway obbligatorio");
 await page.fill("input[name=codice_amway]", "2000001");
 await page.click("form button.primary");
 check(await page.getByText("serve la data di iscrizione").isVisible(), "data obbligatoria per chi inizia");
@@ -90,93 +91,108 @@ check(!(await page.getByText("La mia struttura").count()), "struttura non nella 
 check(await page.getByText("Il mio link personale").isVisible(), "link personale in fondo alla pagina");
 check(!(await page.locator("button[data-act=menu]").count()), "niente più menu ⋯");
 
-// 3. Struttura: aggiunta manuale e link (pagina Gruppo)
+// 3. Struttura: niente inserimenti a mano, si importa il report Amway (pagina Gruppo)
+const oggiCsv = new Intl.DateTimeFormat("en-CA", { timeZone:"Europe/Rome" }).format(new Date());
+const meseFile = oggiCsv.slice(0, 4) + oggiCsv.slice(5, 7);
+const csvRiga = v => v.map(x => `"${x}"`).join(",");
+const testaCsv = ["Qualifica Amway Partner","Codice Amway Partner Sponsor","Codice Amway Partner","Paese","Nome","Data di ingresso","Telefono","Email",
+  "Indirizzo","Data di rinnovo","VPG","VPP","VP reso","Percentuale di bonus","VVG","VP Cliente","VP Rubino"," Clienti"];
+const persona = (liv, sp, cod, nome, vpp) => [String(liv), "'" + sp, "'" + cod, "'Italia", "'" + nome, "'01 gennaio 2020", "'Principale: +39 000", "'x@esempio.it",
+  "'Citta | XX | 00000 | Italia", "'31 dicembre 2026", "'1.234,56", "'" + vpp, "0", "'0%", "1234.56", "'0,00", "0", "'0"];
+const creaCsv = (mese, righe) => "﻿" + [csvRiga(["Amway","CONFIDENZIALE - REPORT DI PROVA"]), csvRiga(["Mese di competenza", mese]), csvRiga(testaCsv)]
+  .concat(righe.map(csvRiga)).join("\n");
+const scegliFile = async (pg, nome, testo, daGruppo) => {
+  await pg.click(daGruppo ? ".card button[data-act=importa]" : "button[data-act=importa]");
+  await pg.locator(".sheet").getByText("Intera Linea di Sponsorizzazione con tutti i KPI disponibili").waitFor();
+  await pg.setInputFiles("#file-report", { name:nome, mimeType:"text/csv", buffer:Buffer.from(testo) });
+};
 await page.click("button[data-act=vista-gruppo]");
 await page.getByText("Il mio gruppo").first().waitFor();
 check(!(await page.locator(".azioni").count()), "niente barra azioni nella pagina Gruppo");
 check(await page.getByText("Invita un nuovo partner").isVisible(), "invito nella pagina Gruppo");
 check(await page.getByText("Ancora nessuno nel tuo gruppo").isVisible(), "gruppo vuoto");
-check(!(await page.content()).includes("sotto di te"), "niente 'sotto di te'");
-await page.click("button[data-act=aggiungi]");
-await page.getByText("Aggiungi una persona").waitFor();
-await page.fill(".sheet input[name=nome]", "Marco Rossi");
-await page.selectOption(".sheet select[name=qualifica]", "pin:6");
-await page.click(".sheet button:has-text('Salva')");
-check(await page.locator(".sheet .errore").innerText() === "Scrivi il suo codice Amway Partner.", "a mano il codice Amway è obbligatorio");
-await page.fill(".sheet input[name=codice_amway]", "1000001");
-await page.click(".sheet button:has-text('Salva')");
-check(await page.getByText("Serve il suo consenso").isVisible(), "consenso obbligatorio");
+check(!(await page.locator("button[data-act=aggiungi]").count()), "niente più + Aggiungi persona");
+await scegliFile(page, "anna.csv", creaCsv(meseFile, [persona(1, "9", "2000001", "BIANCHI, ANNA", "80,00"),
+  persona(2, "2000001", "1000001", "ROSSI, MARCO", "0,00"), persona(3, "1000001", "1000002", "VERDI, LUCA", "12,50")]), true);
+await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+check(await page.locator(".sheet .imp-sezione", { hasText:"Non ancora nell'app · 2" }).isVisible(), "import: 2 persone non ancora nell'app");
+check(await page.locator(".sheet input[name=aggiungi]:checked").count() === 0, "import: nessuno spuntato all'inizio");
+await page.click(".sheet button[data-act=spunta-vpp]");
+check(await page.isChecked(".sheet input[name=aggiungi][value='1000002']") && !(await page.isChecked(".sheet input[name=aggiungi][value='1000001']")),
+  "Spunta chi ha VPP: solo Luca (12,5 VP)");
+await page.click(".sheet button[data-act=spunta-tutti]");
+check(await page.locator(".sheet input[name=aggiungi]:checked").count() === 2, "Spunta tutti");
+check(await page.locator(".sheet label", { hasText:"Luca Verdi" }).getByText("sponsor Marco Rossi").isVisible(), "import: lo sponsor del report accanto al nome");
+await page.screenshot({ path: S + "/e2e/26-importa.png", fullPage:true });
+await page.click(".sheet button:has-text('Importa')");
+check(await page.locator(".sheet .errore").innerText() === "Conferma di avere il consenso delle persone che aggiungi.", "import: serve il consenso");
 await page.check(".sheet input[name=consenso]");
-await page.click(".sheet button:has-text('Salva')");
-await page.getByText("Marco Rossi aggiunto al tuo gruppo").waitFor();
-check(await page.locator(".albero:not(.seguire) li", { hasText:"Marco Rossi" }).getByText("senza app").isVisible(), "Marco senza app nella struttura");
-check(await page.locator(".albero:not(.seguire) li", { hasText:"Marco Rossi" }).getByText("0 VP · gruppo 0").isVisible(), "numeri accanto al nome");
-// seconda persona sotto Marco
-await page.click("button[data-act=aggiungi]");
-const posti = await page.locator(".sheet select[name=sponsor] option").allInnerTexts();
-check(posti[0] === "Io" && posti.some(x => x === "2 · Marco Rossi"), "sponsor: io o qualcuno del mio gruppo, con il livello");
-await page.fill(".sheet input[name=nome]", "Luca Verdi");
-await page.fill(".sheet input[name=codice_amway]", "1000002");
-await page.selectOption(".sheet select[name=sponsor]", { label: posti.find(x => x.includes("Marco")) });
-await page.check(".sheet input[name=consenso]");
-await page.click(".sheet button:has-text('Salva')");
-await page.getByText("Luca Verdi aggiunto al gruppo di Marco Rossi").waitFor();
+await page.click(".sheet button:has-text('Importa')");
+await page.getByText(/2 persone aggiunte/).waitFor(); check(true, "import: 2 persone aggiunte");
+check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).getByText("senza app").isVisible(), "Marco senza app nella struttura");
+check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).getByText("0 VP · gruppo 12,5").isVisible(), "numeri accanto al nome");
 check(await page.getByText("2 persone", { exact:true }).isVisible(), "conteggio persone del gruppo");
 await sync(page);
 const marco = DB.partners.find(p => p.nome === "Marco Rossi"), luca = DB.partners.find(p => p.nome === "Luca Verdi");
-check(marco.sponsor_id === anna.id && luca.sponsor_id === marco.id && marco.percentuale_iniziale === 6, "posizioni e pin salvati");
-check(anna.codice_amway === "2000001" && marco.codice_amway === "1000001" && luca.codice_amway === "1000002", "codici Amway salvati");
+check(marco.sponsor_id === anna.id && luca.sponsor_id === marco.id && marco.gestore_id === anna.id && luca.codice_amway === "1000002",
+  "posizioni del report, importate da Anna");
+check(DB.partners.find(p => p.id === anna.id).codice_amway === "2000001", "codice di Anna invariato");
 await page.screenshot({ path: S + "/e2e/2-struttura.png", fullPage:true });
 // scheda di Marco: inserisco i suoi numeri
-await page.locator(".albero:not(.seguire) li", { hasText:"Marco Rossi" }).locator("button[data-act=apri-scheda]").click();
+await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).locator("button[data-act=apri-scheda]").click();
 await page.getByText("Scheda partner").waitFor();
-check(await page.getByText("non usa l'app: i suoi numeri li aggiorni tu").isVisible(), "scheda di chi è senza app");
+check(await page.getByText("importata da te dal report Amway: la vedi solo tu").isVisible(), "scheda di chi è importato");
+check(!(await page.locator("button[data-act=in-mezzo]").count()) && !(await page.locator("button[data-act=manda-link]").count())
+  && !(await page.locator("button[data-act=cambia-sponsor]").count()), "niente più Manca qualcuno sopra, link personale, cambia sponsor");
 check(!(await page.locator(".azioni").count()), "niente barra delle mie azioni nella scheda");
 await page.locator(".griglia-azioni button[data-act=contatto]").click();
 await page.getByText("Contatto registrato per Marco").waitFor();
 await page.locator(".griglia-azioni button[data-act=totale-mese]").click();
-check(await page.getByText("VP di ottobre di Marco").isVisible() || await page.locator(".sheet h2", { hasText:"di Marco" }).isVisible(), "totale del mese di Marco");
+check(await page.locator(".sheet h2", { hasText:"di Marco" }).isVisible(), "totale del mese di Marco");
 await page.fill(".sheet input[name=vp]", "150");
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText(/aggiornato per Marco: 150 VP/).waitFor();
 check(await page.locator(".oggi li", { hasText:"Contatto" }).getByText("inserito da te").isVisible(), "ogni dato mostra chi l'ha inserito");
 await sync(page);
-check(DB.activities.filter(a => a.partner_id === DB.partners.find(p => p.nome === "Marco Rossi").id).length === 2, "i dati sono di Marco, non miei");
-check(DB.activities.some(a => a.partner_id === DB.partners.find(p => p.nome === "Marco Rossi").id && a.tipo === "rettifica" && Number(a.vp) === 150), "il totale è finito sul profilo di Marco");
+check(DB.activities.filter(a => a.partner_id === marco.id).length === 2, "i dati sono di Marco, non miei");
 await page.screenshot({ path: S + "/e2e/11-scheda-gestito.png", fullPage:true });
-await page.click("button[data-act=manda-link]");
-await page.getByText("Il link di Marco Rossi").waitFor();
-await sync(page);
-const chiaveMarco = DB.partners.find(p => p.nome === "Marco Rossi").chiave;
-const waMarco = decodeURIComponent(await page.locator(".sheet a.wa").getAttribute("href"));
-check(waMarco.includes("Ciao Marco") && waMarco.includes("#chiave=" + chiaveMarco), "link di Marco su WhatsApp");
-await page.screenshot({ path: S + "/e2e/3-link-gestito.png" });
+const invitoAnna = DB.partners.find(p => p.id === anna.id).codice_invito = "ANNA22";
 await ctx.close();
 
-// 4. Marco apre il suo link: privacy e poi dentro
-({ ctx, page } = await apri({}, "#chiave=" + chiaveMarco));
-await page.getByText("Il tuo profilo è già pronto").waitFor();
+// 4. Marco entra dal link d'invito di Anna con il suo codice: ritrova il suo profilo
+({ ctx, page } = await apri({}, "#" + invitoAnna));
+await page.getByText("Ti ha invitato Anna Bianchi").waitFor();
+await page.fill("input[name=nome]", "Marco Rossi");
+await page.selectOption("select[name=qualifica]", "pin:6");
+await page.check("input[name=privacy]");
 await page.click("form button.primary");
-check(await page.getByText("serve accettare l'informativa").isVisible(), "privacy obbligatoria per chi è stato aggiunto");
-await page.check("input[name=privacy]"); await page.click("form button.primary");
+check(await page.locator(".errore").innerText() === "Scrivi il tuo codice Amway Partner.", "ingresso: il codice Amway è obbligatorio");
+await page.fill("input[name=codice_amway]", "2000001");
+await page.click("form button.primary");
+check((await page.locator(".errore").innerText()).startsWith("Con questo codice Amway c'è già qualcuno che usa l'app"), "ingresso: codice di chi usa già l'app");
+await page.fill("input[name=codice_amway]", "1000001");
+await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor();
 await page.click("button[data-act=obiettivo-dopo]");
 await page.getByText("Ciao Marco").waitFor();
 check(await page.getByText("Scrivi il tuo obiettivo").isVisible(), "obiettivo rimandato: su Io l'invito a scriverlo");
 check(await page.getByText("6% raggiunto").isVisible(), "pin di Marco mostrato");
 check(await page.getByText("Path to Bronze").first().isVisible(), "pin senza Bronze -> Path to Bronze");
+check(await page.locator(".card", { hasText:"Il mio mese" }).getByText("150").first().isVisible(), "Marco ritrova i suoi VPP");
 await page.click("button[data-act=vista-gruppo]");
-check(await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).isVisible(), "Marco vede Luca nel suo gruppo");
+check(!(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).count()), "Marco non vede Luca: l'ha importato Anna");
 await page.click("button[data-act=vista-io]");
 check(!(await page.getByText("3 nuove prime linee").count()) && !(await page.getByText("iscritte dal").count()), "Path to Bronze senza vincolo di data");
 await page.screenshot({ path: S + "/e2e/4-marco.png", fullPage:true });
 await sync(page); await ctx.close();
-check(DB.partners.find(p => p.nome === "Marco Rossi").stato === "attivo", "Marco ora è attivo");
+check(DB.partners.find(p => p.nome === "Marco Rossi").id === marco.id && DB.partners.find(p => p.nome === "Marco Rossi").stato === "attivo"
+  && DB.partners.filter(p => p.nome === "Marco Rossi").length === 1, "Marco ha preso il suo profilo: ora usa l'app, nessun doppione");
 
 // 5. Partner già avviato con pin 12%: niente data obbligatoria
 ({ ctx, page } = await apri({}, "#RRRR22"));
 await page.getByText("Benvenuto in Growup").waitFor();
 await page.fill("input[name=nome]", "Bea Verdi");
+await page.fill("input[name=codice_amway]", "2000005");
 await page.selectOption("select[name=qualifica]", "pin:12");
 check(await page.getByText("(facoltativa)").isVisible(), "data facoltativa per chi ha già un pin");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
@@ -188,6 +204,7 @@ await sync(page); await ctx.close();
 // 6. Bronze Foundation con pagamenti (regressione)
 ({ ctx, page } = await apri({}, "#RRRR22"));
 await page.fill("input[name=nome]", "Ciro Neri");
+await page.fill("input[name=codice_amway]", "2000006");
 await page.selectOption("select[name=qualifica]", "foundation_9");
 check(await page.locator("input[name=mese]").isVisible(), "campi pagamenti visibili");
 await page.fill("input[name=mese]", "2026-07"); await page.fill("input[name=pagamenti]", "3");
@@ -206,7 +223,8 @@ await page.check("input[name=privacy]"); await page.click("form button.primary")
 await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.click("button[data-act=vista-gruppo]");
-check(await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).isVisible(), "la radice vede tutta la struttura");
+check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isVisible()
+  && !(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).count()), "la radice vede chi usa l'app, non le persone importate da Anna");
 // da confermare: Bea (pin 12%) e Ciro (Foundation 9%) hanno dichiarato un punto di partenza
 check(await page.locator(".card", { hasText:"Da confermare" }).getByText("Bea Verdi").isVisible(), "Bea da confermare");
 await page.locator(".card", { hasText:"Da confermare" }).locator("li", { hasText:"Bea Verdi" }).locator("button[data-act=conferma]").click();
@@ -217,110 +235,94 @@ await page.getByText("Punto di partenza confermato").waitFor();
 check(!(await page.locator(".card", { hasText:"Da confermare" }).locator("li", { hasText:"Bea Verdi" }).count()), "Bea confermata");
 await sync(page);
 check(DB.partners.find(p => p.nome === "Bea Verdi").percentuale_iniziale === 9, "correzione salvata (12% -> 9%)");
-// inserisci in mezzo: tra Anna e Marco mancava Paolo
-await page.locator(".albero:not(.seguire) li", { hasText:"Marco Rossi" }).locator("button[data-act=apri-scheda]").click();
-await page.click("button[data-act=in-mezzo]");
-await page.getByText("Manca qualcuno sopra Marco?").waitFor();
-check(await page.getByText("Marco Rossi e tutto il suo gruppo passano sotto questa persona").isVisible(), "spiegazione chiara: il gruppo passa da solo");
-check(await page.locator(".sheet input[name=sotto]:checked").count() === 0, "niente da spuntare di default");
-await page.fill(".sheet input[name=nome]", "Paolo Neri");
-await page.fill(".sheet input[name=codice_amway]", "1000003");
+// la radice importa la sua rete: Paolo e Luca (con VPP) sì, Zeno (0 VP) no; Bea è di Ciro secondo il report
+const reportRadice = creaCsv(meseFile, [persona(1, "9", "1111111", "ROSSI, MARIO", "120,00"),
+  persona(2, "1111111", "2000001", "BIANCHI, ANNA", "80,00"), persona(3, "2000001", "1000003", "NERI, PAOLO", "10,00"),
+  persona(4, "1000003", "1000001", "ROSSI, MARCO", "150,00"), persona(5, "1000001", "1000002", "VERDI, LUCA", "5,00"),
+  persona(2, "1111111", "2000006", "NERI, CIRO", "0,00"), persona(3, "2000006", "2000005", "VERDI, BEA", "0,00"),
+  persona(2, "1111111", "3000000", "ZERO, ZENO", "0,00")]);
+await scegliFile(page, "radice.csv", reportRadice, true);
+await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+check(await page.locator(".sheet .imp-sezione", { hasText:"Usano l'app" }).getByText("Bea Verdi (da te a Ciro Neri)").isVisible(),
+  "anteprima: Bea va sotto il suo sponsor del report");
+await page.click(".sheet button[data-act=spunta-vpp]");
+check(await page.locator(".sheet input[name=aggiungi]:checked").count() === 2 && !(await page.isChecked(".sheet input[name=aggiungi][value='3000000']")),
+  "radice: Paolo e Luca spuntati, Zeno no");
 await page.check(".sheet input[name=consenso]");
-await page.click(".sheet button:has-text('Salva')");
-await page.getByText("Paolo Neri inserito: ora Marco è nel suo gruppo").waitFor();
-await sync(page);
-const paolo = DB.partners.find(p => p.nome === "Paolo Neri");
-check(paolo.sponsor_id === anna.id && DB.partners.find(p => p.nome === "Marco Rossi").sponsor_id === paolo.id, "Paolo tra Anna e Marco");
-const ordineAlbero = await page.locator(".albero:not(.seguire) li .nome > span:first-child").allInnerTexts();
-check(ordineAlbero.findIndex(t => t.includes("Paolo")) < ordineAlbero.findIndex(t => t.includes("Marco")), "nell'albero Paolo viene prima di Marco");
-check(await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).getByText("senza app").isVisible(), "Paolo entra senza app");
-await page.screenshot({ path: S + "/e2e/13-in-mezzo.png", fullPage:true });
-// cambia sponsor (admin): Bea passa sotto Ciro
-await page.locator(".albero:not(.seguire) li", { hasText:"Bea Verdi" }).locator("button[data-act=apri-scheda]").click();
-await page.click("button[data-act=cambia-sponsor]");
-await sync(page);
-await page.selectOption(".sheet select[name=sponsor]", DB.partners.find(p => p.nome === "Ciro Neri").id);
-await page.click(".sheet button:has-text('Salva')");
-await page.getByText("Bea Verdi ora è nel gruppo di Ciro Neri").waitFor();
-await sync(page);
-check(DB.partners.find(p => p.nome === "Bea Verdi").sponsor_id === DB.partners.find(p => p.nome === "Ciro Neri").id, "Bea sotto Ciro");
-// cambia sponsor verso il proprio gruppo: Paolo (Anna → Paolo → Marco → Luca) va sotto Luca
-await page.click("button.link[data-act=vista-gruppo]");
-await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=apri-scheda]").click();
-await page.click("button[data-act=cambia-sponsor]");
-const opzSponsor = await page.locator(".sheet select[name=sponsor] option").allInnerTexts();
-check(opzSponsor.some(o => o.includes("Luca Verdi (sponsor Marco) · nel suo gruppo")) && opzSponsor.some(o => o.includes("Marco Rossi (sponsor Paolo) · nel suo gruppo")), "si può scegliere anche chi è nel suo gruppo");
-await page.selectOption(".sheet select[name=sponsor]", DB.partners.find(p => p.nome === "Luca Verdi").id);
-await page.click(".sheet button:has-text('Salva')");
-await page.getByText("Paolo Neri ora è nel gruppo di Luca Verdi, che è salito al suo posto").waitFor();
+await page.click(".sheet button:has-text('Importa')");
+await page.getByText(/2 persone aggiunte/).waitFor(); check(true, "la radice importa la sua rete");
 await sync(page);
 const idDi = n => DB.partners.find(p => p.nome === n).id;
-check(DB.partners.find(p => p.nome === "Luca Verdi").sponsor_id === anna.id && DB.partners.find(p => p.nome === "Paolo Neri").sponsor_id === idDi("Luca Verdi")
-  && DB.partners.find(p => p.nome === "Marco Rossi").sponsor_id === idDi("Paolo Neri"), "Luca sale sotto Anna, Paolo sotto Luca, Marco resta con Paolo");
-// e si rimette com'era: Paolo sotto Anna, poi Luca sotto Marco
-await page.click("button[data-act=cambia-sponsor]");
-await page.selectOption(".sheet select[name=sponsor]", anna.id);
-await page.click(".sheet button:has-text('Salva')"); await page.getByText("Paolo Neri ora è nel gruppo di Anna Bianchi").waitFor();
-await page.click("button.link[data-act=vista-gruppo]");
-await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).locator("button[data-act=apri-scheda]").click();
-await page.click("button[data-act=cambia-sponsor]");
-await page.selectOption(".sheet select[name=sponsor]", idDi("Marco Rossi"));
-await page.click(".sheet button:has-text('Salva')"); await page.getByText("Luca Verdi ora è nel gruppo di Marco Rossi").waitFor();
-await sync(page);
-check(DB.partners.find(p => p.nome === "Luca Verdi").sponsor_id === idDi("Marco Rossi") && DB.partners.find(p => p.nome === "Paolo Neri").sponsor_id === anna.id, "struttura rimessa com'era");
-// livelli come nei report Amway, sponsor accanto al nome, gruppi richiudibili
-await page.click("button.link[data-act=vista-gruppo]");
-const rigaLuca = page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" });
-check(await rigaLuca.locator(".livello").innerText() === "5" && !(await rigaLuca.innerText()).includes("sponsor"), "Luca: livello 5, senza la dicitura sponsor");
-check(await page.locator(".albero:not(.seguire) li", { hasText:"Anna Bianchi" }).locator(".livello").innerText() === "2", "Anna, frontale: livello 2");
+check(DB.partners.find(p => p.nome === "Bea Verdi").sponsor_id === idDi("Ciro Neri"), "Bea sotto Ciro, come nel report");
+check(DB.partners.filter(p => p.codice_amway === "1000002").length === 2, "Luca: una copia di Anna e una della radice");
+const lucaR = DB.partners.find(p => p.codice_amway === "1000002" && p.gestore_id === "R");
+check(lucaR.sponsor_id === marco.id && DB.partners.find(p => p.nome === "Paolo Neri").sponsor_id === anna.id,
+  "chi usa l'app resta sotto chi usa l'app: Luca sotto Marco, Paolo sotto Anna");
+check((DB.esclusi || []).some(x => x.partner_id === "R" && x.codice === "3000000"), "Zeno escluso");
+// al secondo import Zeno non viene riproposto
+await scegliFile(page, "radice.csv", reportRadice, true);
+await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+check(!(await page.locator(".sheet .imp-sezione", { hasText:"Non ancora nell'app" }).count())
+  && await page.locator(".sheet .imp-sezione", { hasText:"Escluse · 1" }).isVisible(), "secondo import: niente da scegliere, Zeno tra le escluse");
+await page.click(".sheet button[data-act=chiudi]");
+// livelli come nei report Amway, gruppi richiudibili
+const rigaLuca = page.locator(".albero.struttura li", { hasText:"Luca Verdi" });
+check(await rigaLuca.locator(".livello").innerText() === "4" && !(await rigaLuca.innerText()).includes("sponsor"), "Luca: livello 4, senza la dicitura sponsor");
+check(await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator(".livello").innerText() === "2", "Anna, frontale: livello 2");
 check(await page.locator(".albero.struttura li").first().locator(".livello").innerText() === "1"
   && (await page.locator(".albero.struttura li").first().innerText()).includes("Stefano e Alessia"), "in cima chi usa l'app: livello 1");
 await page.screenshot({ path: S + "/e2e/22-livelli.png", fullPage:true });
-await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=piega]").click();
-check(await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).isHidden() && await page.locator(".albero:not(.seguire) li", { hasText:"Marco Rossi" }).isHidden(),
-  "gruppo di Paolo richiuso: Marco e Luca nascosti");
-check((await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=piega]").innerText()).trim() === "▸ 2", "Paolo: ▸ 2");
-check(await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).isHidden(), "ancora richiuso");
+await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator("button[data-act=piega]").click();
+check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isHidden() && await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isHidden(),
+  "gruppo di Anna richiuso: Marco e Luca nascosti");
+check((await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator("button[data-act=piega]").innerText()).trim() === "▸ 3", "Anna: ▸ 3");
 // la ricerca trova anche dentro un gruppo richiuso e mostra la linea fino a noi
 await page.fill("#cerca-struttura", "lùca");
-check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Paolo Neri" }).isVisible()
+check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isVisible()
   && await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isHidden(),
-  "ricerca: Luca con la sua linea (Anna, Paolo, Marco), gli altri nascosti");
+  "ricerca: Luca con la sua linea (Anna, Marco), gli altri nascosti");
 check((await page.locator("#cerca-esito").innerText()).startsWith("1 persona trovata"), "ricerca: 1 persona trovata");
 await page.screenshot({ path: S + "/e2e/23-ricerca.png" });
 // durante la ricerca ▸ N apre anche il gruppo della persona trovata
-await page.fill("#cerca-struttura", "paolo");
-const piegaPaolo = page.locator(".albero.struttura li", { hasText:"Paolo Neri" }).locator("button[data-act=piega]");
-check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isHidden() && (await piegaPaolo.innerText()).trim() === "▸ 2", "ricerca: Paolo trovato, il suo gruppo chiuso (▸ 2)");
-await piegaPaolo.click();
+await page.fill("#cerca-struttura", "anna");
+const piegaAnna = page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator("button[data-act=piega]");
+check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isHidden() && (await piegaAnna.innerText()).trim() === "▸ 3", "ricerca: Anna trovata, il suo gruppo chiuso (▸ 3)");
+await piegaAnna.click();
 check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isHidden()
-  && (await piegaPaolo.innerText()).trim() === "▾ 2" && await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isHidden(), "ricerca: ▸ apre i frontali di Paolo (Marco)");
+  && (await piegaAnna.innerText()).trim() === "▾ 3" && await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isHidden(), "ricerca: ▸ apre i frontali di Anna");
 const piegaMarco = page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).locator("button[data-act=piega]");
 check((await piegaMarco.innerText()).trim() === "▸ 1", "ricerca: anche Marco ha la sua freccia");
 await piegaMarco.click();
 check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isVisible() && (await piegaMarco.innerText()).trim() === "▾ 1", "ricerca: la freccia di Marco apre Luca");
 await piegaMarco.click();
-check(await page.locator("#cerca-struttura").inputValue() === "paolo", "ricerca: il testo cercato resta");
-await piegaPaolo.click();
+check(await page.locator("#cerca-struttura").inputValue() === "anna", "ricerca: il testo cercato resta");
+await piegaAnna.click();
 check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isHidden(), "ricerca: ▾ la richiude");
 await page.fill("#cerca-struttura", "zzz");
 check(await page.getByText("Nessuno con questo nome nel tuo gruppo.").isVisible(), "ricerca senza risultati");
 await page.fill("#cerca-struttura", "");
 check(await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isHidden(), "ricerca vuota: torna com'era");
-await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=piega]").click();
-check(await page.locator(".albero:not(.seguire) li", { hasText:"Luca Verdi" }).isVisible(), "gruppo riaperto");
-await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=apri-scheda]").click();
-// cancella: Paolo non rinnova, Marco (con Luca) torna sotto Anna
-await page.click("button.link[data-act=vista-gruppo]");
-await page.locator(".albero:not(.seguire) li", { hasText:"Paolo Neri" }).locator("button[data-act=apri-scheda]").click();
+await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator("button[data-act=piega]").click();
+check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isVisible(), "gruppo riaperto");
+// nascondi: Ciro (con Bea) sparisce solo per la radice, e si rimette
+await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).locator("button[data-act=apri-scheda]").click();
+await page.click("button[data-act=nascondi]");
+await page.getByText("Ciro Neri nascosto dalla tua struttura").waitFor();
+check(!(await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).count()) && !(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).count()),
+  "Ciro nascosto con il suo gruppo");
+await page.click("button[data-act=nascoste]");
+await page.click(".sheet button[data-act=mostra]");
+await page.getByText("Ciro Neri di nuovo nella tua struttura").waitFor();
+check(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).isVisible(), "Ciro e Bea di nuovo visibili");
+// cancella: Paolo (importato dalla radice) non rinnova
+await page.locator(".albero.struttura li", { hasText:"Paolo Neri" }).locator("button[data-act=apri-scheda]").click();
+check(!(await page.locator("button[data-act=nascondi]").count()), "le persone importate si cancellano, non si nascondono");
 await page.click("button[data-act=cancella]");
-await page.getByText("Paolo Neri cancellato: il suo gruppo ora è di Anna Bianchi").waitFor();
+await page.getByText("Paolo Neri cancellato").waitFor();
 await sync(page);
-check(!DB.partners.some(p => p.nome === "Paolo Neri"), "Paolo cancellato");
-check(DB.partners.find(p => p.nome === "Marco Rossi").sponsor_id === anna.id, "Marco risale sotto Anna");
-check(DB.partners.find(p => p.nome === "Luca Verdi").sponsor_id === DB.partners.find(p => p.nome === "Marco Rossi").id, "il gruppo di Marco resta intatto");
+check(!DB.partners.some(p => p.nome === "Paolo Neri") && DB.esclusi.some(x => x.partner_id === "R" && x.codice === "1000003"), "Paolo cancellato ed escluso");
 // admin: nuovo link personale per chi usa l'app
-await page.locator(".albero:not(.seguire) li", { hasText:"Anna Bianchi" }).locator("button[data-act=apri-scheda]").click();
+await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator("button[data-act=apri-scheda]").click();
 await page.getByText("Usa l'app: i suoi numeri li aggiorna lui.").waitFor();
 check(!(await page.locator(".griglia-azioni").count()), "nessun inserimento per chi usa l'app");
 await page.click("button[data-act=nuovo-link]");
@@ -336,7 +338,7 @@ const mesePrec = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00
 DB.partners = [DB.partners.find(p => p.id === "R")];
 DB.partners[0].privacy_accettata_il = "2026-10-01T00:00:00Z";
 DB.accessi = []; DB.activities = []; DB.goals = []; DB.mgoals = []; DB.storico = []; DB.anonDisattivo = false;
-const P = (id, nome, sponsor) => DB.partners.push({ id, nome, sponsor_id:sponsor, stato:"gestito", codice_invito:id.toUpperCase() + "XXXX" });
+const P = (id, nome, sponsor) => DB.partners.push({ id, nome, sponsor_id:sponsor, stato:"gestito", gestore_id:"R", codice_invito:id.toUpperCase() + "XXXX" });
 P("l1", "Linea Uno", "R"); P("l1b", "Sotto Uno", "l1"); P("l2", "Linea Due", "R"); P("l3", "Linea Tre", "R");
 const O = (pid, vp, tipo) => DB.activities.push({ id:"a" + DB.activities.length, partner_id:pid, tipo:tipo || "ordine", quantita:1, vp, data:oggiStr, inserito_il:new Date().toISOString() });
 O("R", 120); O("l1", 150); O("l1b", 100); O("l2", 120); O("l3", 80);
@@ -454,7 +456,7 @@ B("contatto", 5, mesePrec + "-01"); B("contatto", 3, ultimoPrec); B("ordine", 1,
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.click("button[data-act=vista-gruppo]");
-await page.locator(".albero:not(.seguire) li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
+await page.locator(".albero.struttura li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
 await page.getByText("Questo mese e il mese prima").waitFor();
 const riga = async nome => (await page.locator(".confronto tr", { hasText:nome }).locator("td").allInnerTexts()).map(t => t.trim());
 const fineMese = Number(oggiStr.slice(8, 10)) >= Number(ultimoPrec.slice(8, 10));
@@ -499,7 +501,7 @@ const UA_ANDROID = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.evaluate(() => { window.__vai = null; window.GROWUP_VAI = u => { window.__vai = u; }; });
 await page.click("button[data-act=vista-gruppo]");
-await page.locator(".albero:not(.seguire) li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
+await page.locator(".albero.struttura li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
 await page.click("button[data-act=chiamata]");
 check(await page.locator(".sheet select[name=avviso]").count() === 0, "Android: niente scelta del promemoria");
 await page.fill(".sheet input[name=ora]", "20:30");
@@ -517,7 +519,7 @@ const UA_IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleW
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.evaluate(() => { window.__vai = null; window.GROWUP_VAI = u => { window.__vai = u; }; });
 await page.click("button[data-act=vista-gruppo]");
-await page.locator(".albero:not(.seguire) li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
+await page.locator(".albero.struttura li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
 await page.click("button[data-act=chiamata]");
 check(await page.locator(".sheet select[name=avviso]").count() === 1, "iPhone: promemoria nel file");
 await page.click(".sheet button:has-text('Calendario')");
@@ -658,18 +660,11 @@ await ctx.close();
 
 // 18. Import dal report Amway (CSV finto con lo stesso formato del vero)
 await sync(page).catch(() => {});
+DB.partners.find(p => p.id === "R").codice_amway = null; DB.esclusi = [];
 for(const [id, nome, codice] of [["imp-gino","Gino Gestito","3000001"],["imp-dora","Dora Diversa","3000002"],["imp-nadia","Nadia Nocodice",null],["imp-ugo","Ugo Uscito","3000004"],["imp-ivo","Ivo Attivo","3000005"]])
   DB.partners.push({ id, nome, sponsor_id:"R", stato:id === "imp-ivo" ? "attivo" : "gestito", gestore_id:"R", codice_amway:codice, codice_invito:"X" + id.toUpperCase(),
     partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() });
-const meseFile = oggiStr.slice(0, 4) + oggiStr.slice(5, 7);
-const csvRiga = v => v.map(x => `"${x}"`).join(",");
-const testaCsv = ["Qualifica Amway Partner","Codice Amway Partner Sponsor","Codice Amway Partner","Paese","Nome","Data di ingresso","Telefono","Email",
-  "Indirizzo","Data di rinnovo","VPG","VPP","VP reso","Percentuale di bonus","VVG","VP Cliente","VP Rubino"," Clienti"];
-const persona = (liv, sp, cod, nome, vpp) => [String(liv), "'" + sp, "'" + cod, "'Italia", "'" + nome, "'01 gennaio 2020", "'Principale: +39 000", "'x@esempio.it",
-  "'Citta | XX | 00000 | Italia", "'31 dicembre 2026", "'1.234,56", "'" + vpp, "0", "'0%", "1234.56", "'0,00", "0", "'0"];
-const creaCsv = (mese, righe) => "﻿" + [csvRiga(["Amway","CONFIDENZIALE - REPORT DI PROVA"]), csvRiga(["Mese di competenza", mese]), csvRiga(testaCsv)]
-  .concat(righe.map(csvRiga)).join("\n");
-const altriGestiti = DB.partners.filter(p => p.stato === "gestito" && p.codice_amway && !["imp-gino","imp-dora","imp-ugo"].includes(p.id));
+const altriGestiti = DB.partners.filter(p => p.stato === "gestito" && p.gestore_id === "R" && p.codice_amway && !["imp-gino","imp-dora","imp-ugo"].includes(p.id));
 const usanoApp = DB.partners.filter(p => p.stato !== "gestito" && p.codice_amway);
 const righeCsv = [persona(1, "7654321", "1234567", "ROSSI, MARIO", "400,00"), persona(2, "1234567", "3000001", "GESTITO, GINO", "1.055,50"),
   persona(2, "1234567", "3000020", "DIVERSA, DORA", "12,00"), persona(2, "1234567", "3000003", "NOCODICE, NADIA", "5,00"),
@@ -677,18 +672,13 @@ const righeCsv = [persona(1, "7654321", "1234567", "ROSSI, MARIO", "400,00"), pe
   .concat(altriGestiti.concat(usanoApp).map(p => persona(3, "1234567", p.codice_amway, p.nome.toUpperCase(), "1,00")));
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor();
-const scegliFile = async (nome, testo) => {
-  await page.click("button[data-act=importa]");
-  await page.locator(".sheet").getByText("Intera Linea di Sponsorizzazione con tutti i KPI disponibili").waitFor();
-  await page.setInputFiles("#file-report", { name:nome, mimeType:"text/csv", buffer:Buffer.from(testo) });
-};
-await scegliFile("altro.csv", "nome,cognome\nMario,Rossi\n");
+await scegliFile(page, "altro.csv", "nome,cognome\nMario,Rossi\n");
 check(await page.locator(".sheet .errore").getByText("non sembra il report").isVisible(), "import: file sbagliato riconosciuto");
 await page.setInputFiles("#file-report", { name:"altri.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, [persona(1, "1", "1234567", "ROSSI, MARIO", "1"), persona(2, "1234567", "9999999", "ALTRO, ALDO", "1")])) });
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
 await page.click(".sheet button[data-act=chiudi]");
 const meseVecchio = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - 3); return d.toISOString().slice(0, 7).replace("-", ""); })();
-await scegliFile("vecchio.csv", creaCsv(meseVecchio, righeCsv));
+await scegliFile(page, "vecchio.csv", creaCsv(meseVecchio, righeCsv));
 check(await page.locator(".sheet .errore").getByText("quel mese è già chiuso").isVisible(), "import: mese chiuso rifiutato");
 await page.setInputFiles("#file-report", { name:"report.xlsx", mimeType:"application/octet-stream", buffer:Buffer.from("PK") });
 check(await page.locator(".sheet .errore").getByText("sul sito Amway scegli il formato CSV").isVisible(), "import: il file Excel non va, serve il CSV");
@@ -704,12 +694,12 @@ check(await sez("Senza codice, trovati per nome").getByText("Nadia Nocodice = Na
   && await page.isChecked(".sheet input[name=abbina]"), "anteprima: Nadia senza codice, trovata per nome");
 check(await sez("Non più nel report").getByText("Ugo Uscito · 3000004").isVisible() && await page.isChecked(".sheet input[name=cancella]"),
   "anteprima: Ugo non più nel report, già spuntato");
-check(await sez("Usano l'app: non vengono toccati").isVisible(), "anteprima: chi usa l'app non viene toccato");
-check(await sez("Nel report ma non nell'app · 1").isVisible(), "anteprima: Nino solo come informazione");
-await page.screenshot({ path: S + "/e2e/26-importa.png", fullPage:true });
+check(await sez("Usano l'app").isVisible(), "anteprima: chi usa l'app non viene toccato");
+check(await sez("Non ancora nell'app · 1").isVisible() && !(await page.isChecked(".sheet input[name=aggiungi]")), "anteprima: Nino da scegliere, non spuntato");
+await page.screenshot({ path: S + "/e2e/27-importa-conferme.png", fullPage:true });
 await page.check(".sheet input[name=correggi]");
 await page.click(".sheet button:has-text('Importa')");
-await page.getByText(/VPP di \w+ importati: 4 aggiornati, 1 persona cancellata/).waitFor(); check(true, "import fatto");
+await page.getByText(/4 VPP aggiornati, 1 persona cancellata/).waitFor(); check(true, "import fatto");
 await sync(page);
 const vppDi = id => DB.activities.filter(a => a.partner_id === id && ["ordine","rettifica"].includes(a.tipo) && a.data.slice(0, 7) === oggiStr.slice(0, 7))
   .reduce((t, a) => t + Number(a.vp), 0);
@@ -719,14 +709,15 @@ check(DB.partners.find(p => p.id === "imp-nadia").codice_amway === "3000003", "c
 check(!DB.partners.some(p => p.id === "imp-ugo"), "Ugo cancellato");
 check(!DB.activities.some(a => a.tipo === "rettifica" && a.inserito_da === "R" && usanoApp.some(p => p.id === a.partner_id)), "nessun dato di chi usa l'app toccato");
 const nRett = DB.activities.filter(a => a.tipo === "rettifica").length;
-await scegliFile("los.csv", creaCsv(meseFile, righeCsv));
+await scegliFile(page, "los.csv", creaCsv(meseFile, righeCsv));
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
-check(!(await sez("Non più nel report").count()) && !(await page.getByText("viene salvato").count()), "reimport: niente più da confermare");
+check(!(await sez("Non più nel report").count()) && !(await page.getByText("viene salvato").count()) && !(await sez("Non ancora nell'app").count()),
+  "reimport: niente più da confermare, Nino escluso");
 await page.click(".sheet button:has-text('Importa')");
-await page.getByText(/importati: 0 aggiornati/).waitFor();
+await page.getByText(/0 VPP aggiornati/).waitFor();
 await sync(page);
 check(DB.activities.filter(a => a.tipo === "rettifica").length === nRett, "reimport dello stesso file: nessun dato nuovo");
-await scegliFile("di-altri.csv", creaCsv(meseFile, [persona(1, "1", "7777777", "ALTRO, ALDO", "1")]));
+await scegliFile(page, "di-altri.csv", creaCsv(meseFile, [persona(1, "1", "7777777", "ALTRO, ALDO", "1")]));
 check(await page.locator(".sheet .errore").getByText("non il tuo (1234567)").isVisible(), "import: il report di un altro partner è rifiutato");
 await page.click(".sheet button[data-act=chiudi]");
 await page.click("button[data-act=vista-gruppo]");
