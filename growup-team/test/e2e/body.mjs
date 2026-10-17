@@ -284,8 +284,13 @@ await page.fill("#cerca-struttura", "paolo");
 const piegaPaolo = page.locator(".albero.struttura li", { hasText:"Paolo Neri" }).locator("button[data-act=piega]");
 check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isHidden() && (await piegaPaolo.innerText()).trim() === "▸ 2", "ricerca: Paolo trovato, il suo gruppo chiuso (▸ 2)");
 await piegaPaolo.click();
-check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isVisible()
-  && (await piegaPaolo.innerText()).trim() === "▾ 2" && await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isHidden(), "ricerca: ▸ apre la downline di Paolo (Marco, Luca)");
+check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isHidden()
+  && (await piegaPaolo.innerText()).trim() === "▾ 2" && await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isHidden(), "ricerca: ▸ apre i frontali di Paolo (Marco)");
+const piegaMarco = page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).locator("button[data-act=piega]");
+check((await piegaMarco.innerText()).trim() === "▸ 1", "ricerca: anche Marco ha la sua freccia");
+await piegaMarco.click();
+check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isVisible() && (await piegaMarco.innerText()).trim() === "▾ 1", "ricerca: la freccia di Marco apre Luca");
+await piegaMarco.click();
 check(await page.locator("#cerca-struttura").inputValue() === "paolo", "ricerca: il testo cercato resta");
 await piegaPaolo.click();
 check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isHidden(), "ricerca: ▾ la richiude");
