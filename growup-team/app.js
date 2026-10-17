@@ -684,7 +684,6 @@ function vHome(){
   ${st.vista === "scheda" ? vScheda() : gruppo ? `
   ${vDaConfermare()}
   ${vPreferiti()}
-  ${vDaSeguire()}
   ${vStruttura()}
   ${vStoricoGruppo()}
   ${vInvita()}` : `
@@ -1064,10 +1063,6 @@ function etichettaDi(p){
   return Object.assign({ k, perche, giorni, n }, ETICHETTE_GRUPPO[k]);
 }
 /* chi è senza app non ha etichetta: i suoi numeri dipendono da quando lo sponsor li inserisce */
-function elencoUrgenza(){
-  return alberoSotto(st.profilo.id, 0).filter(x => x.p.stato !== "gestito").map(x => ({ p:x.p, e:etichettaDi(x.p) }))
-    .sort((a, b) => a.e.ordine - b.e.ordine || b.e.giorni - a.e.giorni || a.p.nome.localeCompare(b.p.nome));
-}
 /* ---- Preferiti: le persone da seguire da vicino, con i loro numeri rispetto ai loro obiettivi ---- */
 function vPreferiti(){
   const l = alberoSotto(st.profilo.id, 0).map(x => x.p).filter(p => st.preferiti.has(p.id));
@@ -1099,18 +1094,6 @@ function vPreferiti(){
     <ul class="preferiti">${schede.map(x => x.html).join("")}</ul>
     <p class="nota">Contatti e piani delle ultime 4 settimane rispetto al loro obiettivo settimanale × 4; VP del mese rispetto
       al loro obiettivo del mese. Evidenziata la parte sotto soglia. Per togliere una persona: ★ nella sua scheda.</p>
-  </div>`;
-}
-function vDaSeguire(){
-  const l = elencoUrgenza();
-  const senzaApp = alberoSotto(st.profilo.id, 0).filter(x => x.p.stato === "gestito").length;
-  if(!l.length && !senzaApp) return "";
-  return `<div class="card">
-    <div class="spread"><span class="eyebrow">Situazione per persona</span><span class="small">ultime 4 settimane</span></div>
-    ${l.length ? `<ul class="albero seguire">${l.map(({ p, e }) => `<li>
-      <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}"><span>${esc(p.nome)}</span><span class="small">${esc(e.perche)}</span></button>
-      <span class="pill ${e.cl}">${e.nome}</span></li>`).join("")}</ul>` : `<p class="muted">Nessuno nel tuo gruppo usa ancora l'app.</p>`}
-    ${senzaApp ? `<p class="small muted">${senzaApp === 1 ? "1 persona senza app non ha l'etichetta" : `${senzaApp} persone senza app non hanno l'etichetta`}: i numeri li inserisce lo sponsor, quando può. Le trovi nella struttura.</p>` : ""}
   </div>`;
 }
 
