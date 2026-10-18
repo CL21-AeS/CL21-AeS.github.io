@@ -204,6 +204,15 @@
       if(!x) return; db.passi = db.passi.filter(y => y.id !== id);
       if(x.attivita_id) db.activities = db.activities.filter(a => a.id !== x.attivita_id);
       ricalcolaPersona(db.persone.find(y => y.id === x.persona_id)); salva(); },
+    invitiTarget: async () => (db.inviti || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
+    nuovoInvito: async r => { if((db.inviti || []).some(x => x.id === r.id)) throw new Error("duplicate key value violates unique constraint");
+      db.inviti = (db.inviti || []).concat([Object.assign({ proprietario:mio().id, bloccato:false, risposte:null, risposto_il:null,
+        persona_id:null, archiviato:false, creato_il:new Date().toISOString() }, r)]); salva(); },
+    aggiornaInvito: async (id, campi) => { const x = (db.inviti || []).find(y => y.id === id && y.proprietario === mio().id);
+      if(!x) return; if(campi.risposte) x.risposto_il = new Date().toISOString(); Object.assign(x, campi); salva(); },
+    cancellaInvito: async id => { db.inviti = (db.inviti || []).filter(y => !(y.id === id && y.proprietario === mio().id)); salva(); },
+    invitoTargetAperto: async id => { const x = (db.inviti || []).find(y => y.id === id);
+      return !x ? "sconosciuto" : x.bloccato ? "bloccato" : x.risposte ? "usato" : x.scade && x.scade < new Date().toISOString().slice(0, 10) ? "scaduto" : "ok"; },
     numeriPersone: async pid => { const io = mio(), t = db.partners.find(p => p.id === pid);
       if(!t || !vedo(io, t)) throw new Error("non_autorizzato");
       const l = (db.persone || []).filter(x => x.proprietario === pid), m = new Date().toISOString().slice(0, 7);

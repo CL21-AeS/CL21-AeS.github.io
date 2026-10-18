@@ -17,6 +17,7 @@ const CHIAVE_LOCALE = "growup-team.chiave";
 const CHIAVE_SALVATA = "growup-team.chiave-salvata";
 const CHIAVE_INSTALLA_NO = "growup-team.installa-no";
 const CHIAVE_ULTIMA_COPIA = "growup-team.ultima-copia";
+const CHIAVE_RISPOSTA_T = "growup-team.risposta-target";  // risposte Target aperte prima di entrare
 const FORMA_CODICE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
 const FORMA_CHIAVE = /^[0-9a-f]{32}$/;
 const PIN = [3, 6, 9, 12, 15, 18, 21];   // percentuali raggiungibili anche senza qualifica Bronze
@@ -77,6 +78,11 @@ function creaApi(){
     cancellaPersona: id => q(sb.from("persone").delete().eq("id", id)),
     nuoviPassi:   righe => q(sb.from("passi").insert(righe)),
     cancellaPasso: id => q(sb.from("passi").delete().eq("id", id)),
+    invitiTarget: () => q(sb.from("inviti_target").select("*")),
+    nuovoInvito:  riga => q(sb.from("inviti_target").insert(riga)),
+    aggiornaInvito: (id, campi) => q(sb.from("inviti_target").update(campi).eq("id", id)),
+    cancellaInvito: id => q(sb.from("inviti_target").delete().eq("id", id)),
+    invitoTargetAperto: id => q(sb.rpc("invito_target_aperto", { p_id:id })),
     numeriPersone: pid => q(sb.rpc("numeri_persone", { p_partner:pid })),
     mostraTanti:  (io, ids) => q(sb.from("nascosti").delete().eq("partner_id", io).in("nascosto_id", ids)),
     stages:       () => q(sb.from("stage_requirements").select("*").order("ordine")),
@@ -117,7 +123,9 @@ const st = {
   nascosti: new Set(),    // persone nascoste dalla mia struttura (solo loro: chi sta sotto resta)
   persone: [], passi: [], // la mia lista (solo mia) e i suoi passi
   personaId: null, filtroLista: "aperti", cercaLista: "", passoTipo: null,
-  numeriLista: {},        // per la scheda partner: solo i numeri della sua lista
+  numeriLista: {},
+  inviti: [], sezPersone: "lista", invitoId: null, archiviatiT: false,  // il Target (solo miei)
+  ct: null,               // la pagina del contatto (le otto domande)        // per la scheda partner: solo i numeri della sua lista
   conNascoste: false,     // struttura completa: le nascoste al loro posto, in grigio
   filtroNascoste: "nascoste", // elenco "Chi vedi": nascoste | visibili
   esclusi: new Set(),     // codici esclusi dagli import
@@ -402,6 +410,7 @@ async function caricaTutto(){
   try{ st.obiettiviGruppo = new Map((await api.obiettiviGruppo2() || []).map(o => [o.partner_id, o])); }catch(e){}
   await caricaNumeri();
   await caricaPersone();
+  await caricaInviti();
 
   /* nuova settimana / nuovo mese: si riparte dall'ultimo obiettivo scelto */
   const g = (goals || [])[0];
@@ -511,6 +520,7 @@ async function entraConChiave(k){
     const p = await api.entra(k);
     ricordaChiave(k);
     await vaiHome(p);
+    rispostaInAttesa();
   }catch(e){
     const m = messaggio(e);
     if(m === MESSAGGI_ERRORE.chiave_non_valida){ st.fase = "chiave_errata"; }
@@ -530,6 +540,11 @@ async function apriInvito(codice){
 }
 
 async function avvio(){
+  /* il link del Target per il contatto: le otto domande, senza accesso */
+  if(/^#t&/.test(location.hash)){ avviaContatto(location.hash); return; }
+  /* le risposte del Target rimandate dal contatto: si leggono appena si è dentro */
+  const r = location.hash.match(/^#r=(CL21-[0-9A-Za-z-]+)/);
+  if(r){ salvaLocale(CHIAVE_RISPOSTA_T, r[1]); history.replaceState(null, "", location.pathname + location.search); }
   if(!api){ st.fase = "config"; render(); return; }
   const dalLink = leggiLink(location.hash.replace(/^#/, ""));
   /* la chiave non resta nella barra degli indirizzi: non si vede e non finisce negli screenshot */
@@ -541,7 +556,7 @@ async function avvio(){
     const s = await api.session();
     if(s){
       const p = await api.collega();
-      if(p && p.id){ await vaiHome(p); render(); return; }
+      if(p && p.id){ await vaiHome(p); render(); rispostaInAttesa(); return; }
     }
     const invito = (dalLink && dalLink.invito) || leggiLocale(CHIAVE_INVITO);
     if(invito) await apriInvito(invito);
@@ -588,7 +603,8 @@ function etichettePiega(inRicerca){
 function render(){
   const app = document.getElementById("app");
   const viste = { avvio:vAvvio, config:vConfig, benvenuto:vBenvenuto, chiave_errata:vChiaveErrata,
-                  ingresso:vIngresso, privacy_primo:vPrivacyPrimo, obiettivo_primo:vObiettivoPrimo, home:vHome, errore:vErrore };
+                  ingresso:vIngresso, privacy_primo:vPrivacyPrimo, obiettivo_primo:vObiettivoPrimo, home:vHome, errore:vErrore,
+                  contatto:vContatto };
   const html = (viste[st.fase] || vAvvio)();
   if(html !== ultimoApp){ app.innerHTML = html; ultimoApp = html; }
   const conAzioni = st.fase === "home" && st.vista === "io";
@@ -791,7 +807,7 @@ function vHome(){
   const persone = alberoSotto(p.id, 0).length;
   if(st.vista === "persone") return `
   <div class="testata">
-    <div>${marchio()}<h1>${st.personaId ? "La mia lista" : "Persone"}</h1></div>
+    <div>${marchio()}<h1>${st.invitoId ? "Target" : st.personaId ? "La mia lista" : "Persone"}</h1></div>
     ${vSelettore()}
   </div>
   ${vPersone()}
@@ -1870,7 +1886,7 @@ async function eseguiImport(f){
 /* ---- 10. Fogli in basso ---- */
 function vSheet(){
   const s = st.sheet;
-  const sp = vSheetPersone(s);
+  const sp = vSheetPersone(s) || vSheetTarget(s);
   if(sp) return sp;
   const err = st.errore ? `<p class="errore">${esc(st.errore)}</p>` : "";
   const piede = `<div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
@@ -2526,13 +2542,14 @@ function rigaPersona(p, suIo){
 }
 
 function vPersone(){
+  if(st.sezPersone === "target") return st.invitoId ? vTarget() : vSezioniPersone() + vTarget();
   if(st.personaId) return vPersona();
   const filtro = FILTRI_LISTA.find(x => x.id === st.filtroLista) || FILTRI_LISTA[0];
   const q = senzaAccenti(st.cercaLista || "");
   const l = st.persone.filter(filtro.ok).filter(p => !q || senzaAccenti(p.nome + " " + (p.origine || "")).includes(q))
     .sort((a, b) => (a.prossima_data || "9999") < (b.prossima_data || "9999") ? -1 : (a.prossima_data || "9999") > (b.prossima_data || "9999") ? 1
       : a.nome.localeCompare(b.nome, "it"));
-  return `<div class="card">
+  return `${vSezioniPersone()}<div class="card">
     <div class="spread"><span class="eyebrow">La mia lista</span>
       <span class="row" style="gap:6px"><button class="btn small" data-act="persone-tante">Più nomi</button>
       <button class="btn small primary" data-act="persona-nuova">+ Un nome</button></span></div>
@@ -2558,6 +2575,9 @@ function vPersona(){
   <div class="card">
     <div class="spread"><h2>${esc(p.nome)}</h2>${p.esito ? `<span class="pill ${p.esito === "partner" || p.esito === "cliente" ? "v" : p.esito === "no" ? "r" : "g"}">${ESITI[p.esito]}</span>` : ""}</div>
     ${p.contatto || p.origine ? `<p class="small" style="margin:2px 0 0">${[p.contatto, p.origine].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
+    ${(() => { const x = p.invito_target_id && st.inviti.find(y => y.id === p.invito_target_id);
+      return x && x.risposte ? `<p class="small" style="margin:6px 0 0">Target: <b>${esc(statoInvito(x).txt)}</b>
+        <button class="btn link small" data-act="apri-invito" data-id="${esc(x.id)}" style="min-height:0;padding:0 4px">Vedi le risposte</button></p>` : ""; })()}
     ${telefono ? `<div class="row" style="gap:6px;margin-top:8px">
       <a class="btn small" href="tel:${esc(tel)}">Chiama</a>
       <a class="btn small wa" target="_blank" rel="noopener" href="https://wa.me/${esc(tel.replace(/^\+/, "").replace(/^(?=3)/, "39"))}">WhatsApp</a></div>` : ""}
@@ -2666,7 +2686,7 @@ async function dopoPersone(msg){
 }
 
 Object.assign(AZIONI, {
-  "vista-persone"(){ st.vista = "persone"; st.personaId = null; st.target = null; render(); window.scrollTo(0, 0); },
+  "vista-persone"(){ st.vista = "persone"; st.personaId = null; st.invitoId = null; st.target = null; render(); window.scrollTo(0, 0); },
   "apri-persona"(el){ st.vista = "persone"; st.personaId = el.dataset.id; render(); window.scrollTo(0, 0); },
   "torna-lista"(){ st.personaId = null; render(); window.scrollTo(0, 0); },
   "filtro-lista"(el){ st.filtroLista = el.dataset.filtro; render(); },
@@ -2793,6 +2813,400 @@ document.addEventListener("input", e => {
   }
 });
 
+/* ---- 11c. Persone: il Target (dalla mini app "Target") ----
+   Le otto domande per chi NON conosci: lo incontri, ti sembra in gamba, e prima di parlargli dell'attività vedi se
+   è in linea. Il partner crea un invito e lo manda su WhatsApp; il contatto risponde da una pagina di Growup senza
+   accesso (#t&…) e rimanda il codice delle risposte su WhatsApp; aprendolo, le risposte si attaccano all'invito.
+   Il contatto non scrive niente nel database. Gli inviti li vede solo chi li crea. */
+const VERSIONE_DOMANDE = "2026-09-14";
+/* p = punti (0-4); ko = la condizione di base che quella risposta fa cadere. La prima domanda non dà punti. */
+const DOMANDE = [
+  { tema:"La priorità", senzaPunti:true,
+    t:"Se nei prossimi due anni potessi cambiare una di queste due situazioni — soldi o tempo — quale avrebbe la priorità?",
+    o:[{ t:"Un'entrata economica maggiore", p:0, s:"più soldi" },
+       { t:"Non cambierei niente, va bene così", p:0, s:"nessun motivo", ko:"motivo" },
+       { t:"Avere più tempo a mia disposizione", p:0, s:"più tempo" }] },
+  { tema:"Il tempo", t:"Quanto tempo potresti dedicare a migliorare quella situazione?",
+    o:[{ t:"Dedicare 8-10 ore alla settimana", p:4 }, { t:"Tutti i giorni, nei ritagli che riesco a trovare", p:2 },
+       { t:"Niente: non ho tempo", p:0, ko:"tempo" }] },
+  { tema:"Le aspettative", t:"Quando inizi qualcosa di nuovo, quale di queste situazioni ti rappresenta meglio?",
+    o:[{ t:"Preferisco sapere fin dall'inizio cosa otterrò e avere risultati sicuri nel breve periodo", p:0, ko:"aspettative" },
+       { t:"Sono disposto a costruire qualcosa che possa crescere nel tempo, anche se all'inizio i risultati sono graduali", p:4 },
+       { t:"Voglio una base sicura e allo stesso tempo valuto opportunità di crescita", p:2 }] },
+  { tema:"I no", t:"Quanto ti pesa sentirti dire no? Pensa a quando proponi qualcosa ad amici o al lavoro.",
+    o:[{ t:"Niente: è un loro diritto, io vado avanti", p:4 }, { t:"Tanto: mi dispiace e la prendo sul personale", p:0 },
+       { t:"Mi pesa lì per lì, poi mi passa e riprovo", p:2 }] },
+  { tema:"Squadra e metodo", t:"Quanto ti va di lavorare in squadra e seguire un metodo condiviso?",
+    o:[{ t:"Bene, se capisco il perché di quello che mi viene chiesto", p:2 }, { t:"Poco: preferisco fare a modo mio", p:0 },
+       { t:"Molto: se una strada funziona per altri, la seguo volentieri", p:4 }] },
+  { tema:"Un'attività basata sulle relazioni",
+    t:"L'attività si costruisce parlando con le persone che conosci — familiari e amici — e conoscendone di nuove nel tempo.",
+    o:[{ t:"È la cosa che meno mi va di fare", p:0 }, { t:"Sono estroverso: stare con le persone mi viene naturale", p:4 },
+       { t:"Non sono molto estroverso, ma posso imparare a gestirlo", p:2 }] },
+  { tema:"Le opinioni degli altri",
+    t:"Se decidessi di intraprendere qualcosa di nuovo e le persone intorno a te non ti appoggiassero, come la vivresti?",
+    o:[{ t:"Mi dispiacerebbe, ma andrei avanti: le scelte le faccio io", p:4 },
+       { t:"Ci proverei lo stesso, ma senza il loro appoggio farei fatica", p:2 },
+       { t:"Mi fermerei: se chi mi sta intorno non ci crede, non me la sentirei", p:0 }] },
+  { tema:"L'avvio", t:"Quanto saresti disposto a investire per iniziare una tua attività?",
+    o:[{ t:"Meno di 55 €", p:0 }, { t:"Da 55 € a 150 €", p:2 }, { t:"Oltre 150 €", p:4 }] }
+];
+/* Cosa affrontare, punto per punto, quando una risposta vale 0 (il metodo di A&S). */
+const SCOPERTI = [
+  "Nessuna priorità da cambiare. Senza un perché suo, nessun piano regge: prima di parlare di attività, fallo raccontare (cosa vorrebbe, cosa gli manca). Se non emerge nulla, non forzare.",
+  "Ritagli quotidiani, ma poche ore in tutto. Il ritmo è quello giusto — è il monte ore a essere sottile. Prima del piano metti in chiaro quanto serve davvero: circa un'ora al giorno vera, non cinque minuti fra una cosa e l'altra. Se dichiara zero, non è il momento suo.",
+  "Cerca sicurezza e risultati certi nel breve. È l'aspettativa che rompe al terzo mese. Metti in chiaro i numeri veri dei primi mesi prima del piano: se quello che cerca è una certezza immediata, è più onesto dirglielo che venderglielo.",
+  "Il no lo prende sul personale. Va preparato: il no è statistica, non giudizio. Da seguire da vicino nelle prime settimane, o non parte.",
+  "Vuole fare a modo suo. Qui il valore sono la squadra e il metodo: chi va per conto proprio brucia la lista e si ferma. Verifica quanto è disposto a farsi affiancare, prima di aprire il piano.",
+  "Chiuso o riservato sul contatto con le persone. Non è squalificante di per sé — si impara — ma serve accertarsi che sia disposto a imparare, non solo a evitare.",
+  "Le opinioni intorno a lui lo condizionano. Chiarisci presto la posizione di partner e famiglia: se una persona vicina lo frena, si ferma dopo poche settimane.",
+  "Oggi metterebbe meno di quanto serve per partire. Non è un giudizio sulla persona, è il momento — e spesso è una cifra detta al buio, senza sapere cosa riceve in cambio. Affrontalo prima del piano: se il resto regge, spiegagli com'è fatta la partenza; se la cifra resta un problema, fallo partire da cliente e riparlane più avanti."
+];
+const MASSIMO_TARGET = DOMANDE.reduce((n, q) => n + (q.senzaPunti ? 0 : 4), 0);
+const ALFABETO_T = "ACDEFGHJKLMNPQRTUVWXY2346789";   // niente caratteri che si confondono
+const DURATE_T = [["3", "3 giorni"], ["7", "1 settimana"], ["14", "2 settimane"], ["30", "1 mese"], ["", "Senza scadenza"]];
+
+function valutaTarget(a){
+  let tot = 0;
+  const ko = [], zeri = [], riserve = [];
+  a.forEach((k, qi) => {
+    const o = DOMANDE[qi].o[k];
+    if(o.ko) ko.push(o.ko);
+    if(DOMANDE[qi].senzaPunti){ if(o.ko) zeri.push(qi); return; }
+    tot += o.p;
+    if(o.p === 0) zeri.push(qi); else if(o.p === 2) riserve.push(qi);
+  });
+  /* il punteggio dà la fascia, ma un "no" secco la abbassa; una condizione di base che manca mette fuori target */
+  let livello = tot >= 23 ? 3 : tot >= 16 ? 2 : tot >= 10 ? 1 : 0;
+  if(zeri.length >= 3) livello = 0; else if(zeri.length === 2) livello = Math.min(livello, 1); else if(zeri.length === 1) livello = Math.min(livello, 2);
+  let band, titolo, breve, azione;
+  if(ko.length){
+    band = "no"; titolo = breve = "Fuori target";
+    azione = `Non dare il piano. Manca una condizione di base (${ko.join(", ")}): un piano qui non convince, e se convince porta dentro una persona che si ferma in poche settimane. Chiudi con onestà — «guarda, per come me l'hai raccontata questa cosa non fa per te» — e, se i prodotti gli possono servire, proponigli di restare come cliente. Il rapporto resta intatto, e fra un anno la situazione può essere diversa.`;
+  } else if(livello === 3){
+    band = "go"; titolo = "In target — dagli il piano"; breve = "In target";
+    azione = "Fissa l'incontro entro pochi giorni, mentre l'interesse è caldo. Parti dal suo motivo, poi il metodo, poi i numeri. Non gonfiare niente: con questo profilo l'onestà è il tuo argomento migliore.";
+  } else if(livello === 2){
+    band = "go"; titolo = "In target, con riserve — dagli il piano, ma prima chiarisci"; breve = "In target, con riserve";
+    azione = "Vale l'incontro. Prima di aprire il piano, però, affronta i punti qui sotto: se li lasci lì, tornano fuori dopo l'iscrizione, quando costano di più.";
+  } else if(livello === 1){
+    band = "care"; titolo = "Da coltivare — piano non ancora"; breve = "Da coltivare";
+    azione = "Troppe cose in sospeso per un piano che regga. Non chiudere: fallo provare come cliente, mandagli qualcosa da ascoltare, risentitevi fra qualche settimana. Le persone cambiano quando cambia la loro situazione, non quando insisti.";
+  } else {
+    band = "no"; titolo = breve = "Fuori target";
+    azione = "Non dare il piano. Il quadro complessivo dice che questa attività non è cosa sua: più rifiuti secchi su punti che non si aggirano. Dillo chiaramente — è la cosa che ti farà rispettare — e proponigli il ruolo di cliente se i prodotti gli interessano.";
+  }
+  return { tot, band, titolo, breve, azione, zeri, riserve };
+}
+/* Il codice delle risposte: CL21-<8 cifre 1..3>-<controllo>-<id invito> (lo stesso della mini app) */
+function controlloT(cifre){ let s = 0; for(let k = 0; k < cifre.length; k++) s += (cifre.charCodeAt(k) - 48) * (k + 1); return String(s % 9 + 1); }
+function codificaT(risposte, id){ const d = risposte.map(x => x + 1).join(""); return `CL21-${d}-${controlloT(d)}${id ? "-" + id : ""}`; }
+function decodificaT(txt){
+  const m = String(txt || "").toUpperCase().match(/CL21-([1-3]{8})-([1-9])(?:-([A-Z0-9]{4,8}))?/);
+  if(!m || controlloT(m[1]) !== m[2]) return null;
+  return { risposte:m[1].split("").map(c => Number(c) - 1), id:m[3] || null };
+}
+function compattaT(iso){ return String(iso || "").slice(0, 10).replace(/-/g, ""); }
+function firmaT(id, aaaammgg){
+  const s = String(id) + "|" + String(aaaammgg); let n = 7;
+  for(let k = 0; k < s.length; k++) n = (n * 31 + s.charCodeAt(k)) % 99991;
+  return ALFABETO_T.charAt(n % 28) + ALFABETO_T.charAt(Math.floor(n / 28) % 28);
+}
+function nuovoIdT(){ let s = ""; for(let k = 0; k < 6; k++) s += ALFABETO_T.charAt(Math.floor(Math.random() * ALFABETO_T.length)); return s; }
+function linkTarget(inv){
+  const p = ["c=" + encodeURIComponent(inv.nome), "s=" + encodeURIComponent(nomeSaluto(st.profilo.nome)), "i=" + inv.id];
+  if(inv.scade){ const e = compattaT(inv.scade); p.push("e=" + e, "k=" + firmaT(inv.id, e)); }
+  return base() + "#t&" + p.join("&");
+}
+function messaggioTarget(inv){
+  return `Ciao ${inv.nome.split(" ")[0]}, come ci siamo detti.\n\n`
+    + "Prima di vederci, ti mando otto domande: tre minuti. Servono a capire se quello che cerchi e quello che questa attività può darti coincidono.\n\n"
+    + "Non c'è una risposta giusta e non devi dimostrare di essere adatto: rispondi di istinto. Se viene fuori che non fa per te lo vediamo subito e ci siamo risparmiati del tempo tutti e due.\n\n"
+    + linkTarget(inv) + "\n\nAlla fine ti compare un pulsante che mi rimanda le risposte. A dopo,\n" + nomeSaluto(st.profilo.nome);
+}
+function statoInvito(inv){
+  if(inv.risposte){ const v = valutaTarget(inv.risposte); return { cl:v.band === "go" ? "v" : v.band === "care" ? "g" : "r", txt:`${v.breve} · ${v.tot}/${MASSIMO_TARGET}`, v }; }
+  if(inv.bloccato) return { cl:"r", txt:"link bloccato" };
+  if(inv.scade && inv.scade < oggi()) return { cl:"r", txt:"scaduto" };
+  return { cl:"", txt:"in attesa" };
+}
+
+/* ---- Il contatto: la pagina delle otto domande (senza accesso, niente dati nel database) ---- */
+function leggiLinkTarget(h){
+  const q = new URLSearchParams(h.replace(/^#?t&/, ""));
+  return { nome:(q.get("c") || "").slice(0, 80), sponsor:(q.get("s") || "").slice(0, 80), id:(q.get("i") || "").toUpperCase(),
+           scade:q.get("e") || "", firma:q.get("k") || "", passo:"intro", i:0, ans:[], libero:"" };
+}
+function avviaContatto(h){
+  const c = leggiLinkTarget(h);
+  st.ct = c; st.fase = "contatto";
+  if(!/^[A-Z0-9]{4,8}$/.test(c.id)) c.passo = "chiuso", c.motivo = "manomesso";
+  else if(c.scade && (!/^\d{8}$/.test(c.scade) || c.firma !== firmaT(c.id, c.scade))) c.passo = "chiuso", c.motivo = "manomesso";
+  else if(c.scade && compattaT(oggi()) > c.scade) c.passo = "chiuso", c.motivo = "scaduto";
+  render();
+  /* il link è ancora aperto? (bloccato dal partner, già usato, scaduto) — non ferma chi ha già cominciato */
+  if(api && c.passo === "intro") api.invitoTargetAperto(c.id).then(r => {
+    if(r && r !== "ok" && st.ct.passo === "intro"){ st.ct.passo = "chiuso"; st.ct.motivo = r; render(); }
+  }).catch(() => {});
+}
+function messaggioContatto(){
+  const c = st.ct, codice = codificaT(c.ans, c.id);
+  return [`Ciao${c.sponsor ? " " + c.sponsor : ""}, ho risposto alle otto domande.`, "", c.nome, ""]
+    .concat(c.ans.map((k, qi) => `${qi + 1}. ${DOMANDE[qi].tema}: ${DOMANDE[qi].o[k].t}`))
+    .concat(c.libero.trim() ? ["", "Nota: " + c.libero.trim()] : [])
+    .concat(["", "Apri le risposte: " + base() + "#r=" + codice]).join("\n");
+}
+function vContatto(){
+  const c = st.ct;
+  if(c.passo === "chiuso"){
+    const t = { scaduto:["Questo link è scaduto", "Le domande non sono più aperte."], usato:["Hai già risposto", "Le tue risposte sono già arrivate. Grazie!"],
+      bloccato:["Questo link è stato chiuso", "Le domande non sono più aperte."], sconosciuto:["Link non trovato", "Il link non è valido."],
+      manomesso:["Link non valido", "Il link sembra modificato o incompleto."] }[c.motivo] || ["Link non valido", ""];
+    return `<div class="centro"><h1>${t[0]}</h1><p class="muted">${t[1]}</p>
+      <p class="muted">${c.motivo === "usato" ? (c.sponsor ? `Se qualcosa non ti torna, scrivi a ${esc(c.sponsor)}.` : "")
+        : `Se vuoi rispondere, chiedi a ${c.sponsor ? esc(c.sponsor) : "chi te l'ha mandato"} di rimandartelo.`}</p></div>`;
+  }
+  if(c.passo === "intro") return `<div class="contatto">
+    <p class="eyebrow">Otto domande · circa 3 minuti</p>
+    <h1>${c.nome ? `Ciao ${esc(c.nome.split(" ")[0])}` : "Prima di parlarne davvero"}</h1>
+    ${c.sponsor ? `<p class="muted">Te le manda ${esc(c.sponsor)}.</p>` : ""}
+    <div class="card">
+      <p>Queste otto domande non servono a valutarti: servono a capire se c'è un incastro reale fra quello che cerchi e quello che questa attività può offrirti.</p>
+      <p>Per questo non cercare la risposta giusta, e non cercare di compiacere nessuno — più sei diretto, più è facile capirlo.</p>
+      <p>Se emerge che non fa al caso tuo lo capiamo subito e ci siamo risparmiati del tempo entrambi. Se invece l'incastro c'è, abbiamo una base concreta da cui partire.</p>
+      <button class="btn primary wide" data-act="ct-via">Comincia</button>
+      <p class="nota">Le risposte restano su questo telefono finché non le invii tu.</p>
+    </div></div>`;
+  if(c.passo === "quiz"){
+    const q = DOMANDE[c.i];
+    return `<div class="contatto">
+      <div class="avanzamento" aria-hidden="true"><i style="width:${Math.round(c.i / DOMANDE.length * 100)}%"></i></div>
+      <div class="card">
+        <p class="eyebrow">Domanda ${c.i + 1} di ${DOMANDE.length}</p>
+        <h2>${esc(q.t)}</h2>
+        <div class="risposte-ct">${q.o.map((o, k) => `<button class="btn wide${c.ans[c.i] === k ? " on" : ""}" data-act="ct-risposta" data-k="${k}">${esc(o.t)}</button>`).join("")}</div>
+        ${c.i > 0 ? `<button class="btn ghost" style="margin-top:12px" data-act="ct-indietro">Indietro</button>` : ""}
+      </div></div>`;
+  }
+  const codice = codificaT(c.ans, c.id);
+  return `<div class="contatto">
+    <p class="eyebrow">Fatto</p>
+    <h1>${c.nome ? `Grazie, ${esc(c.nome.split(" ")[0])}.` : "Grazie."}</h1>
+    <div class="card">
+      <p class="muted">Le tue risposte sono pronte. Mandamele e ci sentiamo: se ha senso vederci, ti spiego come funziona nel dettaglio; se secondo me non è cosa tua, te lo dico con la stessa sincerità con cui hai risposto.</p>
+      <label class="field"><span>C'è qualcosa che vorresti cambiare nella tua situazione, o una domanda che ti porti dietro? <i>(facoltativo)</i></span>
+        <textarea id="ct-libero" rows="3" maxlength="600" placeholder="Due righe, se ti va">${esc(c.libero)}</textarea></label>
+      <div class="row" style="gap:8px;margin-top:12px">
+        <button class="btn wa grow" data-act="ct-invia">Invia su WhatsApp</button>
+        <button class="btn grow" data-act="ct-copia">Copia le risposte</button></div>
+      <p class="nota">Su WhatsApp scegli la chat di ${c.sponsor ? esc(c.sponsor) : "chi ti ha mandato il link"}. Codice: <b>${codice}</b></p>
+    </div>
+    <div class="card">
+      <h2>Una cosa sola, prima di lasciarti</h2>
+      <p class="muted">Questa è un'attività: non è un premio, non è un passatempo e soprattutto non è qualcosa che funziona da sola. I soldi non li regala nessuno, né qui né in qualsiasi altro lavoro.</p>
+      <p class="muted">Quello che cambia è una cosa sola: qui hai la possibilità di costruire un risultato tuo. Ma per farlo servono tempo, costanza e responsabilità.</p>
+      <p class="muted">Non devi fare tutto subito, non devi essere perfetto e non devi avere tutto sotto controllo. Devi solo decidere di esserci e fare la tua parte, anche un piccolo passo alla volta. Perché alla fine non conta quanto sei motivato il primo giorno: conta quello che fai giorno per giorno, con costanza.</p>
+    </div></div>`;
+}
+
+/* ---- Il partner: Persone → Target ---- */
+async function caricaInviti(){ try{ st.inviti = await api.invitiTarget() || []; }catch(e){ st.inviti = st.inviti || []; } }
+function vSezioniPersone(){
+  return `<div class="row scelte-rapide sezioni-persone" style="gap:6px">
+    <button class="btn small${st.sezPersone === "target" ? " on" : ""}" data-act="sez-persone" data-sez="target" aria-pressed="${st.sezPersone === "target"}">Target</button>
+    <button class="btn small${st.sezPersone !== "target" ? " on" : ""}" data-act="sez-persone" data-sez="lista" aria-pressed="${st.sezPersone !== "target"}">Lista</button></div>`;
+}
+function vTarget(){
+  if(st.invitoId) return vInvito();
+  const tutti = st.inviti.slice().sort((a, b) => (a.risposto_il || a.creato_il) < (b.risposto_il || b.creato_il) ? 1 : -1);
+  const l = tutti.filter(x => !!x.archiviato === !!st.archiviatiT), archiviati = tutti.filter(x => x.archiviato).length;
+  return `<div class="card">
+    <div class="spread"><span class="eyebrow">Target</span>
+      <span class="row" style="gap:6px"><button class="btn small" data-act="target-leggi">Leggi una risposta</button>
+      <button class="btn small primary" data-act="target-nuovo">+ Nuovo invito</button></span></div>
+    <p class="small" style="margin:6px 0 0">Le otto domande per chi non conosci: prima di parlargli dell'attività, vedi se è in linea.</p>
+    ${l.length ? `<ul class="persone">${l.map(x => { const s = statoInvito(x);
+      return `<li><button class="persona" data-act="apri-invito" data-id="${esc(x.id)}">
+        <span class="grow"><b>${esc(x.nome)}</b><br><span class="small">${x.risposte ? "ha risposto il " + dataIt(String(x.risposto_il).slice(0, 10)) : "invito del " + dataIt(String(x.creato_il).slice(0, 10))}${x.persona_id ? " · in lista" : ""}</span></span>
+        <span class="pill ${s.cl}">${esc(s.txt)}</span></button></li>`; }).join("")}</ul>`
+      : `<p class="muted" style="margin:10px 0 0">${st.archiviatiT ? "Nessun invito archiviato." : "Ancora nessun invito."}</p>`}
+    ${archiviati || st.archiviatiT ? `<button class="btn link small" data-act="target-archiviati" style="min-height:0;padding:0;margin-top:8px">${st.archiviatiT ? "‹ Gli inviti in corso" : `Archiviati · ${archiviati}`}</button>` : ""}
+    <p class="nota">Gli inviti e le risposte li vedi solo tu.</p>
+  </div>`;
+}
+function vInvito(){
+  const x = st.inviti.find(y => y.id === st.invitoId);
+  if(!x) return `<button class="btn link" data-act="torna-target" style="padding:0">‹ Target</button><p class="muted">Invito non trovato.</p>`;
+  const s = statoInvito(x);
+  const indietro = `<button class="btn link" data-act="torna-target" style="padding:0">‹ Target</button>`;
+  if(!x.risposte) return `${indietro}
+  <div class="card">
+    <div class="spread"><h2>${esc(x.nome)}</h2><span class="pill ${s.cl}">${esc(s.txt)}</span></div>
+    <p class="small" style="margin:4px 0 0">Invito del ${dataIt(String(x.creato_il).slice(0, 10))} · ${x.scade ? `il link vale fino al ${dataIt(x.scade)}` : "il link non scade"}</p>
+    <div class="row" style="gap:8px;margin-top:12px">
+      <a class="btn wa grow" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(messaggioTarget(x))}">Manda su WhatsApp</a>
+      <button class="btn grow" data-act="target-copia">Copia il messaggio</button></div>
+    <p class="nota">Quando risponde ti arriva un messaggio con il link "Apri le risposte": aprilo da qui, oppure usa "Leggi una risposta".</p>
+  </div>
+  <div class="row" style="gap:6px;justify-content:center">
+    <button class="btn small ghost" data-act="target-blocca">${x.bloccato ? "Riapri il link" : "Blocca il link"}</button>
+    <button class="btn small ghost" data-act="target-elimina">Elimina</button></div>`;
+  const v = s.v, a = x.risposte, fuori = v.band === "no";
+  return `${indietro}
+  <div class="card">
+    <div class="spread"><h2>${esc(x.nome)}</h2><span class="pill ${s.cl}">${esc(v.breve)}</span></div>
+    <p class="small" style="margin:2px 0 0">Ha risposto il ${dataIt(String(x.risposto_il).slice(0, 10))}</p>
+    <div class="esito-t ${v.band}"><b>${esc(v.titolo)}</b>
+      <span class="num">${v.tot}<span class="small"> su ${MASSIMO_TARGET} punti</span></span>
+      <div class="barra-t"><i style="width:${Math.round(v.tot / MASSIMO_TARGET * 100)}%"></i></div></div>
+    <p class="small" style="margin:10px 0 0"><b>Cosa cerca:</b> ${esc(DOMANDE[0].o[a[0]].s)}</p>
+    <p class="small" style="margin:4px 0 0"><b>Cosa lo trattiene:</b> ${esc(v.zeri.length ? v.zeri.map(qi => DOMANDE[qi].tema).join(" · ")
+      : v.riserve.length ? "nessun no secco; riserve su " + v.riserve.map(qi => DOMANDE[qi].tema).join(" · ") : "niente di evidente dalle risposte")}</p>
+    ${x.persona_id ? `<button class="btn wide" style="margin-top:12px" data-act="apri-persona" data-id="${esc(x.persona_id)}">Apri nella lista</button>`
+      : `<button class="btn primary wide" style="margin-top:12px" data-act="target-in-lista">Metti in lista</button>`}
+  </div>
+  <div class="card">
+    <span class="eyebrow">Le risposte</span>
+    <ul class="risposte-t">${a.map((k, qi) => { const o = DOMANDE[qi].o[k], senza = DOMANDE[qi].senzaPunti;
+      return `<li><span class="grow"><b>${esc(DOMANDE[qi].tema)}</b><br><span class="small">${esc(o.t)}</span></span>
+        <span class="num${!senza && o.p === 0 ? " zero" : ""}">${senza ? "–" : o.p}</span></li>`; }).join("")}</ul>
+    <p class="nota">0 è un no secco, 2 un sì con riserva, 4 un sì pieno. La prima domanda non dà punti.</p>
+  </div>
+  <details class="card metodo"><summary><span class="eyebrow">Il metodo</span></summary>
+    <p class="small">${esc(v.azione)}</p>
+    <h3>${fuori ? "Cosa manca" : "Cosa affrontare prima del piano"}</h3>
+    ${v.zeri.length ? `<ul class="small">${v.zeri.map(qi => `<li><b>${esc(DOMANDE[qi].tema)}.</b> ${esc(fuori ? (SCOPERTI[qi].match(/^[^.]+\./) || [SCOPERTI[qi]])[0] : SCOPERTI[qi])}</li>`).join("")}</ul>`
+      : `<p class="small">Nessun no secco. ${v.riserve.length ? "Le riserve si sciolgono parlando, non sono ostacoli." : "Profilo pulito: vai di piano, e non riempirlo di entusiasmo — a questa persona serve sostanza."}</p>`}
+    ${fuori ? "" : `<h3>Promemoria per l'incontro</h3>
+    <p class="small"><b>Cosa si fa davvero.</b> Si usano i prodotti (il consumo personale è la base). Si costruisce una base di clienti che riordinano da soli sull'e-commerce, senza magazzino. Si parla con le persone, circa un'ora al giorno presa dai ritagli. Si segue il metodo e la formazione (app CumLaude21, i tre incontri iniziali con lo sponsor, gli audio). Si aiutano gli altri a fare le stesse cose: il bonus differenziale premia chi fa crescere i suoi.</p>
+    <p class="small"><b>Cosa si può ottenere, con che tempi.</b> Primi mesi: margine del 20% lordo (circa 16% netto) sulla vendita diretta. Il mattone base: 10 clienti da circa 50 € al mese fanno 500 € di fatturato ricorrente. Il bonus sale col volume del gruppo, dal 3% (200 VP) al 21% (10.000 VP). Quando un gruppo raggiunge il 21% scatta un 6% fisso sul suo fatturato. L'attività si può trasmettere agli eredi.</p>
+    <p class="nota">Cifre indicative, di riferimento per te: non sono una promessa di guadagno e non vanno presentate come tale.</p>`}
+    <h3>Cosa dire se l'esito è no</h3>
+    <p class="small">«Ti ringrazio di aver risposto con sincerità. Da quello che mi hai detto, secondo me questa attività adesso non fa per te: chiede tempo ogni giorno e mesi di costanza prima di dare qualcosa di serio, e non voglio venderti un'illusione. Se invece i prodotti ti incuriosiscono, quelli te li faccio provare volentieri.»</p>
+  </details>
+  <div class="row" style="gap:6px;justify-content:center">
+    <button class="btn small ghost" data-act="target-archivia">${x.archiviato ? "Riporta tra gli inviti" : "Archivia"}</button>
+    <button class="btn small ghost" data-act="target-elimina">Elimina</button></div>`;
+}
+
+function vSheetTarget(s){
+  const annulla = `<button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>`;
+  if(s === "target-nuovo") return `<h2>Nuovo invito Target</h2>
+    <p class="small">Per chi non conosci bene: gli mandi le otto domande su WhatsApp e ti rimanda le risposte.</p>
+    <form data-form="target-nuovo" novalidate>
+      <label class="field"><span>Nome e cognome del contatto</span><input name="nome" maxlength="80" required autocomplete="off"></label>
+      <fieldset class="field"><legend>Il link vale</legend>
+        <div class="opzioni">${DURATE_T.map(([v, t]) => `<label class="chip"><input type="radio" name="durata" value="${v}"${v === "14" ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Crea l'invito</button></div>
+    </form>`;
+  if(s === "target-leggi") return `<h2>Leggi una risposta</h2>
+    <p class="small">Su WhatsApp tieni premuto sul messaggio del contatto, «Copia», e incollalo qui: il codice lo trovo io.</p>
+    <form data-form="target-leggi" novalidate>
+      <textarea name="testo" rows="4" aria-label="Il messaggio del contatto"></textarea>
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Leggi</button></div>
+    </form>`;
+  return "";
+}
+
+/* Le risposte arrivate (dal link "Apri le risposte" o incollate): si attaccano all'invito */
+async function applicaRispostaTarget(testo){
+  const d = decodificaT(testo);
+  if(!d) return "Non trovo il codice delle risposte (CL21-…) in questo testo.";
+  const x = d.id && st.inviti.find(y => y.id === d.id);
+  if(!x) return "Questa risposta non corrisponde a nessuno dei tuoi inviti (forse è di un invito fatto con la vecchia app Target).";
+  if(!x.risposte) await api.aggiornaInvito(x.id, { risposte:d.risposte, versione:VERSIONE_DOMANDE });
+  await caricaInviti();
+  st.vista = "persone"; st.sezPersone = "target"; st.invitoId = x.id; st.personaId = null;
+  return "";
+}
+async function rispostaInAttesa(){
+  const r = leggiLocale(CHIAVE_RISPOSTA_T);
+  if(!r) return;
+  salvaLocale(CHIAVE_RISPOSTA_T, null);
+  try{ const err = await applicaRispostaTarget(r); if(err) toast(err); else { render(); window.scrollTo(0, 0); } }catch(e){ toast(messaggio(e)); }
+}
+
+Object.assign(AZIONI, {
+  "ct-via"(){ st.ct.passo = "quiz"; st.ct.i = 0; render(); window.scrollTo(0, 0); },
+  "ct-risposta"(el){
+    const c = st.ct; c.ans[c.i] = Number(el.dataset.k);
+    if(c.i < DOMANDE.length - 1) c.i++; else { c.ans = c.ans.slice(0, DOMANDE.length); c.passo = "fine"; }
+    render(); window.scrollTo(0, 0);
+  },
+  "ct-indietro"(){ if(st.ct.i > 0){ st.ct.i--; render(); } },
+  "ct-invia"(){ window.open("https://wa.me/?text=" + encodeURIComponent(messaggioContatto()), "_blank", "noopener"); },
+  async "ct-copia"(){ try{ await navigator.clipboard.writeText(messaggioContatto()); toast("Copiato: incollalo nella chat"); }catch(e){ toast("Non riesco a copiare: usa Invia su WhatsApp"); } },
+  "sez-persone"(el){ st.sezPersone = el.dataset.sez; st.personaId = null; st.invitoId = null; render(); },
+  "apri-invito"(el){ st.vista = "persone"; st.sezPersone = "target"; st.invitoId = el.dataset.id; render(); window.scrollTo(0, 0); },
+  "torna-target"(){ st.invitoId = null; render(); window.scrollTo(0, 0); },
+  "target-archiviati"(){ st.archiviatiT = !st.archiviatiT; render(); },
+  "target-nuovo"(){ st.errore = ""; st.sheet = "target-nuovo"; render(); },
+  "target-leggi"(){ st.errore = ""; st.sheet = "target-leggi"; render(); },
+  async "target-copia"(){
+    const x = st.inviti.find(y => y.id === st.invitoId);
+    try{ await navigator.clipboard.writeText(messaggioTarget(x)); toast("Messaggio copiato"); }catch(e){ toast(messaggio(e)); }
+  },
+  async "target-blocca"(){
+    const x = st.inviti.find(y => y.id === st.invitoId);
+    try{ await api.aggiornaInvito(x.id, { bloccato:!x.bloccato }); await caricaInviti(); render(); toast(x.bloccato ? "Link riaperto" : "Link bloccato: al contatto non si apre più"); }
+    catch(e){ toast(messaggio(e)); }
+  },
+  async "target-archivia"(){
+    const x = st.inviti.find(y => y.id === st.invitoId);
+    try{ await api.aggiornaInvito(x.id, { archiviato:!x.archiviato }); await caricaInviti(); st.invitoId = null; render(); toast(x.archiviato ? "Di nuovo tra gli inviti" : "Archiviato"); }
+    catch(e){ toast(messaggio(e)); }
+  },
+  async "target-elimina"(){
+    const x = st.inviti.find(y => y.id === st.invitoId);
+    if(!x || !confirm(`Eliminare l'invito di ${x.nome} e le sue risposte?`)) return;
+    try{ await api.cancellaInvito(x.id); await caricaInviti(); st.invitoId = null; render(); toast("Invito eliminato"); }catch(e){ toast(messaggio(e)); }
+  },
+  async "target-in-lista"(){
+    const x = st.inviti.find(y => y.id === st.invitoId);
+    if(!x) return;
+    try{
+      const id = uuid(), v = valutaTarget(x.risposte);
+      await api.nuovePersone([{ id, nome:x.nome, invito_target_id:x.id, origine:"Target" }]);
+      /* le otto domande sono già un contatto: la persona entra "Contattato" (senza contare di nuovo l'attività) */
+      await api.nuoviPassi([{ id:uuid(), persona_id:id, tipo:"contatto", data:String(x.risposto_il || oggi()).slice(0, 10), importato:true,
+        come:"Target", reazione:v.breve.slice(0, 80) }]);
+      await api.aggiornaInvito(x.id, { persona_id:id });
+      await caricaInviti();
+      st.sezPersone = "lista"; st.invitoId = null; st.personaId = id;
+      await dopoPersone(`${x.nome} nella tua lista`);
+    }catch(e){ toast(messaggio(e)); }
+  }
+});
+
+Object.assign(MODULI, {
+  async "target-nuovo"(f){
+    const nome = f.nome.value.trim();
+    if(!nome){ mostraErroreForm(f, "Scrivi il nome del contatto."); return; }
+    const durata = (f.querySelector("input[name=durata]:checked") || {}).value || "";
+    const scade = durata ? piuGiorni(oggi(), Number(durata)) : null;
+    try{
+      let id = null;
+      for(let t = 0; t < 4 && !id; t++){
+        const prova = nuovoIdT();
+        try{ await api.nuovoInvito({ id:prova, nome, scade }); id = prova; }
+        catch(e){ if(!/duplicate|unique|23505/i.test(e.message || e.code || "")) throw e; }
+      }
+      await caricaInviti();
+      st.sheet = null; st.vista = "persone"; st.sezPersone = "target"; st.invitoId = id; render(); window.scrollTo(0, 0);
+      toast("Invito pronto: mandalo su WhatsApp");
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async "target-leggi"(f){
+    try{
+      const err = await applicaRispostaTarget(f.testo.value);
+      if(err){ mostraErroreForm(f, err); return; }
+      st.sheet = null; render(); window.scrollTo(0, 0); toast("Risposte lette");
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  }
+});
+
+document.addEventListener("input", e => { if(e.target && e.target.id === "ct-libero" && st.ct) st.ct.libero = e.target.value; });
+
 /* ---- 12. Eventi ---- */
 document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]");
@@ -2865,9 +3279,10 @@ document.addEventListener("touchend", e => {
   /* ordine delle pagine: Obiettivo | Io | Gruppo */
   if(dx < 0 && st.vista === "obiettivo") scorri("vista-io", "da-destra");
   else if(dx < 0 && st.vista === "io") scorri("vista-persone", "da-destra");
-  else if(dx < 0 && st.vista === "persone" && !st.personaId) scorri("vista-gruppo", "da-destra");
-  else if(dx > 0 && st.vista === "persone" && !st.personaId) scorri("vista-io", "da-sinistra");
+  else if(dx < 0 && st.vista === "persone" && !st.personaId && !st.invitoId) scorri("vista-gruppo", "da-destra");
+  else if(dx > 0 && st.vista === "persone" && st.invitoId) scorri("torna-target", "da-sinistra");
   else if(dx > 0 && st.vista === "persone" && st.personaId) scorri("torna-lista", "da-sinistra");
+  else if(dx > 0 && st.vista === "persone") scorri("vista-io", "da-sinistra");
   else if(dx > 0 && st.vista === "io") scorri("vista-obiettivo", "da-sinistra");
   else if(dx > 0 && st.vista === "gruppo") scorri("vista-persone", "da-sinistra");
   else if(dx > 0 && st.vista === "scheda") scorri("vista-gruppo", "da-sinistra");

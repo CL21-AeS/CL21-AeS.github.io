@@ -995,6 +995,73 @@ check(!(await page.getByText("Segreto").count()), "la lista di Lia non compare n
 await page.screenshot({ path: S + "/e2e/30-persone.png", fullPage:true });
 await ctx.close();
 
+// 23. Persone → Target: invito, le otto domande del contatto, le risposte che tornano, Metti in lista
+DB.inviti = [];
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.click("button[data-act=vista-persone]");
+await page.click("button[data-sez=target]");
+check(await page.getByText("Ancora nessun invito").isVisible(), "Target: nessun invito all'inizio");
+await page.click("button[data-act=target-nuovo]");
+await page.fill(".sheet input[name=nome]", "Carla Nuova");
+await page.click('.sheet button:has-text("Crea l\'invito")');
+await page.getByText("Invito pronto").waitFor();
+const hrefWa = await page.locator("a.wa:has-text('Manda su WhatsApp')").getAttribute("href");
+const msgT = decodeURIComponent(hrefWa.split("text=")[1]);
+const linkT = msgT.match(/https?:\/\/\S+#t&\S+/)[0];
+check(/c=Carla%20Nuova/.test(linkT) && /&e=\d{8}&k=/.test(linkT) && !/333|tel/.test(linkT), "il link del contatto: nome e scadenza firmata, nessun telefono");
+await sync(page);
+const statoR = await ctx.storageState(); await ctx.close();
+// il contatto: senza accesso, otto domande
+const ctxC = await browser.newContext({ viewport:{width:390,height:844}, locale:"it-IT", bypassCSP:true });
+await ctxC.route(/cdn\.jsdelivr\.net/, r => r.abort());
+await ctxC.route(/challenges\.cloudflare\.com/, r => r.abort());
+const pc = await ctxC.newPage();
+pc.on("pageerror", e => errori.push(String(e)));
+await pc.addInitScript(([db, m]) => { window.__DB = db; eval(m); }, [DB, mock]);
+await pc.goto(BASE + linkT.slice(linkT.indexOf("#")));
+await pc.getByText("Ciao Carla").waitFor();
+check(await pc.getByText("Te le manda Stefano e Alessia").isVisible(), "il contatto vede chi gliele manda");
+await pc.click("button[data-act=ct-via]");
+for(const k of [0, 0, 1, 0, 2, 1, 0, 2]) await pc.click(`button[data-act=ct-risposta][data-k="${k}"]`);
+await pc.getByText("Grazie, Carla.").waitFor();
+const codiceT = await pc.locator(".contatto .nota b").innerText();
+check(/^CL21-[1-3]{8}-\d-[A-Z0-9]{6}$/.test(codiceT), "il contatto ha il codice delle risposte");
+check(!(await pc.evaluate(() => JSON.stringify(window.__DBOUT || {}).includes("risposte\":["))), "il contatto non scrive niente nel database");
+await ctxC.close();
+// il partner apre il link "Apri le risposte" dal messaggio del contatto
+({ ctx, page } = await apri({ storageState:statoR }, "#r=" + codiceT));
+await page.getByText("Carla Nuova").first().waitFor();
+await page.getByText("In target — dagli il piano").waitFor();
+check(await page.getByText("28 su 28 punti").isVisible() || await page.getByText(/28\s*su 28 punti/).isVisible(), "le risposte arrivano: in target, 28 su 28");
+check(!(await page.locator("details.metodo").getAttribute("open")), "il metodo è chiuso, si apre a richiesta");
+await page.click("details.metodo summary");
+check(await page.getByText("Cosa dire se l'esito è no").isVisible(), "il riquadro Il metodo si apre");
+await sync(page);
+const attT = DB.activities.length;
+await page.click("button[data-act=target-in-lista]");
+await page.getByText("Carla Nuova nella tua lista").waitFor();
+await sync(page);
+const carla = DB.persone.find(x => x.nome === "Carla Nuova");
+check(carla && carla.fase === "contattato" && carla.invito_target_id && DB.activities.length === attT, "Metti in lista: Contattato, con il Target, senza contare di nuovo");
+check(await page.getByText(/Target: In target · 28\/28/).isVisible(), "nella scheda della persona l'esito del Target");
+// la stessa risposta incollata con "Leggi una risposta" non cambia niente; un codice non mio è rifiutato
+await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=target]");
+await page.click("button[data-act=target-leggi]");
+await page.fill(".sheet textarea[name=testo]", "Apri le risposte: x#r=CL21-11111111-1-ZZZZZZ");
+await page.click(".sheet button:has-text('Leggi')");
+check(await page.locator(".sheet .errore").getByText(/non corrisponde a nessuno dei tuoi inviti|Non trovo il codice/).isVisible(), "un codice che non è mio è rifiutato");
+await page.click(".sheet button[data-act=chiudi]");
+await sync(page); await ctx.close();
+// il link già usato non si riapre
+const ctxC2 = await browser.newContext({ viewport:{width:390,height:844}, locale:"it-IT", bypassCSP:true });
+await ctxC2.route(/cdn\.jsdelivr\.net/, r => r.abort());
+const pc2 = await ctxC2.newPage();
+await pc2.addInitScript(([db, m]) => { window.__DB = db; eval(m); }, [DB, mock]);
+await pc2.goto(BASE + linkT.slice(linkT.indexOf("#")));
+await pc2.getByText("Hai già risposto").waitFor(); check(true, "il link usato si chiude");
+await ctxC2.close();
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

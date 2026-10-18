@@ -61,7 +61,9 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 17. `supabase/020_persone.sql` — la Lista (pagina Persone): nomi solo di chi li scrive, passi che contano le attività,
     all'upline solo i numeri
 18. `supabase/021_persone_io.sql` — su Io le persone in percorso; ognuno può toglierne una da Io e rimetterla
-19. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+19. `supabase/022_target.sql` — il Target (Persone → Target): inviti solo di chi li crea; il contatto chiede solo se
+    il suo link è aperto
+20. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 17. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 18. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
