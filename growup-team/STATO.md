@@ -23,6 +23,11 @@ responsabile di dichiarare il giusto e i numeri veri arrivano dal report Amway. 
 il "!" nella struttura e "Conferma" nella scheda (resta "Punto di partenza dichiarato" come informazione);
 `conferma_partenza` chiusa. Ognuno corregge il proprio dal fondo della pagina Io → "Modifica" (`modifica_partenza`).
 
+**18 ottobre — nascondere una persona sola**: dopo l'import di Stefano con "Nascondi chi ha 0 VP" erano spariti
+anche i gruppi attivi sotto i frontali a 0 VP (nessun dato perso: 170 importate, 134 nascoste). Ora chi è nascosto
+sparisce da solo e chi sta sotto resta visibile; all'import chi era nascosto e ha fatto VP personali ricompare
+(sezione "Tornano visibili" nell'anteprima).
+
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
    import, nascondi, scheda partner).
