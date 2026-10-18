@@ -67,7 +67,8 @@ richiesta. "Metti in lista" → la persona entra in Lista già Contattato, con l
 contare di nuovo il contatto). Blocca / riapri il link, archivia, elimina. Domande, punteggi e testi identici alla
 mini app (versione 2026-09-14). La mini app Target resta online per i link già mandati; nessuna importazione.
 Poi (023): dalla scheda di una persona della **Lista** "Manda le 8 domande (Target)" — l'invito nasce collegato a lei e
-le risposte compaiono nella sua scheda; se una persona arrivata dal Target si toglie dalla lista, l'invito resta e
+le risposte compaiono nella sua scheda; chi era solo "In lista" diventa **Contattato** (passo Contatto "Target", che conta
+il contatto); se una persona arrivata dal Target si toglie dalla lista, l'invito resta e
 torna "Metti in lista" (prima restava un "Apri nella lista" che non apriva niente).
 
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):

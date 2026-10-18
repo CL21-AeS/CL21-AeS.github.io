@@ -3214,7 +3214,15 @@ Object.assign(MODULI, {
         catch(e){ if(!/duplicate|unique|23505/i.test(e.message || e.code || "")) throw e; }
       }
       const pl = st.targetPersona && st.persone.find(p => p.id === st.targetPersona);
-      if(pl){ await api.aggiornaInvito(id, { persona_id:pl.id }); await api.modificaPersona(pl.id, { invito_target_id:id }); await caricaPersone(); }
+      if(pl){
+        await api.aggiornaInvito(id, { persona_id:pl.id });
+        await api.modificaPersona(pl.id, { invito_target_id:id, nascosta_io:false });
+        /* mandare le otto domande è il primo contatto: chi era solo "In lista" diventa Contattato (e conta il contatto) */
+        if(pl.fase === "lista" && !pl.esito)
+          await api.nuoviPassi([{ id:uuid(), persona_id:pl.id, tipo:"contatto", data:oggi(), come:"Target", reazione:"Gli ho mandato le 8 domande" }]);
+        await caricaPersone();
+        aggiornaAttivita();
+      }
       st.targetPersona = null;
       await caricaInviti();
       st.sheet = null; st.vista = "persone"; st.sezPersone = "target"; st.invitoId = id; render(); window.scrollTo(0, 0);
