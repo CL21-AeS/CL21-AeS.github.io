@@ -3454,6 +3454,12 @@ revoke execute on function public.invito_target_aperto(text), public.inviti_targ
 grant execute on function public.invito_target_aperto(text) to anon, authenticated;
 
 -- ============================================================
+-- Growup Team — 023: il Target anche per chi è già nella Lista (18 ottobre 2026).
+-- Dalla scheda di una persona della lista si può mandarle le otto domande: l'invito si collega alla persona.
+
+grant update (invito_target_id) on public.persone to authenticated;
+
+-- ============================================================
 -- Growup Team — 010: Fase 2, blocco 3 — soglie delle etichette del gruppo
 -- Si tarano dal Table editor (tabella settings), senza toccare il codice.
 --   giorni_da_chiamare   oltre questi giorni senza aggiornamenti: "Non aggiorna"

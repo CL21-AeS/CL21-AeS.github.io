@@ -187,7 +187,8 @@
     modificaPersona: async (id, campi) => { const x = (db.persone || []).find(y => y.id === id && y.proprietario === mio().id);
       if(x) Object.assign(x, campi); salva(); },
     cancellaPersona: async id => { db.persone = db.persone.filter(y => !(y.id === id && y.proprietario === mio().id));
-      db.passi = (db.passi || []).filter(y => y.persona_id !== id); salva(); },
+      db.passi = (db.passi || []).filter(y => y.persona_id !== id);
+      (db.inviti || []).forEach(y => { if(y.persona_id === id) y.persona_id = null; }); salva(); },
     nuoviPassi: async righe => {
       for(const r of righe){
         const pe = (db.persone || []).find(y => y.id === r.persona_id);
