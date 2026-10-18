@@ -117,16 +117,16 @@ await scegliFile(page, "anna.csv", creaCsv(meseFile, [persona(1, "9", "2000001",
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
 check(await page.locator(".sheet .imp-sezione", { hasText:"Nuovi nel report · 2" }).isVisible(), "import: 2 persone nuove, entrano tutte");
 check(await page.locator(".sheet input[name=nascondi]:checked").count() === 0, "import: nessuno nascosto all'inizio");
-await page.click(".sheet button[data-act=nascondi-zero]");
+await page.click(".sheet .imp-da-scegliere button[data-act=nascondi-zero]");
 check(await page.isChecked(".sheet input[name=nascondi][value='1000001']") && !(await page.isChecked(".sheet input[name=nascondi][value='1000002']")),
   "Nascondi chi ha 0 VP: solo Marco");
-await page.click(".sheet button[data-act=nascondi-tutti]");
+await page.click(".sheet .imp-da-scegliere button[data-act=nascondi-tutti]");
 check(await page.locator(".sheet input[name=nascondi]:checked").count() === 2, "Nascondi tutti");
-check(await page.getAttribute(".sheet button[data-act=nascondi-tutti]", "aria-pressed") === "true"
-  && await page.getAttribute(".sheet button[data-act=nascondi-zero]", "aria-pressed") === "false", "il pulsante usato resta acceso, gli altri si spengono");
+check(await page.getAttribute(".sheet .imp-da-scegliere button[data-act=nascondi-tutti]", "aria-pressed") === "true"
+  && await page.getAttribute(".sheet .imp-da-scegliere button[data-act=nascondi-zero]", "aria-pressed") === "false", "il pulsante usato resta acceso, gli altri si spengono");
 await page.uncheck(".sheet input[name=nascondi][value='1000001']");
 check(!(await page.locator(".sheet .scelte-rapide .btn.on").count()), "una casella cambiata a mano spegne il pulsante");
-await page.click(".sheet button[data-act=mostra-tutti]");
+await page.click(".sheet .imp-da-scegliere button[data-act=mostra-tutti]");
 check(await page.locator(".sheet input[name=nascondi]:checked").count() === 0, "Mostra tutti");
 check(await page.locator(".sheet label", { hasText:"Luca Verdi" }).getByText("sponsor Marco Rossi").isVisible(), "import: lo sponsor del report accanto al nome");
 await page.screenshot({ path: S + "/e2e/26-importa.png", fullPage:true });
@@ -260,7 +260,7 @@ await scegliFile(page, "radice.csv", reportRadice, true);
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
 check(await page.locator(".sheet .imp-sezione", { hasText:"Usano l'app" }).getByText("Bea Verdi (da te a Ciro Neri)").isVisible(),
   "anteprima: Bea va sotto il suo sponsor del report");
-await page.click(".sheet button[data-act=nascondi-zero]");
+await page.click(".sheet .imp-da-scegliere button[data-act=nascondi-zero]");
 check(await page.locator(".sheet input[name=nascondi]:checked").count() === 1 && await page.isChecked(".sheet input[name=nascondi][value='3000000']"),
   "radice: Zeno (0 VP) da nascondere, Paolo e Luca visibili");
 await page.check(".sheet input[name=consenso]");
@@ -331,10 +331,24 @@ check(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).locato
   && !(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).getAttribute("data-path")).includes(idDi("Ciro Neri")),
   "Bea tiene il livello del report e sale sotto il primo sponsor visibile");
 await page.click("button[data-act=nascoste]");
+check(await page.locator(".sheet li", { hasText:"Ciro Neri" }).getByText("Livello 2 · sotto te · 1 persona sotto").isVisible(), "Rivedi: si vede dove sta la persona");
 await page.locator(".sheet li", { hasText:"Ciro Neri" }).locator("button[data-act=mostra]").click();
 await page.getByText("Ciro Neri di nuovo nella tua struttura").waitFor();
+// dall'elenco si nasconde anche chi è visibile
+await page.click(".sheet button[data-filtro=visibili]");
+await page.locator(".sheet li", { hasText:"Bea Verdi" }).locator("button[data-act=nascondi-qui]").click();
+await page.getByText("Bea Verdi nascosto dalla tua struttura").waitFor();
 await page.click(".sheet button[data-act=chiudi]");
-check(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).isVisible(), "Ciro e Bea di nuovo visibili");
+check(await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isVisible() && !(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).count()),
+  "Ciro di nuovo visibile, Bea nascosta dall'elenco");
+// struttura completa: le nascoste al loro posto, in grigio, e si rimettono dalla riga
+await page.click("button[data-act=con-nascoste]");
+check(await page.locator(".albero.struttura li.nascosta", { hasText:"Bea Verdi" }).isVisible(), "Mostra anche le nascoste: Bea in grigio al suo posto");
+await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).locator("button[data-act=mostra]").click();
+await page.getByText("Bea Verdi di nuovo nella tua struttura").waitFor();
+await page.click("button[data-act=con-nascoste]");
+check(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).isVisible() && !(await page.locator(".albero.struttura li.nascosta").count()),
+  "Ciro e Bea di nuovo visibili");
 // nessuno cancella: anche le persone importate si nascondono soltanto
 await page.locator(".albero.struttura li", { hasText:"Paolo Neri" }).locator("button[data-act=apri-scheda]").click();
 check(!(await page.locator("button[data-act=cancella]").count()), "niente più Cancella dalla struttura");
@@ -728,7 +742,8 @@ check(!(await sez("Nome uguale, codice diverso").count()) && !(await sez("trovat
 check(await sez("Non più nel report").getByText("Ugo Uscito (3000004)").isVisible() && !(await page.locator(".sheet input[name=cancella]").count()),
   "anteprima: Ugo non più nel report, nessuna cancellazione");
 check(await sez("Usano l'app").isVisible(), "anteprima: chi usa l'app non viene toccato");
-check(await sez("Tornano visibili · 1").getByText("Gino Gestito").isVisible(), "anteprima: Gino era nascosto e ha fatto VP, torna visibile");
+check(await page.isChecked(".sheet input[name=modo][value=tieni]") && !(await page.locator(".sheet .imp-esistenti").isVisible()),
+  "reimport: di base lascia tutto com'è");
 check(await sez("Nuovi nel report · 1").isVisible() && !(await page.isChecked(".sheet input[name=nascondi]")), "anteprima: Nino entra, non nascosto");
 await page.screenshot({ path: S + "/e2e/27-importa-conferme.png", fullPage:true });
 await page.click(".sheet button:has-text('Importa')");
@@ -740,7 +755,7 @@ const vppDi = id => DB.activities.filter(a => a.partner_id === id && ["ordine","
   .reduce((t, a) => t + Number(a.vp), 0);
 check(DB.partners.find(p => p.id === "R").codice_amway === "1234567" && Math.abs(vppDi("R") - 400) < 0.001, "i miei VPP del mese sono quelli del report");
 check(vppDi("imp-gino") === 1055.5, "VPP delle persone importate");
-check(!DB.nascosti.some(x => x.nascosto_id === "imp-gino"), "Gino di nuovo visibile al suo posto");
+check(DB.nascosti.some(x => x.nascosto_id === "imp-gino"), "Lascia tutto com'è: Gino resta nascosto anche se ha fatto VP");
 check(DB.partners.find(p => p.id === "imp-ugo").fuori_report_dal && DB.nascosti.some(x => x.nascosto_id === "imp-ugo"), "Ugo resta, segnato e nascosto");
 check(!DB.activities.some(a => a.tipo === "rettifica" && a.inserito_da === "R" && usanoApp.some(p => p.id === a.partner_id)), "nessun dato di chi usa l'app toccato");
 const nRett = DB.activities.filter(a => a.tipo === "rettifica").length;
@@ -748,9 +763,16 @@ await scegliFile(page, "los.csv", creaCsv(meseFile, righeCsv));
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
 check(!(await sez("Non più nel report").count()) && !(await page.getByText("viene salvato").count()) && !(await sez("Nuovi nel report").count()),
   "reimport: niente più da confermare");
+// riapplica i filtri a tutti: Gino (con VP) torna visibile, Nino lo nascondo io
+await page.check(".sheet input[name=modo][value=filtri]");
+await page.click(".sheet .imp-filtri button[data-act=nascondi-zero]");
+check(!(await page.isChecked(".sheet .imp-esistenti input[value=imp-gino]")), "filtro 0 VP riapplicato: Gino con VP non è spuntato");
+check(await page.locator(".sheet .imp-esistenti label", { hasText:"Gino Gestito" }).getByText("Livello 2 · sotto te").isVisible(), "anteprima: dove sta ognuno");
+await page.locator(".sheet .imp-esistenti label", { hasText:"Nino" }).locator("input").check();
 await page.click(".sheet button:has-text('Importa')");
-await page.getByText(/0 VPP aggiornati/).waitFor();
+await page.getByText(/0 VPP aggiornati, 1 nascosta, 1 di nuovo visibile/).waitFor();
 await sync(page);
+check(!DB.nascosti.some(x => x.nascosto_id === "imp-gino") && DB.nascosti.some(x => x.nascosto_id === idDi("Nino Nuovo")), "Riapplica i filtri: Gino visibile, Nino nascosto");
 check(DB.activities.filter(a => a.tipo === "rettifica").length === nRett, "reimport dello stesso file: nessun dato nuovo");
 await scegliFile(page, "di-altri.csv", creaCsv(meseFile, [persona(1, "1", "7777777", "ALTRO, ALDO", "1")]));
 check(await page.locator(".sheet .errore").getByText("il tuo codice nell'app è 1234567").isVisible()

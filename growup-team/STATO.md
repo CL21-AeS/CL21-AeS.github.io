@@ -25,8 +25,11 @@ il "!" nella struttura e "Conferma" nella scheda (resta "Punto di partenza dichi
 
 **18 ottobre — nascondere una persona sola**: dopo l'import di Stefano con "Nascondi chi ha 0 VP" erano spariti
 anche i gruppi attivi sotto i frontali a 0 VP (nessun dato perso: 170 importate, 134 nascoste). Ora chi è nascosto
-sparisce da solo e chi sta sotto resta visibile; all'import chi era nascosto e ha fatto VP personali ricompare
-(sezione "Tornano visibili" nell'anteprima).
+sparisce da solo e chi sta sotto resta visibile. Poi, su richiesta di Stefano: al reimport la scelta **Lascia tutto
+com'è** (di base, solo i VP) / **Riapplica i filtri a tutti** (anche chi hai nascosto a mano segue il filtro: poi lo si
+rinasconde dall'elenco); struttura con **Mostra anche le nascoste** (albero completo, nascoste in grigio, Mostra /
+Nascondi per riga); **Rivedi** = elenco Nascoste · Visibili con livello, sponsor e persone sotto, da cui si nasconde
+anche chi è visibile.
 
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
