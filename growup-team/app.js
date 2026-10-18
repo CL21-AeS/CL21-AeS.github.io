@@ -17,7 +17,8 @@ const CHIAVE_LOCALE = "growup-team.chiave";
 const CHIAVE_SALVATA = "growup-team.chiave-salvata";
 const CHIAVE_INSTALLA_NO = "growup-team.installa-no";
 const CHIAVE_ULTIMA_COPIA = "growup-team.ultima-copia";
-const CHIAVE_RISPOSTA_T = "growup-team.risposta-target";  // risposte Target aperte prima di entrare
+const CHIAVE_RISPOSTA_T = "growup-team.risposta-target";
+const CHIAVE_WA = "growup-team.whatsapp";              // il mio numero WhatsApp (solo su questo telefono) per le risposte del Target  // risposte Target aperte prima di entrare
 const FORMA_CODICE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
 const FORMA_CHIAVE = /^[0-9a-f]{32}$/;
 const PIN = [3, 6, 9, 12, 15, 18, 21];   // percentuali raggiungibili anche senza qualifica Bronze
@@ -2913,8 +2914,17 @@ function firmaT(id, aaaammgg){
   return ALFABETO_T.charAt(n % 28) + ALFABETO_T.charAt(Math.floor(n / 28) % 28);
 }
 function nuovoIdT(){ let s = ""; for(let k = 0; k < 6; k++) s += ALFABETO_T.charAt(Math.floor(Math.random() * ALFABETO_T.length)); return s; }
+/* Il numero WhatsApp per wa.me: solo cifre, con il prefisso (un cellulare italiano scritto senza prende il 39) */
+function numeroWa(v){
+  let n = String(v || "").replace(/[^\d+]/g, "").replace(/^\+/, "").replace(/^00/, "");
+  if(/^3\d{8,9}$/.test(n)) n = "39" + n;
+  return /^\d{8,15}$/.test(n) ? n : "";
+}
 function linkTarget(inv){
   const p = ["c=" + encodeURIComponent(inv.nome), "s=" + encodeURIComponent(nomeSaluto(st.profilo.nome)), "i=" + inv.id];
+  /* il mio numero: la risposta del contatto si apre direttamente nella mia chat */
+  const tel = numeroWa(leggiLocale(CHIAVE_WA));
+  if(tel) p.push("t=" + tel);
   if(inv.scade){ const e = compattaT(inv.scade); p.push("e=" + e, "k=" + firmaT(inv.id, e)); }
   return base() + "#t&" + p.join("&");
 }
@@ -2934,7 +2944,7 @@ function statoInvito(inv){
 /* ---- Il contatto: la pagina delle otto domande (senza accesso, niente dati nel database) ---- */
 function leggiLinkTarget(h){
   const q = new URLSearchParams(h.replace(/^#?t&/, ""));
-  return { nome:(q.get("c") || "").slice(0, 80), sponsor:(q.get("s") || "").slice(0, 80), id:(q.get("i") || "").toUpperCase(),
+  return { nome:(q.get("c") || "").slice(0, 80), sponsor:(q.get("s") || "").slice(0, 80), id:(q.get("i") || "").toUpperCase(), tel:numeroWa(q.get("t")),
            scade:q.get("e") || "", firma:q.get("k") || "", passo:"intro", i:0, ans:[], libero:"" };
 }
 function avviaContatto(h){
@@ -2999,7 +3009,8 @@ function vContatto(){
       <div class="row" style="gap:8px;margin-top:12px">
         <button class="btn wa grow" data-act="ct-invia">Invia su WhatsApp</button>
         <button class="btn grow" data-act="ct-copia">Copia le risposte</button></div>
-      <p class="nota">Su WhatsApp scegli la chat di ${c.sponsor ? esc(c.sponsor) : "chi ti ha mandato il link"}. Codice: <b>${codice}</b></p>
+      <p class="nota">${c.tel ? `Il messaggio si apre nella chat di ${c.sponsor ? esc(c.sponsor) : "chi ti ha mandato il link"}: basta inviarlo.`
+        : `Su WhatsApp scegli la chat di ${c.sponsor ? esc(c.sponsor) : "chi ti ha mandato il link"}.`} Codice: <b>${codice}</b></p>
     </div>
     <div class="card">
       <h2>Una cosa sola, prima di lasciarti</h2>
@@ -3095,6 +3106,9 @@ function vSheetTarget(s){
     <p class="small">Per chi non conosci bene: gli mandi le otto domande su WhatsApp e ti rimanda le risposte.</p>
     <form data-form="target-nuovo" novalidate>
       <label class="field"><span>Nome e cognome del contatto</span><input name="nome" maxlength="80" required autocomplete="off"></label>
+      <label class="field"><span>Il tuo numero WhatsApp <i>(per ricevere le risposte direttamente nella tua chat)</i></span>
+        <input name="whatsapp" type="tel" inputmode="tel" maxlength="20" placeholder="es. 333 1234567" value="${esc(leggiLocale(CHIAVE_WA) || "")}"></label>
+      <p class="nota" style="margin-top:4px">Resta solo su questo telefono e va nel link che mandi al contatto. Senza numero, il contatto sceglie la chat da solo.</p>
       <fieldset class="field"><legend>Il link vale</legend>
         <div class="opzioni">${DURATE_T.map(([v, t]) => `<label class="chip"><input type="radio" name="durata" value="${v}"${v === "14" ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Crea l'invito</button></div>
@@ -3134,7 +3148,7 @@ Object.assign(AZIONI, {
     render(); window.scrollTo(0, 0);
   },
   "ct-indietro"(){ if(st.ct.i > 0){ st.ct.i--; render(); } },
-  "ct-invia"(){ window.open("https://wa.me/?text=" + encodeURIComponent(messaggioContatto()), "_blank", "noopener"); },
+  "ct-invia"(){ window.open(`https://wa.me/${st.ct.tel || ""}?text=` + encodeURIComponent(messaggioContatto()), "_blank", "noopener"); },
   async "ct-copia"(){ try{ await navigator.clipboard.writeText(messaggioContatto()); toast("Copiato: incollalo nella chat"); }catch(e){ toast("Non riesco a copiare: usa Invia su WhatsApp"); } },
   "sez-persone"(el){ st.sezPersone = el.dataset.sez; st.personaId = null; st.invitoId = null; render(); },
   "apri-invito"(el){ st.vista = "persone"; st.sezPersone = "target"; st.invitoId = el.dataset.id; render(); window.scrollTo(0, 0); },
@@ -3182,6 +3196,9 @@ Object.assign(MODULI, {
   async "target-nuovo"(f){
     const nome = f.nome.value.trim();
     if(!nome){ mostraErroreForm(f, "Scrivi il nome del contatto."); return; }
+    const wa = f.whatsapp.value.trim();
+    if(wa && !numeroWa(wa)){ mostraErroreForm(f, "Il numero WhatsApp non sembra giusto: scrivilo con il prefisso, per esempio +39 333 1234567."); return; }
+    salvaLocale(CHIAVE_WA, wa ? numeroWa(wa) : null);
     const durata = (f.querySelector("input[name=durata]:checked") || {}).value || "";
     const scade = durata ? piuGiorni(oggi(), Number(durata)) : null;
     try{

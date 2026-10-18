@@ -57,8 +57,9 @@ fissa una data o si riapre il percorso, oppure dalla sua scheda con "Rimetti in 
 
 **18 ottobre — Persone → Target (fase 2)** (migrazione `022_target.sql`): in Persone due sezioni, **Target · Lista**.
 Il Target è per chi non conosci: "+ Nuovo invito" (nome, durata del link: 3 giorni … senza scadenza) → messaggio
-WhatsApp con il link alle otto domande (pagina di Growup `#t&…`, senza accesso; nessun telefono nel link, decisione di
-Stefano: il contatto rimanda le risposte scegliendo la chat). Il contatto non scrive nel database: rimanda il codice
+WhatsApp con il link alle otto domande (pagina di Growup `#t&…`, senza accesso). Nel link il **numero WhatsApp del
+partner** (chiesto nel "Nuovo invito", salvato solo sul suo telefono): "Invia su WhatsApp" del contatto apre
+direttamente la sua chat (richiesta di Stefano, 18 ottobre); senza numero il contatto sceglie la chat. Il contatto non scrive nel database: rimanda il codice
 `CL21-…` con il link "Apri le risposte" (`#r=…`, si legge appena il partner è dentro) o "Leggi una risposta".
 Scheda dell'invito: esito (In target · Con riserve · Da coltivare · Fuori target), punteggio su 28, cosa cerca / cosa lo
 trattiene, le risposte; **"Il metodo"** (cosa affrontare, promemoria per l'incontro, cosa dire se è no) si apre a
