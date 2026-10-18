@@ -815,14 +815,29 @@ let promptInstalla = null;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); promptInstalla = e; if(st.fase === "home") render(); });
 window.addEventListener("appinstalled", () => { promptInstalla = null; salvaLocale(CHIAVE_INSTALLA_NO, "1"); if(st.fase === "home") render(); });
 function puoInstallare(){ return !installata() && (suAndroid() || suIos()); }
+/* Su iPhone "Aggiungi alla schermata Home" c'è solo in Safari (e in Chrome): non nei browser interni delle app
+   da cui spesso si aprono i link. Quelli riconoscibili si nominano; per gli altri resta la nota in fondo. */
+function browserInterno(){
+  const u = navigator.userAgent;
+  if(/Instagram/i.test(u)) return "Instagram";
+  if(/FBAN|FBAV|FB_IAB/i.test(u)) return "Facebook";
+  if(/Telegram/i.test(u)) return "Telegram";
+  if(/WhatsApp/i.test(u)) return "WhatsApp";
+  return "";
+}
 function vInstalla(){
   if(!puoInstallare() || leggiLocale(CHIAVE_SALVATA) !== "1" || leggiLocale(CHIAVE_INSTALLA_NO) === "1") return "";
+  const interno = suIos() ? browserInterno() : "", chrome = /CriOS/.test(navigator.userAgent);
   const corpo = suIos() ? `
+    ${interno ? `<p class="avviso-interno">Sei dentro <b>${interno}</b>: da qui l'app non si può installare. Copia il link e apri la pagina in <b>Safari</b>.</p>` : ""}
     <ol class="passi">
       <li>Tocca <b>Copia il mio link</b> qui sotto: ti servirà tra un attimo.</li>
-      <li>In Safari tocca <b>Condividi</b> (il quadrato con la freccia in su) e poi <b>Aggiungi alla schermata Home</b>.</li>
+      ${interno ? `<li>Tocca <b>•••</b> in alto (o l'icona della bussola) e scegli <b>Apri in Safari</b>.</li>` : ""}
+      <li>${chrome ? "In Chrome tocca <b>Condividi</b> (in alto, nella barra dell'indirizzo)" : "In Safari tocca <b>Condividi</b> (il quadrato con la freccia in su)"}, scorri in basso e tocca <b>Aggiungi alla schermata Home</b>.</li>
       <li>Apri Growup dalla nuova icona e tocca <b>Incolla il link personale</b>: sei dentro, una volta per sempre.</li>
     </ol>
+    ${interno ? "" : `<p class="nota">Non trovi «Aggiungi alla schermata Home»? Forse hai aperto il link dentro WhatsApp o Telegram:
+      tocca <b>•••</b> in alto (o la bussola) e scegli <b>Apri in Safari</b>, poi riprova.</p>`}
     <p class="nota">Su iPhone l'app sulla Home non vede quello che hai fatto in Safari: per questo la prima volta ti chiede il link.</p>
     <div class="row" style="margin-top:10px"><button class="btn primary grow" data-act="copia-chiave">Copia il mio link</button>
       <button class="btn ghost" data-act="installa-no">Non ora</button></div>`
