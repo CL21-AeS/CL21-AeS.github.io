@@ -57,7 +57,8 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     "ricucita", numeri ufficiali dal report Amway (VPG, percentuale, linee) e qualifica calcolata su quelli
 15. `supabase/018_niente_cancellazioni.sql` — nessuno cancella dall'app; import sempre completo; chi non è più nel
     report resta segnato e nascosto
-16. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+16. `supabase/019_partenza_senza_conferma.sql` — nessuno conferma il punto di partenza; ognuno corregge il proprio
+17. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 17. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 18. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
@@ -189,7 +190,7 @@ Unica dipendenza esterna: la libreria ufficiale `@supabase/supabase-js` 2.117.2 
 ## Prossime fasi
 
 - **Fase 2 — Visione upline**: Il mio gruppo, Scheda partner, Struttura; VP di gruppo e linee attive calcolati
-  dall'albero; conferma dello sponsor sul punto di partenza.
+  dall'albero. Il punto di partenza lo dichiara e lo corregge ognuno per sé (dal 18 ottobre nessuno lo conferma).
 - **Fase 3 — Partner gestiti e presa in carico**: inserimento per conto terzi, soglia dei 14 giorni, link per
   prendere possesso del profilo (stesso link personale, mandato su WhatsApp/Telegram), avvisi.
 - **Fase 4 — Diagnosi e rifinitura**: mancanze evidenziate (nessun suggerimento: decide il partner), serie di settimane, 90 giorni.

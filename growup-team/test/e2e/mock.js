@@ -97,9 +97,9 @@
           da_report:!!n, linee_report:n ? n.linee : null, linee_nascoste:n ? !!n.nascoste : false }; }); },
     storico: async pid => (db.storico || []).filter(r => r.partner_id === pid),
     livelli: async () => [[3,200],[6,600],[9,1200],[12,2400],[15,4000],[18,7000],[21,10000]].map(([percentuale, vp_gruppo]) => ({ percentuale, vp_gruppo })),
-    conferma: async a => { const p = db.partners.find(x => x.id === a.p_partner);
+    modificaPartenza: async a => { const p = mio(); if(!p) throw new Error("non_autenticato");
       Object.assign(p, { qualifica_iniziale:a.p_qualifica, percentuale_iniziale:a.p_percentuale, qualifica_iniziale_mese:a.p_qualifica_mese,
-        pagamenti_iniziali:a.p_pagamenti, partenza_confermata_il:new Date().toISOString() }); db.conferme = (db.conferme || []).concat([a]); salva(); return pub(p); },
+        pagamenti_iniziali:a.p_pagamenti }); salva(); return pub(p); },
     nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid); p.chiave = hex();
       db.accessi = db.accessi.filter(a => a.partner_id !== pid); salva(); return p.chiave; },
     /* come nel database: il mio codice o quello di una persona che ho importato; unico tra chi usa l'app, e tra le mie importate */

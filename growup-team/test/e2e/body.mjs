@@ -231,16 +231,25 @@ await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.click("button[data-act=vista-gruppo]");
 check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isVisible()
   && !(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).count()), "la radice vede chi usa l'app, non le persone importate da Anna");
-// da confermare: Bea (pin 12%) e Ciro (Foundation 9%) hanno dichiarato un punto di partenza
-check(await page.locator(".card", { hasText:"Da confermare" }).getByText("Bea Verdi").isVisible(), "Bea da confermare");
-await page.locator(".card", { hasText:"Da confermare" }).locator("li", { hasText:"Bea Verdi" }).locator("button[data-act=conferma]").click();
-check(await page.locator(".sheet select[name=qualifica]").inputValue() === "pin:12", "il dichiarato è già selezionato");
-await page.selectOption(".sheet select[name=qualifica]", "pin:9");
-await page.click(".sheet button:has-text('Conferma')");
-await page.getByText("Punto di partenza confermato").waitFor();
-check(!(await page.locator(".card", { hasText:"Da confermare" }).locator("li", { hasText:"Bea Verdi" }).count()), "Bea confermata");
+// niente conferme: Bea (pin 12%) ha dichiarato un punto di partenza, lo sponsor lo vede soltanto
+check(!(await page.getByText("Da confermare").count()) && !(await page.locator("button[data-act=conferma]").count()), "nessun riquadro Da confermare");
+await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).locator("button[data-act=apri-scheda]").click();
+check(await page.getByText("Punto di partenza dichiarato: 12%").isVisible() && !(await page.locator("button[data-act=conferma]").count()),
+  "scheda: punto di partenza solo come informazione");
+await page.click("button.link[data-act=vista-gruppo]");
+// ognuno corregge il proprio, dal fondo della pagina
+await page.click("button[data-act=partenza]");
+check(await page.locator(".sheet select[name=qualifica]").inputValue() === "", "il dichiarato è già selezionato");
+await page.selectOption(".sheet select[name=qualifica]", "pin:3");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Punto di partenza aggiornato").waitFor();
 await sync(page);
-check(DB.partners.find(p => p.nome === "Bea Verdi").percentuale_iniziale === 9, "correzione salvata (12% -> 9%)");
+check(DB.partners.find(p => p.id === "R").percentuale_iniziale === 3, "il proprio punto di partenza corretto");
+await page.click("button[data-act=partenza]");
+await page.selectOption(".sheet select[name=qualifica]", "");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Punto di partenza aggiornato").waitFor();
+await sync(page);
 // la radice importa la sua rete: Paolo e Luca (con VPP) sì, Zeno (0 VP) no; Bea è di Ciro secondo il report
 const reportRadice = creaCsv(meseFile, [persona(1, "9", "1111111", "ROSSI, MARIO", "120,00"),
   persona(2, "1111111", "2000001", "BIANCHI, ANNA", "80,00"), persona(3, "2000001", "1000003", "NERI, PAOLO", "10,00"),

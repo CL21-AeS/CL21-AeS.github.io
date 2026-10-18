@@ -362,14 +362,19 @@ begin
                          'C ha dichiarato il pin 9%: punto di partenza da confermare');
   perform growup_test.ok((select partenza_confermata_il is not null from public.partners where id = a),
                          'A partiva da zero: niente da confermare');
-  perform growup_test.come(u4);  -- C
-  perform growup_test.deve_fallire(format('select public.conferma_partenza(%L, null, 9)', c), 'C non conferma sé stesso');
-  perform growup_test.come(u5);  -- A, altra linea
-  perform growup_test.deve_fallire(format('select public.conferma_partenza(%L, null, 9)', c), 'A non conferma C (altra linea)');
-  perform growup_test.come(u1);  -- R, sponsor di C: corregge 9% in 6%
-  perform growup_test.ok((public.conferma_partenza(c, null, 6)->>'percentuale_iniziale')::int = 6, 'R conferma C correggendo il pin');
+  -- 019: nessuno conferma più; ognuno corregge solo il proprio punto di partenza
+  perform growup_test.come(u1);  -- R, sponsor di C
+  perform growup_test.deve_fallire(format('select public.conferma_partenza(%L, null, 6)', c), 'lo sponsor non conferma più (funzione chiusa)');
+  perform growup_test.come(u4);  -- C corregge il suo: 9% → 6%
+  perform growup_test.ok((public.modifica_partenza(null, 6)->>'percentuale_iniziale')::int = 6, 'C corregge il proprio punto di partenza');
+  perform growup_test.deve_fallire('select public.modifica_partenza(null, 7)', 'percentuale non valida rifiutata');
+  perform growup_test.deve_fallire('select public.modifica_partenza(''inesistente'')', 'qualifica non valida rifiutata');
+  perform growup_test.come(u1);  -- R: modifica_partenza cambia solo il proprio profilo
+  perform public.modifica_partenza(null, null);
   execute 'reset role';
-  perform growup_test.ok((select partenza_confermata_da = r from public.partners where id = c), 'la conferma registra chi l''ha data');
+  perform growup_test.ok((select percentuale_iniziale = 6 from public.partners where id = c), 'R non tocca il punto di partenza di C');
+  perform growup_test.ok(not has_function_privilege('anon', 'public.modifica_partenza(text, int, date, int)', 'execute'),
+                         'chi non è entrato non può modificare');
 
   -- ---- Mesi chiusi e storico per chi guarda ----
   perform growup_test.come(u5);  -- A

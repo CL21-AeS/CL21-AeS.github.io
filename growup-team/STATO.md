@@ -18,6 +18,11 @@ Content Security Policy e il captcha.
 Su iPhone la guida all'installazione ora riconosce Telegram, WhatsApp, Instagram e Facebook ("Sei dentro Telegram…
 Apri in Safari"), dà i passi giusti anche in Chrome e, in Safari, ha la nota per chi è dentro un'altra app.
 
+**18 ottobre — niente conferme** (migrazione `019_partenza_senza_conferma.sql`): decisione di Stefano, ognuno è
+responsabile di dichiarare il giusto e i numeri veri arrivano dal report Amway. Tolti il riquadro "Da confermare",
+il "!" nella struttura e "Conferma" nella scheda (resta "Punto di partenza dichiarato" come informazione);
+`conferma_partenza` chiusa. Ognuno corregge il proprio dal fondo della pagina Io → "Modifica" (`modifica_partenza`).
+
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
    import, nascondi, scheda partner).
@@ -94,7 +99,7 @@ già applicate; attività pianificata `growup-chiusura-mese` attiva):
   per chi usa l'app, solo agli admin, "Nuovo link personale" (`nuova_chiave_per`);
 - `posso_gestire`: su un partner gestito scrivono chi l'ha aggiunto e tutta la sua upline;
 - riquadro "Da confermare" nella pagina Gruppo: il punto di partenza dichiarato si conferma o si corregge
-  (`conferma_partenza`, da sponsor o upline; colonne `partenza_confermata_il/_da`).
+  (`conferma_partenza`, da sponsor o upline; colonne `partenza_confermata_il/_da`). **Tolto il 18 ottobre** (019).
 
 **Inserisci in mezzo** (migrazione `008_inserisci_in_mezzo.sql` già applicata): nella scheda partner
 "Manca qualcuno sopra?" crea una persona senza app tra lo sponsor attuale e il partner (più eventuali "fratelli"
