@@ -31,11 +31,10 @@ rinasconde dall'elenco); struttura con **Mostra anche le nascoste** (albero comp
 Nascondi per riga); **Rivedi** = elenco Nascoste · Visibili con livello, sponsor e persone sotto, da cui si nasconde
 anche chi è visibile.
 
-**18 ottobre — il bonus di performance, in VP**: scheda "Il tuo bonus di …" nella pagina Io (e "Il suo bonus" nella
-scheda partner, per sponsor e upline): percentuale su VP di gruppo, per ogni linea la sua percentuale (dal report,
-altrimenti dalla tabella dei livelli) e la differenza; bonus in VP = % × VP sulla differenza; **percentuale
-effettiva** = bonus / VP di gruppo. Così si vede il "9% trasparente". Solo VP, mai euro (decisione di Stefano);
-linee non mostrate dal report: segnalate come non calcolabili. Nella pagina Obiettivo la riga "Questo mese: …".
+**18 ottobre — bonus di performance tolto**: la scheda "Il tuo bonus di …" (PR #54) è stata tolta su richiesta di
+Stefano ("non riempiamo le schermate"). Il calcolo (differenza di percentuale per linea, in VP, percentuale effettiva)
+tornerà in una **sezione dedicata per analizzare e gestire la situazione di una persona**, da progettare. Il codice
+di riferimento è nel commit "il bonus di performance in VP" della storia del repository.
 
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
