@@ -2489,36 +2489,39 @@ function testoProssima(p){
   const g = giorniTra(oggi(), p.prossima_data);
   return `${g < 0 ? "In ritardo · " : g === 0 ? "Oggi · " : g === 1 ? "Domani · " : ""}${dataIt(p.prossima_data)}${p.prossima_nota ? " · " + p.prossima_nota : ""}`;
 }
-/* le persone aperte da sentire: in ritardo, oggi, nei prossimi giorni; e quelle ferme da 2 settimane */
+/* Su Io, come promemoria: tutte le persone con cui è iniziato un percorso (da Contattato in poi), aperte o "Non ora"
+   con una data, tranne quelle che ho tolto da Io. Prima chi ha una data (in ritardo, oggi, prossimi giorni), poi le altre. */
+function ultimoPasso(p){ const s = passiDi(p.id)[0]; return s ? s.data : String(p.creato_il || oggi()).slice(0, 10); }
 function daFare(){
-  const aperte = st.persone.filter(aperta);
-  const conData = aperte.filter(p => p.prossima_data).sort((a, b) => a.prossima_data < b.prossima_data ? -1 : 1);
-  const ultimo = p => { const s = passiDi(p.id)[0]; return s ? s.data : String(p.creato_il || oggi()).slice(0, 10); };
+  const l = st.persone.filter(p => !p.nascosta_io && p.fase !== "lista" && (!p.esito || (p.esito === "non_ora" && p.prossima_data)));
+  const conData = l.filter(p => p.prossima_data).sort((a, b) => a.prossima_data < b.prossima_data ? -1 : 1);
   return {
     ritardo: conData.filter(p => p.prossima_data < oggi()),
     oggi: conData.filter(p => p.prossima_data === oggi()),
     presto: conData.filter(p => p.prossima_data > oggi() && p.prossima_data <= piuGiorni(oggi(), 4)),
-    ferme: aperte.filter(p => !p.esito && p.fase !== "lista" && !p.prossima_data && giorniTra(ultimo(p), oggi()) >= 14)
+    corso: l.filter(p => !p.prossima_data || p.prossima_data > piuGiorni(oggi(), 4))
+      .sort((a, b) => indiceFase(b.fase) - indiceFase(a.fase) || (ultimoPasso(a) < ultimoPasso(b) ? -1 : 1))
   };
 }
 
-/* Su Io: le persone da sentire. Se non c'è niente da fare, non occupa spazio. */
 function vDaFare(){
-  const d = daFare(), gruppi = [["In ritardo", d.ritardo], ["Oggi", d.oggi], ["Prossimi giorni", d.presto], ["Ferme da 2 settimane", d.ferme]]
+  const d = daFare(), gruppi = [["In ritardo", d.ritardo], ["Oggi", d.oggi], ["Prossimi giorni", d.presto], ["In corso", d.corso]]
     .filter(([, l]) => l.length);
   if(!gruppi.length) return "";
   return `<div class="card">
-    <span class="eyebrow">Da fare con la tua lista</span>
+    <span class="eyebrow">Il tuo percorso con la lista</span>
     ${gruppi.map(([t, l]) => `<p class="small da-fare-t">${t}</p>
-      <ul class="persone">${l.map(rigaPersona).join("")}</ul>`).join("")}
+      <ul class="persone">${l.map(p => rigaPersona(p, true)).join("")}</ul>`).join("")}
+    <p class="nota">× toglie una persona da qui (non dalla lista): la rimetti dalla sua scheda.</p>
   </div>`;
 }
-function rigaPersona(p){
-  const f = FASI[indiceFase(p.fase)];
-  return `<li><button class="persona" data-act="apri-persona" data-id="${esc(p.id)}">
-      <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${p.esito ? ESITI[p.esito] : f.nome}${p.prossima_data ? " · " + esc(testoProssima(p)) : ""}</span></span>
+function rigaPersona(p, suIo){
+  const f = FASI[indiceFase(p.fase)], fermo = !p.prossima_data && !p.esito && p.fase !== "lista" ? giorniTra(ultimoPasso(p), oggi()) : 0;
+  return `<li class="${suIo ? "su-io" : ""}"><button class="persona" data-act="apri-persona" data-id="${esc(p.id)}">
+      <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${p.esito ? ESITI[p.esito] : f.nome}${p.prossima_data ? " · " + esc(testoProssima(p))
+        : fermo >= 14 ? ` · nessun passo da ${fermo} giorni` : ""}</span></span>
       <span class="punti" aria-hidden="true">${FASI.map((x, i) => `<i class="${i <= indiceFase(p.fase) ? "on" : ""}"></i>`).join("")}</span>
-    </button></li>`;
+    </button>${suIo ? `<button class="x" data-act="togli-da-io" data-id="${esc(p.id)}" aria-label="Togli ${esc(p.nome)} da Io">×</button>` : ""}</li>`;
 }
 
 function vPersone(){
@@ -2582,6 +2585,7 @@ function vPersona(){
       : `<p class="muted" style="margin:6px 0 0">Ancora nessun passo. Il primo è il contatto.</p>`}
   </div>
   <div class="row" style="gap:6px;justify-content:center">
+    ${p.fase !== "lista" ? `<button class="btn small ghost" data-act="${p.nascosta_io ? "rimetti-in-io" : "togli-da-io"}" data-id="${esc(p.id)}">${p.nascosta_io ? "Rimetti in Io" : "Togli da Io"}</button>` : ""}
     <button class="btn small ghost" data-act="persona-modifica">Modifica i dati</button>
     <button class="btn small ghost" data-act="persona-cancella">Togli dalla lista</button>
   </div>`;
@@ -2670,6 +2674,14 @@ Object.assign(AZIONI, {
   "persona-modifica"(){ st.errore = ""; st.sheet = "persona-modifica"; render(); },
   passo(){ st.passoTipo = null; st.errore = ""; st.sheet = "passo"; render(); },
   "tipo-passo"(el){ st.passoTipo = el.dataset.tipo; render(); },
+  async "togli-da-io"(el){
+    try{ await api.modificaPersona(el.dataset.id, { nascosta_io:true }); await dopoPersone(`${nomeSaluto((st.persone.find(x => x.id === el.dataset.id) || {}).nome || "")} tolto da Io`); }
+    catch(e){ toast(messaggio(e)); }
+  },
+  async "rimetti-in-io"(el){
+    try{ await api.modificaPersona(el.dataset.id, { nascosta_io:false }); await dopoPersone("Di nuovo in Io"); }
+    catch(e){ toast(messaggio(e)); }
+  },
   prossima(){ st.errore = ""; st.sheet = "prossima"; render(); },
   async "persona-cancella"(){
     const p = st.persone.find(x => x.id === st.personaId);

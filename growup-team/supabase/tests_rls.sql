@@ -522,6 +522,8 @@ begin
   perform growup_test.come(u3);
   insert into public.passi (persona_id, tipo) values (pp, 'riapri');
   perform growup_test.ok((select esito is null from public.persone where id = pp), 'Riapri il percorso');
+  update public.persone set nascosta_io = true where id = pp;
+  perform growup_test.ok((select nascosta_io from public.persone where id = pp), 'B toglie una persona da Io');
   delete from public.passi where id = pq;
   perform growup_test.ok((select fase = 'contattato' from public.persone where id = pp), 'togliendo il piano la fase torna indietro');
   execute 'reset role';
@@ -529,6 +531,7 @@ begin
   perform growup_test.come(u2);  -- A, sponsor di B
   perform growup_test.ok((select count(*) from public.persone) = 0 and (select count(*) from public.passi) = 0, 'lo sponsor non vede i nomi della lista di B');
   perform growup_test.ok(growup_test.righe(format('update public.persone set nome = ''X'' where id = %L', pp)) = 0, 'lo sponsor non modifica la lista di B');
+  perform growup_test.ok(growup_test.righe(format('update public.persone set nascosta_io = true where id = %L', pp)) = 0, 'lo sponsor non nasconde i nomi di B da Io');
   perform growup_test.deve_fallire(format('insert into public.passi (persona_id, tipo) values (%L, ''nota'')', pp), 'lo sponsor non segna passi sulla lista di B');
   perform growup_test.ok((public.numeri_persone(b)->>'totale')::int = 1 and (public.numeri_persone(b)->>'in_corso')::int = 1,
                          'lo sponsor vede solo i numeri della lista di B');
