@@ -954,17 +954,6 @@ await page.fill(".sheet textarea[name=righe]", "Marta Neri, 333 999, palestra\nL
 await page.click(".sheet button:has-text('Aggiungi')");
 await page.getByText("1 nome aggiunto").waitFor();
 check(await page.getByText("Chiusi · 1").isVisible() && await page.getByText("In lista · 1").isVisible(), "filtri con i conteggi");
-// importazione dalla vecchia app: i nomi già presenti non si doppiano, i passi non contano attività
-await page.click("button[data-act=importa-lista]");
-const attPrima = DB.activities.length;
-await page.setInputFiles("#file-lista", { name:"lista-nomi.json", mimeType:"application/json", buffer:Buffer.from(JSON.stringify({ v:1, people:[
-  { name:"Gino Vecchio", contact:"", events:[{ type:"contatto", date:"2026-01-10", how:"Telefono" }, { type:"piano", date:"2026-01-20", plan:"molto" }] },
-  { name:"Marta Neri" }] })) });
-await page.getByText("1 nome importato, 1 già presente").waitFor();
-await sync(page);
-check(DB.persone.find(x => x.nome === "Gino Vecchio").fase === "piano" && DB.activities.length === attPrima,
-  "import: Gino arriva con i suoi passi, senza contare attività");
-check(DB.passi.some(x => x.reazione === "Molto interessato"), "import: il risultato del piano diventa la reazione");
 await ctx.close();
 // lo sponsor vede solo i numeri della lista di chi sta sotto
 const annaId = "lia";

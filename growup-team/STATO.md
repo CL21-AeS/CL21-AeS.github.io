@@ -46,8 +46,8 @@ Fase 1 (migrazione `020_persone.sql`): tabelle `persone` e `passi`; percorso In 
 Piano → Follow-up → Chiusura (Partner · Cliente · Non ora · No) con le voci di "Dalla Lista al Sì"; un passo
 Contatto / Piano / Chiusura-Cliente **conta da solo** l'attività (trigger), togliendo il passo si toglie;
 "Da fare con la tua lista" su Io (in ritardo, oggi, prossimi giorni, ferme da 2 settimane); nella scheda partner
-"La sua lista: …" (solo numeri); importazione dal backup JSON della vecchia app (passi importati non contano
-attività); "Scarica la mia lista"; Partner chiuso → "Mandagli il tuo link d'invito". Informativa aggiornata.
+"La sua lista: …" (solo numeri); "Scarica la mia lista" (l'importazione dalla vecchia app, usata solo in prova,
+è stata tolta il 18 ottobre); Partner chiuso → "Mandagli il tuo link d'invito". Informativa aggiornata.
 
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
