@@ -1268,7 +1268,8 @@ function vStruttura(){
         <button class="btn link small" data-act="nascoste" style="min-height:0;padding:0 4px">${nascoste ? "Rivedi" : "Scegli chi nascondere"}</button></p>
       ${nascoste ? `<button class="btn small ghost${completa ? " on" : ""}" data-act="con-nascoste" aria-pressed="${!!completa}" style="margin-top:8px">
         ${completa ? "Torna alla mia struttura" : "Mostra anche le nascoste"}</button>
-        ${completa ? `<p class="nota">Le nascoste sono in grigio, al loro posto. Mostra o Nascondi su ogni riga.</p>` : ""}` : ""}`
+        ${completa ? `<p class="nota">Le nascoste sono in grigio, al loro posto. I gruppi partono chiusi: ▸ apre il gruppo di una persona.
+          Mostra o Nascondi su ogni riga.</p>` : ""}` : ""}`
       : `<p class="muted" style="margin:8px 0 0">Ancora nessuno nel tuo gruppo. Invita chi vuole usare l'app con il link qui sotto,
           oppure importa il report Amway per vedere anche chi non la usa.</p>`}
   </div>`;
@@ -2163,7 +2164,16 @@ const AZIONI = {
   },
   nascoste(){ st.filtroNascoste = st.nascosti.size ? "nascoste" : "visibili"; st.sheet = "nascoste"; render(); },
   "filtro-nascoste"(el){ st.filtroNascoste = el.dataset.filtro; render(); },
-  "con-nascoste"(){ st.conNascoste = !st.conNascoste; render(); },
+  /* la struttura completa parte con i gruppi chiusi (si vedono i frontali, ▸ apre un gruppo);
+     tornando alla mia struttura, i gruppi tornano aperti o chiusi come prima */
+  "con-nascoste"(){
+    st.conNascoste = !st.conNascoste;
+    if(st.conNascoste){
+      st.chiusiPrima = new Set(st.chiusi);
+      st.chiusi = new Set(st.struttura.filter(p => p.id !== st.profilo.id && figli(p.id).length).map(p => p.id));
+    }else if(st.chiusiPrima){ st.chiusi = st.chiusiPrima; st.chiusiPrima = null; }
+    render();
+  },
   async "nascondi-qui"(el){
     try{
       await api.nascondi(st.profilo.id, el.dataset.id);
@@ -2176,7 +2186,7 @@ const AZIONI = {
     try{
       await api.mostra(st.profilo.id, el.dataset.id);
       st.nascosti.delete(el.dataset.id);
-      if(!st.nascosti.size) st.conNascoste = false;
+      if(!st.nascosti.size && st.conNascoste){ st.conNascoste = false; if(st.chiusiPrima){ st.chiusi = st.chiusiPrima; st.chiusiPrima = null; } }
       render(); toast(`${nomeDi(el.dataset.id)} di nuovo nella tua struttura`);
     }catch(e){ toast(messaggio(e)); }
   },
