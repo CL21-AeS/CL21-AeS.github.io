@@ -1071,6 +1071,8 @@ await page.getByText("Invito pronto").waitFor();
 await sync(page);
 const dario = DB.persone.find(x => x.nome === "Dario Conosciuto"), invD = DB.inviti.find(x => x.nome === "Dario Conosciuto");
 check(dario.invito_target_id === invD.id && invD.persona_id === dario.id, "l'invito nasce collegato alla persona della lista");
+check(dario.fase === "contattato" && DB.passi.some(x => x.persona_id === dario.id && x.tipo === "contatto" && x.come === "Target"),
+  "mandando il Target chi era In lista diventa Contattato");
 await page.click("button[data-act=torna-target]"); await page.click("button[data-sez=lista]");
 await page.locator("button[data-act=apri-persona]", { hasText:"Dario Conosciuto" }).click();
 check(await page.getByText(/Target: in attesa/).isVisible(), "nella scheda: Target in attesa");
