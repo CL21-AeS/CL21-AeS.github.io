@@ -20,6 +20,12 @@
   const visibiliRicuciti = io => visibili(io).map(p => Object.assign({}, p, { sponsor_id:sponsorVis(io, p) }));
   const antenatoConApp = p => { let s = db.partners.find(x => x.id === p.sponsor_id);
     while(s && s.stato === "gestito" && s.sponsor_id) s = db.partners.find(x => x.id === s.sponsor_id); return s ? s.id : p.sponsor_id; };
+  const ricalcolaPersona = pe => { if(!pe) return;
+    const ps = (db.passi || []).filter(x => x.persona_id === pe.id), ord = { contatto:1, invito:2, piano:3, followup:4 };
+    const max = Math.max(0, ...ps.map(x => ord[x.tipo] || 0));
+    pe.fase = ["lista", "contattato", "invitato", "piano", "followup"][max];
+    const c = ps.filter(x => x.tipo === "chiusura" || x.tipo === "riapri").sort((x, y) => x.data < y.data ? 1 : x.data > y.data ? -1 : x.creato_il < y.creato_il ? 1 : -1)[0];
+    pe.esito = c && c.tipo === "chiusura" ? c.esito : null; };
   window.GROWUP_API = {
     session: async () => session,
     signInAnon: async token => { if(db.anonDisattivo) throw new Error("Anonymous sign-ins are disabled");
@@ -173,6 +179,38 @@
     stages: async () => db.stages,
     settings: async () => db.settings,
     activities: async (pid, dal) => db.activities.filter(a => a.partner_id === pid && (a.data >= dal || ["ordine","rettifica","cliente"].includes(a.tipo))),
+    /* la Lista: solo mia; i passi contano le attività e aggiornano fase ed esito, come i trigger del database */
+    persone: async () => (db.persone || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
+    passi: async () => (db.passi || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
+    nuovePersone: async righe => { db.persone = (db.persone || []).concat(righe.map(r => Object.assign({ fase:"lista", esito:null,
+      proprietario:mio().id, creato_il:new Date().toISOString(), prossima_data:null, prossima_nota:null }, r))); salva(); },
+    modificaPersona: async (id, campi) => { const x = (db.persone || []).find(y => y.id === id && y.proprietario === mio().id);
+      if(x) Object.assign(x, campi); salva(); },
+    cancellaPersona: async id => { db.persone = db.persone.filter(y => !(y.id === id && y.proprietario === mio().id));
+      db.passi = (db.passi || []).filter(y => y.persona_id !== id); salva(); },
+    nuoviPassi: async righe => {
+      for(const r of righe){
+        const pe = (db.persone || []).find(y => y.id === r.persona_id);
+        if(!pe || pe.proprietario !== mio().id) throw new Error("non_autorizzato");
+        const t = r.tipo === "contatto" ? "contatto" : r.tipo === "piano" ? "piano" : r.tipo === "chiusura" && r.esito === "cliente" ? "cliente" : null;
+        const passo = Object.assign({ proprietario:pe.proprietario, creato_il:new Date().toISOString() + Math.random(), attivita_id:null }, r);
+        if(t && !r.importato){ const a = { id:uid(), partner_id:pe.proprietario, tipo:t, quantita:1, data:r.data, inserito_da:pe.proprietario, inserito_il:new Date().toISOString() };
+          db.activities.push(a); passo.attivita_id = a.id; }
+        db.passi = (db.passi || []).concat([passo]);
+        ricalcolaPersona(pe);
+      }
+      salva(); },
+    cancellaPasso: async id => { const x = (db.passi || []).find(y => y.id === id);
+      if(!x) return; db.passi = db.passi.filter(y => y.id !== id);
+      if(x.attivita_id) db.activities = db.activities.filter(a => a.id !== x.attivita_id);
+      ricalcolaPersona(db.persone.find(y => y.id === x.persona_id)); salva(); },
+    numeriPersone: async pid => { const io = mio(), t = db.partners.find(p => p.id === pid);
+      if(!t || !vedo(io, t)) throw new Error("non_autorizzato");
+      const l = (db.persone || []).filter(x => x.proprietario === pid), m = new Date().toISOString().slice(0, 7);
+      return { in_lista:l.filter(x => !x.esito && x.fase === "lista").length, in_corso:l.filter(x => !x.esito && x.fase !== "lista").length,
+        piani_mese:(db.passi || []).filter(x => x.proprietario === pid && x.tipo === "piano" && x.data.slice(0, 7) === m).length,
+        si_mese:(db.passi || []).filter(x => x.proprietario === pid && x.tipo === "chiusura" && ["partner", "cliente"].includes(x.esito) && x.data.slice(0, 7) === m).length,
+        totale:l.length }; },
     addActivity: async row => { const r = Object.assign({ id:uid(), inserito_il:new Date().toISOString(), inserito_da:mio().id }, row); db.activities.push(r); salva(); return r; },
     deleteActivity: async id => { db.activities = db.activities.filter(a => a.id !== id); salva(); },
     lastGoal: async (pid, fino) => db.goals.filter(g => g.partner_id === pid && g.settimana <= fino).sort((a,b) => a.settimana < b.settimana ? 1 : -1).slice(0,1),

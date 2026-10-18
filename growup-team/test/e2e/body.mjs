@@ -677,11 +677,15 @@ const trascina = (x1, x2, y1 = 400, y2 = 400, su = "#app") => page.evaluate(([x1
     el.dispatchEvent(new TouchEvent(tipo, { bubbles:true, cancelable:true, touches: tipo === "touchend" ? [] : [t], changedTouches:[t] })); };
   tocca("touchstart", x1, y1); tocca("touchend", x2, y2);
 }, [x1, x2, y1, y2, su]);
-check((await page.locator(".schede button").allInnerTexts()).join(" | ") === "Obiettivo | Io | Gruppo", "pagine in ordine: Obiettivo | Io | Gruppo");
+check((await page.locator(".schede button").allInnerTexts()).join(" | ") === "Obiettivo | Io | Persone | Gruppo", "pagine in ordine: Obiettivo | Io | Persone | Gruppo");
 await trascina(320, 80);
-check(await page.getByText("Il mio gruppo").first().isVisible(), "verso sinistra: da Io a Gruppo");
+check(await page.locator(".testata h1").innerText() === "Persone", "verso sinistra: da Io a Persone");
+await trascina(320, 80);
+check(await page.getByText("Il mio gruppo").first().isVisible(), "verso sinistra: da Persone a Gruppo");
 await trascina(80, 320);
-check(await page.getByText("Ciao Stefano e Alessia").isVisible(), "verso destra: da Gruppo a Io");
+check(await page.locator(".testata h1").innerText() === "Persone", "verso destra: da Gruppo a Persone");
+await trascina(80, 320);
+check(await page.getByText("Ciao Stefano e Alessia").isVisible(), "verso destra: da Persone a Io");
 await trascina(80, 320);
 check(await page.locator(".testata h1").innerText() === "Il mio obiettivo", "verso destra: da Io a Obiettivo");
 await trascina(320, 80);
@@ -778,6 +782,7 @@ await sync(page);
 check(!DB.nascosti.some(x => x.nascosto_id === "imp-gino") && DB.nascosti.some(x => x.nascosto_id === idDi("Nino Nuovo")), "Riapplica i filtri: Gino visibile, Nino nascosto");
 check(DB.activities.filter(a => a.tipo === "rettifica").length === nRett, "reimport dello stesso file: nessun dato nuovo");
 await scegliFile(page, "di-altri.csv", creaCsv(meseFile, [persona(1, "1", "7777777", "ALTRO, ALDO", "1")]));
+await page.locator(".sheet .errore").waitFor();
 check(await page.locator(".sheet .errore").getByText("il tuo codice nell'app è 1234567").isVisible()
   && await page.locator(".sheet .errore").getByText("correggilo in fondo alla pagina Io").isVisible(), "import: il report di un altro partner è rifiutato (admin: correggi)");
 await page.click(".sheet button[data-act=chiudi]");
@@ -897,6 +902,87 @@ DB.captchaKo = true;
 await page.getByText("Il controllo di sicurezza non è riuscito").waitFor();
 check(!(await page.locator(".captcha").count()), "captcha fallito: messaggio chiaro e nessun accesso");
 await ctx.close(); DB.captchaKo = false;
+
+// 22. Persone → la Lista: nomi solo miei, passi che contano le attività, da fare, numeri per l'upline, import
+DB.persone = []; DB.passi = [];
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.click("button[data-act=vista-persone]");
+check(await page.getByText("La tua lista è vuota").isVisible(), "Persone: lista vuota con l'invito a scrivere i nomi");
+await page.click("button[data-act=persona-nuova]");
+await page.fill(".sheet input[name=nome]", "Luigi Verdi"); await page.fill(".sheet input[name=contatto]", "333 1234567");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Luigi Verdi nella tua lista").waitFor();
+check(await page.locator("button[data-act=passo]").innerText() === "Segna un passo · Contatto", "scheda persona: il passo proposto è il contatto");
+const contattiPrima = DB.activities.filter(a => a.partner_id === "R" && a.tipo === "contatto").length;
+await page.click("button[data-act=passo]");
+await page.click(".sheet label.chip:has-text('Telefono')");
+await page.click(".sheet label.chip:has-text('Aperto, incuriosito')");
+await page.click(".sheet label.chip:has-text('Domani')");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Contatto segnato").waitFor();
+await sync(page);
+const luigi = DB.persone.find(x => x.nome === "Luigi Verdi");
+check(luigi.fase === "contattato" && luigi.prossima_data > oggiStr && luigi.proprietario === "R", "il contatto porta Luigi a Contattato, con la prossima data");
+check(DB.activities.filter(a => a.partner_id === "R" && a.tipo === "contatto").length === contattiPrima + 1, "il contatto è contato da solo nei numeri");
+check(await page.locator(".percorso-persona li.qui").innerText() === "Contattato", "il percorso mostra dove è Luigi");
+await page.click("button[data-act=vista-io]");
+check(await page.locator(".card", { hasText:"Da fare con la tua lista" }).getByText("Luigi Verdi").isVisible(), "Io: Luigi tra le cose da fare");
+await page.locator(".card", { hasText:"Da fare con la tua lista" }).locator("button[data-act=apri-persona]").click();
+await page.getByText("Prossima cosa").waitFor();
+await page.click("button[data-act=passo]");
+await page.click(".sheet button[data-tipo=piano]");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Piano segnato").waitFor();
+await page.click("button[data-act=passo]");
+await page.click(".sheet button[data-tipo=chiusura]");
+await page.click(".sheet button:has-text('Salva')");
+check(await page.locator(".sheet .errore").getByText("Scegli com'è finita").isVisible(), "chiusura: serve l'esito");
+await page.click(".sheet label.chip:has-text('Partner')");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Chiusura · Partner segnato").waitFor();
+check(await page.getByText("Mandagli il tuo link d'invito").isVisible(), "Partner: si manda il link d'invito di Growup");
+await sync(page);
+const pianiDopo = DB.activities.filter(a => a.partner_id === "R" && a.tipo === "piano").length;
+await page.locator(".card", { hasText:"I passi" }).locator("li", { hasText:"Piano" }).locator("button[data-act=togli-passo]").click();
+await page.getByText("Passo tolto").waitFor();
+await sync(page);
+check(DB.activities.filter(a => a.partner_id === "R" && a.tipo === "piano").length === pianiDopo - 1, "togliendo il passo si toglie il piano contato");
+await page.click("button[data-act=torna-lista]");
+await page.click("button[data-act=persone-tante]");
+await page.fill(".sheet textarea[name=righe]", "Marta Neri, 333 999, palestra\nLuigi Verdi");
+await page.click(".sheet button:has-text('Aggiungi')");
+await page.getByText("1 nome aggiunto").waitFor();
+check(await page.getByText("Chiusi · 1").isVisible() && await page.getByText("In lista · 1").isVisible(), "filtri con i conteggi");
+// importazione dalla vecchia app: i nomi già presenti non si doppiano, i passi non contano attività
+await page.click("button[data-act=importa-lista]");
+const attPrima = DB.activities.length;
+await page.setInputFiles("#file-lista", { name:"lista-nomi.json", mimeType:"application/json", buffer:Buffer.from(JSON.stringify({ v:1, people:[
+  { name:"Gino Vecchio", contact:"", events:[{ type:"contatto", date:"2026-01-10", how:"Telefono" }, { type:"piano", date:"2026-01-20", plan:"molto" }] },
+  { name:"Marta Neri" }] })) });
+await page.getByText("1 nome importato, 1 già presente").waitFor();
+await sync(page);
+check(DB.persone.find(x => x.nome === "Gino Vecchio").fase === "piano" && DB.activities.length === attPrima,
+  "import: Gino arriva con i suoi passi, senza contare attività");
+check(DB.passi.some(x => x.reazione === "Molto interessato"), "import: il risultato del piano diventa la reazione");
+await ctx.close();
+// lo sponsor vede solo i numeri della lista di chi sta sotto
+const annaId = "lia";
+DB.partners.push({ id:annaId, nome:"Lia Lista", sponsor_id:"R", stato:"attivo", codice_invito:"LIALIA", creato_il:new Date().toISOString(),
+  ultimo_aggiornamento:new Date().toISOString() });
+DB.persone.push({ id:"pa1", proprietario:annaId, nome:"Segreto Uno", fase:"lista", esito:null },
+  { id:"pa2", proprietario:annaId, nome:"Segreto Due", fase:"piano", esito:null });
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.click("button[data-act=vista-gruppo]");
+await page.locator(".albero.struttura li", { hasText:"Lia Lista" }).locator("button[data-act=apri-scheda]").first().click();
+await page.getByText("La sua lista:").waitFor();
+check(await page.getByText(/La sua lista: 1 in lista · 1 in corso/).isVisible() && !(await page.getByText("Segreto").count()),
+  "scheda partner: i numeri della sua lista, mai i nomi");
+await page.click("button[data-act=vista-persone]");
+check(!(await page.getByText("Segreto").count()), "la lista di Lia non compare nella mia");
+await page.screenshot({ path: S + "/e2e/30-persone.png", fullPage:true });
+await ctx.close();
 
 await browser.close();
 console.log(`controlli superati: ${ok}`);

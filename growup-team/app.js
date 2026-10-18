@@ -70,6 +70,14 @@ function creaApi(){
     nascondi:     (io, pid) => q(sb.from("nascosti").insert({ partner_id:io, nascosto_id:pid })),
     mostra:       (io, pid) => q(sb.from("nascosti").delete().eq("partner_id", io).eq("nascosto_id", pid)),
     nascondiTanti:(io, ids) => q(sb.from("nascosti").insert(ids.map(id => ({ partner_id:io, nascosto_id:id })))),
+    persone:      () => q(sb.from("persone").select("*")),
+    passi:        () => q(sb.from("passi").select("*")),
+    nuovePersone: righe => q(sb.from("persone").insert(righe)),
+    modificaPersona: (id, campi) => q(sb.from("persone").update(campi).eq("id", id)),
+    cancellaPersona: id => q(sb.from("persone").delete().eq("id", id)),
+    nuoviPassi:   righe => q(sb.from("passi").insert(righe)),
+    cancellaPasso: id => q(sb.from("passi").delete().eq("id", id)),
+    numeriPersone: pid => q(sb.rpc("numeri_persone", { p_partner:pid })),
     mostraTanti:  (io, ids) => q(sb.from("nascosti").delete().eq("partner_id", io).in("nascosto_id", ids)),
     stages:       () => q(sb.from("stage_requirements").select("*").order("ordine")),
     settings:     () => q(sb.from("settings").select("chiave,valore")),
@@ -107,6 +115,9 @@ const st = {
   struttura: [],          // io e la mia downline
   linkGestito: null,      // { nome, chiave }: nuovo link personale creato dall'admin per chi l'ha perso
   nascosti: new Set(),    // persone nascoste dalla mia struttura (solo loro: chi sta sotto resta)
+  persone: [], passi: [], // la mia lista (solo mia) e i suoi passi
+  personaId: null, filtroLista: "aperti", cercaLista: "", passoTipo: null,
+  numeriLista: {},        // per la scheda partner: solo i numeri della sua lista
   conNascoste: false,     // struttura completa: le nascoste al loro posto, in grigio
   filtroNascoste: "nascoste", // elenco "Chi vedi": nascoste | visibili
   esclusi: new Set(),     // codici esclusi dagli import
@@ -390,6 +401,7 @@ async function caricaTutto(){
   try{ st.obiettivo = await api.obiettivo(p.id) || null; }catch(e){ st.obiettivo = null; }
   try{ st.obiettiviGruppo = new Map((await api.obiettiviGruppo2() || []).map(o => [o.partner_id, o])); }catch(e){}
   await caricaNumeri();
+  await caricaPersone();
 
   /* nuova settimana / nuovo mese: si riparte dall'ultimo obiettivo scelto */
   const g = (goals || [])[0];
@@ -709,9 +721,11 @@ function vIngresso(){
 function testoPrivacy(){
   return `<div class="small stack" style="margin-top:10px">
       <p><b>Cosa raccogliamo.</b> Nome, data di iscrizione, qualifica e i tuoi numeri: quanti contatti,
-        quanti piani, quanti VP, quanti clienti. Dei tuoi contatti e clienti registriamo <b>solo il numero</b>: nessun nome né telefono.
-        Non serve la tua email.</p>
+        quanti piani, quanti VP, quanti clienti. Non serve la tua email.</p>
       <p><b>Chi li vede.</b> Tu e chi sta sopra di te nella tua organizzazione (la tua upline). Nessun altro.</p>
+      <p><b>La tua lista.</b> I nomi e i dati che scrivi nella pagina Persone li vedi <b>solo tu</b>: né la tua upline né
+        Stefano e Alessia. A chi ti segue arrivano soltanto i numeri (quanti in lista, piani, sì). Inserisci solo persone
+        che conosci, con i dati che servono a ricontattarle; le togli quando vuoi.</p>
       <p><b>A cosa servono.</b> A pianificare la tua settimana e a farti aiutare da chi ti segue.</p>
       <p><b>Dove stanno.</b> In un database ospitato nell'Unione Europea (Supabase).</p>
       <p><b>I tuoi diritti.</b> Puoi chiedere in qualsiasi momento di vedere, correggere o cancellare il tuo
@@ -738,6 +752,7 @@ function vSelettore(){
   return `<div class="schede" role="tablist" aria-label="Pagina">
     <button role="tab" aria-selected="${st.vista === "obiettivo"}" class="${st.vista === "obiettivo" ? "on" : ""}" data-act="vista-obiettivo">Obiettivo</button>
     <button role="tab" aria-selected="${st.vista === "io"}" class="${st.vista === "io" ? "on" : ""}" data-act="vista-io">Io</button>
+    <button role="tab" aria-selected="${st.vista === "persone"}" class="${st.vista === "persone" ? "on" : ""}" data-act="vista-persone">Persone</button>
     <button role="tab" aria-selected="${st.vista === "gruppo" || st.vista === "scheda"}" class="${st.vista === "gruppo" || st.vista === "scheda" ? "on" : ""}" data-act="vista-gruppo">Gruppo</button>
   </div>`;
 }
@@ -774,6 +789,13 @@ function vHome(){
   const p = st.profilo;
   const gruppo = st.vista === "gruppo" || st.vista === "scheda";
   const persone = alberoSotto(p.id, 0).length;
+  if(st.vista === "persone") return `
+  <div class="testata">
+    <div>${marchio()}<h1>${st.personaId ? "La mia lista" : "Persone"}</h1></div>
+    ${vSelettore()}
+  </div>
+  ${vPersone()}
+  ${vFondo()}`;
   if(st.vista === "obiettivo") return `
   <div class="testata">
     <div>${marchio()}<h1>Il mio obiettivo</h1></div>
@@ -795,6 +817,7 @@ function vHome(){
   ${leggiLocale(CHIAVE_SALVATA) === "1" || !st.chiave ? "" : vSalvaChiave()}
   ${vInstalla()}
   ${vObiettivoBreve()}
+  ${vDaFare()}
   ${vTappa()}
   ${vSettimana()}
   ${vMese()}
@@ -1489,6 +1512,7 @@ function vScheda(){
       return l.length ? `<ul class="linee">${l.map(x => `<li><span class="grow">${esc(x.nome)}</span>
       <span class="num ${x.vp >= soglia() ? "" : "faint"}">${num(x.vp)} VP</span></li>`).join("")}</ul>` : ""; })()}
     <p class="small" style="margin:10px 0 0">Punto di partenza dichiarato: <b>${esc(testoPartenza(p))}</b></p>
+    ${gestito ? "" : vNumeriLista(p.id)}
     <button class="btn wide" style="margin-top:12px" data-act="chiamata" data-id="${esc(p.id)}">Fissa una chiamata</button>
   </div>
   ${vConfronto(p)}
@@ -1846,6 +1870,8 @@ async function eseguiImport(f){
 /* ---- 10. Fogli in basso ---- */
 function vSheet(){
   const s = st.sheet;
+  const sp = vSheetPersone(s);
+  if(sp) return sp;
   const err = st.errore ? `<p class="errore">${esc(st.errore)}</p>` : "";
   const piede = `<div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
         <button class="btn primary grow">Salva</button></div>`;
@@ -2135,6 +2161,7 @@ const AZIONI = {
     st.vista = "scheda"; render(); window.scrollTo(0, 0);
     try{ st.attScheda = (await api.activities(p.id, primaDataAperta()) || []).filter(a => a.data >= primaDataAperta()); render(); }
     catch(e){ toast(messaggio(e)); }
+    if(p.stato !== "gestito") api.numeriPersone(p.id).then(n => { st.numeriLista[p.id] = n; render(); }).catch(() => {});
   },
   partenza(){ st.sheet = "partenza"; render(); },
   chiamata(el){ st.chiamataId = el.dataset.id; st.errore = ""; st.sheet = "chiamata"; render(); },
@@ -2415,6 +2442,397 @@ function mostraErroreForm(f, msg){
   p.textContent = msg;
 }
 
+/* ---- 11b. Persone: la Lista (dalla mini app "Dalla Lista al Sì") ----
+   Ognuno ha qui i nomi della sua lista e il percorso fino al sì. Nomi e dettagli li vede solo lui (RLS "solo mio");
+   allo sponsor e all'upline arrivano soltanto i numeri. Segnare un passo conta da solo l'attività
+   (Contatto, Piano, Chiusura "Cliente"): lo fa il database. */
+const FASI = [
+  { id:"lista", nome:"In lista" }, { id:"contattato", nome:"Contattato" }, { id:"invitato", nome:"Invitato" },
+  { id:"piano", nome:"Piano fatto" }, { id:"followup", nome:"Follow-up" }];
+const ESITI = { partner:"Partner", cliente:"Cliente", non_ora:"Non ora", no:"No" };
+const TIPI_PASSO = {
+  contatto: { nome:"Contatto", come:["Telefono", "Messaggio", "Di persona", "Social"],
+    reazione:["Aperto, incuriosito", "Gentile ma tiepido", "Dice che ha poco tempo", "Non ha risposto"], prossima:"Quando ci ritorni sopra" },
+  invito: { nome:"Invito", come:["Piano a casa", "Videochiamata", "Uno-a-uno al bar", "Evento"],
+    reazione:["Sì, appuntamento fissato", "Deve confermare", "Ha rimandato", "No"], prossima:"Data dell'appuntamento" },
+  piano: { nome:"Piano", come:["A casa sua", "A casa mia", "Videochiamata", "Al bar", "Evento"],
+    reazione:["Molto interessato", "Interessato", "Deve pensarci", "Poco interessato", "Non si è presentato"], prossima:"Quando lo risenti" },
+  followup: { nome:"Follow-up", come:["Telefono", "Messaggio", "Di persona", "Videochiamata"],
+    reazione:["Vuole partire", "Ha ancora dubbi", "Deve parlarne in famiglia", "Ha rimandato", "Non ha risposto"], prossima:"Quando lo risenti" },
+  chiusura: { nome:"Chiusura", prossima:"" },
+  nota: { nome:"Nota", prossima:"Prossima cosa da fare" }
+};
+const PROSSIMA_CHIUSURA = { partner:"Primo passo insieme", cliente:"Quando risentirlo", non_ora:"Quando riprovare", no:"" };
+const FILTRI_LISTA = [
+  { id:"aperti", nome:"Aperti", ok:p => !p.esito || p.esito === "non_ora" },
+  { id:"lista", nome:"In lista", ok:p => !p.esito && p.fase === "lista" },
+  { id:"corso", nome:"In corso", ok:p => !p.esito && p.fase !== "lista" },
+  { id:"riprendere", nome:"Da riprendere", ok:p => p.esito === "non_ora" },
+  { id:"chiusi", nome:"Chiusi", ok:p => p.esito && p.esito !== "non_ora" }];
+
+function uuid(){ return crypto.randomUUID ? crypto.randomUUID()
+  : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)); }
+async function caricaPersone(){
+  try{
+    const [persone, passi] = await Promise.all([api.persone(), api.passi()]);
+    st.persone = persone || []; st.passi = passi || [];
+  }catch(e){ st.persone = st.persone || []; st.passi = st.passi || []; }
+}
+function passiDi(id){ return st.passi.filter(s => s.persona_id === id).sort((a, b) => a.data < b.data ? 1 : a.data > b.data ? -1 : a.creato_il < b.creato_il ? 1 : -1); }
+function indiceFase(f){ return Math.max(0, FASI.findIndex(x => x.id === f)); }
+function aperta(p){ return !p.esito || p.esito === "non_ora"; }
+function passoProposto(p){
+  return p.esito ? "nota" : { lista:"contatto", contattato:"invito", invitato:"piano", piano:"followup", followup:"followup" }[p.fase] || "contatto";
+}
+function testoProssima(p){
+  if(!p.prossima_data) return "";
+  const g = giorniTra(oggi(), p.prossima_data);
+  return `${g < 0 ? "In ritardo · " : g === 0 ? "Oggi · " : g === 1 ? "Domani · " : ""}${dataIt(p.prossima_data)}${p.prossima_nota ? " · " + p.prossima_nota : ""}`;
+}
+/* le persone aperte da sentire: in ritardo, oggi, nei prossimi giorni; e quelle ferme da 2 settimane */
+function daFare(){
+  const aperte = st.persone.filter(aperta);
+  const conData = aperte.filter(p => p.prossima_data).sort((a, b) => a.prossima_data < b.prossima_data ? -1 : 1);
+  const ultimo = p => { const s = passiDi(p.id)[0]; return s ? s.data : String(p.creato_il || oggi()).slice(0, 10); };
+  return {
+    ritardo: conData.filter(p => p.prossima_data < oggi()),
+    oggi: conData.filter(p => p.prossima_data === oggi()),
+    presto: conData.filter(p => p.prossima_data > oggi() && p.prossima_data <= piuGiorni(oggi(), 4)),
+    ferme: aperte.filter(p => !p.esito && p.fase !== "lista" && !p.prossima_data && giorniTra(ultimo(p), oggi()) >= 14)
+  };
+}
+
+/* Su Io: le persone da sentire. Se non c'è niente da fare, non occupa spazio. */
+function vDaFare(){
+  const d = daFare(), gruppi = [["In ritardo", d.ritardo], ["Oggi", d.oggi], ["Prossimi giorni", d.presto], ["Ferme da 2 settimane", d.ferme]]
+    .filter(([, l]) => l.length);
+  if(!gruppi.length) return "";
+  return `<div class="card">
+    <span class="eyebrow">Da fare con la tua lista</span>
+    ${gruppi.map(([t, l]) => `<p class="small da-fare-t">${t}</p>
+      <ul class="persone">${l.map(rigaPersona).join("")}</ul>`).join("")}
+  </div>`;
+}
+function rigaPersona(p){
+  const f = FASI[indiceFase(p.fase)];
+  return `<li><button class="persona" data-act="apri-persona" data-id="${esc(p.id)}">
+      <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${p.esito ? ESITI[p.esito] : f.nome}${p.prossima_data ? " · " + esc(testoProssima(p)) : ""}</span></span>
+      <span class="punti" aria-hidden="true">${FASI.map((x, i) => `<i class="${i <= indiceFase(p.fase) ? "on" : ""}"></i>`).join("")}</span>
+    </button></li>`;
+}
+
+function vPersone(){
+  if(st.personaId) return vPersona();
+  const filtro = FILTRI_LISTA.find(x => x.id === st.filtroLista) || FILTRI_LISTA[0];
+  const q = senzaAccenti(st.cercaLista || "");
+  const l = st.persone.filter(filtro.ok).filter(p => !q || senzaAccenti(p.nome + " " + (p.origine || "")).includes(q))
+    .sort((a, b) => (a.prossima_data || "9999") < (b.prossima_data || "9999") ? -1 : (a.prossima_data || "9999") > (b.prossima_data || "9999") ? 1
+      : a.nome.localeCompare(b.nome, "it"));
+  return `<div class="card">
+    <div class="spread"><span class="eyebrow">La mia lista</span>
+      <span class="row" style="gap:6px"><button class="btn small" data-act="persone-tante">Più nomi</button>
+      <button class="btn small primary" data-act="persona-nuova">+ Un nome</button></span></div>
+    ${st.persone.length ? `
+    <input type="search" id="cerca-lista" class="cerca" placeholder="Cerca un nome…" autocomplete="off" aria-label="Cerca un nome" value="${esc(st.cercaLista || "")}">
+    <div class="row wrap scelte-rapide" style="gap:6px;margin-top:8px">${FILTRI_LISTA.map(x => {
+      const n = st.persone.filter(x.ok).length;
+      return `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-lista" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${n}</button>`; }).join("")}</div>
+    ${l.length ? `<ul class="persone">${l.map(rigaPersona).join("")}</ul>` : `<p class="muted" style="margin:10px 0 0">Nessun nome qui.</p>`}`
+    : `<p class="muted" style="margin:8px 0 0">La tua lista è vuota. Scrivi i nomi delle persone che conosci: amici, parenti,
+        colleghi, vicini. Basta il nome; il resto lo aggiungi quando serve.</p>`}
+    <p class="nota">I nomi della tua lista li vedi solo tu. A chi ti segue arrivano soltanto i numeri.</p>
+  </div>
+  <div class="card tight">
+    <div class="row wrap" style="gap:6px">
+      <button class="btn small ghost" data-act="importa-lista">Importa da "Dalla Lista al Sì"</button>
+      ${st.persone.length ? `<button class="btn small ghost" data-act="scarica-persone">Scarica la mia lista</button>` : ""}
+    </div>
+  </div>`;
+}
+
+function vPersona(){
+  const p = st.persone.find(x => x.id === st.personaId);
+  if(!p) return `<button class="btn link" data-act="torna-lista" style="padding:0">‹ La mia lista</button><p class="muted">Nome non trovato.</p>`;
+  const i = indiceFase(p.fase), passi = passiDi(p.id), tel = String(p.contatto || "").replace(/[^\d+]/g, "");
+  const telefono = tel.replace(/\D/g, "").length >= 6;
+  return `<button class="btn link" data-act="torna-lista" style="padding:0">‹ La mia lista</button>
+  <div class="card">
+    <div class="spread"><h2>${esc(p.nome)}</h2>${p.esito ? `<span class="pill ${p.esito === "partner" || p.esito === "cliente" ? "v" : p.esito === "no" ? "r" : "g"}">${ESITI[p.esito]}</span>` : ""}</div>
+    ${p.contatto || p.origine ? `<p class="small" style="margin:2px 0 0">${[p.contatto, p.origine].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
+    ${telefono ? `<div class="row" style="gap:6px;margin-top:8px">
+      <a class="btn small" href="tel:${esc(tel)}">Chiama</a>
+      <a class="btn small wa" target="_blank" rel="noopener" href="https://wa.me/${esc(tel.replace(/^\+/, "").replace(/^(?=3)/, "39"))}">WhatsApp</a></div>` : ""}
+    <ol class="percorso-persona" aria-label="Percorso">${FASI.map((x, k) => `<li class="${k < i ? "fatta" : k === i ? "qui" : ""}"><i></i><span>${x.nome}</span></li>`).join("")}</ol>
+    <div class="prossima">
+      <span class="small">Prossima cosa</span>
+      <b>${p.prossima_data ? esc(testoProssima(p)) : "Nessuna data"}</b>
+      <span class="row" style="gap:6px;margin-top:6px">
+        <button class="btn small" data-act="prossima">${p.prossima_data ? "Cambia" : "Fissa una data"}</button>
+        ${p.prossima_data ? `<button class="btn small ghost" data-act="persona-calendario">Nel calendario</button>` : ""}</span>
+    </div>
+    <button class="btn primary wide" style="margin-top:12px" data-act="passo">Segna un passo · ${TIPI_PASSO[passoProposto(p)].nome}</button>
+    ${p.esito === "partner" ? `<a class="btn wa wide" style="margin-top:8px" target="_blank" rel="noopener"
+        href="https://wa.me/?text=${encodeURIComponent(testoInvito() + "\n\n" + linkInvito())}">Mandagli il tuo link d'invito</a>` : ""}
+    ${p.esito ? `<button class="btn ghost wide" style="margin-top:8px" data-act="riapri-persona">Riapri il percorso</button>` : ""}
+    ${p.note ? `<p class="small" style="margin:10px 0 0;white-space:pre-wrap">${esc(p.note)}</p>` : ""}
+  </div>
+  <div class="card">
+    <span class="eyebrow">I passi</span>
+    ${passi.length ? `<ul class="oggi">${passi.map(s => `<li>
+      <span class="grow"><b>${s.tipo === "chiusura" ? `Chiusura · ${ESITI[s.esito]}` : s.tipo === "riapri" ? "Percorso riaperto" : TIPI_PASSO[s.tipo].nome}</b>
+        ${[s.come, s.reazione].filter(Boolean).length ? `<br><span class="small">${[s.come, s.reazione].filter(Boolean).map(esc).join(" · ")}</span>` : ""}
+        ${s.nota ? `<br><span class="small">${esc(s.nota)}</span>` : ""}</span>
+      <span class="small">${dataIt(s.data)}</span>
+      <button class="x" data-act="togli-passo" data-id="${esc(s.id)}" aria-label="Togli il passo">×</button></li>`).join("")}</ul>`
+      : `<p class="muted" style="margin:6px 0 0">Ancora nessun passo. Il primo è il contatto.</p>`}
+  </div>
+  <div class="row" style="gap:6px;justify-content:center">
+    <button class="btn small ghost" data-act="persona-modifica">Modifica i dati</button>
+    <button class="btn small ghost" data-act="persona-cancella">Togli dalla lista</button>
+  </div>`;
+}
+
+/* Il numero della lista di una persona del gruppo (per sponsor e upline: mai i nomi) */
+function vNumeriLista(pid){
+  const n = st.numeriLista[pid];
+  if(!n || !Number(n.totale)) return "";
+  return `<p class="small" style="margin:8px 0 0">La sua lista: <b>${num(n.in_lista)}</b> in lista · <b>${num(n.in_corso)}</b> in corso ·
+    questo mese <b>${num(n.piani_mese)}</b> ${Number(n.piani_mese) === 1 ? "piano" : "piani"} e <b>${num(n.si_mese)}</b> sì</p>`;
+}
+
+function opzioni(nome, valori, scelto){
+  return `<div class="opzioni">${valori.map(v => `<label class="chip"><input type="radio" name="${nome}" value="${esc(v)}"${v === scelto ? " checked" : ""}><span>${esc(v)}</span></label>`).join("")}</div>`;
+}
+function campiProssima(titolo, p){
+  return `<fieldset class="field"><legend>${esc(titolo)}</legend>
+      <div class="opzioni">${[["", "Nessuna"], ["1", "Domani"], ["3", "Tra 3 giorni"], ["7", "Tra una settimana"]].map(([v, t]) =>
+        `<label class="chip"><input type="radio" name="tra" value="${v}"${v === "" && !p ? " checked" : ""}><span>${t}</span></label>`).join("")}</div>
+      <input type="date" name="prossima_data" min="${oggi()}" value="${esc(p && p.prossima_data || "")}" aria-label="Oppure scegli il giorno">
+      <input name="prossima_nota" maxlength="200" placeholder="Cosa (facoltativo)" value="${esc(p && p.prossima_nota || "")}"></fieldset>`;
+}
+function leggiProssima(f){
+  const tra = (f.querySelector("input[name=tra]:checked") || {}).value || "";
+  const data = f.prossima_data.value || (tra ? piuGiorni(oggi(), Number(tra)) : null);
+  return { prossima_data:data, prossima_nota:data ? f.prossima_nota.value.trim() || null : null };
+}
+
+function vSheetPersone(s){
+  const p = st.persone.find(x => x.id === st.personaId);
+  const annulla = `<button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>`;
+  if(s === "persona-nuova" || (s === "persona-modifica" && p)){
+    const m = s === "persona-modifica" ? p : {};
+    return `<h2>${m.id ? "Modifica i dati" : "Un nome nella tua lista"}</h2>
+    <form data-form="${s}" novalidate>
+      <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc(m.nome || "")}" autocomplete="off"></label>
+      <label class="field"><span>Telefono o contatto <i>(facoltativo)</i></span><input name="contatto" maxlength="80" inputmode="tel" value="${esc(m.contatto || "")}"></label>
+      <label class="field"><span>Come lo conosci <i>(facoltativo)</i></span><input name="origine" maxlength="80" placeholder="es. collega, palestra, cugino" value="${esc(m.origine || "")}"></label>
+      ${m.id ? `<label class="field"><span>Note</span><textarea name="note" rows="3" maxlength="2000">${esc(m.note || "")}</textarea></label>` : ""}
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
+    </form>`;
+  }
+  if(s === "persone-tante") return `<h2>Più nomi insieme</h2>
+    <p class="small">Uno per riga. Se vuoi, dopo una virgola il telefono e come lo conosci: <i>Mario Rossi, 333 1234567, collega</i></p>
+    <form data-form="persone-tante" novalidate>
+      <textarea name="righe" rows="8" maxlength="20000" aria-label="Nomi, uno per riga"></textarea>
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Aggiungi</button></div>
+    </form>`;
+  if(s === "passo" && p){
+    const tipo = st.passoTipo || passoProposto(p), t = TIPI_PASSO[tipo];
+    return `<h2>${esc(nomeSaluto(p.nome))}: segna un passo</h2>
+    <div class="opzioni tipi">${Object.keys(TIPI_PASSO).map(k => `<button type="button" class="btn small${k === tipo ? " on" : ""}" data-act="tipo-passo" data-tipo="${k}" aria-pressed="${k === tipo}">${TIPI_PASSO[k].nome}</button>`).join("")}</div>
+    <form data-form="passo" novalidate>
+      <label class="field"><span>Quando</span><input type="date" name="data" max="${oggi()}" value="${oggi()}"></label>
+      ${t.come ? `<fieldset class="field"><legend>Come</legend>${opzioni("come", t.come)}</fieldset>
+        <fieldset class="field"><legend>${tipo === "piano" ? "Com'è andato" : "Come ha reagito"}</legend>${opzioni("reazione", t.reazione)}</fieldset>` : ""}
+      ${tipo === "chiusura" ? `<fieldset class="field"><legend>Com'è finita</legend>${opzioni("esito", Object.values(ESITI))}</fieldset>` : ""}
+      <label class="field"><span>Nota <i>(facoltativa)</i></span><input name="nota" maxlength="1000"></label>
+      ${tipo === "chiusura" ? campiProssima("Prossima cosa (per Partner, Cliente o Non ora)", null) : campiProssima(t.prossima, null)}
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
+    </form>`;
+  }
+  if(s === "prossima" && p) return `<h2>Prossima cosa con ${esc(nomeSaluto(p.nome))}</h2>
+    <form data-form="prossima" novalidate>
+      ${campiProssima("Quando", p)}
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
+    </form>`;
+  if(s === "importa-lista") return `<h2>Importa da "Dalla Lista al Sì"</h2>
+    <p class="small">Nella vecchia app: <b>Dati → Salva una copia</b>. Poi scegli qui il file <i>lista-nomi-….json</i>.
+      I nomi già nella tua lista non si doppiano; i passi arrivano con le loro date ma non contano come attività di oggi.</p>
+    <label class="btn primary wide" style="margin-top:12px">Scegli il file
+      <input type="file" id="file-lista" accept=".json,application/json" hidden></label>
+    ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
+    <button class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>`;
+  return "";
+}
+
+/* Dal file di backup della vecchia app: persone e passi, con identificativi nuovi */
+function daListaVecchia(d, presenti){
+  if(!d || !Array.isArray(d.people)) return null;
+  const piano = { molto:"Molto interessato", interessato:"Interessato", pensarci:"Deve pensarci", freddo:"Poco interessato", assente:"Non si è presentato" };
+  const taglia = (v, n) => { const x = String(v || "").trim(); return x ? x.slice(0, n) : null; };
+  const giorno = v => /^\d{4}-\d{2}-\d{2}/.test(String(v || "")) ? String(v).slice(0, 10) : null;
+  const persone = [], passi = [], visti = new Set(presenti);
+  let doppi = 0;
+  for(const x of d.people){
+    const nome = taglia(x.name, 80);
+    if(!nome) continue;
+    if(visti.has(senzaAccenti(nome))){ doppi++; continue; }
+    visti.add(senzaAccenti(nome));
+    const id = uuid();
+    const prossima = giorno(x.nextDate);
+    persone.push({ id, nome, contatto:taglia(x.contact, 80), origine:taglia(x.origine, 80), note:taglia(x.note, 2000),
+      prossima_data:prossima, prossima_nota:prossima ? taglia(x.nextNote, 200) : null });
+    for(const e of Array.isArray(x.events) ? x.events : []){
+      const data = giorno(e.date) || oggi();
+      const base = { id:uuid(), persona_id:id, data, importato:true, nota:taglia(e.note, 1000) };
+      if(e.reopen) passi.push(Object.assign({}, base, { tipo:"riapri" }));
+      else if(e.type === "esito"){ if(ESITI[e.outcome]) passi.push(Object.assign({}, base, { tipo:"chiusura", esito:e.outcome })); }
+      else if(TIPI_PASSO[e.type] && e.type !== "chiusura")
+        passi.push(Object.assign({}, base, { tipo:e.type, come:taglia(e.how, 60), reazione:taglia(e.type === "piano" ? piano[e.plan] || e.plan || e.react : e.react, 80) }));
+    }
+  }
+  return { persone, passi, doppi };
+}
+async function importaListaVecchia(file){
+  if(!file) return;
+  let a;
+  try{ a = daListaVecchia(JSON.parse(await file.text()), st.persone.map(p => senzaAccenti(p.nome))); }catch(e){ a = null; }
+  if(!a){ st.errore = "Questo file non sembra la copia di \"Dalla Lista al Sì\"."; render(); return; }
+  if(!a.persone.length){ st.errore = a.doppi ? "Tutti i nomi di questo file sono già nella tua lista." : "Nel file non ci sono nomi."; render(); return; }
+  st.occupato = true;
+  try{
+    for(let i = 0; i < a.persone.length; i += 200) await api.nuovePersone(a.persone.slice(i, i + 200));
+    for(let i = 0; i < a.passi.length; i += 200) await api.nuoviPassi(a.passi.slice(i, i + 200));
+    await caricaPersone();
+    st.sheet = null; st.errore = ""; st.occupato = false; render();
+    toast(`${plur(a.persone.length, "nome importato", "nomi importati")}${a.doppi ? `, ${plur(a.doppi, "già presente", "già presenti")}` : ""}`);
+  }catch(e){ st.occupato = false; await caricaPersone(); st.errore = messaggio(e); render(); }
+}
+
+async function dopoPersone(msg){
+  await caricaPersone();
+  st.sheet = null; st.passoTipo = null; render();
+  if(msg) toast(msg);
+  aggiornaAttivita();  // i passi contano contatti, piani e clienti: si aggiornano anche i numeri di Io
+}
+
+Object.assign(AZIONI, {
+  "vista-persone"(){ st.vista = "persone"; st.personaId = null; st.target = null; render(); window.scrollTo(0, 0); },
+  "apri-persona"(el){ st.vista = "persone"; st.personaId = el.dataset.id; render(); window.scrollTo(0, 0); },
+  "torna-lista"(){ st.personaId = null; render(); window.scrollTo(0, 0); },
+  "filtro-lista"(el){ st.filtroLista = el.dataset.filtro; render(); },
+  "persona-nuova"(){ st.errore = ""; st.sheet = "persona-nuova"; render(); },
+  "persone-tante"(){ st.errore = ""; st.sheet = "persone-tante"; render(); },
+  "persona-modifica"(){ st.errore = ""; st.sheet = "persona-modifica"; render(); },
+  passo(){ st.passoTipo = null; st.errore = ""; st.sheet = "passo"; render(); },
+  "tipo-passo"(el){ st.passoTipo = el.dataset.tipo; render(); },
+  prossima(){ st.errore = ""; st.sheet = "prossima"; render(); },
+  "importa-lista"(){ st.errore = ""; st.sheet = "importa-lista"; render(); },
+  async "persona-cancella"(){
+    const p = st.persone.find(x => x.id === st.personaId);
+    if(!p || !confirm(`Togliere ${p.nome} dalla tua lista? Si cancellano anche i suoi passi (i numeri già contati restano).`)) return;
+    try{ await api.cancellaPersona(p.id); st.personaId = null; await dopoPersone(`${p.nome} tolto dalla lista`); }catch(e){ toast(messaggio(e)); }
+  },
+  async "togli-passo"(el){
+    if(!confirm("Togliere questo passo? Se aveva contato un contatto, un piano o un cliente, si toglie anche quello.")) return;
+    try{ await api.cancellaPasso(el.dataset.id); await dopoPersone("Passo tolto"); }catch(e){ toast(messaggio(e)); }
+  },
+  async "riapri-persona"(){
+    try{ await api.nuoviPassi([{ id:uuid(), persona_id:st.personaId, tipo:"riapri", data:oggi() }]); await dopoPersone("Percorso riaperto"); }
+    catch(e){ toast(messaggio(e)); }
+  },
+  "persona-calendario"(){
+    const p = st.persone.find(x => x.id === st.personaId);
+    if(!p || !p.prossima_data) return;
+    const dati = { nome:p.nome, data:p.prossima_data, ora:"10:00", minuti:15, avviso:15, note:p.prossima_nota || "" };
+    if(suAndroid()){ vaiA(googleCalendar(dati), true); return; }
+    apriIcs(creaIcs(dati), p.nome);
+  },
+  "scarica-persone"(){
+    const dati = JSON.stringify({ app:"Growup Team · la mia lista", creata_il:new Date().toISOString(), persone:st.persone, passi:st.passi }, null, 2);
+    const url = URL.createObjectURL(new Blob([dati], { type:"application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `growup-lista-${oggi()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+});
+
+Object.assign(MODULI, {
+  async "persona-nuova"(f){
+    const nome = f.nome.value.trim();
+    if(!nome){ mostraErroreForm(f, "Scrivi il nome."); return; }
+    try{
+      const id = uuid();
+      await api.nuovePersone([{ id, nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null }]);
+      st.personaId = id; st.vista = "persone";
+      await dopoPersone(`${nome} nella tua lista`);
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async "persona-modifica"(f){
+    const nome = f.nome.value.trim();
+    if(!nome){ mostraErroreForm(f, "Scrivi il nome."); return; }
+    try{
+      await api.modificaPersona(st.personaId, { nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null,
+        note:f.note.value.trim() || null });
+      await dopoPersone("Dati salvati");
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async "persone-tante"(f){
+    const presenti = new Set(st.persone.map(p => senzaAccenti(p.nome)));
+    const righe = f.righe.value.split(/\r?\n/).map(r => r.split(",").map(x => x.trim())).filter(r => r[0]);
+    const nuove = [];
+    for(const [nome, contatto, ...resto] of righe){
+      const k = senzaAccenti(nome);
+      if(presenti.has(k)) continue;
+      presenti.add(k);
+      nuove.push({ id:uuid(), nome:nome.slice(0, 80), contatto:(contatto || "").slice(0, 80) || null, origine:resto.join(", ").slice(0, 80) || null });
+    }
+    if(!nuove.length){ mostraErroreForm(f, righe.length ? "Questi nomi sono già nella tua lista." : "Scrivi almeno un nome."); return; }
+    try{
+      for(let i = 0; i < nuove.length; i += 200) await api.nuovePersone(nuove.slice(i, i + 200));
+      await dopoPersone(plur(nuove.length, "nome aggiunto", "nomi aggiunti"));
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async passo(f){
+    const p = st.persone.find(x => x.id === st.personaId);
+    if(!p) return;
+    const tipo = st.passoTipo || passoProposto(p);
+    const scelto = n => (f.querySelector(`input[name=${n}]:checked`) || {}).value || null;
+    const esitoTesto = scelto("esito"), esito = esitoTesto ? Object.keys(ESITI).find(k => ESITI[k] === esitoTesto) : null;
+    if(tipo === "chiusura" && !esito){ mostraErroreForm(f, "Scegli com'è finita."); return; }
+    const data = f.data.value || oggi();
+    if(data > oggi()){ mostraErroreForm(f, "Il passo non può essere nel futuro: per quello c'è la prossima cosa."); return; }
+    const pr = leggiProssima(f);
+    try{
+      await api.nuoviPassi([{ id:uuid(), persona_id:p.id, tipo, data, come:scelto("come"), reazione:scelto("reazione"),
+        esito:tipo === "chiusura" ? esito : null, nota:f.nota.value.trim() || null }]);
+      await api.modificaPersona(p.id, (tipo === "chiusura" && esito === "no") ? { prossima_data:null, prossima_nota:null } : pr);
+      await dopoPersone(`${TIPI_PASSO[tipo].nome}${tipo === "chiusura" ? " · " + ESITI[esito] : ""} segnato`);
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async prossima(f){
+    try{ await api.modificaPersona(st.personaId, leggiProssima(f)); await dopoPersone("Prossima cosa salvata"); }
+    catch(e){ mostraErroreForm(f, messaggio(e)); }
+  }
+});
+
+document.addEventListener("change", e => {
+  if(e.target && e.target.id === "file-lista") importaListaVecchia(e.target.files && e.target.files[0]);
+  /* scegliendo "Domani / Tra 3 giorni…" la data scritta a mano si svuota, e viceversa */
+  if(e.target && e.target.name === "tra" && e.target.form) e.target.form.prossima_data.value = "";
+  if(e.target && e.target.name === "prossima_data" && e.target.value && e.target.form){
+    const n = e.target.form.querySelector("input[name=tra][value='']"); if(n) n.checked = true;
+  }
+});
+document.addEventListener("input", e => {
+  if(e.target && e.target.id === "cerca-lista"){
+    st.cercaLista = e.target.value;
+    const q = senzaAccenti(st.cercaLista);
+    document.querySelectorAll(".persone li").forEach(li => { li.style.display = !q || senzaAccenti(li.textContent).includes(q) ? "" : "none"; });
+  }
+});
+
 /* ---- 12. Eventi ---- */
 document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]");
@@ -2486,9 +2904,11 @@ document.addEventListener("touchend", e => {
   if(Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8 || ms > 800) return;
   /* ordine delle pagine: Obiettivo | Io | Gruppo */
   if(dx < 0 && st.vista === "obiettivo") scorri("vista-io", "da-destra");
-  else if(dx < 0 && st.vista === "io") scorri("vista-gruppo", "da-destra");
+  else if(dx < 0 && st.vista === "io") scorri("vista-persone", "da-destra");
+  else if(dx < 0 && st.vista === "persone" && !st.personaId) scorri("vista-gruppo", "da-destra");
+  else if(dx > 0 && st.vista === "persone" && !st.personaId) scorri("vista-io", "da-sinistra");
   else if(dx > 0 && st.vista === "io") scorri("vista-obiettivo", "da-sinistra");
-  else if(dx > 0 && st.vista === "gruppo") scorri("vista-io", "da-sinistra");
+  else if(dx > 0 && st.vista === "gruppo") scorri("vista-persone", "da-sinistra");
   else if(dx > 0 && st.vista === "scheda") scorri("vista-gruppo", "da-sinistra");
 }, { passive:true });
 function scorri(azione, verso){
