@@ -547,6 +547,32 @@ begin
   execute 'reset role';
   perform growup_test.ok((select count(*) from public.activities where partner_id = b) = att_prima + 2, 'togliendo un nome i numeri già contati restano');
 
+  -- ---- 022: il Target — inviti solo miei, il contatto chiede solo se il link è aperto ----
+  perform growup_test.come(u3);  -- B
+  insert into public.inviti_target (id, nome, scade) values ('ABC234', 'Contatto Prova', current_date + 14);
+  perform growup_test.ok((select proprietario = b and risposte is null from public.inviti_target where id = 'ABC234'), 'B crea un invito Target');
+  perform growup_test.come(null);
+  perform growup_test.ok(public.invito_target_aperto('ABC234') = 'ok', 'il contatto vede che il link è aperto');
+  perform growup_test.ok(public.invito_target_aperto('ZZZ999') = 'sconosciuto', 'un link inventato non esiste');
+  perform growup_test.deve_fallire('select count(*) from public.inviti_target', 'chi non è entrato non legge gli inviti');
+  perform growup_test.come(u2);  -- A, sponsor di B
+  perform growup_test.ok((select count(*) from public.inviti_target) = 0, 'lo sponsor non vede gli inviti di B');
+  perform growup_test.ok(growup_test.righe('update public.inviti_target set bloccato = true where id = ''ABC234''') = 0, 'lo sponsor non blocca i link di B');
+  perform growup_test.come(u3);
+  update public.inviti_target set risposte = '{0,0,1,0,2,1,0,2}', versione = '2026-09-14' where id = 'ABC234';
+  perform growup_test.ok((select risposto_il is not null from public.inviti_target where id = 'ABC234'), 'le risposte si salvano con la data');
+  perform growup_test.deve_fallire('update public.inviti_target set risposte = ''{0,0,3,0,2,1,0,2}'' where id = ''ABC234''', 'risposte fuori scala rifiutate');
+  perform growup_test.ok(public.invito_target_aperto('ABC234') = 'usato', 'dopo le risposte il link si chiude');
+  insert into public.persone (nome, invito_target_id) values ('Contatto Prova', 'ABC234') returning id into pp;
+  update public.inviti_target set persona_id = pp where id = 'ABC234';
+  perform growup_test.ok((select persona_id = pp from public.inviti_target where id = 'ABC234'), 'Metti in lista: la persona porta con sé il Target');
+  insert into public.inviti_target (id, nome) values ('DEF567', 'Altro');
+  update public.inviti_target set bloccato = true where id = 'DEF567';
+  perform growup_test.ok(public.invito_target_aperto('DEF567') = 'bloccato', 'un link bloccato non si apre');
+  delete from public.persone where id = pp;
+  delete from public.inviti_target;
+  execute 'reset role';
+
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');

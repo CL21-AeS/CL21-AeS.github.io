@@ -7,13 +7,14 @@ al database e prima del lancio a tutto il gruppo.
 
 | Dove | Protezione |
 |---|---|
-| **Supabase (database, UE)** | Row Level Security attiva su **tutte** le tabelle; chi non ha un profilo non legge niente. Ognuno vede sé, chi usa l'app nella propria downline e le persone importate da lui; mai chi sta sopra o di lato. Le scritture delicate passano solo da funzioni che controllano chi le chiama. Nessuna tabella è leggibile senza accesso; l'unica funzione aperta a chi non è entrato è `sponsor_da_codice` (il nome di chi invita, per la pagina d'ingresso). Nessun file caricato (storage vuoto). |
+| **Supabase (database, UE)** | Row Level Security attiva su **tutte** le tabelle; chi non ha un profilo non legge niente. Ognuno vede sé, chi usa l'app nella propria downline e le persone importate da lui; mai chi sta sopra o di lato. Le scritture delicate passano solo da funzioni che controllano chi le chiama. Nessuna tabella è leggibile senza accesso; le funzioni aperte a chi non è entrato sono `sponsor_da_codice` (il nome di chi invita, per la pagina d'ingresso) e `invito_target_aperto` (se un link del Target è ancora aperto). Nessun file caricato (storage vuoto). |
 | **Captcha** | Cloudflare Turnstile al primo ingresso di un telefono: niente programmi che creano accessi finti a migliaia. La Site Key (pubblica) è in `config.js`; la Secret Key solo in Supabase → Authentication → Attack Protection. Limite di 30 accessi anonimi all'ora per indirizzo; provider Email spento. |
 | **Accesso** | Niente password: link personale con una chiave casuale di 128 bit (nel database solo l'impronta sha256, non reversibile). Il link si toglie dalla barra degli indirizzi appena letto. |
 | **App (GitHub Pages)** | Content Security Policy: il browser esegue solo il codice dell'app, la libreria Supabase (con controllo di integrità) e il captcha di Cloudflare, e si collega solo al nostro progetto. Ogni testo che viene dal database è "sterilizzato" prima di essere mostrato (provato con un nome contenente codice HTML). La cache del telefono tiene solo l'app, mai i dati. `no-referrer`: i link non rivelano da dove si arriva. |
 | **Report Amway (CSV)** | Si legge sul telefono, non viene caricato da nessuna parte; al database arrivano solo nome, codice e numeri di chi si importa. |
 | **GitHub (pubblico)** | Contiene solo codice: nessuna chiave segreta (in `config.js` c'è solo la chiave pubblica, fatta per stare nel browser), nessun dato reale nei file (i test usano nomi e codici inventati). |
 | **La Lista (pagina Persone)** | Nomi, telefoni e passi delle persone della lista li legge e scrive **solo chi li ha inseriti**: né sponsor, né upline, né admin (RLS "solo mio", controllata in `tests_rls.sql`). All'upline arrivano solo i numeri (`numeri_persone`). La copia degli admin non contiene le liste; ognuno scarica la propria. |
+| **Il Target (pagina Persone)** | Gli inviti e le risposte li vede solo chi li crea (RLS "solo mio"). Il contatto apre una pagina di Growup **senza accesso** e senza scrivere niente nel database: le risposte tornano al partner su WhatsApp. L'unica cosa che la pagina chiede è se il link è ancora aperto (`invito_target_aperto`: risponde solo ok / scaduto / bloccato / usato, mai nomi o risposte). Nessun telefono nel link. |
 | **Niente cancellazioni** | Dall'app nessuno può cancellare persone (neanche gli admin): si possono solo nascondere. La cancellazione per diritto all'oblio si fa dall'SQL Editor (`ADMIN.md`). |
 | **GitHub, storia** | 17 ottobre 2026: la storia del repository è stata riscritta per togliere ogni dato reale (nomi, codici Amway, numeri, codice d'invito, email dell'autore dei commit). |
 | **Copia di sicurezza** | La scarica solo un admin; contiene tutti i dati: va tenuta in una cartella privata di Google Drive. |
@@ -51,4 +52,4 @@ select c.relname, c.relrowsecurity as rls, has_table_privilege('anon', c.oid, 's
 from pg_class c join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public' and c.relkind = 'r' order by c.relname;
 ```
-Risultato atteso: `anon` solo su `sponsor_da_codice`; `rls` vero e `anon_legge` falso su tutte le tabelle.
+Risultato atteso: `anon` solo su `sponsor_da_codice` e `invito_target_aperto`; `rls` vero e `anon_legge` falso su tutte le tabelle.

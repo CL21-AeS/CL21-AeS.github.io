@@ -55,6 +55,17 @@ chiuse, tranne "Non ora" con una data): prima in ritardo · oggi · prossimi gio
 percorso in cima). × toglie una persona da Io (colonna `nascosta_io`); torna da sola quando si segna un passo, si
 fissa una data o si riapre il percorso, oppure dalla sua scheda con "Rimetti in Io".
 
+**18 ottobre — Persone → Target (fase 2)** (migrazione `022_target.sql`): in Persone due sezioni, **Target · Lista**.
+Il Target è per chi non conosci: "+ Nuovo invito" (nome, durata del link: 3 giorni … senza scadenza) → messaggio
+WhatsApp con il link alle otto domande (pagina di Growup `#t&…`, senza accesso; nessun telefono nel link, decisione di
+Stefano: il contatto rimanda le risposte scegliendo la chat). Il contatto non scrive nel database: rimanda il codice
+`CL21-…` con il link "Apri le risposte" (`#r=…`, si legge appena il partner è dentro) o "Leggi una risposta".
+Scheda dell'invito: esito (In target · Con riserve · Da coltivare · Fuori target), punteggio su 28, cosa cerca / cosa lo
+trattiene, le risposte; **"Il metodo"** (cosa affrontare, promemoria per l'incontro, cosa dire se è no) si apre a
+richiesta. "Metti in lista" → la persona entra in Lista già Contattato, con l'esito del Target nella sua scheda (senza
+contare di nuovo il contatto). Blocca / riapri il link, archivia, elimina. Domande, punteggi e testi identici alla
+mini app (versione 2026-09-14). La mini app Target resta online per i link già mandati; nessuna importazione.
+
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
    import, nascondi, scheda partner).
