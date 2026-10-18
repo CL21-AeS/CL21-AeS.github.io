@@ -2540,13 +2540,8 @@ function vPersone(){
     ${l.length ? `<ul class="persone">${l.map(rigaPersona).join("")}</ul>` : `<p class="muted" style="margin:10px 0 0">Nessun nome qui.</p>`}`
     : `<p class="muted" style="margin:8px 0 0">La tua lista è vuota. Scrivi i nomi delle persone che conosci: amici, parenti,
         colleghi, vicini. Basta il nome; il resto lo aggiungi quando serve.</p>`}
-    <p class="nota">I nomi della tua lista li vedi solo tu. A chi ti segue arrivano soltanto i numeri.</p>
-  </div>
-  <div class="card tight">
-    <div class="row wrap" style="gap:6px">
-      <button class="btn small ghost" data-act="importa-lista">Importa da "Dalla Lista al Sì"</button>
-      ${st.persone.length ? `<button class="btn small ghost" data-act="scarica-persone">Scarica la mia lista</button>` : ""}
-    </div>
+    <p class="nota">I nomi della tua lista li vedi solo tu. A chi ti segue arrivano soltanto i numeri.
+      ${st.persone.length ? `<button class="btn link small" data-act="scarica-persone" style="min-height:0;padding:0">Scarica una copia della mia lista</button>` : ""}</p>
   </div>`;
 }
 
@@ -2655,58 +2650,7 @@ function vSheetPersone(s){
       ${campiProssima("Quando", p)}
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
     </form>`;
-  if(s === "importa-lista") return `<h2>Importa da "Dalla Lista al Sì"</h2>
-    <p class="small">Nella vecchia app: <b>Dati → Salva una copia</b>. Poi scegli qui il file <i>lista-nomi-….json</i>.
-      I nomi già nella tua lista non si doppiano; i passi arrivano con le loro date ma non contano come attività di oggi.</p>
-    <label class="btn primary wide" style="margin-top:12px">Scegli il file
-      <input type="file" id="file-lista" accept=".json,application/json" hidden></label>
-    ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
-    <button class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>`;
   return "";
-}
-
-/* Dal file di backup della vecchia app: persone e passi, con identificativi nuovi */
-function daListaVecchia(d, presenti){
-  if(!d || !Array.isArray(d.people)) return null;
-  const piano = { molto:"Molto interessato", interessato:"Interessato", pensarci:"Deve pensarci", freddo:"Poco interessato", assente:"Non si è presentato" };
-  const taglia = (v, n) => { const x = String(v || "").trim(); return x ? x.slice(0, n) : null; };
-  const giorno = v => /^\d{4}-\d{2}-\d{2}/.test(String(v || "")) ? String(v).slice(0, 10) : null;
-  const persone = [], passi = [], visti = new Set(presenti);
-  let doppi = 0;
-  for(const x of d.people){
-    const nome = taglia(x.name, 80);
-    if(!nome) continue;
-    if(visti.has(senzaAccenti(nome))){ doppi++; continue; }
-    visti.add(senzaAccenti(nome));
-    const id = uuid();
-    const prossima = giorno(x.nextDate);
-    persone.push({ id, nome, contatto:taglia(x.contact, 80), origine:taglia(x.origine, 80), note:taglia(x.note, 2000),
-      prossima_data:prossima, prossima_nota:prossima ? taglia(x.nextNote, 200) : null });
-    for(const e of Array.isArray(x.events) ? x.events : []){
-      const data = giorno(e.date) || oggi();
-      const base = { id:uuid(), persona_id:id, data, importato:true, nota:taglia(e.note, 1000) };
-      if(e.reopen) passi.push(Object.assign({}, base, { tipo:"riapri" }));
-      else if(e.type === "esito"){ if(ESITI[e.outcome]) passi.push(Object.assign({}, base, { tipo:"chiusura", esito:e.outcome })); }
-      else if(TIPI_PASSO[e.type] && e.type !== "chiusura")
-        passi.push(Object.assign({}, base, { tipo:e.type, come:taglia(e.how, 60), reazione:taglia(e.type === "piano" ? piano[e.plan] || e.plan || e.react : e.react, 80) }));
-    }
-  }
-  return { persone, passi, doppi };
-}
-async function importaListaVecchia(file){
-  if(!file) return;
-  let a;
-  try{ a = daListaVecchia(JSON.parse(await file.text()), st.persone.map(p => senzaAccenti(p.nome))); }catch(e){ a = null; }
-  if(!a){ st.errore = "Questo file non sembra la copia di \"Dalla Lista al Sì\"."; render(); return; }
-  if(!a.persone.length){ st.errore = a.doppi ? "Tutti i nomi di questo file sono già nella tua lista." : "Nel file non ci sono nomi."; render(); return; }
-  st.occupato = true;
-  try{
-    for(let i = 0; i < a.persone.length; i += 200) await api.nuovePersone(a.persone.slice(i, i + 200));
-    for(let i = 0; i < a.passi.length; i += 200) await api.nuoviPassi(a.passi.slice(i, i + 200));
-    await caricaPersone();
-    st.sheet = null; st.errore = ""; st.occupato = false; render();
-    toast(`${plur(a.persone.length, "nome importato", "nomi importati")}${a.doppi ? `, ${plur(a.doppi, "già presente", "già presenti")}` : ""}`);
-  }catch(e){ st.occupato = false; await caricaPersone(); st.errore = messaggio(e); render(); }
 }
 
 async function dopoPersone(msg){
@@ -2727,7 +2671,6 @@ Object.assign(AZIONI, {
   passo(){ st.passoTipo = null; st.errore = ""; st.sheet = "passo"; render(); },
   "tipo-passo"(el){ st.passoTipo = el.dataset.tipo; render(); },
   prossima(){ st.errore = ""; st.sheet = "prossima"; render(); },
-  "importa-lista"(){ st.errore = ""; st.sheet = "importa-lista"; render(); },
   async "persona-cancella"(){
     const p = st.persone.find(x => x.id === st.personaId);
     if(!p || !confirm(`Togliere ${p.nome} dalla tua lista? Si cancellano anche i suoi passi (i numeri già contati restano).`)) return;
@@ -2818,7 +2761,6 @@ Object.assign(MODULI, {
 });
 
 document.addEventListener("change", e => {
-  if(e.target && e.target.id === "file-lista") importaListaVecchia(e.target.files && e.target.files[0]);
   /* scegliendo "Domani / Tra 3 giorni…" la data scritta a mano si svuota, e viceversa */
   if(e.target && e.target.name === "tra" && e.target.form) e.target.form.prossima_data.value = "";
   if(e.target && e.target.name === "prossima_data" && e.target.value && e.target.form){
@@ -2907,6 +2849,7 @@ document.addEventListener("touchend", e => {
   else if(dx < 0 && st.vista === "io") scorri("vista-persone", "da-destra");
   else if(dx < 0 && st.vista === "persone" && !st.personaId) scorri("vista-gruppo", "da-destra");
   else if(dx > 0 && st.vista === "persone" && !st.personaId) scorri("vista-io", "da-sinistra");
+  else if(dx > 0 && st.vista === "persone" && st.personaId) scorri("torna-lista", "da-sinistra");
   else if(dx > 0 && st.vista === "io") scorri("vista-obiettivo", "da-sinistra");
   else if(dx > 0 && st.vista === "gruppo") scorri("vista-persone", "da-sinistra");
   else if(dx > 0 && st.vista === "scheda") scorri("vista-gruppo", "da-sinistra");

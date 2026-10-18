@@ -948,23 +948,18 @@ await page.locator(".card", { hasText:"I passi" }).locator("li", { hasText:"Pian
 await page.getByText("Passo tolto").waitFor();
 await sync(page);
 check(DB.activities.filter(a => a.partner_id === "R" && a.tipo === "piano").length === pianiDopo - 1, "togliendo il passo si toglie il piano contato");
-await page.click("button[data-act=torna-lista]");
+// dalla scheda della persona, col dito verso destra si torna alla lista
+await page.evaluate(() => { const el = document.querySelector("#app");
+  const t = (tipo, x) => { const k = new Touch({ identifier:1, target:el, clientX:x, clientY:400 });
+    el.dispatchEvent(new TouchEvent(tipo, { bubbles:true, cancelable:true, touches:tipo === "touchend" ? [] : [k], changedTouches:[k] })); };
+  t("touchstart", 80); t("touchend", 320); });
+check(await page.locator(".card", { hasText:"La mia lista" }).isVisible() && !(await page.locator("button[data-act=passo]").count()), "scheda persona: col dito si torna alla lista");
+check(await page.getByText("Scarica una copia della mia lista").isVisible(), "la copia della lista è un piccolo link");
 await page.click("button[data-act=persone-tante]");
 await page.fill(".sheet textarea[name=righe]", "Marta Neri, 333 999, palestra\nLuigi Verdi");
 await page.click(".sheet button:has-text('Aggiungi')");
 await page.getByText("1 nome aggiunto").waitFor();
 check(await page.getByText("Chiusi · 1").isVisible() && await page.getByText("In lista · 1").isVisible(), "filtri con i conteggi");
-// importazione dalla vecchia app: i nomi già presenti non si doppiano, i passi non contano attività
-await page.click("button[data-act=importa-lista]");
-const attPrima = DB.activities.length;
-await page.setInputFiles("#file-lista", { name:"lista-nomi.json", mimeType:"application/json", buffer:Buffer.from(JSON.stringify({ v:1, people:[
-  { name:"Gino Vecchio", contact:"", events:[{ type:"contatto", date:"2026-01-10", how:"Telefono" }, { type:"piano", date:"2026-01-20", plan:"molto" }] },
-  { name:"Marta Neri" }] })) });
-await page.getByText("1 nome importato, 1 già presente").waitFor();
-await sync(page);
-check(DB.persone.find(x => x.nome === "Gino Vecchio").fase === "piano" && DB.activities.length === attPrima,
-  "import: Gino arriva con i suoi passi, senza contare attività");
-check(DB.passi.some(x => x.reazione === "Molto interessato"), "import: il risultato del piano diventa la reazione");
 await ctx.close();
 // lo sponsor vede solo i numeri della lista di chi sta sotto
 const annaId = "lia";
