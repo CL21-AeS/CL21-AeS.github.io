@@ -736,6 +736,7 @@ await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
 await page.click(".sheet button[data-act=chiudi]");
 const meseVecchio = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - 3); return d.toISOString().slice(0, 7).replace("-", ""); })();
 await scegliFile(page, "vecchio.csv", creaCsv(meseVecchio, righeCsv));
+await page.locator(".sheet .errore").waitFor();
 check(await page.locator(".sheet .errore").getByText("quel mese è già chiuso").isVisible(), "import: mese chiuso rifiutato");
 await page.setInputFiles("#file-report", { name:"report.xlsx", mimeType:"application/octet-stream", buffer:Buffer.from("PK") });
 check(await page.locator(".sheet .errore").getByText("sul sito Amway scegli il formato CSV").isVisible(), "import: il file Excel non va, serve il CSV");
@@ -974,6 +975,7 @@ await page.fill(".sheet textarea[name=righe]", "Marta Neri, 333 999, palestra\nL
 await page.click(".sheet button:has-text('Aggiungi')");
 await page.getByText("1 nome aggiunto").waitFor();
 check(await page.getByText("Chiusi · 1").isVisible() && await page.getByText("In lista · 1").isVisible(), "filtri con i conteggi");
+check(!(await page.locator(".persone button[data-act=togli-da-io]").count()), "nella lista nessuna × (quella è solo su Io)");
 await ctx.close();
 // lo sponsor vede solo i numeri della lista di chi sta sotto
 const annaId = "lia";
