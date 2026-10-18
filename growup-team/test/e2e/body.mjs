@@ -948,7 +948,13 @@ await page.locator(".card", { hasText:"I passi" }).locator("li", { hasText:"Pian
 await page.getByText("Passo tolto").waitFor();
 await sync(page);
 check(DB.activities.filter(a => a.partner_id === "R" && a.tipo === "piano").length === pianiDopo - 1, "togliendo il passo si toglie il piano contato");
-await page.click("button[data-act=torna-lista]");
+// dalla scheda della persona, col dito verso destra si torna alla lista
+await page.evaluate(() => { const el = document.querySelector("#app");
+  const t = (tipo, x) => { const k = new Touch({ identifier:1, target:el, clientX:x, clientY:400 });
+    el.dispatchEvent(new TouchEvent(tipo, { bubbles:true, cancelable:true, touches:tipo === "touchend" ? [] : [k], changedTouches:[k] })); };
+  t("touchstart", 80); t("touchend", 320); });
+check(await page.locator(".card", { hasText:"La mia lista" }).isVisible() && !(await page.locator("button[data-act=passo]").count()), "scheda persona: col dito si torna alla lista");
+check(await page.getByText("Scarica una copia della mia lista").isVisible(), "la copia della lista è un piccolo link");
 await page.click("button[data-act=persone-tante]");
 await page.fill(".sheet textarea[name=righe]", "Marta Neri, 333 999, palestra\nLuigi Verdi");
 await page.click(".sheet button:has-text('Aggiungi')");

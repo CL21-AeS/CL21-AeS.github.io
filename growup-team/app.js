@@ -2540,12 +2540,8 @@ function vPersone(){
     ${l.length ? `<ul class="persone">${l.map(rigaPersona).join("")}</ul>` : `<p class="muted" style="margin:10px 0 0">Nessun nome qui.</p>`}`
     : `<p class="muted" style="margin:8px 0 0">La tua lista è vuota. Scrivi i nomi delle persone che conosci: amici, parenti,
         colleghi, vicini. Basta il nome; il resto lo aggiungi quando serve.</p>`}
-    <p class="nota">I nomi della tua lista li vedi solo tu. A chi ti segue arrivano soltanto i numeri.</p>
-  </div>
-  <div class="card tight">
-    <div class="row wrap" style="gap:6px">
-      ${st.persone.length ? `<button class="btn small ghost" data-act="scarica-persone">Scarica la mia lista</button>` : ""}
-    </div>
+    <p class="nota">I nomi della tua lista li vedi solo tu. A chi ti segue arrivano soltanto i numeri.
+      ${st.persone.length ? `<button class="btn link small" data-act="scarica-persone" style="min-height:0;padding:0">Scarica una copia della mia lista</button>` : ""}</p>
   </div>`;
 }
 
@@ -2853,6 +2849,7 @@ document.addEventListener("touchend", e => {
   else if(dx < 0 && st.vista === "io") scorri("vista-persone", "da-destra");
   else if(dx < 0 && st.vista === "persone" && !st.personaId) scorri("vista-gruppo", "da-destra");
   else if(dx > 0 && st.vista === "persone" && !st.personaId) scorri("vista-io", "da-sinistra");
+  else if(dx > 0 && st.vista === "persone" && st.personaId) scorri("torna-lista", "da-sinistra");
   else if(dx > 0 && st.vista === "io") scorri("vista-obiettivo", "da-sinistra");
   else if(dx > 0 && st.vista === "gruppo") scorri("vista-persone", "da-sinistra");
   else if(dx > 0 && st.vista === "scheda") scorri("vista-gruppo", "da-sinistra");
