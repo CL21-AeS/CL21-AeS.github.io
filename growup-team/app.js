@@ -46,7 +46,7 @@ function creaApi(){
     /* io e chi vedo, ognuno sotto il primo sopra di lui che vedo (struttura "ricucita" nel database) */
     struttura:    () => q(sb.rpc("struttura_visibile")),
     creaInvitoSopra: (pid, altri) => q(sb.rpc("crea_invito_sopra", { p_partner:pid, p_altri:altri })),
-    conferma:     args => q(sb.rpc("conferma_partenza", args)),
+    modificaPartenza: args => q(sb.rpc("modifica_partenza", args)),
     preferiti:    () => q(sb.from("preferiti").select("preferito_id")),
     copiaDati:    () => q(sb.rpc("copia_dati")),
     /* il primo obiettivo: il proprio per intero; del gruppo solo cifra e data (il perché resta personale) */
@@ -121,7 +121,6 @@ const st = {
   schedaId: null,         // partner aperto nella scheda
   attScheda: [],          // le sue attività (mese aperto)
   target: null,           // per chi sto registrando: null = io; un id = partner senza app che gestisco
-  confermaId: null,       // partner di cui confermo il punto di partenza
   sponsorNome: "",
   errore: "",
   occupato: false,
@@ -690,7 +689,7 @@ function vIngresso(){
       <p class="nota" style="margin-top:6px">È il numero del tuo accesso al sito Amway. Se il tuo sponsor ti ha già nella sua
         struttura, con il codice ritrovi il tuo profilo con i tuoi numeri.</p>
       ${campiQualifica(true)}
-      <p class="nota">Il punto di partenza lo conferma poi il tuo sponsor, così i numeri del gruppo restano affidabili.</p>
+      <p class="nota">Dichiara il punto giusto: è una tua responsabilità e lo potrai correggere tu dalla pagina Io.</p>
 
       <label class="check"><input type="checkbox" name="privacy" required>
         <span>Ho letto l'<button type="button" class="btn link" data-act="privacy" style="min-height:0;padding:0">informativa privacy</button>
@@ -761,6 +760,8 @@ function vFondo(){
     <p class="nota" style="text-align:center">${esc(st.profilo.nome)} · codice d'invito <b>${esc(st.profilo.codice_invito)}</b><br>
       ${st.profilo.codice_amway ? `Codice Amway Partner <b>${esc(st.profilo.codice_amway)}</b>` : "Codice Amway Partner non ancora scritto"}
       ${st.profilo.is_admin ? `<button class="btn link small" data-act="codice" data-id="${esc(st.profilo.id)}" style="min-height:0;padding:0 4px">Correggi</button>` : ""}<br>
+      Punto di partenza <b>${esc(testoPartenza(st.profilo))}</b>
+      <button class="btn link small" data-act="partenza" style="min-height:0;padding:0 4px">Modifica</button><br>
       Per cancellare il profilo e i tuoi dati scrivi a Stefano e Alessia.</p>
   </div>`;
 }
@@ -783,7 +784,6 @@ function vHome(){
     ${vSelettore()}
   </div>
   ${st.vista === "scheda" ? vScheda() : gruppo ? `
-  ${vDaConfermare()}
   ${vPreferiti()}
   ${vStruttura()}
   ${vStoricoGruppo()}
@@ -1235,7 +1235,6 @@ function vStruttura(){
       </button>
       ${quanti ? `<button class="piega" data-act="piega" data-id="${esc(p.id)}" data-quanti="${quanti}" aria-expanded="${!chiuso}"
         aria-label="${chiuso ? "Mostra" : "Nascondi"} il gruppo di ${esc(p.nome)}">${chiuso ? "▸" : "▾"} ${quanti}</button>` : ""}
-      ${p.partenza_confermata_il ? "" : `<span class="pill g" title="Punto di partenza da confermare">!</span>`}
       ${p.fuori_report_dal ? `<span class="pill g" title="Non più nel report Amway">fuori</span>` : ""}
       <span class="pill ${sp.cl}">${sp.txt}</span></li>`; }).join("")}</ul>
       <p class="nota">Il numero è il livello, come nei report Amway: 1 sei tu, 2 i tuoi frontali, 3 i loro, e così via.
@@ -1245,18 +1244,6 @@ function vStruttura(){
         <button class="btn link small" data-act="nascoste" style="min-height:0;padding:0 4px">Rivedi</button></p>` : ""}`
       : `<p class="muted" style="margin:8px 0 0">Ancora nessuno nel tuo gruppo. Invita chi vuole usare l'app con il link qui sotto,
           oppure importa il report Amway per vedere anche chi non la usa.</p>`}
-  </div>`;
-}
-
-function vDaConfermare(){
-  const l = alberoSotto(st.profilo.id, 0).map(x => x.p).filter(p => !p.partenza_confermata_il);
-  if(!l.length) return "";
-  return `<div class="card" style="border-color:var(--giallo)">
-    <span class="eyebrow">Da confermare</span>
-    <p class="small" style="margin:4px 0 0">Il punto di partenza che hanno dichiarato entrando. Confermalo o correggilo:
-      così i numeri del gruppo restano affidabili.</p>
-    <ul class="albero">${l.map(p => `<li><span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${esc(testoPartenza(p))}</span></span>
-      <button class="btn small" data-act="conferma" data-id="${esc(p.id)}">Conferma</button></li>`).join("")}</ul>
   </div>`;
 }
 
@@ -1473,9 +1460,7 @@ function vScheda(){
     ${(() => { const l = r.da_report ? lineeReport(r) : frontali.map(x => ({ nome:nomeDi(x.partner_id), vp:Number(x.vp_gruppo) }));
       return l.length ? `<ul class="linee">${l.map(x => `<li><span class="grow">${esc(x.nome)}</span>
       <span class="num ${x.vp >= soglia() ? "" : "faint"}">${num(x.vp)} VP</span></li>`).join("")}</ul>` : ""; })()}
-    <p class="small" style="margin:10px 0 0">Punto di partenza: <b>${esc(testoPartenza(p))}</b>
-      ${p.partenza_confermata_il ? `<span class="pill v">confermato</span>`
-        : `<button class="btn link small" data-act="conferma" data-id="${esc(p.id)}">Conferma</button>`}</p>
+    <p class="small" style="margin:10px 0 0">Punto di partenza dichiarato: <b>${esc(testoPartenza(p))}</b></p>
     <button class="btn wide" style="margin-top:12px" data-act="chiamata" data-id="${esc(p.id)}">Fissa una chiamata</button>
   </div>
   ${vConfronto(p)}
@@ -1929,16 +1914,16 @@ function vSheet(){
       <button type="button" class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>${err}
     </form>`;
   }
-  if(s === "conferma"){
-    const p = st.struttura.find(x => x.id === st.confermaId);
-    if(!p) return "";
-    return `<h2>Punto di partenza di ${esc(nomeSaluto(p.nome))}</h2>
-    <p class="small">Ha dichiarato: <b>${esc(testoPartenza(p))}</b>. Se è giusto conferma; se no correggilo e poi conferma.</p>
-    <form data-form="conferma" novalidate>
+  if(s === "partenza"){
+    const p = st.profilo;
+    return `<h2>Il mio punto di partenza</h2>
+    <p class="small">Hai dichiarato: <b>${esc(testoPartenza(p))}</b>. Se non è giusto, correggilo: è una tua responsabilità
+      e nessuno lo conferma al posto tuo. I numeri del mese arrivano dal report Amway.</p>
+    <form data-form="partenza" novalidate>
       ${campiQualifica(false, { valore:valoreQualifica(p), mese:p.qualifica_iniziale_mese ? meseDi(p.qualifica_iniziale_mese) : "",
                                pagamenti:p.pagamenti_iniziali, senzaData:true })}
       <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
-        <button class="btn primary grow">Conferma</button></div>
+        <button class="btn primary grow">Salva</button></div>
     </form>`;
   }
   if(s === "link-gestito"){
@@ -2082,7 +2067,7 @@ const AZIONI = {
     try{ st.attScheda = (await api.activities(p.id, primaDataAperta()) || []).filter(a => a.data >= primaDataAperta()); render(); }
     catch(e){ toast(messaggio(e)); }
   },
-  conferma(el){ st.confermaId = el.dataset.id; st.sheet = "conferma"; render(); },
+  partenza(){ st.sheet = "partenza"; render(); },
   chiamata(el){ st.chiamataId = el.dataset.id; st.errore = ""; st.sheet = "chiamata"; render(); },
   "chiamata-ics"(el){
     const f = el.form, x = st.struttura.find(y => y.id === st.chiamataId);
@@ -2264,14 +2249,14 @@ const MODULI = {
     apriIcs(creaIcs(dati), x.nome);
     if(!suIos()) toast("Apri il file per aggiungere la chiamata al calendario");
   },
-  async conferma(f){
+  async partenza(f){
     const q = leggiQualifica(f);
     if(q.mancaMese){ mostraErroreForm(f, "Indica il mese della prima qualifica."); return; }
     try{
-      await api.conferma({ p_partner:st.confermaId, p_qualifica:q.qualifica, p_percentuale:q.percentuale,
+      st.profilo = await api.modificaPartenza({ p_qualifica:q.qualifica, p_percentuale:q.percentuale,
                            p_qualifica_mese:q.mese, p_pagamenti:q.pagamenti });
       await caricaStruttura();
-      st.sheet = null; render(); toast("Punto di partenza confermato");
+      st.sheet = null; render(); toast("Punto di partenza aggiornato");
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
   async ingresso(f){
