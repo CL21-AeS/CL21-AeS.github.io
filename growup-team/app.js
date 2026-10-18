@@ -2512,7 +2512,8 @@ function vDaFare(){
     <span class="eyebrow">Il tuo percorso con la lista</span>
     ${gruppi.map(([t, l]) => `<p class="small da-fare-t">${t}</p>
       <ul class="persone">${l.map(p => rigaPersona(p, true)).join("")}</ul>`).join("")}
-    <p class="nota">× toglie una persona da qui (non dalla lista): la rimetti dalla sua scheda.</p>
+    <p class="nota">× toglie una persona da qui (non dalla lista). Torna da sola quando segni un passo o fissi una data,
+      oppure dalla sua scheda con "Rimetti in Io".</p>
   </div>`;
 }
 function rigaPersona(p, suIo){
@@ -2540,7 +2541,7 @@ function vPersone(){
     <div class="row wrap scelte-rapide" style="gap:6px;margin-top:8px">${FILTRI_LISTA.map(x => {
       const n = st.persone.filter(x.ok).length;
       return `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-lista" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${n}</button>`; }).join("")}</div>
-    ${l.length ? `<ul class="persone">${l.map(rigaPersona).join("")}</ul>` : `<p class="muted" style="margin:10px 0 0">Nessun nome qui.</p>`}`
+    ${l.length ? `<ul class="persone">${l.map(p => rigaPersona(p)).join("")}</ul>` : `<p class="muted" style="margin:10px 0 0">Nessun nome qui.</p>`}`
     : `<p class="muted" style="margin:8px 0 0">La tua lista è vuota. Scrivi i nomi delle persone che conosci: amici, parenti,
         colleghi, vicini. Basta il nome; il resto lo aggiungi quando serve.</p>`}
     <p class="nota">I nomi della tua lista li vedi solo tu. A chi ti segue arrivano soltanto i numeri.
@@ -2693,7 +2694,11 @@ Object.assign(AZIONI, {
     try{ await api.cancellaPasso(el.dataset.id); await dopoPersone("Passo tolto"); }catch(e){ toast(messaggio(e)); }
   },
   async "riapri-persona"(){
-    try{ await api.nuoviPassi([{ id:uuid(), persona_id:st.personaId, tipo:"riapri", data:oggi() }]); await dopoPersone("Percorso riaperto"); }
+    try{
+      await api.nuoviPassi([{ id:uuid(), persona_id:st.personaId, tipo:"riapri", data:oggi() }]);
+      await api.modificaPersona(st.personaId, { nascosta_io:false });
+      await dopoPersone("Percorso riaperto");
+    }
     catch(e){ toast(messaggio(e)); }
   },
   "persona-calendario"(){
@@ -2762,12 +2767,13 @@ Object.assign(MODULI, {
     try{
       await api.nuoviPassi([{ id:uuid(), persona_id:p.id, tipo, data, come:scelto("come"), reazione:scelto("reazione"),
         esito:tipo === "chiusura" ? esito : null, nota:f.nota.value.trim() || null }]);
-      await api.modificaPersona(p.id, (tipo === "chiusura" && esito === "no") ? { prossima_data:null, prossima_nota:null } : pr);
+      /* un passo nuovo riporta la persona su Io, se l'avevo tolta */
+      await api.modificaPersona(p.id, Object.assign((tipo === "chiusura" && esito === "no") ? { prossima_data:null, prossima_nota:null } : pr, { nascosta_io:false }));
       await dopoPersone(`${TIPI_PASSO[tipo].nome}${tipo === "chiusura" ? " · " + ESITI[esito] : ""} segnato`);
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
   async prossima(f){
-    try{ await api.modificaPersona(st.personaId, leggiProssima(f)); await dopoPersone("Prossima cosa salvata"); }
+    try{ await api.modificaPersona(st.personaId, Object.assign(leggiProssima(f), { nascosta_io:false })); await dopoPersone("Prossima cosa salvata"); }
     catch(e){ mostraErroreForm(f, messaggio(e)); }
   }
 });
