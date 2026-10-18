@@ -49,6 +49,11 @@ Contatto / Piano / Chiusura-Cliente **conta da solo** l'attività (trigger), tog
 "La sua lista: …" (solo numeri); "Scarica la mia lista" (l'importazione dalla vecchia app, usata solo in prova,
 è stata tolta il 18 ottobre); Partner chiuso → "Mandagli il tuo link d'invito". Informativa aggiornata.
 
+**18 ottobre — la Lista su Io** (migrazione `021_persone_io.sql`): su Io, "Il tuo percorso con la lista" mostra come
+promemoria **tutte** le persone con cui è iniziato un percorso (da Contattato in poi; non chi è solo "In lista"; non le
+chiuse, tranne "Non ora" con una data): prima in ritardo · oggi · prossimi giorni, poi "In corso" (le più avanti nel
+percorso in cima). × toglie una persona da Io (colonna `nascosta_io`); dalla sua scheda "Rimetti in Io".
+
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
    import, nascondi, scheda partner).
