@@ -566,6 +566,8 @@ begin
   insert into public.persone (nome, invito_target_id) values ('Contatto Prova', 'ABC234') returning id into pp;
   update public.inviti_target set persona_id = pp where id = 'ABC234';
   perform growup_test.ok((select persona_id = pp from public.inviti_target where id = 'ABC234'), 'Metti in lista: la persona porta con sé il Target');
+  update public.persone set invito_target_id = 'ABC234' where id = pp;
+  perform growup_test.ok((select invito_target_id = 'ABC234' from public.persone where id = pp), 'dalla Lista: la persona si collega al suo invito Target');
   insert into public.inviti_target (id, nome) values ('DEF567', 'Altro');
   update public.inviti_target set bloccato = true where id = 'DEF567';
   perform growup_test.ok(public.invito_target_aperto('DEF567') = 'bloccato', 'un link bloccato non si apre');

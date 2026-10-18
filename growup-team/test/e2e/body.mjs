@@ -1050,6 +1050,30 @@ await sync(page);
 const carla = DB.persone.find(x => x.nome === "Carla Nuova");
 check(carla && carla.fase === "contattato" && carla.invito_target_id && DB.activities.length === attT, "Metti in lista: Contattato, con il Target, senza contare di nuovo");
 check(await page.getByText(/Target: In target · 28\/28/).isVisible(), "nella scheda della persona l'esito del Target");
+// togliendo Carla dalla lista, l'invito resta e si può rimettere in lista
+await page.click("button[data-act=persona-cancella]");
+await page.getByText("Carla Nuova tolto dalla lista").waitFor();
+await page.click("button[data-sez=target]");
+await page.locator("button[data-act=apri-invito]", { hasText:"Carla Nuova" }).click();
+check(await page.locator("button[data-act=target-in-lista]").isVisible() && !(await page.getByText("Apri nella lista").count()), "tolta dalla lista: si può rimettere in lista");
+await page.click("button[data-act=target-in-lista]");
+await page.getByText("Carla Nuova nella tua lista").waitFor();
+// dalla lista: a chi è già in lista si mandano le 8 domande
+await page.click("button[data-act=torna-lista]");
+await page.click("button[data-act=persona-nuova]");
+await page.fill(".sheet input[name=nome]", "Dario Conosciuto");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Dario Conosciuto nella tua lista").waitFor();
+await page.click("button[data-act=target-da-persona]");
+check(await page.locator(".sheet input[name=nome]").inputValue() === "Dario Conosciuto", "Target dalla lista: il nome è già scritto");
+await page.click('.sheet button:has-text("Crea l\'invito")');
+await page.getByText("Invito pronto").waitFor();
+await sync(page);
+const dario = DB.persone.find(x => x.nome === "Dario Conosciuto"), invD = DB.inviti.find(x => x.nome === "Dario Conosciuto");
+check(dario.invito_target_id === invD.id && invD.persona_id === dario.id, "l'invito nasce collegato alla persona della lista");
+await page.click("button[data-act=torna-target]"); await page.click("button[data-sez=lista]");
+await page.locator("button[data-act=apri-persona]", { hasText:"Dario Conosciuto" }).click();
+check(await page.getByText(/Target: in attesa/).isVisible(), "nella scheda: Target in attesa");
 // la stessa risposta incollata con "Leggi una risposta" non cambia niente; un codice non mio è rifiutato
 await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=target]");
 await page.click("button[data-act=target-leggi]");

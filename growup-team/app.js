@@ -2577,8 +2577,9 @@ function vPersona(){
     <div class="spread"><h2>${esc(p.nome)}</h2>${p.esito ? `<span class="pill ${p.esito === "partner" || p.esito === "cliente" ? "v" : p.esito === "no" ? "r" : "g"}">${ESITI[p.esito]}</span>` : ""}</div>
     ${p.contatto || p.origine ? `<p class="small" style="margin:2px 0 0">${[p.contatto, p.origine].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
     ${(() => { const x = p.invito_target_id && st.inviti.find(y => y.id === p.invito_target_id);
-      return x && x.risposte ? `<p class="small" style="margin:6px 0 0">Target: <b>${esc(statoInvito(x).txt)}</b>
-        <button class="btn link small" data-act="apri-invito" data-id="${esc(x.id)}" style="min-height:0;padding:0 4px">Vedi le risposte</button></p>` : ""; })()}
+      return x ? `<p class="small" style="margin:6px 0 0">Target: <b>${esc(statoInvito(x).txt)}</b>
+        <button class="btn link small" data-act="apri-invito" data-id="${esc(x.id)}" style="min-height:0;padding:0 4px">${x.risposte ? "Vedi le risposte" : "Apri l'invito"}</button></p>`
+        : `<button class="btn small ghost" style="margin-top:8px" data-act="target-da-persona">Manda le 8 domande (Target)</button>`; })()}
     ${telefono ? `<div class="row" style="gap:6px;margin-top:8px">
       <a class="btn small" href="tel:${esc(tel)}">Chiama</a>
       <a class="btn small wa" target="_blank" rel="noopener" href="https://wa.me/${esc(tel.replace(/^\+/, "").replace(/^(?=3)/, "39"))}">WhatsApp</a></div>` : ""}
@@ -2681,6 +2682,7 @@ function vSheetPersone(s){
 
 async function dopoPersone(msg){
   await caricaPersone();
+  await caricaInviti();   // togliendo una persona, il suo invito Target si scollega
   st.sheet = null; st.passoTipo = null; render();
   if(msg) toast(msg);
   aggiornaAttivita();  // i passi contano contatti, piani e clienti: si aggiornano anche i numeri di Io
@@ -3038,7 +3040,7 @@ function vTarget(){
     <p class="small" style="margin:6px 0 0">Le otto domande per chi non conosci: prima di parlargli dell'attività, vedi se è in linea.</p>
     ${l.length ? `<ul class="persone">${l.map(x => { const s = statoInvito(x);
       return `<li><button class="persona" data-act="apri-invito" data-id="${esc(x.id)}">
-        <span class="grow"><b>${esc(x.nome)}</b><br><span class="small">${x.risposte ? "ha risposto il " + dataIt(String(x.risposto_il).slice(0, 10)) : "invito del " + dataIt(String(x.creato_il).slice(0, 10))}${x.persona_id ? " · in lista" : ""}</span></span>
+        <span class="grow"><b>${esc(x.nome)}</b><br><span class="small">${x.risposte ? "ha risposto il " + dataIt(String(x.risposto_il).slice(0, 10)) : "invito del " + dataIt(String(x.creato_il).slice(0, 10))}${x.persona_id && st.persone.some(p => p.id === x.persona_id) ? " · in lista" : ""}</span></span>
         <span class="pill ${s.cl}">${esc(s.txt)}</span></button></li>`; }).join("")}</ul>`
       : `<p class="muted" style="margin:10px 0 0">${st.archiviatiT ? "Nessun invito archiviato." : "Ancora nessun invito."}</p>`}
     ${archiviati || st.archiviatiT ? `<button class="btn link small" data-act="target-archiviati" style="min-height:0;padding:0;margin-top:8px">${st.archiviatiT ? "‹ Gli inviti in corso" : `Archiviati · ${archiviati}`}</button>` : ""}
@@ -3073,7 +3075,7 @@ function vInvito(){
     <p class="small" style="margin:10px 0 0"><b>Cosa cerca:</b> ${esc(DOMANDE[0].o[a[0]].s)}</p>
     <p class="small" style="margin:4px 0 0"><b>Cosa lo trattiene:</b> ${esc(v.zeri.length ? v.zeri.map(qi => DOMANDE[qi].tema).join(" · ")
       : v.riserve.length ? "nessun no secco; riserve su " + v.riserve.map(qi => DOMANDE[qi].tema).join(" · ") : "niente di evidente dalle risposte")}</p>
-    ${x.persona_id ? `<button class="btn wide" style="margin-top:12px" data-act="apri-persona" data-id="${esc(x.persona_id)}">Apri nella lista</button>`
+    ${x.persona_id && st.persone.some(p => p.id === x.persona_id) ? `<button class="btn wide" style="margin-top:12px" data-act="apri-persona" data-id="${esc(x.persona_id)}">Apri nella lista</button>`
       : `<button class="btn primary wide" style="margin-top:12px" data-act="target-in-lista">Metti in lista</button>`}
   </div>
   <div class="card">
@@ -3102,17 +3104,18 @@ function vInvito(){
 
 function vSheetTarget(s){
   const annulla = `<button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>`;
-  if(s === "target-nuovo") return `<h2>Nuovo invito Target</h2>
-    <p class="small">Per chi non conosci bene: gli mandi le otto domande su WhatsApp e ti rimanda le risposte.</p>
+  if(s === "target-nuovo"){ const pl = st.targetPersona && st.persone.find(p => p.id === st.targetPersona);
+    return `<h2>${pl ? `Le 8 domande a ${esc(nomeSaluto(pl.nome))}` : "Nuovo invito Target"}</h2>
+    <p class="small">${pl ? "Le risposte arriveranno nella sua scheda della lista." : "Per chi non conosci bene: gli mandi le otto domande su WhatsApp e ti rimanda le risposte."}</p>
     <form data-form="target-nuovo" novalidate>
-      <label class="field"><span>Nome e cognome del contatto</span><input name="nome" maxlength="80" required autocomplete="off"></label>
+      <label class="field"><span>Nome e cognome del contatto</span><input name="nome" maxlength="80" required autocomplete="off" value="${esc(pl ? pl.nome : "")}"></label>
       <label class="field"><span>Il tuo numero WhatsApp <i>(per ricevere le risposte direttamente nella tua chat)</i></span>
         <input name="whatsapp" type="tel" inputmode="tel" maxlength="20" placeholder="es. 333 1234567" value="${esc(leggiLocale(CHIAVE_WA) || "")}"></label>
       <p class="nota" style="margin-top:4px">Resta solo su questo telefono e va nel link che mandi al contatto. Senza numero, il contatto sceglie la chat da solo.</p>
       <fieldset class="field"><legend>Il link vale</legend>
         <div class="opzioni">${DURATE_T.map(([v, t]) => `<label class="chip"><input type="radio" name="durata" value="${v}"${v === "14" ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Crea l'invito</button></div>
-    </form>`;
+    </form>`; }
   if(s === "target-leggi") return `<h2>Leggi una risposta</h2>
     <p class="small">Su WhatsApp tieni premuto sul messaggio del contatto, «Copia», e incollalo qui: il codice lo trovo io.</p>
     <form data-form="target-leggi" novalidate>
@@ -3154,7 +3157,9 @@ Object.assign(AZIONI, {
   "apri-invito"(el){ st.vista = "persone"; st.sezPersone = "target"; st.invitoId = el.dataset.id; render(); window.scrollTo(0, 0); },
   "torna-target"(){ st.invitoId = null; render(); window.scrollTo(0, 0); },
   "target-archiviati"(){ st.archiviatiT = !st.archiviatiT; render(); },
-  "target-nuovo"(){ st.errore = ""; st.sheet = "target-nuovo"; render(); },
+  "target-nuovo"(){ st.errore = ""; st.targetPersona = null; st.sheet = "target-nuovo"; render(); },
+  /* dalla scheda di una persona della lista: l'invito nasce già collegato a lei */
+  "target-da-persona"(){ st.errore = ""; st.targetPersona = st.personaId; st.sheet = "target-nuovo"; render(); },
   "target-leggi"(){ st.errore = ""; st.sheet = "target-leggi"; render(); },
   async "target-copia"(){
     const x = st.inviti.find(y => y.id === st.invitoId);
@@ -3208,6 +3213,9 @@ Object.assign(MODULI, {
         try{ await api.nuovoInvito({ id:prova, nome, scade }); id = prova; }
         catch(e){ if(!/duplicate|unique|23505/i.test(e.message || e.code || "")) throw e; }
       }
+      const pl = st.targetPersona && st.persone.find(p => p.id === st.targetPersona);
+      if(pl){ await api.aggiornaInvito(id, { persona_id:pl.id }); await api.modificaPersona(pl.id, { invito_target_id:id }); await caricaPersone(); }
+      st.targetPersona = null;
       await caricaInviti();
       st.sheet = null; st.vista = "persone"; st.sezPersone = "target"; st.invitoId = id; render(); window.scrollTo(0, 0);
       toast("Invito pronto: mandalo su WhatsApp");

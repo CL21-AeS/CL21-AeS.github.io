@@ -66,6 +66,9 @@ trattiene, le risposte; **"Il metodo"** (cosa affrontare, promemoria per l'incon
 richiesta. "Metti in lista" → la persona entra in Lista già Contattato, con l'esito del Target nella sua scheda (senza
 contare di nuovo il contatto). Blocca / riapri il link, archivia, elimina. Domande, punteggi e testi identici alla
 mini app (versione 2026-09-14). La mini app Target resta online per i link già mandati; nessuna importazione.
+Poi (023): dalla scheda di una persona della **Lista** "Manda le 8 domande (Target)" — l'invito nasce collegato a lei e
+le risposte compaiono nella sua scheda; se una persona arrivata dal Target si toglie dalla lista, l'invito resta e
+torna "Metti in lista" (prima restava un "Apri nella lista" che non apriva niente).
 
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
