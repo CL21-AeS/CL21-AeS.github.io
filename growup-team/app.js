@@ -269,6 +269,54 @@ function percentualeDa(vpGruppo){
   for(const l of st.livelli) if(vpGruppo >= Number(l.vp_gruppo)) pct = l.percentuale;
   return pct;
 }
+/* Bonus di performance, tutto in VP (niente euro: il rapporto cambia nel tempo). Si prende sulla DIFFERENZA tra la
+   propria percentuale e quella di ogni linea frontale: una linea con la stessa percentuale dà 0%. La percentuale
+   di una linea è quella ufficiale del report, se c'è, altrimenti quella della tabella dei livelli sui suoi VP. */
+function bonusDa(pct, gruppo, linee, nascoste){
+  pct = Number(pct) || 0; gruppo = Number(gruppo) || 0;
+  if(!pct || !gruppo) return null;
+  const l = linee.map(x => { const r = x.id ? rigaDi(st.riep, x.id) : null;
+    const lp = r && r.percentuale != null ? Number(r.percentuale) : (percentualeDa(x.vp) || 0);
+    return Object.assign({}, x, { pct:lp, diff:Math.max(0, pct - lp) }); });
+  const resto = Math.max(0, gruppo - somma(l, "vp"));
+  const bonus = (pct * resto + l.reduce((t, x) => t + x.diff * x.vp, 0)) / 100;
+  return { pct, gruppo, linee:l, resto, bonus, effettiva:bonus / gruppo * 100,
+           stessa:somma(l.filter(x => x.pct >= pct), "vp") / gruppo, nascoste:!!nascoste };
+}
+function bonusMio(){
+  const n = numeriMese(meseDi(oggi()));
+  return bonusDa(n.percentuale, n.gruppo, n.linee, (rigaDi(st.riep, st.profilo.id) || {}).linee_nascoste);
+}
+function bonusDi(pid){
+  const r = rigaDi(st.riep, pid);
+  if(!r) return null;
+  const linee = r.da_report ? lineeReport(r) : st.riep.filter(x => x.sponsor_id === pid)
+    .map(x => ({ id:x.partner_id, nome:nomeDi(x.partner_id), vp:Number(x.vp_gruppo) })).sort((a, b) => b.vp - a.vp);
+  return bonusDa(r.percentuale != null ? r.percentuale : percentualeDa(Number(r.vp_gruppo)), r.vp_gruppo, linee, r.linee_nascoste);
+}
+function pctIt(x){ return num(Math.round(x * 10) / 10) + "%"; }
+function vBonus(b, mio){
+  if(!b) return "";
+  return `<div class="card">
+    <span class="eyebrow">${mio ? "Il tuo" : "Il suo"} bonus di ${nomeMese(meseDi(oggi())).split(" ")[0]}</span>
+    <h2 style="margin-top:4px">${b.pct}% su ${num(b.gruppo)} VP di gruppo</h2>
+    <ul class="linee-bonus">${b.linee.map(x => `<li><span class="grow">${esc(x.nome)}<br>
+        <span class="small">${num(x.vp)} VP · ${x.pct ? `linea al ${x.pct}%` : "linea sotto il 3%"}</span></span>
+        <span class="num${x.diff ? "" : " faint"}">differenza ${x.diff}%</span></li>`).join("")}
+      ${b.resto ? `<li><span class="grow">VP personali e dei clienti<br><span class="small">${num(b.resto)} VP</span></span>
+        <span class="num">differenza ${b.pct}%</span></li>` : ""}</ul>
+    <div class="dati-bonus">
+      <div><span class="small">Bonus in VP</span><b class="num">${num(b.bonus)}</b></div>
+      <div><span class="small">Percentuale effettiva</span><b class="num">${pctIt(b.effettiva)}</b></div>
+    </div>
+    ${b.stessa > 0 ? `<p class="small" style="margin:8px 0 0">Il ${pctIt(b.stessa * 100)} del gruppo è in linee con la ${mio ? "tua" : "sua"} stessa
+      percentuale (o più alta): lì la differenza è 0%.</p>` : ""}
+    ${b.nascoste ? `<p class="nota">Alcune linee il report non le mostra: non si possono calcolare, il bonus reale può essere diverso.</p>` : ""}
+    <p class="nota">Bonus di performance: percentuale × VP, sulla differenza con la percentuale di ogni linea.
+      In VP, non in euro; non comprende gli altri bonus.</p>
+  </div>`;
+}
+
 /* Requisiti di una tappa (dal Path to Bronze in su) nel mese m: cosa manca */
 function mancanze(t, n){
   const out = [];
@@ -798,6 +846,7 @@ function vHome(){
   ${vTappa()}
   ${vSettimana()}
   ${vMese()}
+  ${vBonus(bonusMio(), true)}
   ${vOggi()}`}
   ${vFondo()}`;
 }
@@ -965,6 +1014,8 @@ function vObiettivo(){
     <div class="spread" style="margin-top:4px"><h2>${esc(t.tappa.nome)}</h2><span class="num">${euro(t.tappa.guadagno_mese)}<span class="small"> /mese*</span></span></div>
     ${t.oltre ? `<p class="small" style="margin:4px 0 0">La tua cifra è oltre Argento: Argento vale circa ${euro(t.tappa.guadagno_mese)} al mese.</p>` : ""}
     ${t.tappa.struttura_calcolo ? `<p class="small" style="margin:4px 0 0">Calcolato su: ${esc(t.tappa.struttura_calcolo)}</p>` : ""}
+    ${(() => { const b = bonusMio(); return b ? `<p class="small" style="margin:8px 0 0">Questo mese: <b>${b.pct}%</b> · percentuale effettiva
+      <b>${pctIt(b.effettiva)}</b> · bonus ${num(b.bonus)} VP</p>` : ""; })()}
     <p class="small" style="margin:8px 0 0">${giaFatto ? "Hai già raggiunto questa tappa." : mancano === 1 ? "È la tua tappa attuale." : `Da qui: ${mancano} tappe, compresa quella attuale.`}</p>
     <p class="nota">* ${notaGuadagni()}</p>
   </div>
@@ -1491,6 +1542,7 @@ function vScheda(){
     <p class="small" style="margin:10px 0 0">Punto di partenza dichiarato: <b>${esc(testoPartenza(p))}</b></p>
     <button class="btn wide" style="margin-top:12px" data-act="chiamata" data-id="${esc(p.id)}">Fissa una chiamata</button>
   </div>
+  ${vBonus(bonusDi(p.id), false)}
   ${vConfronto(p)}
   ${gestito ? `<div class="card">
     <span class="eyebrow">I suoi numeri · ${nomeMese(m)}</span>
