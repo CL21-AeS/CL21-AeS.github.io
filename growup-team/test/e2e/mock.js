@@ -84,6 +84,7 @@
     esclusi: async () => (db.esclusi || []).filter(x => x.partner_id === mio().id),
     nascosti: async () => (db.nascosti || []).filter(x => x.partner_id === mio().id),
     nascondi: async (io, pid) => { db.nascosti = (db.nascosti || []).concat([{ partner_id:io, nascosto_id:pid }]); salva(); },
+    mostraTanti: async (io, ids) => { db.nascosti = (db.nascosti || []).filter(x => !(x.partner_id === io && ids.includes(x.nascosto_id))); salva(); },
     mostra: async (io, pid) => { db.nascosti = (db.nascosti || []).filter(x => !(x.partner_id === io && x.nascosto_id === pid)); salva(); },
     riepilogo: async mese => { const io = mio(); if(!io) return []; const m = mese.slice(0, 7);
       const ric = visibiliRicuciti(io);

@@ -173,6 +173,8 @@ più le proprie persone importate); lo storico dei mesi chiusi si congela allo s
 Cosa possono fare in più gli admin (inviti sotto una persona o "chi manca sopra", correzione del codice Amway, …):
 vedi `ADMIN.md`. Dalla scheda di chiunque: **Nascondi dalla mia struttura** (sparisce solo per me, con il suo gruppo; i suoi VP contano
 sempre nei numeri personali e di gruppo). Le nascoste si rivedono da "N persone nascoste · Rivedi" nella struttura.
+Si nasconde **solo la persona**: chi sta sotto di lei resta visibile (sotto il primo sponsor visibile, con il suo
+livello del report). All'import, chi era nascosto e nel mese ha fatto VP personali **torna visibile** da solo.
 **Nell'app nessuno cancella niente**, neanche gli admin.
 
 ## Com'è fatta

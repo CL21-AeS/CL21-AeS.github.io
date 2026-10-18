@@ -69,6 +69,7 @@ function creaApi(){
     nascosti:     () => q(sb.from("nascosti").select("nascosto_id")),
     nascondi:     (io, pid) => q(sb.from("nascosti").insert({ partner_id:io, nascosto_id:pid })),
     mostra:       (io, pid) => q(sb.from("nascosti").delete().eq("partner_id", io).eq("nascosto_id", pid)),
+    mostraTanti:  (io, ids) => q(sb.from("nascosti").delete().eq("partner_id", io).in("nascosto_id", ids)),
     stages:       () => q(sb.from("stage_requirements").select("*").order("ordine")),
     settings:     () => q(sb.from("settings").select("chiave,valore")),
     /* la settimana e il mese in corso per intero; ordini e clienti di sempre (servono alle tappe) */
@@ -104,7 +105,7 @@ const st = {
   invitoRiserva: null,    // l'invito lasciato per "entra con il tuo link": si può tornare indietro
   struttura: [],          // io e la mia downline
   linkGestito: null,      // { nome, chiave }: nuovo link personale creato dall'admin per chi l'ha perso
-  nascosti: new Set(),    // persone nascoste dalla mia struttura (con il loro gruppo)
+  nascosti: new Set(),    // persone nascoste dalla mia struttura (solo loro: chi sta sotto resta)
   esclusi: new Set(),     // codici esclusi dagli import
   riep: [],               // numeri del mese in corso: io e la mia downline (riepilogo_mese)
   chiusi: new Set(),
@@ -1206,8 +1207,10 @@ function vStruttura(){
   const io = st.profilo.id;
   const tutte = alberoSotto(io, 0), sopra = [io];
   for(const r of tutte){ sopra.length = r.livello + 1; r.path = sopra.slice(); sopra.push(r.p.id); }
-  /* le persone nascoste spariscono con il loro gruppo (solo per me) */
-  const righe = tutte.filter(r => !r.path.concat([r.p.id]).some(id => st.nascosti.has(id)));
+  /* una persona nascosta sparisce da sola (solo per me): chi sta sotto di lei resta, sotto il primo sponsor
+     visibile. Il numero resta il livello vero del report; il rientro e il percorso seguono le righe visibili. */
+  const righe = tutte.filter(r => !st.nascosti.has(r.p.id));
+  for(const r of righe) r.path = r.path.filter(id => !st.nascosti.has(id));
   const nascoste = [...st.nascosti].filter(id => nomeDi(id)).length;
   const rIo = rigaDi(st.riep, io) || {}, chiusoIo = st.chiusi.has(io);
   const rigaIo = `<li class="liv io" style="--rientro:0px" data-id="${esc(io)}" data-path="" data-nome="${esc(senzaAccenti(st.profilo.nome))}">
@@ -1224,9 +1227,9 @@ function vStruttura(){
       <p class="small" id="cerca-esito" aria-live="polite" style="margin:6px 0 0"></p>` : ""}
     ${tutte.length ? `<ul class="albero struttura">${rigaIo}${righe.map(({ p, livello, path }) => {
       const r = rigaDi(st.riep, p.id) || {}, sp = statoDi(p);
-      const quanti = alberoSotto(p.id, 0).length, chiuso = st.chiusi.has(p.id);
+      const quanti = righe.filter(x => x.path.includes(p.id)).length, chiuso = st.chiusi.has(p.id);
       const piegato = path.some(id => st.chiusi.has(id));
-      return `<li class="liv${piegato ? " piegato" : ""}" style="--rientro:${Math.min(livello + 1, 4) * 10}px"
+      return `<li class="liv${piegato ? " piegato" : ""}" style="--rientro:${Math.min(path.length, 4) * 10}px"
         data-id="${esc(p.id)}" data-path="${esc(path.join(" "))}" data-nome="${esc(senzaAccenti(p.nome))}">
       <span class="livello l${(livello + 1) % 4}" title="Livello ${livello + 2}">${livello + 2}</span>
       <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}">
@@ -1492,7 +1495,8 @@ function vScheda(){
     ${st.nascosti.has(p.id)
       ? `<button class="btn wide" style="margin-top:10px" data-act="mostra" data-id="${esc(p.id)}">Mostra di nuovo nella mia struttura</button>`
       : `<button class="btn wide" style="margin-top:10px" data-act="nascondi" data-id="${esc(p.id)}">Nascondi dalla mia struttura</button>`}
-    <p class="nota">Nascosta sparisce solo per te, con il suo gruppo; i suoi VP contano lo stesso nei numeri personali e di gruppo.
+    <p class="nota">Nascosta sparisce solo per te, e solo lei: chi sta sotto di lei resta visibile. I suoi VP contano lo stesso
+      nei numeri personali e di gruppo.
       La rimetti quando vuoi da «Nascoste». Nell'app nessuno si cancella: la struttura rispecchia il report Amway.</p>
   </div>`;
 }
@@ -1658,6 +1662,8 @@ function analizzaReport(rep){
     if(nuovo !== p.sponsor_id && !alberoSotto(p.id, 0).some(x => x.p.id === nuovo))
       a.spostati.push({ p, da:p.sponsor_id === io.id ? "te" : nomeDi(p.sponsor_id), a:nuovo === io.id ? "te" : nomeDi(nuovo) });
   }
+  /* chi era nascosto e questo mese ha fatto VP personali torna visibile, al suo posto */
+  a.riappaiono = a.aggiorna.concat(a.usanoApp).filter(({ p, r }) => st.nascosti.has(p.id) && Number(r.vpp) > 0).map(x => x.p);
   /* tante persone che mancano insieme: forse il file è parziale (filtri, "Vista corrente") */
   const conCodice = mie.filter(p => p.codice_amway).length;
   a.troppiMancanti = a.mancanti.length > Math.max(3, Math.round(conCodice * 0.1));
@@ -1708,6 +1714,9 @@ function vImporta(){
       "imp-da-scegliere") : ""}
     ${sezione(`Si aggiornano i VPP · ${aggiorna.length}`, `<ul class="imp">${aggiorna.map(x => `<li>${riga(x.io ? { nome:`${st.profilo.nome} (tu)` } : x.p,
         x.io && a.codiceMio ? `il tuo codice ${esc(x.r.codice)} viene salvato` : "")}<b class="num">${num(x.r.vpp)} VP</b></li>`).join("")}</ul>`)}
+    ${a.riappaiono.length ? sezione(`Tornano visibili · ${a.riappaiono.length}`,
+      `<p class="small">${a.riappaiono.map(p => esc(p.nome)).join(", ")}</p>`,
+      "Erano nascoste e questo mese hanno fatto VP personali: ricompaiono al loro posto nella struttura.") : ""}
     ${a.mancanti.length ? sezione(`Non più nel report · ${a.mancanti.length}`,
       `${a.troppiMancanti ? `<p class="avviso">Mancano molte persone insieme: controlla di aver esportato <b>l'intera linea senza filtri</b>.</p>` : ""}
       <p class="small">${a.mancanti.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})`).join(", ")}</p>`,
@@ -1769,6 +1778,7 @@ async function eseguiImport(f){
     const esito = await api.importaRete({ p_mese:a.mese + "-01", p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp }, numeri(a.prima)), p_persone:persone,
       p_attivi:usanoApp, p_nascondi:[...nascondi], p_fuori:a.mancanti.map(p => p.id) }) || {};
     if(a.codiceMio) st.profilo = Object.assign({}, io, { codice_amway:a.prima.codice });
+    if(a.riappaiono.length) await api.mostraTanti(io.id, a.riappaiono.map(p => p.id));
     await caricaStruttura();
     st.att = await api.activities(io.id, [settimana(), primoDelMese()].sort()[0]) || [];
     await caricaNumeri();
@@ -1776,7 +1786,8 @@ async function eseguiImport(f){
     const n = k => Number(esito[k]) || 0;
     toast(`Import di ${nomeMese(a.mese).split(" ")[0]}: ${[n("aggiunte") ? plur(n("aggiunte"), "persona aggiunta", "persone aggiunte") : "",
       plur(n("aggiornati"), "VPP aggiornato", "VPP aggiornati"), n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
-      n("fuori") ? plur(n("fuori"), "persona non più nel report", "persone non più nel report") : ""].filter(Boolean).join(", ")}`);
+      n("fuori") ? plur(n("fuori"), "persona non più nel report", "persone non più nel report") : "",
+      a.riappaiono.length ? plur(a.riappaiono.length, "di nuovo visibile", "di nuovo visibili") : ""].filter(Boolean).join(", ")}`);
   }catch(e){
     st.occupato = false;
     try{ await caricaStruttura(); }catch(x){}

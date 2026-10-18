@@ -321,12 +321,15 @@ await page.fill("#cerca-struttura", "");
 check(await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isHidden(), "ricerca vuota: torna com'era");
 await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator("button[data-act=piega]").click();
 check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isVisible(), "gruppo riaperto");
-// nascondi: Ciro (con Bea) sparisce solo per la radice, e si rimette
+// nascondi: sparisce solo Ciro (per la radice); Bea, sotto di lui, resta con il suo livello vero, e Ciro si rimette
 await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).locator("button[data-act=apri-scheda]").click();
 await page.click("button[data-act=nascondi]");
 await page.getByText("Ciro Neri nascosto dalla tua struttura").waitFor();
-check(!(await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).count()) && !(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).count()),
-  "Ciro nascosto con il suo gruppo");
+check(!(await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).count()) && await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).isVisible(),
+  "nascosto solo Ciro: Bea, sotto di lui, resta visibile");
+check(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).locator(".livello").innerText() === "3"
+  && !(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).getAttribute("data-path")).includes(idDi("Ciro Neri")),
+  "Bea tiene il livello del report e sale sotto il primo sponsor visibile");
 await page.click("button[data-act=nascoste]");
 await page.locator(".sheet li", { hasText:"Ciro Neri" }).locator("button[data-act=mostra]").click();
 await page.getByText("Ciro Neri di nuovo nella tua struttura").waitFor();
@@ -697,6 +700,7 @@ DB.partners.find(p => p.id === "R").codice_amway = null; DB.esclusi = [];
 for(const [id, nome, codice] of [["imp-gino","Gino Gestito","3000001"],["imp-ugo","Ugo Uscito","3000004"],["imp-ivo","Ivo Attivo","3000005"]])
   DB.partners.push({ id, nome, sponsor_id:"R", stato:id === "imp-ivo" ? "attivo" : "gestito", gestore_id:"R", codice_amway:codice, codice_invito:"X" + id.toUpperCase(),
     partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() });
+DB.nascosti = (DB.nascosti || []).concat([{ partner_id:"R", nascosto_id:"imp-gino" }]);  // nascosto quando aveva 0 VP
 const altriGestiti = DB.partners.filter(p => p.stato === "gestito" && p.gestore_id === "R" && p.codice_amway && !["imp-gino","imp-ugo"].includes(p.id));
 const usanoApp = DB.partners.filter(p => p.stato !== "gestito" && p.codice_amway);
 const righeCsv = [persona(1, "7654321", "1234567", "ROSSI, MARIO", "400,00"), persona(2, "1234567", "3000001", "GESTITO, GINO", "1.055,50"),
@@ -724,6 +728,7 @@ check(!(await sez("Nome uguale, codice diverso").count()) && !(await sez("trovat
 check(await sez("Non più nel report").getByText("Ugo Uscito (3000004)").isVisible() && !(await page.locator(".sheet input[name=cancella]").count()),
   "anteprima: Ugo non più nel report, nessuna cancellazione");
 check(await sez("Usano l'app").isVisible(), "anteprima: chi usa l'app non viene toccato");
+check(await sez("Tornano visibili · 1").getByText("Gino Gestito").isVisible(), "anteprima: Gino era nascosto e ha fatto VP, torna visibile");
 check(await sez("Nuovi nel report · 1").isVisible() && !(await page.isChecked(".sheet input[name=nascondi]")), "anteprima: Nino entra, non nascosto");
 await page.screenshot({ path: S + "/e2e/27-importa-conferme.png", fullPage:true });
 await page.click(".sheet button:has-text('Importa')");
@@ -735,6 +740,7 @@ const vppDi = id => DB.activities.filter(a => a.partner_id === id && ["ordine","
   .reduce((t, a) => t + Number(a.vp), 0);
 check(DB.partners.find(p => p.id === "R").codice_amway === "1234567" && Math.abs(vppDi("R") - 400) < 0.001, "i miei VPP del mese sono quelli del report");
 check(vppDi("imp-gino") === 1055.5, "VPP delle persone importate");
+check(!DB.nascosti.some(x => x.nascosto_id === "imp-gino"), "Gino di nuovo visibile al suo posto");
 check(DB.partners.find(p => p.id === "imp-ugo").fuori_report_dal && DB.nascosti.some(x => x.nascosto_id === "imp-ugo"), "Ugo resta, segnato e nascosto");
 check(!DB.activities.some(a => a.tipo === "rettifica" && a.inserito_da === "R" && usanoApp.some(p => p.id === a.partner_id)), "nessun dato di chi usa l'app toccato");
 const nRett = DB.activities.filter(a => a.tipo === "rettifica").length;
