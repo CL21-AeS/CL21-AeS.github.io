@@ -343,6 +343,9 @@ check(await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isVisi
   "Ciro di nuovo visibile, Bea nascosta dall'elenco");
 // struttura completa: le nascoste al loro posto, in grigio, e si rimettono dalla riga
 await page.click("button[data-act=con-nascoste]");
+check(await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isVisible() && !(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).isVisible()),
+  "struttura completa: parte con i gruppi chiusi");
+await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).locator("button[data-act=piega]").click();
 check(await page.locator(".albero.struttura li.nascosta", { hasText:"Bea Verdi" }).isVisible(), "Mostra anche le nascoste: Bea in grigio al suo posto");
 await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).locator("button[data-act=mostra]").click();
 await page.getByText("Bea Verdi di nuovo nella tua struttura").waitFor();

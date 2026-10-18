@@ -175,7 +175,7 @@ vedi `ADMIN.md`. Dalla scheda di chiunque: **Nascondi dalla mia struttura** (spa
 sempre nei numeri personali e di gruppo). Le nascoste si rivedono da "N persone nascoste · Rivedi" nella struttura.
 Si nasconde **solo la persona**: chi sta sotto di lei resta visibile (sotto il primo sponsor visibile, con il suo
 livello del report). Nella struttura, **Mostra anche le nascoste** fa vedere l'albero completo (le nascoste in
-grigio, con Mostra / Nascondi su ogni riga); **Rivedi** apre l'elenco Nascoste · Visibili con livello, sponsor e
+grigio, con Mostra / Nascondi su ogni riga; parte con i gruppi chiusi, ▸ li apre); **Rivedi** apre l'elenco Nascoste · Visibili con livello, sponsor e
 persone sotto. Al reimport si sceglie: **Lascia tutto com'è** (si aggiornano solo i VP) oppure **Riapplica i filtri a
 tutti** (Nascondi chi ha 0 VP / Nascondi tutti / Mostra tutti anche su chi c'è già).
 **Nell'app nessuno cancella niente**, neanche gli admin.
