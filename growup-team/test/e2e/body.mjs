@@ -403,6 +403,10 @@ await page.getByText("Ciao Stefano e Alessia").waitFor();
 check(await page.getByText("✓ Path to Bronze").isVisible(), "Path to Bronze riconosciuto dai numeri");
 check(await page.getByText("9% questo mese").isVisible(), "1.310 VP di gruppo = 9%");
 check(await page.getByText(/9% raggiunto · Bronze Foundation 9% non qualificato: mancano 2 linee da almeno 200 VP/).isVisible(), "percentuale e qualifica distinte");
+const cardBonus = page.locator(".card", { hasText:"Il tuo bonus" });
+check(await cardBonus.getByText("9% su 1.310 VP di gruppo").isVisible()
+  && await cardBonus.locator("li", { hasText:"Linea Uno" }).getByText("differenza 3%").isVisible(), "bonus: la linea al 6% dà solo la differenza del 3%");
+check(await cardBonus.getByText("60,9").isVisible() && await cardBonus.getByText("4,6%").isVisible(), "bonus in VP 60,9 e percentuale effettiva 4,6%");
 await page.screenshot({ path: S + "/e2e/9-distinti.png", fullPage:true });
 await sync(page); await ctx.close();
 // storico: un mese chiuso da Bronze Foundation 9% -> tappa successiva e pagamenti
