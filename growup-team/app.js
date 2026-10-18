@@ -69,6 +69,7 @@ function creaApi(){
     nascosti:     () => q(sb.from("nascosti").select("nascosto_id")),
     nascondi:     (io, pid) => q(sb.from("nascosti").insert({ partner_id:io, nascosto_id:pid })),
     mostra:       (io, pid) => q(sb.from("nascosti").delete().eq("partner_id", io).eq("nascosto_id", pid)),
+    nascondiTanti:(io, ids) => q(sb.from("nascosti").insert(ids.map(id => ({ partner_id:io, nascosto_id:id })))),
     mostraTanti:  (io, ids) => q(sb.from("nascosti").delete().eq("partner_id", io).in("nascosto_id", ids)),
     stages:       () => q(sb.from("stage_requirements").select("*").order("ordine")),
     settings:     () => q(sb.from("settings").select("chiave,valore")),
@@ -106,6 +107,8 @@ const st = {
   struttura: [],          // io e la mia downline
   linkGestito: null,      // { nome, chiave }: nuovo link personale creato dall'admin per chi l'ha perso
   nascosti: new Set(),    // persone nascoste dalla mia struttura (solo loro: chi sta sotto resta)
+  conNascoste: false,     // struttura completa: le nascoste al loro posto, in grigio
+  filtroNascoste: "nascoste", // elenco "Chi vedi": nascoste | visibili
   esclusi: new Set(),     // codici esclusi dagli import
   riep: [],               // numeri del mese in corso: io e la mia downline (riepilogo_mese)
   chiusi: new Set(),
@@ -1200,6 +1203,20 @@ function statoDi(p){
   const g = giorniTra(String(p.ultimo_aggiornamento || p.creato_il || oggi()).slice(0, 10), oggi());
   return g <= 7 ? { txt:"attivo", cl:"v", g } : g <= 14 ? { txt:"rallenta", cl:"g", g } : { txt:"fermo", cl:"r", g };
 }
+/* Dove sta una persona nella mia struttura: livello del report, sponsor e quante persone ha sotto */
+function posizioni(){
+  const m = new Map(), perId = new Map(st.struttura.map(p => [p.id, p]));
+  for(const { p, livello } of alberoSotto(st.profilo.id, 0))
+    m.set(p.id, { livello:livello + 2, sponsor:p.sponsor_id === st.profilo.id ? "te" : nomeDi(p.sponsor_id), sotto:0 });
+  for(const id of m.keys()){
+    let s = (perId.get(id) || {}).sponsor_id;
+    for(let n = 0; s && m.has(s) && n < 200; n++){ m.get(s).sotto++; s = (perId.get(s) || {}).sponsor_id; }
+  }
+  return m;
+}
+function testoPosizione(x){
+  return x ? `Livello ${x.livello} · sotto ${esc(x.sponsor)}${x.sotto ? ` · ${plur(x.sotto, "persona sotto", "persone sotto")}` : ""}` : "";
+}
 function vStruttura(){
   /* Come nei report Amway: in cima chi usa l'app (livello 1), poi i suoi frontali (2), i loro (3) e così via;
      il gruppo di una persona si può richiudere. Tutte le righe sono nella pagina: quelle dei gruppi richiusi
@@ -1209,9 +1226,11 @@ function vStruttura(){
   for(const r of tutte){ sopra.length = r.livello + 1; r.path = sopra.slice(); sopra.push(r.p.id); }
   /* una persona nascosta sparisce da sola (solo per me): chi sta sotto di lei resta, sotto il primo sponsor
      visibile. Il numero resta il livello vero del report; il rientro e il percorso seguono le righe visibili. */
-  const righe = tutte.filter(r => !st.nascosti.has(r.p.id));
-  for(const r of righe) r.path = r.path.filter(id => !st.nascosti.has(id));
   const nascoste = [...st.nascosti].filter(id => nomeDi(id)).length;
+  /* "Mostra anche le nascoste": l'albero completo come nel report, le nascoste in grigio al loro posto */
+  const completa = st.conNascoste && nascoste;
+  const righe = completa ? tutte : tutte.filter(r => !st.nascosti.has(r.p.id));
+  if(!completa) for(const r of righe) r.path = r.path.filter(id => !st.nascosti.has(id));
   const rIo = rigaDi(st.riep, io) || {}, chiusoIo = st.chiusi.has(io);
   const rigaIo = `<li class="liv io" style="--rientro:0px" data-id="${esc(io)}" data-path="" data-nome="${esc(senzaAccenti(st.profilo.nome))}">
       <span class="livello l0" title="Livello 1">1</span>
@@ -1228,8 +1247,8 @@ function vStruttura(){
     ${tutte.length ? `<ul class="albero struttura">${rigaIo}${righe.map(({ p, livello, path }) => {
       const r = rigaDi(st.riep, p.id) || {}, sp = statoDi(p);
       const quanti = righe.filter(x => x.path.includes(p.id)).length, chiuso = st.chiusi.has(p.id);
-      const piegato = path.some(id => st.chiusi.has(id));
-      return `<li class="liv${piegato ? " piegato" : ""}" style="--rientro:${Math.min(path.length, 4) * 10}px"
+      const piegato = path.some(id => st.chiusi.has(id)), nascosta = st.nascosti.has(p.id);
+      return `<li class="liv${piegato ? " piegato" : ""}${nascosta ? " nascosta" : ""}" style="--rientro:${Math.min(path.length, 4) * 10}px"
         data-id="${esc(p.id)}" data-path="${esc(path.join(" "))}" data-nome="${esc(senzaAccenti(p.nome))}">
       <span class="livello l${(livello + 1) % 4}" title="Livello ${livello + 2}">${livello + 2}</span>
       <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}">
@@ -1239,12 +1258,17 @@ function vStruttura(){
       ${quanti ? `<button class="piega" data-act="piega" data-id="${esc(p.id)}" data-quanti="${quanti}" aria-expanded="${!chiuso}"
         aria-label="${chiuso ? "Mostra" : "Nascondi"} il gruppo di ${esc(p.nome)}">${chiuso ? "▸" : "▾"} ${quanti}</button>` : ""}
       ${p.fuori_report_dal ? `<span class="pill g" title="Non più nel report Amway">fuori</span>` : ""}
-      <span class="pill ${sp.cl}">${sp.txt}</span></li>`; }).join("")}</ul>
+      ${completa ? (nascosta ? `<button class="btn small" data-act="mostra" data-id="${esc(p.id)}">Mostra</button>`
+        : `<button class="btn small ghost" data-act="nascondi-qui" data-id="${esc(p.id)}">Nascondi</button>`)
+        : `<span class="pill ${sp.cl}">${sp.txt}</span>`}</li>`; }).join("")}</ul>
       <p class="nota">Il numero è il livello, come nei report Amway: 1 sei tu, 2 i tuoi frontali, 3 i loro, e così via.
         ▾ chiude o riapre il gruppo di una persona.
         Tocca un nome per aprire la sua scheda.</p>
-      ${nascoste ? `<p class="small" style="margin:6px 0 0">${plur(nascoste, "persona nascosta", "persone nascoste")}
-        <button class="btn link small" data-act="nascoste" style="min-height:0;padding:0 4px">Rivedi</button></p>` : ""}`
+      <p class="small" style="margin:6px 0 0">${nascoste ? plur(nascoste, "persona nascosta", "persone nascoste") : "Nessuna persona nascosta"}
+        <button class="btn link small" data-act="nascoste" style="min-height:0;padding:0 4px">${nascoste ? "Rivedi" : "Scegli chi nascondere"}</button></p>
+      ${nascoste ? `<button class="btn small ghost${completa ? " on" : ""}" data-act="con-nascoste" aria-pressed="${!!completa}" style="margin-top:8px">
+        ${completa ? "Torna alla mia struttura" : "Mostra anche le nascoste"}</button>
+        ${completa ? `<p class="nota">Le nascoste sono in grigio, al loro posto. Mostra o Nascondi su ogni riga.</p>` : ""}` : ""}`
       : `<p class="muted" style="margin:8px 0 0">Ancora nessuno nel tuo gruppo. Invita chi vuole usare l'app con il link qui sotto,
           oppure importa il report Amway per vedere anche chi non la usa.</p>`}
   </div>`;
@@ -1662,8 +1686,8 @@ function analizzaReport(rep){
     if(nuovo !== p.sponsor_id && !alberoSotto(p.id, 0).some(x => x.p.id === nuovo))
       a.spostati.push({ p, da:p.sponsor_id === io.id ? "te" : nomeDi(p.sponsor_id), a:nuovo === io.id ? "te" : nomeDi(nuovo) });
   }
-  /* chi era nascosto e questo mese ha fatto VP personali torna visibile, al suo posto */
-  a.riappaiono = a.aggiorna.concat(a.usanoApp).filter(({ p, r }) => st.nascosti.has(p.id) && Number(r.vpp) > 0).map(x => x.p);
+  /* reimport: chi è già nella mia struttura (importato o con l'app), per riapplicare i filtri a tutti */
+  a.esistenti = a.aggiorna.concat(a.usanoApp);
   /* tante persone che mancano insieme: forse il file è parziale (filtri, "Vista corrente") */
   const conCodice = mie.filter(p => p.codice_amway).length;
   a.troppiMancanti = a.mancanti.length > Math.max(3, Math.round(conCodice * 0.1));
@@ -1698,9 +1722,26 @@ function vImporta(){
   const scelta = r => `<label data-nome="${esc(senzaAccenti(r.nome) + " " + r.codice)}"><input type="checkbox" name="nascondi" value="${esc(r.codice)}" data-vpp="${r.vpp > 0 ? 1 : 0}"${st.esclusi.has(r.codice) ? " checked" : ""}>
       <span>${esc(r.nome)} · <b>${num(r.vpp)} VP</b><br><span class="small">${esc(r.codice)}${sponsorDi(r) ? " · " + sponsorDi(r) : ""}</span></span></label>`;
   const aggiorna = [{ p:st.profilo, r:a.prima, io:true }].concat(a.aggiorna);
+  const pos = posizioni(); [...pos.values()].forEach((x, i) => { x.ordine = i; });
   return `<h2>Report di ${nomeMese(a.mese)}</h2>
   <p class="small">${plur(a.totale, "persona", "persone")} nel file${a.mese === meseDi(oggi()) ? " · mese in corso: puoi reimportarlo quando vuoi, i valori si sostituiscono" : ""}.</p>
   <form data-form="importa" novalidate>
+    ${a.esistenti.length ? sezione("Chi vuoi vedere dopo l'import?",
+      `<label class="check"><input type="radio" name="modo" value="tieni" checked>
+        <span><b>Lascia tutto com'è</b>: si aggiornano solo i VP; chi hai nascosto resta nascosto, chi vedi resta visibile.</span></label>
+      <label class="check"><input type="radio" name="modo" value="filtri">
+        <span><b>Riapplica i filtri a tutti</b>: scegli di nuovo chi nascondere, anche tra chi è già nella tua struttura.</span></label>
+      <div class="imp-filtri">
+        <div class="row wrap scelte-rapide" style="gap:6px;margin-top:8px">
+          <button type="button" class="btn small" data-act="nascondi-zero" aria-pressed="false">Nascondi chi ha 0 VP</button>
+          <button type="button" class="btn small" data-act="nascondi-tutti" aria-pressed="false">Nascondi tutti</button>
+          <button type="button" class="btn small" data-act="mostra-tutti" aria-pressed="false">Mostra tutti</button></div>
+        <p class="small">Valgono per tutti: chi è già nella struttura e i nuovi. Spuntato = nascosto.</p>
+        ${a.esistenti.length > 8 ? `<input type="search" class="cerca" data-cerca=".imp-esistenti" placeholder="Cerca per nome o codice…" autocomplete="off" aria-label="Cerca per nome o codice">` : ""}
+        <div class="scelte imp-esistenti">${a.esistenti.slice().sort((x, y) => (pos.get(x.p.id) || {}).ordine - (pos.get(y.p.id) || {}).ordine).map(({ p, r }) =>
+          `<label data-nome="${esc(senzaAccenti(p.nome) + " " + r.codice)}"><input type="checkbox" name="nascondi-es" value="${esc(p.id)}" data-vpp="${r.vpp > 0 ? 1 : 0}"${st.nascosti.has(p.id) ? " checked" : ""}>
+          <span>${esc(p.nome)} · <b>${num(r.vpp)} VP</b><br><span class="small">${testoPosizione(pos.get(p.id))}</span></span></label>`).join("")}</div>
+      </div>`) : ""}
     ${a.nuovi.length ? sezione(`Nuovi nel report · ${a.nuovi.length}`,
       `<div class="row wrap scelte-rapide" style="gap:6px;margin-top:8px">
         <button type="button" class="btn small" data-act="nascondi-zero" aria-pressed="false">Nascondi chi ha 0 VP</button>
@@ -1714,9 +1755,6 @@ function vImporta(){
       "imp-da-scegliere") : ""}
     ${sezione(`Si aggiornano i VPP · ${aggiorna.length}`, `<ul class="imp">${aggiorna.map(x => `<li>${riga(x.io ? { nome:`${st.profilo.nome} (tu)` } : x.p,
         x.io && a.codiceMio ? `il tuo codice ${esc(x.r.codice)} viene salvato` : "")}<b class="num">${num(x.r.vpp)} VP</b></li>`).join("")}</ul>`)}
-    ${a.riappaiono.length ? sezione(`Tornano visibili · ${a.riappaiono.length}`,
-      `<p class="small">${a.riappaiono.map(p => esc(p.nome)).join(", ")}</p>`,
-      "Erano nascoste e questo mese hanno fatto VP personali: ricompaiono al loro posto nella struttura.") : ""}
     ${a.mancanti.length ? sezione(`Non più nel report · ${a.mancanti.length}`,
       `${a.troppiMancanti ? `<p class="avviso">Mancano molte persone insieme: controlla di aver esportato <b>l'intera linea senza filtri</b>.</p>` : ""}
       <p class="small">${a.mancanti.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})`).join(", ")}</p>`,
@@ -1734,7 +1772,9 @@ function accendiRapida(el){
   document.querySelectorAll(".scelte-rapide .btn").forEach(b => { const on = b === el; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
 }
 function sceltaRapida(el, spunta){
-  document.querySelectorAll(".imp-da-scegliere input[name=nascondi]").forEach(i => { i.checked = spunta(i); });
+  const tutti = el.closest(".imp-filtri");
+  document.querySelectorAll(tutti ? ".imp-da-scegliere input[name=nascondi], .imp-esistenti input[name=nascondi-es]"
+    : ".imp-da-scegliere input[name=nascondi]").forEach(i => { i.checked = spunta(i); });
   accendiRapida(el);
 }
 
@@ -1756,6 +1796,11 @@ async function eseguiImport(f){
   const a = st.imp, io = st.profilo;
   const scelti = nome => new Set([...f.querySelectorAll(`input[name=${nome}]:checked`)].map(i => i.value));
   const nascondi = scelti("nascondi");
+  /* "Riapplica i filtri": chi c'è già si nasconde o si rimette secondo le caselle; "Lascia tutto com'è": nessun cambio */
+  const filtri = !!f.querySelector("input[name=modo][value=filtri]:checked"), voglio = scelti("nascondi-es");
+  const elencati = filtri ? [...f.querySelectorAll("input[name=nascondi-es]")].map(i => i.value) : [];
+  const daNascondere = elencati.filter(id => voglio.has(id) && !st.nascosti.has(id));
+  const daMostrare = elencati.filter(id => !voglio.has(id) && st.nascosti.has(id));
   if(a.nuovi.length && !f.consenso.checked){ mostraErroreForm(f, "Conferma di avere il consenso delle persone della tua linea."); return; }
   /* l'import è completo: le mie persone sono quelle già importate più tutte le nuove */
   const mie = a.aggiorna.map(x => x.r).concat(a.nuovi);
@@ -1778,7 +1823,8 @@ async function eseguiImport(f){
     const esito = await api.importaRete({ p_mese:a.mese + "-01", p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp }, numeri(a.prima)), p_persone:persone,
       p_attivi:usanoApp, p_nascondi:[...nascondi], p_fuori:a.mancanti.map(p => p.id) }) || {};
     if(a.codiceMio) st.profilo = Object.assign({}, io, { codice_amway:a.prima.codice });
-    if(a.riappaiono.length) await api.mostraTanti(io.id, a.riappaiono.map(p => p.id));
+    if(daNascondere.length) await api.nascondiTanti(io.id, daNascondere);
+    if(daMostrare.length) await api.mostraTanti(io.id, daMostrare);
     await caricaStruttura();
     st.att = await api.activities(io.id, [settimana(), primoDelMese()].sort()[0]) || [];
     await caricaNumeri();
@@ -1787,7 +1833,8 @@ async function eseguiImport(f){
     toast(`Import di ${nomeMese(a.mese).split(" ")[0]}: ${[n("aggiunte") ? plur(n("aggiunte"), "persona aggiunta", "persone aggiunte") : "",
       plur(n("aggiornati"), "VPP aggiornato", "VPP aggiornati"), n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
       n("fuori") ? plur(n("fuori"), "persona non più nel report", "persone non più nel report") : "",
-      a.riappaiono.length ? plur(a.riappaiono.length, "di nuovo visibile", "di nuovo visibili") : ""].filter(Boolean).join(", ")}`);
+      daNascondere.length ? plur(daNascondere.length, "nascosta", "nascoste") : "",
+      daMostrare.length ? plur(daMostrare.length, "di nuovo visibile", "di nuovo visibili") : ""].filter(Boolean).join(", ")}`);
   }catch(e){
     st.occupato = false;
     try{ await caricaStruttura(); }catch(x){}
@@ -1854,13 +1901,23 @@ function vSheet(){
     </form>`;
   }
   if(s === "nascoste"){
-    const l = [...st.nascosti].map(id => st.struttura.find(x => x.id === id)).filter(Boolean).sort((a, b) => a.nome.localeCompare(b.nome, "it"));
-    return `<h2>Nascoste dalla tua struttura · ${l.length}</h2>
-    <p class="small">Le vedi solo tu così: per gli altri non cambia niente, e i loro VP contano nei tuoi numeri. Tocca un nome per aprire la scheda.</p>
+    /* tutta la mia struttura in ordine di report, con dove sta ognuno: si nasconde o si rimette da qui */
+    const pos = posizioni(), nasc = st.filtroNascoste === "nascoste";
+    const tutte = alberoSotto(st.profilo.id, 0).map(x => x.p), quanteN = tutte.filter(p => st.nascosti.has(p.id)).length;
+    const l = tutte.filter(p => st.nascosti.has(p.id) === nasc);
+    return `<h2>Chi vedi nella struttura</h2>
+    <p class="small">Le nascoste le vedi solo tu così: per gli altri non cambia niente, e i loro VP contano nei tuoi numeri.
+      Tocca un nome per aprire la scheda.</p>
+    <div class="row scelte-rapide" style="gap:6px;margin:8px 0">
+      <button class="btn small${nasc ? " on" : ""}" data-act="filtro-nascoste" data-filtro="nascoste" aria-pressed="${nasc}">Nascoste · ${quanteN}</button>
+      <button class="btn small${nasc ? "" : " on"}" data-act="filtro-nascoste" data-filtro="visibili" aria-pressed="${!nasc}">Visibili · ${tutte.length - quanteN}</button></div>
     ${l.length > 8 ? `<input type="search" class="cerca" data-cerca=".imp-nascoste" placeholder="Cerca per nome o codice…" autocomplete="off" aria-label="Cerca per nome o codice">` : ""}
-    <ul class="imp imp-nascoste">${l.map(p => `<li data-nome="${esc(senzaAccenti(p.nome) + " " + (p.codice_amway || ""))}">
-      <button class="btn link grow" style="text-align:left;padding:0" data-act="apri-nascosta" data-id="${esc(p.id)}">${esc(p.nome)}${p.fuori_report_dal ? ` <span class="pill g">fuori</span>` : ""}</button>
-      <button class="btn small" data-act="mostra" data-id="${esc(p.id)}">Mostra</button></li>`).join("")}</ul>
+    ${l.length ? `<ul class="imp imp-nascoste">${l.map(p => `<li data-nome="${esc(senzaAccenti(p.nome) + " " + (p.codice_amway || ""))}">
+      <span class="grow"><button class="btn link" style="text-align:left;padding:0;min-height:0" data-act="apri-nascosta" data-id="${esc(p.id)}">${esc(p.nome)}${p.fuori_report_dal ? ` <span class="pill g">fuori</span>` : ""}</button>
+        <br><span class="small">${testoPosizione(pos.get(p.id))}</span></span>
+      ${nasc ? `<button class="btn small" data-act="mostra" data-id="${esc(p.id)}">Mostra</button>`
+        : `<button class="btn small ghost" data-act="nascondi-qui" data-id="${esc(p.id)}">Nascondi</button>`}</li>`).join("")}</ul>`
+      : `<p class="muted">${nasc ? "Nessuna persona nascosta." : "Nessuna persona visibile."}</p>`}
     <button class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
   }
   if(s === "codice"){
@@ -2104,13 +2161,22 @@ const AZIONI = {
       toast(`${p.nome} nascosto dalla tua struttura`);
     }catch(e){ toast(messaggio(e)); }
   },
-  nascoste(){ st.sheet = "nascoste"; render(); },
+  nascoste(){ st.filtroNascoste = st.nascosti.size ? "nascoste" : "visibili"; st.sheet = "nascoste"; render(); },
+  "filtro-nascoste"(el){ st.filtroNascoste = el.dataset.filtro; render(); },
+  "con-nascoste"(){ st.conNascoste = !st.conNascoste; render(); },
+  async "nascondi-qui"(el){
+    try{
+      await api.nascondi(st.profilo.id, el.dataset.id);
+      st.nascosti.add(el.dataset.id);
+      render(); toast(`${nomeDi(el.dataset.id)} nascosto dalla tua struttura`);
+    }catch(e){ toast(messaggio(e)); }
+  },
   "apri-nascosta"(el){ st.sheet = null; AZIONI["apri-scheda"](el); },
   async mostra(el){
     try{
       await api.mostra(st.profilo.id, el.dataset.id);
       st.nascosti.delete(el.dataset.id);
-      if(!st.nascosti.size) st.sheet = null;
+      if(!st.nascosti.size) st.conNascoste = false;
       render(); toast(`${nomeDi(el.dataset.id)} di nuovo nella tua struttura`);
     }catch(e){ toast(messaggio(e)); }
   },

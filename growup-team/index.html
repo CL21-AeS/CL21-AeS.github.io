@@ -287,6 +287,9 @@ ul.imp li:first-child{border-top:0}
 }
 @keyframes entra-destra{from{transform:translateX(28px);opacity:.4}to{transform:none;opacity:1}}
 @keyframes entra-sinistra{from{transform:translateX(-28px);opacity:.4}to{transform:none;opacity:1}}
+.albero.struttura li.nascosta{opacity:.55}
+.imp-filtri{display:none}
+form:has(input[name=modo][value=filtri]:checked) .imp-filtri{display:block}
 .avviso-interno{margin:10px 0 0;padding:10px 12px;border-radius:12px;background:var(--traccia);border:1px solid var(--rame);font-size:14px}
 .captcha{position:fixed;inset:0;z-index:70;background:rgba(8,10,14,.5);display:flex;align-items:center;justify-content:center;padding:16px}
 .captcha-box{background:var(--card);color:var(--ink);border-radius:18px;padding:20px;max-width:360px;width:100%;text-align:center}
