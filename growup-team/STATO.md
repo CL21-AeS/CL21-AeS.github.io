@@ -14,6 +14,10 @@ Email spento in Supabase. Account Cloudflare di Stefano con verifica in due pass
 **Confermato da Stefano**: migrazione `018_niente_cancellazioni.sql` applicata; l'app funziona sul telefono con la
 Content Security Policy e il captcha.
 
+**18 ottobre**: Alessia non trovava "Aggiungi alla schermata Home" perché aveva aperto il link dentro Telegram.
+Su iPhone la guida all'installazione ora riconosce Telegram, WhatsApp, Instagram e Facebook ("Sei dentro Telegram…
+Apri in Safari"), dà i passi giusti anche in Chrome e, in Safari, ha la nota per chi è dentro un'altra app.
+
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
    import, nascondi, scheda partner).

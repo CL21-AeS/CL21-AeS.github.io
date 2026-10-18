@@ -573,7 +573,7 @@ const PERM = ["clipboard-read", "clipboard-write"];
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.evaluate(() => localStorage.setItem("growup-team.chiave-salvata", "1"));
 await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor();
-check(await page.getByText("Installa Growup sul telefono").isVisible() && await page.getByText("Aggiungi alla schermata Home").isVisible(), "iPhone: guida all'installazione");
+check(await page.getByText("Installa Growup sul telefono").isVisible() && await page.getByText("Aggiungi alla schermata Home").first().isVisible(), "iPhone: guida all'installazione");
 await page.screenshot({ path: S + "/e2e/18-installa-iphone.png" });
 await page.click("button[data-act=copia-chiave]");
 check((await page.evaluate(() => navigator.clipboard.readText())).endsWith("#chiave=" + "a".repeat(32)), "iPhone: link personale copiato");
@@ -581,6 +581,16 @@ await page.click("button[data-act=installa-no]");
 check(await page.getByText("Installa Growup sul telefono").count() === 0, "Non ora: la guida sparisce");
 await page.click("button[data-act=installa-si]");
 check(await page.getByText("Installa Growup sul telefono").isVisible(), "dal fondo pagina si riapre");
+check(await page.getByText("Forse hai aperto il link dentro WhatsApp o Telegram").isVisible(), "iPhone in Safari: nota per chi è dentro un'altra app");
+await ctx.close();
+
+// 13b. iPhone dentro il browser di Telegram: avviso e passo "Apri in Safari"
+({ ctx, page } = await apri({ userAgent:UA_IPHONE + " Telegram-iOS/11.0", permissions:PERM }, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.evaluate(() => localStorage.setItem("growup-team.chiave-salvata", "1"));
+await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor();
+check(await page.getByText("Sei dentro Telegram").isVisible() && await page.getByText("Apri in Safari").isVisible(), "iPhone dentro Telegram: avviso e passo Apri in Safari");
+await page.locator(".avviso-interno").screenshot({ path: S + "/e2e/18b-installa-telegram.png" });
 await ctx.close();
 
 ({ ctx, page } = await apri({ userAgent:UA_ANDROID }, "#chiave=" + "a".repeat(32)));
