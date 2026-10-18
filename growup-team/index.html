@@ -287,6 +287,18 @@ ul.imp li:first-child{border-top:0}
 }
 @keyframes entra-destra{from{transform:translateX(28px);opacity:.4}to{transform:none;opacity:1}}
 @keyframes entra-sinistra{from{transform:translateX(-28px);opacity:.4}to{transform:none;opacity:1}}
+/* Persone: i Clienti */
+.avviso-cliente{border-left:4px solid var(--giallo)}
+.righe-ordine{list-style:none;margin:0;padding:0}
+.righe-ordine li{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.righe-ordine li:first-child{border-top:0}
+.qta{display:flex;align-items:center;gap:4px}
+.qta .btn{min-width:32px;padding:0 8px}
+input.mini{width:56px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;background:var(--card);color:var(--ink)}
+input.mini.prezzo{width:68px;text-align:right}
+.risultati-prodotto{list-style:none;margin:6px 0 0;padding:0;max-height:280px;overflow:auto}
+.risultati-prodotto li{border-top:1px solid var(--line)}
+.btn.small.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 /* Persone: il Target */
 .sezioni-persone{margin:4px 0 12px}
 .sezioni-persone .btn{flex:1}
@@ -361,6 +373,7 @@ form:has(input[name=modo][value=filtri]:checked) .imp-filtri{display:block}
 <div id="sheet"></div>
 <div id="azioni"></div>
 <div id="toast"></div>
+<script src="catalogo.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -1093,6 +1093,84 @@ await pc2.goto(BASE + linkT.slice(linkT.indexOf("#")));
 await pc2.getByText("Hai già risposto").waitFor(); check(true, "il link usato si chiude");
 await ctxC2.close();
 
+// 24. Persone → Clienti: + Un cliente, ordine dal catalogo, durata, riordini, verifica, compleanno, messaggi
+const gg = n => new Intl.DateTimeFormat("en-CA", { timeZone:"Europe/Rome" }).format(new Date(Date.now() + n * 864e5));
+DB.ordini = []; DB.righe = []; DB.durate = [{ proprietario:"R", codice:"VV1", giorni:90 }];
+DB.persone.push(
+  { id:"cu1", proprietario:"R", nome:"Ugo Riordino", contatto:"333 1112223", fase:"contattato", esito:"cliente", lasciati:[], creato_il:gg(-60) },
+  { id:"cu2", proprietario:"R", nome:"Vera Verifica", fase:"contattato", esito:"cliente", lasciati:[], creato_il:gg(-60) },
+  { id:"cu3", proprietario:"R", nome:"Bea Compleanno", fase:"contattato", esito:"cliente", lasciati:[], compleanno:gg(3).slice(5), creato_il:gg(-60) });
+DB.ordini.push({ id:"o1", proprietario:"R", persona_id:"cu1", data:gg(-27), modo:"sito", creato_il:"a", verificato:gg(-15) },
+  { id:"o2", proprietario:"R", persona_id:"cu2", data:gg(-10), modo:"sito", creato_il:"b" },
+  { id:"o3", proprietario:"R", persona_id:"cu3", data:gg(-5), modo:"sito", creato_il:"c", verificato:gg(-1) });
+DB.righe.push({ id:"r1", proprietario:"R", ordine_id:"o1", codice:"UU1", nome:"Prodotto Ugo", quantita:1, prezzo:20 },
+  { id:"r2", proprietario:"R", ordine_id:"o2", codice:"VV1", nome:"Prodotto Vera", quantita:1, prezzo:30 },
+  { id:"r3", proprietario:"R", ordine_id:"o3", codice:"VV1", nome:"Prodotto Vera", quantita:1, prezzo:30 });
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+const cardCli = page.locator(".card", { hasText:"I tuoi clienti da sentire" });
+check(await cardCli.getByText("Sta finendo: Prodotto Ugo").isVisible(), "Io: Ugo da sentire, il prodotto sta finendo");
+check(await cardCli.getByText("Come si è trovato con Prodotto Vera").isVisible(), "Io: Vera, come si è trovata (prodotto nuovo da 10 giorni)");
+check(await cardCli.getByText(/Compleanno il/).isVisible(), "Io: il compleanno di Bea tra 3 giorni");
+// il messaggio "sta finendo" si apre nella chat di Ugo
+await cardCli.locator("button[data-act=apri-cliente]", { hasText:"Ugo Riordino" }).click();
+await page.getByText("Cosa usa").waitFor();
+await page.click("button[data-act=messaggio-cliente]");
+check(await page.locator("#testo-msg").inputValue().then(t => t.includes("Prodotto Ugo")), "messaggio pronto con il prodotto che finisce");
+await page.evaluate(() => { window.open = u => { window.__aperto = u; }; });
+await page.click("button[data-act=manda-msg]");
+check((await page.evaluate(() => window.__aperto)).startsWith("https://wa.me/393331112223?text="), "il messaggio si apre nella chat WhatsApp del cliente");
+await page.click(".sheet button[data-act=chiudi]");
+await page.click("button[data-act=riordinato]");
+await page.getByText("Prodotto Ugo: riordinato oggi").waitFor();
+check(await page.locator(".card .pill", { hasText:"A posto" }).first().isVisible(), "Riordinato: Ugo torna a posto");
+// Vera: fatto il "come ti sei trovato"
+await page.click("button[data-act=torna-clienti]");
+await page.click("button[data-filtro=tutti]");
+await page.locator("button[data-act=apri-cliente]", { hasText:"Vera Verifica" }).click();
+await page.click("button[data-act=verifica-fatta]");
+await page.getByText("gli hai chiesto come si è trovato").waitFor();
+await sync(page);
+check(DB.ordini.find(o => o.id === "o2").verificato === oggiStr, "verifica fatta segnata sull'ordine");
+// + Un cliente e il suo primo ordine dal catalogo
+await page.click("button[data-act=torna-clienti]");
+const clientiPrima = DB.activities.filter(a => a.partner_id === "R" && a.tipo === "cliente").length;
+await page.click("button[data-act=cliente-nuovo]");
+await page.fill(".sheet input[name=nome]", "Gina Cliente");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Gina Cliente tra i tuoi clienti").waitFor();
+check(await page.locator(".pill", { hasText:"Mai ordinato" }).isVisible(), "cliente nuovo: mai ordinato");
+await page.click("button[data-act=ordine-nuovo]");
+await page.fill("#cerca-prodotto", "double");
+await page.locator("#risultati-prodotto button[data-act=aggiungi-prodotto]").first().click();
+await page.click(".sheet button[data-act=riga-piu]");
+await page.fill(".sheet input[data-campo=giorni]", "31");
+await page.click('.sheet label.chip:has-text("L\'ho fatto io")');
+await page.click('.sheet button:has-text("Salva l\'ordine")');
+await page.getByText("Ordine salvato").waitFor();
+await sync(page);
+const gina = DB.persone.find(x => x.nome === "Gina Cliente"), oG = DB.ordini.find(o => o.persona_id === gina.id), rG = DB.righe.find(r => r.ordine_id === oG.id);
+check(gina.esito === "cliente" && DB.activities.filter(a => a.partner_id === "R" && a.tipo === "cliente").length === clientiPrima + 1, "+ Un cliente conta nei nuovi clienti");
+check(oG.modo === "io" && rG.quantita === 2 && rG.prezzo > 0 && /double/i.test(rG.nome), "ordine dal catalogo: prodotto, quantità 2, prezzo di listino");
+check(DB.durate.some(d => d.codice === rG.codice && d.giorni === 31), "la durata scelta resta per tutti i clienti");
+check(await page.getByText(`finisce il ${await page.evaluate(d => { const [y, m, g] = d.split("-").map(Number); return g + " " + ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"][m - 1]; }, gg(62))}`).first().isVisible()
+  || await page.getByText(/finisce il/).first().isVisible(), "quando finisce: 2 × 31 giorni");
+await page.click("button[data-act=ordine-pagato]");
+await page.getByText("✓ Pagato").waitFor(); check(true, "ordine fatto da me: pagato");
+await page.click("button[data-act=ordine-ripeti]");
+check(await page.locator(".righe-ordine li").count() === 1, "Ripeti l'ultimo: lo stesso prodotto già nell'ordine");
+await page.click('.sheet button:has-text("Salva l\'ordine")');
+await page.getByText("Ordine salvato").waitFor();
+await sync(page);
+check(DB.ordini.filter(o => o.persona_id === gina.id).length === 2 && !DB.activities.some(a => a.tipo === "ordine" && a.data === oggiStr && a.partner_id === "R" && a.vp == null),
+  "due ordini, nessun VP toccato");
+await page.click("button[data-act=cliente-non-compra]");
+await page.getByText("Segnato: non compra più").waitFor();
+await page.click("button[data-act=torna-clienti]");
+check(await page.getByText("Non comprano più · 1").isVisible(), "filtro: non comprano più");
+await page.screenshot({ path: S + "/e2e/31-clienti.png", fullPage:true });
+await ctx.close();
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
