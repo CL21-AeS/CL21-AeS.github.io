@@ -71,6 +71,18 @@ le risposte compaiono nella sua scheda; chi era solo "In lista" diventa **Contat
 il contatto); se una persona arrivata dal Target si toglie dalla lista, l'invito resta e
 torna "Metti in lista" (prima restava un "Apri nella lista" che non apriva niente).
 
+**18 ottobre — Persone → Clienti (fase 3)** (migrazione `024_clienti.sql`, file `catalogo.js` con i 370 prodotti del
+listino Amway): Persone ha tre sezioni **Target · Lista · Clienti**. Un cliente è una persona della Lista chiusa come
+Cliente (una sola scheda); "+ Un cliente" lo crea direttamente (conta come nuovo cliente). Scheda cliente: stato (A posto ·
+Sta finendo · Doveva riordinare · Fermo dopo 45 giorni · Mai ordinato · Da risentire · Non compra più), **+ Ordine** dal
+catalogo (quantità, prezzo modificabile, quanto dura: 30 giorni di base, si cambia e vale per tutti i miei clienti),
+"Dal sito" / "L'ho fatto io" (con Consegnato / Pagato), **Ripeti l'ultimo**, "Riordinato" sul singolo prodotto, ×
+"non lo prende più", **Scrivigli** con i messaggi della mini app (Sta finendo · Come ti sei trovato · Auguri e
+proposta) che si aprono nella chat WhatsApp del cliente, Rimanda (3 giorni … 1 mese), compleanno. Su Io "I tuoi clienti
+da sentire" (sta finendo / in ritardo, come si è trovato 8 giorni dopo un prodotto nuovo, compleanno entro 7 giorni).
+Gli ordini **non contano nei VP** (decisione di Stefano). All'upline il numero dei clienti nella scheda partner.
+Da fare se esiste: importazione degli ordini clienti dal sito Amway (Stefano verifica se c'è un'esportazione).
+
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
    import, nascondi, scheda partner).

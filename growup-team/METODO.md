@@ -56,7 +56,7 @@ dice diversamente. Gli esempi concreti stanno nei file di `growup-team/` citati 
 - Ogni regola nuova entra in `supabase/tests_rls.sql`.
 
 ### Database: come si fanno le modifiche
-- **Migrazioni numerate** in `supabase/` (`001_schema.sql`, `002_rls.sql`, … `023_target_da_lista.sql`), più
+- **Migrazioni numerate** in `supabase/` (`001_schema.sql`, `002_rls.sql`, … `024_clienti.sql`), più
   `installa_tutto.sql` che le contiene tutte per installare da zero, e `LEGGIMI.md` con l'ordine.
 - Claude le applica con il connettore Supabase. Le istruzioni con `delete`/`drop` dal connettore chiedono una
   conferma che scade: quelle parti le incolla Stefano nell'SQL Editor.

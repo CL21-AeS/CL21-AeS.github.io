@@ -84,6 +84,17 @@ function creaApi(){
     aggiornaInvito: (id, campi) => q(sb.from("inviti_target").update(campi).eq("id", id)),
     cancellaInvito: id => q(sb.from("inviti_target").delete().eq("id", id)),
     invitoTargetAperto: id => q(sb.rpc("invito_target_aperto", { p_id:id })),
+    ordini:       () => q(sb.from("ordini").select("*")),
+    righeOrdini:  () => q(sb.from("righe_ordine").select("*")),
+    durate:       () => q(sb.from("durate").select("codice, giorni")),
+    nuovoOrdine:  riga => q(sb.from("ordini").insert(riga)),
+    nuoveRighe:   righe => q(sb.from("righe_ordine").insert(righe)),
+    aggiornaOrdine: (id, campi) => q(sb.from("ordini").update(campi).eq("id", id)),
+    cancellaOrdine: id => q(sb.from("ordini").delete().eq("id", id)),
+    salvaDurata:  async (codice, giorni) => {
+      const r = await q(sb.from("durate").update({ giorni }).eq("codice", codice).select("codice"));
+      if(!r || !r.length) await q(sb.from("durate").insert({ codice, giorni }));
+    },
     numeriPersone: pid => q(sb.rpc("numeri_persone", { p_partner:pid })),
     mostraTanti:  (io, ids) => q(sb.from("nascosti").delete().eq("partner_id", io).in("nascosto_id", ids)),
     stages:       () => q(sb.from("stage_requirements").select("*").order("ordine")),
@@ -126,7 +137,9 @@ const st = {
   personaId: null, filtroLista: "aperti", cercaLista: "", passoTipo: null,
   numeriLista: {},
   inviti: [], sezPersone: "lista", invitoId: null, archiviatiT: false,  // il Target (solo miei)
-  ct: null,               // la pagina del contatto (le otto domande)        // per la scheda partner: solo i numeri della sua lista
+  ct: null,               // la pagina del contatto (le otto domande)
+  ordini: [], righe: [], durate: new Map(), filtroClienti: "sentire",   // i Clienti (solo miei)
+  bozza: null, cercaProdotto: "", tipoMsg: "finendo", varianteMsg: 0, durataCodice: null, nuovoCliente: false,        // per la scheda partner: solo i numeri della sua lista
   conNascoste: false,     // struttura completa: le nascoste al loro posto, in grigio
   filtroNascoste: "nascoste", // elenco "Chi vedi": nascoste | visibili
   esclusi: new Set(),     // codici esclusi dagli import
@@ -412,6 +425,7 @@ async function caricaTutto(){
   await caricaNumeri();
   await caricaPersone();
   await caricaInviti();
+  await caricaClienti();
 
   /* nuova settimana / nuovo mese: si riparte dall'ultimo obiettivo scelto */
   const g = (goals || [])[0];
@@ -740,8 +754,9 @@ function testoPrivacy(){
       <p><b>Cosa raccogliamo.</b> Nome, data di iscrizione, qualifica e i tuoi numeri: quanti contatti,
         quanti piani, quanti VP, quanti clienti. Non serve la tua email.</p>
       <p><b>Chi li vede.</b> Tu e chi sta sopra di te nella tua organizzazione (la tua upline). Nessun altro.</p>
-      <p><b>La tua lista.</b> I nomi e i dati che scrivi nella pagina Persone li vedi <b>solo tu</b>: né la tua upline né
-        Stefano e Alessia. A chi ti segue arrivano soltanto i numeri (quanti in lista, piani, sì). Inserisci solo persone
+      <p><b>La tua lista e i tuoi clienti.</b> I nomi e i dati che scrivi nella pagina Persone (lista, Target, clienti e
+        loro ordini) li vedi <b>solo tu</b>: né la tua upline né Stefano e Alessia. A chi ti segue arrivano soltanto i numeri
+        (quanti in lista, piani, sì, clienti). Inserisci solo persone
         che conosci, con i dati che servono a ricontattarle; le togli quando vuoi.</p>
       <p><b>A cosa servono.</b> A pianificare la tua settimana e a farti aiutare da chi ti segue.</p>
       <p><b>Dove stanno.</b> In un database ospitato nell'Unione Europea (Supabase).</p>
@@ -808,7 +823,7 @@ function vHome(){
   const persone = alberoSotto(p.id, 0).length;
   if(st.vista === "persone") return `
   <div class="testata">
-    <div>${marchio()}<h1>${st.invitoId ? "Target" : st.personaId ? "La mia lista" : "Persone"}</h1></div>
+    <div>${marchio()}<h1>${st.invitoId ? "Target" : st.personaId ? (st.sezPersone === "clienti" ? "I miei clienti" : "La mia lista") : "Persone"}</h1></div>
     ${vSelettore()}
   </div>
   ${vPersone()}
@@ -835,6 +850,7 @@ function vHome(){
   ${vInstalla()}
   ${vObiettivoBreve()}
   ${vDaFare()}
+  ${vClientiDaSentire()}
   ${vTappa()}
   ${vSettimana()}
   ${vMese()}
@@ -1887,7 +1903,7 @@ async function eseguiImport(f){
 /* ---- 10. Fogli in basso ---- */
 function vSheet(){
   const s = st.sheet;
-  const sp = vSheetPersone(s) || vSheetTarget(s);
+  const sp = vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s);
   if(sp) return sp;
   const err = st.errore ? `<p class="errore">${esc(st.errore)}</p>` : "";
   const piede = `<div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
@@ -2543,6 +2559,7 @@ function rigaPersona(p, suIo){
 }
 
 function vPersone(){
+  if(st.sezPersone === "clienti") return vClienti();
   if(st.sezPersone === "target") return st.invitoId ? vTarget() : vSezioniPersone() + vTarget();
   if(st.personaId) return vPersona();
   const filtro = FILTRI_LISTA.find(x => x.id === st.filtroLista) || FILTRI_LISTA[0];
@@ -2594,6 +2611,7 @@ function vPersona(){
     <button class="btn primary wide" style="margin-top:12px" data-act="passo">Segna un passo · ${TIPI_PASSO[passoProposto(p)].nome}</button>
     ${p.esito === "partner" ? `<a class="btn wa wide" style="margin-top:8px" target="_blank" rel="noopener"
         href="https://wa.me/?text=${encodeURIComponent(testoInvito() + "\n\n" + linkInvito())}">Mandagli il tuo link d'invito</a>` : ""}
+    ${p.esito === "cliente" ? `<button class="btn wide" style="margin-top:8px" data-act="apri-cliente" data-id="${esc(p.id)}">Apri nei Clienti</button>` : ""}
     ${p.esito ? `<button class="btn ghost wide" style="margin-top:8px" data-act="riapri-persona">Riapri il percorso</button>` : ""}
     ${p.note ? `<p class="small" style="margin:10px 0 0;white-space:pre-wrap">${esc(p.note)}</p>` : ""}
   </div>
@@ -2619,7 +2637,7 @@ function vNumeriLista(pid){
   const n = st.numeriLista[pid];
   if(!n || !Number(n.totale)) return "";
   return `<p class="small" style="margin:8px 0 0">La sua lista: <b>${num(n.in_lista)}</b> in lista · <b>${num(n.in_corso)}</b> in corso ·
-    questo mese <b>${num(n.piani_mese)}</b> ${Number(n.piani_mese) === 1 ? "piano" : "piani"} e <b>${num(n.si_mese)}</b> sì</p>`;
+    questo mese <b>${num(n.piani_mese)}</b> ${Number(n.piani_mese) === 1 ? "piano" : "piani"} e <b>${num(n.si_mese)}</b> sì${n.clienti != null ? ` · <b>${num(n.clienti)}</b> ${Number(n.clienti) === 1 ? "cliente" : "clienti"}` : ""}</p>`;
 }
 
 function opzioni(nome, valori, scelto){
@@ -2643,7 +2661,7 @@ function vSheetPersone(s){
   const annulla = `<button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>`;
   if(s === "persona-nuova" || (s === "persona-modifica" && p)){
     const m = s === "persona-modifica" ? p : {};
-    return `<h2>${m.id ? "Modifica i dati" : "Un nome nella tua lista"}</h2>
+    return `<h2>${m.id ? "Modifica i dati" : st.nuovoCliente ? "Un nuovo cliente" : "Un nome nella tua lista"}</h2>
     <form data-form="${s}" novalidate>
       <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc(m.nome || "")}" autocomplete="off"></label>
       <label class="field"><span>Telefono o contatto <i>(facoltativo)</i></span><input name="contatto" maxlength="80" inputmode="tel" value="${esc(m.contatto || "")}"></label>
@@ -2683,6 +2701,7 @@ function vSheetPersone(s){
 async function dopoPersone(msg){
   await caricaPersone();
   await caricaInviti();   // togliendo una persona, il suo invito Target si scollega
+  await caricaClienti();  // e i suoi ordini
   st.sheet = null; st.passoTipo = null; render();
   if(msg) toast(msg);
   aggiornaAttivita();  // i passi contano contatti, piani e clienti: si aggiornano anche i numeri di Io
@@ -2690,10 +2709,10 @@ async function dopoPersone(msg){
 
 Object.assign(AZIONI, {
   "vista-persone"(){ st.vista = "persone"; st.personaId = null; st.invitoId = null; st.target = null; render(); window.scrollTo(0, 0); },
-  "apri-persona"(el){ st.vista = "persone"; st.personaId = el.dataset.id; render(); window.scrollTo(0, 0); },
+  "apri-persona"(el){ st.vista = "persone"; st.sezPersone = "lista"; st.invitoId = null; st.personaId = el.dataset.id; render(); window.scrollTo(0, 0); },
   "torna-lista"(){ st.personaId = null; render(); window.scrollTo(0, 0); },
   "filtro-lista"(el){ st.filtroLista = el.dataset.filtro; render(); },
-  "persona-nuova"(){ st.errore = ""; st.sheet = "persona-nuova"; render(); },
+  "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.sheet = "persona-nuova"; render(); },
   "persone-tante"(){ st.errore = ""; st.sheet = "persone-tante"; render(); },
   "persona-modifica"(){ st.errore = ""; st.sheet = "persona-modifica"; render(); },
   passo(){ st.passoTipo = null; st.errore = ""; st.sheet = "passo"; render(); },
@@ -2749,6 +2768,13 @@ Object.assign(MODULI, {
       const id = uuid();
       await api.nuovePersone([{ id, nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null }]);
       st.personaId = id; st.vista = "persone";
+      if(st.nuovoCliente){
+        /* un cliente nuovo: nella lista è chiuso come Cliente (e conta nei nuovi clienti del mese) */
+        await api.nuoviPassi([{ id:uuid(), persona_id:id, tipo:"chiusura", esito:"cliente", data:oggi() }]);
+        st.nuovoCliente = false; st.sezPersone = "clienti";
+        await dopoPersone(`${nome} tra i tuoi clienti`);
+        return;
+      }
       await dopoPersone(`${nome} nella tua lista`);
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
@@ -3027,7 +3053,8 @@ async function caricaInviti(){ try{ st.inviti = await api.invitiTarget() || []; 
 function vSezioniPersone(){
   return `<div class="row scelte-rapide sezioni-persone" style="gap:6px">
     <button class="btn small${st.sezPersone === "target" ? " on" : ""}" data-act="sez-persone" data-sez="target" aria-pressed="${st.sezPersone === "target"}">Target</button>
-    <button class="btn small${st.sezPersone !== "target" ? " on" : ""}" data-act="sez-persone" data-sez="lista" aria-pressed="${st.sezPersone !== "target"}">Lista</button></div>`;
+    <button class="btn small${st.sezPersone === "lista" ? " on" : ""}" data-act="sez-persone" data-sez="lista" aria-pressed="${st.sezPersone === "lista"}">Lista</button>
+    <button class="btn small${st.sezPersone === "clienti" ? " on" : ""}" data-act="sez-persone" data-sez="clienti" aria-pressed="${st.sezPersone === "clienti"}">Clienti</button></div>`;
 }
 function vTarget(){
   if(st.invitoId) return vInvito();
@@ -3240,6 +3267,404 @@ Object.assign(MODULI, {
 
 document.addEventListener("input", e => { if(e.target && e.target.id === "ct-libero" && st.ct) st.ct.libero = e.target.value; });
 
+/* ---- 11d. Persone: i Clienti (dalla mini app "Clienti e Riordini") ----
+   Un cliente è una persona della lista chiusa come "Cliente": una sola scheda per tutto il percorso.
+   Si segna cosa ha preso e quando; l'app calcola quando finisce e chi è da sentire (riordino, "come ti sei trovato",
+   compleanno). Gli ordini non contano nei VP del mese: quelli arrivano dal report Amway. Tutto visibile solo a me. */
+const DURATA_BASE = 30, PREAVVISO = 7, FERMO_DOPO = 45, VERIFICA_DOPO = 8, FINESTRA_VERIFICA = 30, COMPLEANNO_PRIMA = 7;
+const MESI_LUNGHI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+const FILTRI_CLIENTI = [
+  { id:"sentire", nome:"Da sentire", ok:p => !p.non_compra && ["ritardo", "ora", "fermo", "mai"].includes(statoCliente(p).key) },
+  { id:"tutti", nome:"Tutti", ok:p => !p.non_compra },
+  { id:"fermi", nome:"Fermi", ok:p => !p.non_compra && statoCliente(p).key === "fermo" },
+  { id:"mai", nome:"Mai ordinato", ok:p => !p.non_compra && statoCliente(p).key === "mai" },
+  { id:"persi", nome:"Non comprano più", ok:p => p.non_compra }];
+
+async function caricaClienti(){
+  try{
+    const [ordini, righe, durate] = await Promise.all([api.ordini(), api.righeOrdini(), api.durate()]);
+    st.ordini = ordini || []; st.righe = righe || [];
+    st.durate = new Map((durate || []).map(d => [d.codice, Number(d.giorni)]));
+  }catch(e){ st.ordini = st.ordini || []; st.righe = st.righe || []; st.durate = st.durate || new Map(); }
+}
+function clientiTutti(){ return st.persone.filter(p => p.esito === "cliente"); }
+function ordiniDi(pid){ return st.ordini.filter(o => o.persona_id === pid).sort((a, b) => a.data < b.data ? 1 : a.data > b.data ? -1 : a.creato_il < b.creato_il ? 1 : -1); }
+function righeDi(oid){ return st.righe.filter(r => r.ordine_id === oid); }
+function giorniDi(codice){ return st.durate.get(codice) || DURATA_BASE; }
+function prodottoCatalogo(codice){ const r = (window.CATALOGO_AMWAY || []).find(x => x[0] === codice); return r ? { codice:r[0], nome:r[1], formato:r[2], prezzo:r[4] } : null; }
+function totaleOrdine(o){ return righeDi(o.id).reduce((t, r) => t + (Number(r.prezzo) || 0) * r.quantita, 0); }
+/* i prodotti che segue: per ognuno l'ultimo acquisto, e quando finisce (giorni × quantità) */
+function scaffale(p){
+  const ultimo = new Map();
+  for(const o of ordiniDi(p.id).slice().reverse()) for(const r of righeDi(o.id)) ultimo.set(r.codice, { r, data:o.data });
+  const lasciati = new Set(p.lasciati || []);
+  return [...ultimo.values()].filter(x => !lasciati.has(x.r.codice)).map(({ r, data }) => {
+    const finisce = piuGiorni(data, giorniDi(r.codice) * r.quantita);
+    return { codice:r.codice, nome:r.nome, quantita:r.quantita, prezzo:r.prezzo, data, finisce, tra:giorniTra(oggi(), finisce) };
+  }).sort((a, b) => a.finisce < b.finisce ? -1 : 1);
+}
+/* lo stato in una parola: chi non compra più, chi non ha mai ordinato, chi è rimandato, fermo, in ritardo, sta finendo, a posto */
+function statoCliente(p){
+  if(p.non_compra) return { key:"perso", txt:"Non compra più", cl:"" };
+  const o = ordiniDi(p.id);
+  if(!o.length) return { key:"mai", txt:"Mai ordinato", cl:"g" };
+  const s = scaffale(p);
+  if(!s.length) return { key:"senza", txt:"Nessun prodotto seguito", cl:"" };
+  if(p.prossima_data && p.prossima_data > oggi()) return { key:"rinviato", txt:`Da risentire il ${dataIt(p.prossima_data)}`, cl:"", primo:s[0] };
+  const ultima = s.reduce((m, x) => x.finisce > m ? x.finisce : m, s[0].finisce);
+  if(giorniTra(ultima, oggi()) > FERMO_DOPO) return { key:"fermo", txt:"Fermo", cl:"r", primo:s[0] };
+  if(s[0].tra < 0) return { key:"ritardo", txt:"Doveva riordinare", cl:"r", primo:s[0] };
+  if(s[0].tra <= PREAVVISO) return { key:"ora", txt:"Sta finendo", cl:"g", primo:s[0] };
+  return { key:"ok", txt:"A posto", cl:"v", primo:s[0] };
+}
+function abitudine(p){ const n = ordiniDi(p.id).length; return n === 1 ? "Ha provato" : n > 1 ? "Ricompra" : ""; }
+/* "come ti sei trovato": qualche giorno dopo un ordine con un prodotto mai preso prima, per 30 giorni */
+function verificaDi(p){
+  if(p.non_compra) return null;
+  const visti = new Set();
+  let trovata = null;
+  for(const o of ordiniDi(p.id).slice().reverse()){
+    const nuovi = righeDi(o.id).filter(r => !visti.has(r.codice));
+    righeDi(o.id).forEach(r => visti.add(r.codice));
+    if(!nuovi.length || o.verificato) continue;
+    const quando = piuGiorni(o.data, VERIFICA_DOPO), tra = giorniTra(oggi(), quando);
+    if(tra <= 0 && tra >= -FINESTRA_VERIFICA) trovata = { o, nuovi, giorni:giorniTra(o.data, oggi()) };
+  }
+  return trovata;
+}
+function compleannoDi(p){
+  if(!p.compleanno || p.non_compra) return null;
+  const [mm, gg] = p.compleanno.split("-").map(Number), anno = Number(oggi().slice(0, 4));
+  let quando = `${anno}-${p.compleanno}`, festa = anno;
+  if(quando < oggi()){ festa = anno + 1; quando = `${festa}-${p.compleanno}`; }
+  return { quando, tra:giorniTra(oggi(), quando), anno:festa, testo:`${gg} ${MESI_LUNGHI[mm - 1]}`, fatto:Number(p.auguri_anno) === festa };
+}
+/* su Io: i clienti da sentire, con il perché */
+function clientiDaSentire(){
+  const out = [];
+  for(const p of clientiTutti()){
+    if(p.non_compra) continue;
+    const s = statoCliente(p), v = verificaDi(p), c = compleannoDi(p);
+    if(c && !c.fatto && c.tra <= COMPLEANNO_PRIMA) out.push({ p, ordine:c.tra, motivo:c.tra === 0 ? "Compleanno oggi" : `Compleanno il ${c.testo}` });
+    else if(v) out.push({ p, ordine:1, motivo:`Come si è trovato con ${v.nuovi[0].nome}` });
+    else if(s.key === "ritardo" || s.key === "ora") out.push({ p, ordine:s.primo.tra, motivo:`${s.txt}: ${s.primo.nome}` });
+  }
+  return out.sort((a, b) => a.ordine - b.ordine);
+}
+function vClientiDaSentire(){
+  const l = clientiDaSentire();
+  if(!l.length) return "";
+  return `<div class="card">
+    <span class="eyebrow">I tuoi clienti da sentire</span>
+    <ul class="persone">${l.map(x => `<li><button class="persona" data-act="apri-cliente" data-id="${esc(x.p.id)}">
+      <span class="grow"><b>${esc(x.p.nome)}</b><br><span class="small">${esc(x.motivo)}</span></span></button></li>`).join("")}</ul>
+  </div>`;
+}
+
+function vClienti(){
+  if(st.personaId) return vCliente();
+  const filtro = FILTRI_CLIENTI.find(x => x.id === st.filtroClienti) || FILTRI_CLIENTI[0];
+  const tutti = clientiTutti(), l = tutti.filter(filtro.ok).sort((a, b) => {
+    const sa = statoCliente(a), sb = statoCliente(b);
+    return (sa.primo ? sa.primo.finisce : "9999") < (sb.primo ? sb.primo.finisce : "9999") ? -1 : 1; });
+  return `${vSezioniPersone()}<div class="card">
+    <div class="spread"><span class="eyebrow">I miei clienti</span>
+      <button class="btn small primary" data-act="cliente-nuovo">+ Un cliente</button></div>
+    ${tutti.length ? `<div class="row wrap scelte-rapide" style="gap:6px;margin-top:10px">${FILTRI_CLIENTI.map(x =>
+      `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-clienti" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${tutti.filter(x.ok).length}</button>`).join("")}</div>
+    ${l.length ? `<ul class="persone">${l.map(p => { const s = statoCliente(p);
+      return `<li><button class="persona" data-act="apri-cliente" data-id="${esc(p.id)}">
+        <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${s.primo && s.key !== "fermo" ? `${esc(s.primo.nome)} · finisce il ${dataIt(s.primo.finisce)}` : esc(abitudine(p) || "nessun ordine")}</span></span>
+        <span class="pill ${s.cl}">${esc(s.txt)}</span></button></li>`; }).join("")}</ul>`
+      : `<p class="muted" style="margin:10px 0 0">${filtro.id === "sentire" ? "Nessuno da sentire adesso." : "Nessun cliente qui."}</p>`}`
+    : `<p class="muted" style="margin:8px 0 0">Ancora nessun cliente. Entrano da qui con "+ Un cliente", oppure dalla Lista quando chiudi una persona come Cliente.</p>`}
+    <p class="nota">I tuoi clienti li vedi solo tu. Gli ordini servono ai riordini: non cambiano i tuoi VP.</p>
+  </div>`;
+}
+
+function vCliente(){
+  const p = st.persone.find(x => x.id === st.personaId);
+  const indietro = `<button class="btn link" data-act="torna-clienti" style="padding:0">‹ I miei clienti</button>`;
+  if(!p) return `${indietro}<p class="muted">Cliente non trovato.</p>`;
+  const s = statoCliente(p), sc = scaffale(p), ord = ordiniDi(p.id), v = verificaDi(p), c = compleannoDi(p);
+  const tel = numeroWa(p.contatto);
+  return `${indietro}
+  <div class="card">
+    <div class="spread"><h2>${esc(p.nome)}</h2><span class="pill ${s.cl}">${esc(s.txt)}</span></div>
+    <p class="small" style="margin:2px 0 0">${[p.contatto, abitudine(p), c ? `compleanno ${c.testo}` : ""].filter(Boolean).map(esc).join(" · ")}</p>
+    ${tel ? `<div class="row" style="gap:6px;margin-top:8px">
+      <a class="btn small" href="tel:+${esc(tel)}">Chiama</a>
+      <a class="btn small wa" target="_blank" rel="noopener" href="https://wa.me/${esc(tel)}">WhatsApp</a></div>` : ""}
+    <div class="row" style="gap:8px;margin-top:12px">
+      <button class="btn primary grow" data-act="ordine-nuovo">+ Ordine</button>
+      ${ord.length ? `<button class="btn grow" data-act="ordine-ripeti">Ripeti l'ultimo</button>` : ""}</div>
+    <div class="row wrap" style="gap:6px;margin-top:8px">
+      <button class="btn small" data-act="messaggio-cliente">Scrivigli</button>
+      <button class="btn small ghost" data-act="rimanda-cliente">Rimanda</button>
+      <button class="btn small ghost" data-act="compleanno-cliente">${p.compleanno ? "Compleanno" : "+ Compleanno"}</button></div>
+  </div>
+  ${v ? `<div class="card avviso-cliente"><b>Come si è trovato?</b>
+    <p class="small" style="margin:4px 0 8px">Sono passati ${v.giorni} giorni da quando ha preso ${esc(v.nuovi.map(r => r.nome).join(" e "))}: è il momento di chiederglielo.</p>
+    <div class="row" style="gap:6px"><button class="btn small" data-act="messaggio-cliente" data-tipo="checkin">Scrivigli</button>
+      <button class="btn small ghost" data-act="verifica-fatta" data-id="${esc(v.o.id)}">Fatto, gliel'ho chiesto</button></div></div>` : ""}
+  ${c && !c.fatto && c.tra <= COMPLEANNO_PRIMA ? `<div class="card avviso-cliente"><b>${c.tra === 0 ? "Oggi è il suo compleanno" : `Compleanno il ${c.testo}`}</b>
+    <div class="row" style="gap:6px;margin-top:8px"><button class="btn small" data-act="messaggio-cliente" data-tipo="auguri">Auguri</button>
+      <button class="btn small ghost" data-act="auguri-fatti">Fatti</button></div></div>` : ""}
+  <div class="card">
+    <span class="eyebrow">Cosa usa</span>
+    ${sc.length ? `<ul class="oggi">${sc.map(x => `<li>
+      <span class="grow"><b>${esc(x.nome)}</b>${x.quantita > 1 ? ` × ${x.quantita}` : ""}<br>
+        <span class="small">${x.tra < 0 ? `finito ${-x.tra === 1 ? "ieri" : `${-x.tra} giorni fa`}` : x.tra === 0 ? "finisce oggi" : `finisce il ${dataIt(x.finisce)}`} · dura ${giorniDi(x.codice)} giorni
+          <button class="btn link small" data-act="durata-prodotto" data-codice="${esc(x.codice)}" style="min-height:0;padding:0 2px">cambia</button></span></span>
+      <button class="btn small" data-act="riordinato" data-codice="${esc(x.codice)}">Riordinato</button>
+      <button class="x" data-act="lascia-prodotto" data-codice="${esc(x.codice)}" aria-label="Non lo prende più">×</button></li>`).join("")}</ul>`
+      : `<p class="muted" style="margin:6px 0 0">${ord.length ? "Nessun prodotto seguito." : "Ancora nessun ordine: segna il primo con + Ordine."}</p>`}
+  </div>
+  ${ord.length ? `<div class="card">
+    <span class="eyebrow">Ordini</span>
+    <ul class="oggi">${ord.map(o => { const t = totaleOrdine(o);
+      return `<li><span class="grow"><b>${dataIt(o.data)}</b> · ${o.modo === "io" ? "fatto da me" : "dal sito"}${t ? ` · ${euro(t)}` : ""}<br>
+        <span class="small">${righeDi(o.id).map(r => esc(r.nome) + (r.quantita > 1 ? ` × ${r.quantita}` : "")).join(", ")}</span>
+        ${o.modo === "io" ? `<br><span class="row" style="gap:6px;margin-top:4px">
+          <button class="btn small${o.consegnato ? " on" : " ghost"}" data-act="ordine-consegnato" data-id="${esc(o.id)}">${o.consegnato ? "✓ Consegnato" : "Consegnato?"}</button>
+          <button class="btn small${o.pagato ? " on" : " ghost"}" data-act="ordine-pagato" data-id="${esc(o.id)}">${o.pagato ? "✓ Pagato" : "Pagato?"}</button></span>` : ""}</span>
+        <button class="x" data-act="ordine-togli" data-id="${esc(o.id)}" aria-label="Togli l'ordine">×</button></li>`; }).join("")}</ul>
+  </div>` : ""}
+  <div class="row wrap" style="gap:6px;justify-content:center">
+    <button class="btn small ghost" data-act="apri-persona" data-id="${esc(p.id)}">Il suo percorso nella lista</button>
+    <button class="btn small ghost" data-act="cliente-non-compra">${p.non_compra ? "Torna cliente" : "Non compra più"}</button>
+  </div>`;
+}
+
+/* ---- I messaggi pronti (come nella mini app) ---- */
+function messaggiCliente(p, tipo){
+  const n = p.nome.split(" ")[0], sc = scaffale(p);
+  if(tipo === "checkin"){
+    const v = verificaDi(p), prod = v ? v.nuovi.map(r => r.nome).join(" e ") : "quello che hai preso", gg = v ? v.giorni : VERIFICA_DOPO;
+    return { titolo:"Come ti sei trovato", fatto:v ? "verifica" : "",
+      guida:"Questo messaggio non chiede niente — ed è per questo che funziona: è il punto in cui uno che ha provato diventa uno che ricompra.",
+      varianti:[{ label:"Aperto", testo:`Ciao ${n}, sono passati ${gg} giorni da quando hai preso ${prod}: come ti stai trovando?\n\nSe c'è qualcosa che non ti torna dimmelo pure — mi interessa più sapere com'è andata che venderti altro.` },
+        { label:"Pratico", testo:`Ciao ${n}, ti scrivo per sapere come va con ${prod}. Riesci a usarlo tutti i giorni? Se hai dubbi su quanto prenderne o su quando, chiedimi: sono due minuti.` },
+        { label:"Corto", testo:`Ciao ${n}, tutto bene con ${prod}?` }] };
+  }
+  if(tipo === "auguri"){
+    const suggerito = sc.length ? sc[0].nome : "quello che usi di solito";
+    return { titolo:"Auguri", fatto:"auguri",
+      guida:"Gli auguri restano auguri: la proposta, se vuoi farla, va qualche giorno dopo (Il regalo · Sul prodotto).",
+      varianti:[{ label:"Semplice", testo:`Buon compleanno ${n}! Ti auguro una giornata come la vuoi tu.` },
+        { label:"Caldo", testo:`Tanti auguri ${n}! Spero che oggi ti facciano festeggiare come si deve. Un abbraccio.` },
+        { label:"Il regalo (dopo)", testo:`Ciao ${n}, ti devo ancora il regalo di compleanno. Ho pensato a [scrivi cosa: un campione, un prodotto in omaggio, lo sconto che puoi fare]: se ti va te lo porto con il prossimo ordine.` },
+        { label:"Sul prodotto (dopo)", testo:`Ciao ${n}, per il tuo compleanno volevo farti un pensiero: su ${suggerito} posso lasciarti [scrivi cosa] fino a [data]. Dimmi se ti interessa e te lo metto da parte.` }] };
+  }
+  const x = sc[0], prod = x ? x.nome : "quello che prendi di solito", quanti = x && x.quantita > 1 ? ` Te ne riporto ${x.quantita} come l'altra volta?` : "";
+  return { titolo:"Sta finendo", fatto:"",
+    guida:"Chiedere non è insistere: se dice che ne ha ancora, usa «Rimanda» e la data si sposta senza perdere niente.",
+    varianti:[{ label:"Diretto", testo:`Ciao ${n}, se non ho sbagliato i conti ${prod} ti sta finendo in questi giorni. Te ne serve ancora?${quanti}` },
+      { label:"Con l'ordine", testo:`Ciao ${n}, sto per fare un ordine: ti aggiungo ${prod}? Dovrebbe essere più o meno il momento in cui finisce.` },
+      { label:"Dopo un silenzio", testo:`Ciao ${n}, mi sono accorto che non ci sentiamo da un po'. Come stai?\n\nIl ${prod} l'hai finito o hai deciso di lasciarlo? Dimmelo tranquillamente, non me la prendo — mi serve solo per non farti telefonate a vuoto.` }] };
+}
+function tipoMessaggio(p){
+  const c = compleannoDi(p);
+  if(c && !c.fatto && c.tra <= COMPLEANNO_PRIMA) return "auguri";
+  if(verificaDi(p)) return "checkin";
+  return "finendo";
+}
+
+function vSheetClienti(s){
+  const p = st.persone.find(x => x.id === st.personaId);
+  const annulla = `<button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>`;
+  if(s === "ordine" && p){
+    const b = st.bozza, tot = b.righe.reduce((t, r) => t + (Number(r.prezzo) || 0) * r.quantita, 0);
+    return `<h2>Ordine di ${esc(nomeSaluto(p.nome))}</h2>
+    <form data-form="ordine-cliente" novalidate>
+      <label class="field"><span>Quando</span><input type="date" name="data" max="${oggi()}" value="${esc(b.data)}" data-bozza="data"></label>
+      <fieldset class="field"><legend>Come ha ordinato</legend>
+        <div class="opzioni">${[["sito", "Da solo, dal sito Amway"], ["io", "L'ho fatto io"]].map(([v, t]) =>
+          `<label class="chip"><input type="radio" name="modo" value="${v}" data-bozza="modo"${b.modo === v ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>
+      <fieldset class="field"><legend>Prodotti</legend>
+        ${b.righe.length ? `<ul class="righe-ordine">${b.righe.map((r, i) => `<li>
+          <span class="grow"><b>${esc(r.nome)}</b><br><span class="small">dura <input class="mini" type="number" min="1" max="3650" inputmode="numeric" value="${r.giorni}" data-riga="${i}" data-campo="giorni" aria-label="Giorni che dura"> giorni</span></span>
+          <span class="qta"><button type="button" class="btn small ghost" data-act="riga-meno" data-i="${i}" aria-label="Uno in meno">−</button><b>${r.quantita}</b>
+            <button type="button" class="btn small ghost" data-act="riga-piu" data-i="${i}" aria-label="Uno in più">+</button></span>
+          <input class="mini prezzo" type="text" inputmode="decimal" value="${r.prezzo != null ? String(r.prezzo).replace(".", ",") : ""}" placeholder="€" data-riga="${i}" data-campo="prezzo" aria-label="Prezzo"></li>`).join("")}</ul>
+          <p class="small" style="margin:6px 0 0">Totale <b id="totale-ordine">${euro(tot)}</b></p>` : `<p class="small muted">Cerca i prodotti qui sotto.</p>`}
+        <input type="search" id="cerca-prodotto" class="cerca" placeholder="Cerca un prodotto Amway (nome o codice)…" autocomplete="off" value="${esc(st.cercaProdotto || "")}">
+        <ul class="risultati-prodotto" id="risultati-prodotto">${risultatiProdotto(st.cercaProdotto)}</ul>
+      </fieldset>
+      <label class="field"><span>Nota <i>(facoltativa)</i></span><input name="nota" maxlength="500" value="${esc(b.nota || "")}" data-bozza="nota"></label>
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva l'ordine</button></div>
+    </form>`;
+  }
+  if(s === "messaggio-cliente" && p){
+    const m = messaggiCliente(p, st.tipoMsg), v = m.varianti[st.varianteMsg] || m.varianti[0], tel = numeroWa(p.contatto);
+    return `<h2>${esc(m.titolo)}</h2>
+    <div class="opzioni tipi">${[["finendo", "Sta finendo"], ["checkin", "Come ti sei trovato"], ["auguri", "Auguri"]].map(([k, t]) =>
+      `<button type="button" class="btn small${k === st.tipoMsg ? " on" : ""}" data-act="tipo-msg" data-tipo="${k}">${t}</button>`).join("")}</div>
+    <p class="small">${esc(m.guida)}</p>
+    <div class="opzioni">${m.varianti.map((x, i) => `<button type="button" class="btn small${x === v ? " on" : " ghost"}" data-act="variante-msg" data-i="${i}">${esc(x.label)}</button>`).join("")}</div>
+    <textarea id="testo-msg" rows="7" style="margin-top:10px">${esc(v.testo)}</textarea>
+    <div class="row" style="gap:8px;margin-top:10px">
+      <button class="btn wa grow" data-act="manda-msg" data-tel="${esc(tel)}">${tel ? "Apri la sua chat WhatsApp" : "WhatsApp"}</button>
+      <button class="btn grow" data-act="copia-msg">Copia</button></div>
+    ${m.fatto ? `<button class="btn ghost wide" style="margin-top:8px" data-act="${m.fatto === "auguri" ? "auguri-fatti" : "verifica-fatta"}"${m.fatto === "verifica" ? ` data-id="${esc(verificaDi(p).o.id)}"` : ""}>Fatto</button>` : ""}
+    <button class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>`;
+  }
+  if(s === "rimanda-cliente" && p) return `<h2>Rimanda ${esc(nomeSaluto(p.nome))}</h2>
+    <p class="small">Se ne ha ancora: fino a quella data non compare tra quelli da sentire.</p>
+    <form data-form="rimanda-cliente" novalidate>
+      <div class="opzioni">${[["3", "3 giorni"], ["7", "1 settimana"], ["14", "2 settimane"], ["30", "1 mese"]].map(([v, t]) =>
+        `<label class="chip"><input type="radio" name="giorni" value="${v}"${v === "7" ? " checked" : ""}><span>${t}</span></label>`).join("")}</div>
+      <label class="field"><span>Perché <i>(facoltativo)</i></span><input name="nota" maxlength="200" placeholder="es. ne ha ancora mezzo flacone"></label>
+      ${p.prossima_data && p.prossima_data > oggi() ? `<button type="button" class="btn ghost wide" style="margin-top:8px" data-act="rimanda-togli">Togli il rinvio (oggi è da risentire il ${dataIt(p.prossima_data)})</button>` : ""}
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Rimanda</button></div>
+    </form>`;
+  if(s === "compleanno-cliente" && p){ const [mm, gg] = (p.compleanno || "-").split("-");
+    return `<h2>Il compleanno di ${esc(nomeSaluto(p.nome))}</h2>
+    <form data-form="compleanno-cliente" novalidate>
+      <div class="row" style="gap:8px">
+        <label class="field grow"><span>Giorno</span><input name="giorno" type="number" min="1" max="31" inputmode="numeric" value="${esc(gg ? Number(gg) : "")}"></label>
+        <label class="field grow"><span>Mese</span><select name="mese"><option value=""></option>${MESI_LUNGHI.map((x, i) => `<option value="${i + 1}"${Number(mm) === i + 1 ? " selected" : ""}>${x}</option>`).join("")}</select></label></div>
+      <p class="nota">Senza anno. Qualche giorno prima te lo ricordo su Io, con gli auguri pronti.</p>
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
+    </form>`; }
+  if(s === "durata" && st.durataCodice){ const nome = (st.righe.find(r => r.codice === st.durataCodice) || {}).nome || st.durataCodice;
+    return `<h2>Quanto dura</h2><p class="small">${esc(nome)}: vale per tutti i tuoi clienti.</p>
+    <form data-form="durata" novalidate>
+      <label class="field"><span>Giorni (una confezione)</span><input name="giorni" type="number" min="1" max="3650" inputmode="numeric" value="${giorniDi(st.durataCodice)}"></label>
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
+    </form>`; }
+  return "";
+}
+function risultatiProdotto(q){
+  const t = senzaAccenti(q || "");
+  if(t.length < 2) return "";
+  const cat = (window.CATALOGO_AMWAY || []).filter(r => senzaAccenti(r[0] + " " + r[1]).includes(t)).slice(0, 8);
+  return cat.map(r => `<li><button type="button" class="persona" data-act="aggiungi-prodotto" data-codice="${esc(r[0])}">
+      <span class="grow">${esc(r[1])}<br><span class="small">${esc([r[0], r[2], euro(r[4])].filter(Boolean).join(" · "))}</span></span><b>+</b></button></li>`).join("")
+    + `<li><button type="button" class="persona" data-act="aggiungi-libero"><span class="grow"><i>Non c'è: aggiungi "${esc(q.trim())}"</i></span><b>+</b></button></li>`;
+}
+function nuovaBozza(righe){
+  return { data:oggi(), modo:"sito", nota:"", righe:(righe || []).map(r => ({ codice:r.codice, nome:r.nome, quantita:r.quantita || 1,
+    prezzo:r.prezzo != null ? Number(r.prezzo) : (prodottoCatalogo(r.codice) || {}).prezzo ?? null, giorni:giorniDi(r.codice) })) };
+}
+async function salvaOrdine(pid, b){
+  const id = uuid();
+  await api.nuovoOrdine({ id, persona_id:pid, data:b.data, modo:b.modo, nota:(b.nota || "").trim() || null });
+  await api.nuoveRighe(b.righe.map(r => ({ id:uuid(), ordine_id:id, codice:r.codice, nome:r.nome.slice(0, 160), quantita:r.quantita,
+    prezzo:r.prezzo === "" || r.prezzo == null || isNaN(Number(r.prezzo)) ? null : Number(r.prezzo) })));
+  /* la durata scelta vale per tutti i miei clienti */
+  for(const r of b.righe){ const g = Math.max(1, Math.min(3650, Number(r.giorni) || DURATA_BASE));
+    if(g !== giorniDi(r.codice)) await api.salvaDurata(r.codice, g); }
+  /* un ordine nuovo: niente più rinvio */
+  await api.modificaPersona(pid, { prossima_data:null, prossima_nota:null });
+}
+async function dopoClienti(msg){ await caricaClienti(); await caricaPersone(); st.sheet = null; render(); if(msg) toast(msg); }
+function apriWa(tel, testo){ window.open(`https://wa.me/${tel || ""}?text=` + encodeURIComponent(testo), "_blank", "noopener"); }
+
+Object.assign(AZIONI, {
+  "apri-cliente"(el){ st.vista = "persone"; st.sezPersone = "clienti"; st.invitoId = null; st.personaId = el.dataset.id; render(); window.scrollTo(0, 0); },
+  "torna-clienti"(){ st.personaId = null; render(); window.scrollTo(0, 0); },
+  "filtro-clienti"(el){ st.filtroClienti = el.dataset.filtro; render(); },
+  "cliente-nuovo"(){ st.errore = ""; st.nuovoCliente = true; st.sheet = "persona-nuova"; render(); },
+  "ordine-nuovo"(){ st.bozza = nuovaBozza([]); st.cercaProdotto = ""; st.sheet = "ordine"; render(); },
+  "ordine-ripeti"(){
+    const o = ordiniDi(st.personaId)[0];
+    st.bozza = nuovaBozza(righeDi(o.id)); st.bozza.modo = o.modo; st.cercaProdotto = ""; st.sheet = "ordine"; render();
+  },
+  async riordinato(el){
+    const x = scaffale(st.persone.find(p => p.id === st.personaId)).find(y => y.codice === el.dataset.codice);
+    if(!x) return;
+    const b = nuovaBozza([x]); b.modo = (ordiniDi(st.personaId)[0] || {}).modo || "sito";
+    try{ await salvaOrdine(st.personaId, b); await dopoClienti(`${x.nome}: riordinato oggi`); }catch(e){ toast(messaggio(e)); }
+  },
+  "aggiungi-prodotto"(el){
+    const c = prodottoCatalogo(el.dataset.codice);
+    if(!c) return;
+    const r = st.bozza.righe.find(y => y.codice === c.codice);
+    if(r) r.quantita = Math.min(99, r.quantita + 1);
+    else st.bozza.righe.push({ codice:c.codice, nome:c.nome + (c.formato ? ` (${c.formato})` : ""), quantita:1, prezzo:c.prezzo, giorni:giorniDi(c.codice) });
+    st.cercaProdotto = ""; render();
+  },
+  "aggiungi-libero"(){
+    const nome = (st.cercaProdotto || "").trim();
+    if(!nome) return;
+    const codice = "P-" + senzaAccenti(nome).replace(/[^a-z0-9]+/g, "").slice(0, 18);
+    st.bozza.righe.push({ codice, nome:nome.slice(0, 160), quantita:1, prezzo:null, giorni:giorniDi(codice) });
+    st.cercaProdotto = ""; render();
+  },
+  "riga-piu"(el){ const r = st.bozza.righe[Number(el.dataset.i)]; r.quantita = Math.min(99, r.quantita + 1); render(); },
+  "riga-meno"(el){ const i = Number(el.dataset.i), r = st.bozza.righe[i]; if(r.quantita > 1) r.quantita--; else st.bozza.righe.splice(i, 1); render(); },
+  async "ordine-consegnato"(el){ const o = st.ordini.find(x => x.id === el.dataset.id);
+    try{ await api.aggiornaOrdine(o.id, { consegnato:o.consegnato ? null : oggi() }); await dopoClienti(); }catch(e){ toast(messaggio(e)); } },
+  async "ordine-pagato"(el){ const o = st.ordini.find(x => x.id === el.dataset.id);
+    try{ await api.aggiornaOrdine(o.id, { pagato:o.pagato ? null : oggi() }); await dopoClienti(); }catch(e){ toast(messaggio(e)); } },
+  async "ordine-togli"(el){
+    if(!confirm("Togliere questo ordine?")) return;
+    try{ await api.cancellaOrdine(el.dataset.id); await dopoClienti("Ordine tolto"); }catch(e){ toast(messaggio(e)); }
+  },
+  async "lascia-prodotto"(el){
+    const p = st.persone.find(x => x.id === st.personaId);
+    if(!confirm("Non lo prende più? Smetto di ricordartelo (resta nello storico degli ordini).")) return;
+    try{ await api.modificaPersona(p.id, { lasciati:(p.lasciati || []).concat([el.dataset.codice]) }); await dopoClienti("Non lo segue più"); }catch(e){ toast(messaggio(e)); }
+  },
+  "durata-prodotto"(el){ st.durataCodice = el.dataset.codice; st.sheet = "durata"; render(); },
+  "messaggio-cliente"(el){
+    const p = st.persone.find(x => x.id === st.personaId);
+    st.tipoMsg = el.dataset.tipo || tipoMessaggio(p); st.varianteMsg = 0; st.sheet = "messaggio-cliente"; render();
+  },
+  "tipo-msg"(el){ st.tipoMsg = el.dataset.tipo; st.varianteMsg = 0; render(); },
+  "variante-msg"(el){ st.varianteMsg = Number(el.dataset.i); render(); },
+  "manda-msg"(el){ apriWa(el.dataset.tel, document.getElementById("testo-msg").value); },
+  async "copia-msg"(){ try{ await navigator.clipboard.writeText(document.getElementById("testo-msg").value); toast("Messaggio copiato"); }catch(e){ toast(messaggio(e)); } },
+  async "verifica-fatta"(el){ try{ await api.aggiornaOrdine(el.dataset.id, { verificato:oggi() }); await dopoClienti("Fatto: gli hai chiesto come si è trovato"); }catch(e){ toast(messaggio(e)); } },
+  async "auguri-fatti"(){ const p = st.persone.find(x => x.id === st.personaId), c = compleannoDi(p);
+    try{ await api.modificaPersona(p.id, { auguri_anno:c ? c.anno : Number(oggi().slice(0, 4)) }); await dopoClienti("Auguri fatti"); }catch(e){ toast(messaggio(e)); } },
+  "rimanda-cliente"(){ st.sheet = "rimanda-cliente"; render(); },
+  async "rimanda-togli"(){ try{ await api.modificaPersona(st.personaId, { prossima_data:null, prossima_nota:null }); await dopoClienti("Rinvio tolto"); }catch(e){ toast(messaggio(e)); } },
+  "compleanno-cliente"(){ st.sheet = "compleanno-cliente"; render(); },
+  async "cliente-non-compra"(){ const p = st.persone.find(x => x.id === st.personaId);
+    try{ await api.modificaPersona(p.id, { non_compra:!p.non_compra }); await dopoClienti(p.non_compra ? "Di nuovo tra i clienti" : "Segnato: non compra più"); }catch(e){ toast(messaggio(e)); } }
+});
+
+Object.assign(MODULI, {
+  async "ordine-cliente"(f){
+    const b = st.bozza;
+    if(!b.righe.length){ mostraErroreForm(f, "Aggiungi almeno un prodotto."); return; }
+    if(!b.data || b.data > oggi()){ mostraErroreForm(f, "Scegli il giorno dell'ordine (non nel futuro)."); return; }
+    try{ await salvaOrdine(st.personaId, b); st.bozza = null; await dopoClienti("Ordine salvato"); }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async "rimanda-cliente"(f){
+    const g = Number((f.querySelector("input[name=giorni]:checked") || {}).value || 7);
+    try{ await api.modificaPersona(st.personaId, { prossima_data:piuGiorni(oggi(), g), prossima_nota:f.nota.value.trim() || null }); await dopoClienti("Rimandato"); }
+    catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async "compleanno-cliente"(f){
+    const g = Number(f.giorno.value), m = Number(f.mese.value);
+    const v = !g && !m ? null : (g >= 1 && g <= 31 && m >= 1 && m <= 12) ? `${String(m).padStart(2, "0")}-${String(g).padStart(2, "0")}` : "x";
+    if(v === "x"){ mostraErroreForm(f, "Scegli giorno e mese."); return; }
+    try{ await api.modificaPersona(st.personaId, { compleanno:v }); await dopoClienti("Compleanno salvato"); }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async durata(f){
+    const g = Number(f.giorni.value);
+    if(!(g >= 1 && g <= 3650)){ mostraErroreForm(f, "Scrivi i giorni (da 1 a 3650)."); return; }
+    try{ await api.salvaDurata(st.durataCodice, g); await dopoClienti("Durata salvata"); }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  }
+});
+
+document.addEventListener("input", e => {
+  const t = e.target;
+  if(!t || !st.bozza) return;
+  if(t.id === "cerca-prodotto"){ st.cercaProdotto = t.value; const u = document.getElementById("risultati-prodotto"); if(u) u.innerHTML = risultatiProdotto(t.value); return; }
+  if(t.dataset && t.dataset.bozza) st.bozza[t.dataset.bozza] = t.value;
+  if(t.dataset && t.dataset.riga != null){
+    const r = st.bozza.righe[Number(t.dataset.riga)];
+    if(t.dataset.campo === "prezzo") r.prezzo = t.value.trim() ? numIt(t.value) : null; else r.giorni = Number(t.value) || DURATA_BASE;
+    const tot = document.getElementById("totale-ordine");
+    if(tot) tot.textContent = euro(st.bozza.righe.reduce((s, x) => s + (Number(x.prezzo) || 0) * x.quantita, 0));
+  }
+});
+document.addEventListener("change", e => { const t = e.target; if(t && st.bozza && t.dataset && t.dataset.bozza) st.bozza[t.dataset.bozza] = t.value; });
+
 /* ---- 12. Eventi ---- */
 document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]");
@@ -3314,7 +3739,7 @@ document.addEventListener("touchend", e => {
   else if(dx < 0 && st.vista === "io") scorri("vista-persone", "da-destra");
   else if(dx < 0 && st.vista === "persone" && !st.personaId && !st.invitoId) scorri("vista-gruppo", "da-destra");
   else if(dx > 0 && st.vista === "persone" && st.invitoId) scorri("torna-target", "da-sinistra");
-  else if(dx > 0 && st.vista === "persone" && st.personaId) scorri("torna-lista", "da-sinistra");
+  else if(dx > 0 && st.vista === "persone" && st.personaId) scorri(st.sezPersone === "clienti" ? "torna-clienti" : "torna-lista", "da-sinistra");
   else if(dx > 0 && st.vista === "persone") scorri("vista-io", "da-sinistra");
   else if(dx > 0 && st.vista === "io") scorri("vista-obiettivo", "da-sinistra");
   else if(dx > 0 && st.vista === "gruppo") scorri("vista-persone", "da-sinistra");

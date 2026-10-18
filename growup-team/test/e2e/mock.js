@@ -188,7 +188,9 @@
       if(x) Object.assign(x, campi); salva(); },
     cancellaPersona: async id => { db.persone = db.persone.filter(y => !(y.id === id && y.proprietario === mio().id));
       db.passi = (db.passi || []).filter(y => y.persona_id !== id);
-      (db.inviti || []).forEach(y => { if(y.persona_id === id) y.persona_id = null; }); salva(); },
+      (db.inviti || []).forEach(y => { if(y.persona_id === id) y.persona_id = null; });
+      const ord = (db.ordini || []).filter(y => y.persona_id === id).map(y => y.id);
+      db.ordini = (db.ordini || []).filter(y => y.persona_id !== id); db.righe = (db.righe || []).filter(y => !ord.includes(y.ordine_id)); salva(); },
     nuoviPassi: async righe => {
       for(const r of righe){
         const pe = (db.persone || []).find(y => y.id === r.persona_id);
@@ -214,13 +216,26 @@
     cancellaInvito: async id => { db.inviti = (db.inviti || []).filter(y => !(y.id === id && y.proprietario === mio().id)); salva(); },
     invitoTargetAperto: async id => { const x = (db.inviti || []).find(y => y.id === id);
       return !x ? "sconosciuto" : x.bloccato ? "bloccato" : x.risposte ? "usato" : x.scade && x.scade < new Date().toISOString().slice(0, 10) ? "scaduto" : "ok"; },
+    ordini: async () => (db.ordini || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
+    righeOrdini: async () => (db.righe || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
+    durate: async () => (db.durate || []).filter(x => x.proprietario === mio().id).map(x => ({ codice:x.codice, giorni:x.giorni })),
+    nuovoOrdine: async r => { const pe = (db.persone || []).find(y => y.id === r.persona_id);
+      if(!pe || pe.proprietario !== mio().id) throw new Error("non_autorizzato");
+      db.ordini = (db.ordini || []).concat([Object.assign({ proprietario:pe.proprietario, consegnato:null, pagato:null, verificato:null, creato_il:new Date().toISOString() + Math.random() }, r)]); salva(); },
+    nuoveRighe: async righe => { for(const r of righe){ const o = (db.ordini || []).find(y => y.id === r.ordine_id);
+      if(!o || o.proprietario !== mio().id) throw new Error("non_autorizzato");
+      db.righe = (db.righe || []).concat([Object.assign({ proprietario:o.proprietario }, r)]); } salva(); },
+    aggiornaOrdine: async (id, campi) => { const o = (db.ordini || []).find(y => y.id === id && y.proprietario === mio().id); if(o) Object.assign(o, campi); salva(); },
+    cancellaOrdine: async id => { db.ordini = (db.ordini || []).filter(y => y.id !== id); db.righe = (db.righe || []).filter(y => y.ordine_id !== id); salva(); },
+    salvaDurata: async (codice, giorni) => { db.durate = (db.durate || []).filter(y => !(y.proprietario === mio().id && y.codice === codice))
+      .concat([{ proprietario:mio().id, codice, giorni }]); salva(); },
     numeriPersone: async pid => { const io = mio(), t = db.partners.find(p => p.id === pid);
       if(!t || !vedo(io, t)) throw new Error("non_autorizzato");
       const l = (db.persone || []).filter(x => x.proprietario === pid), m = new Date().toISOString().slice(0, 7);
       return { in_lista:l.filter(x => !x.esito && x.fase === "lista").length, in_corso:l.filter(x => !x.esito && x.fase !== "lista").length,
         piani_mese:(db.passi || []).filter(x => x.proprietario === pid && x.tipo === "piano" && x.data.slice(0, 7) === m).length,
         si_mese:(db.passi || []).filter(x => x.proprietario === pid && x.tipo === "chiusura" && ["partner", "cliente"].includes(x.esito) && x.data.slice(0, 7) === m).length,
-        totale:l.length }; },
+        clienti:l.filter(x => x.esito === "cliente" && !x.non_compra).length, totale:l.length }; },
     addActivity: async row => { const r = Object.assign({ id:uid(), inserito_il:new Date().toISOString(), inserito_da:mio().id }, row); db.activities.push(r); salva(); return r; },
     deleteActivity: async id => { db.activities = db.activities.filter(a => a.id !== id); salva(); },
     lastGoal: async (pid, fino) => db.goals.filter(g => g.partner_id === pid && g.settimana <= fino).sort((a,b) => a.settimana < b.settimana ? 1 : -1).slice(0,1),

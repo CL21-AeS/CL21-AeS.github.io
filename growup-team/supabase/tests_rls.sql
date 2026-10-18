@@ -575,6 +575,30 @@ begin
   delete from public.inviti_target;
   execute 'reset role';
 
+  -- ---- 024: i Clienti — ordini e durate solo miei ----
+  perform growup_test.come(u3);  -- B
+  insert into public.persone (nome) values ('Cliente Prova') returning id into pp;
+  insert into public.passi (persona_id, tipo, esito) values (pp, 'chiusura', 'cliente');
+  update public.persone set compleanno = '03-15' where id = pp;
+  perform growup_test.deve_fallire(format('update public.persone set compleanno = ''13-40'' where id = %L', pp), 'compleanno non valido rifiutato');
+  insert into public.ordini (persona_id, data, modo) values (pp, current_date, 'io') returning id into pq;
+  insert into public.righe_ordine (ordine_id, codice, nome, quantita, prezzo) values (pq, '110415', 'Prodotto prova', 2, 30.5);
+  insert into public.durate (codice, giorni) values ('110415', 45);
+  perform growup_test.ok((select proprietario = b from public.ordini where id = pq)
+                         and (select proprietario = b from public.righe_ordine where ordine_id = pq), 'B segna un ordine del suo cliente');
+  update public.ordini set pagato = current_date, consegnato = current_date where id = pq;
+  perform growup_test.come(u2);  -- A, sponsor di B
+  perform growup_test.ok((select count(*) from public.ordini) = 0 and (select count(*) from public.righe_ordine) = 0
+                         and (select count(*) from public.durate) = 0, 'lo sponsor non vede ordini e durate di B');
+  perform growup_test.deve_fallire(format('insert into public.ordini (persona_id) values (%L)', pp), 'lo sponsor non segna ordini sui clienti di B');
+  perform growup_test.deve_fallire(format('insert into public.righe_ordine (ordine_id, codice, nome) values (%L, ''1'', ''x'')', pq), 'né righe sugli ordini di B');
+  perform growup_test.ok((public.numeri_persone(b)->>'clienti')::int = 1, 'lo sponsor vede quanti clienti ha B');
+  perform growup_test.come(u3);
+  delete from public.persone where id = pp;
+  perform growup_test.ok((select count(*) from public.ordini) = 0 and (select count(*) from public.righe_ordine) = 0, 'togliendo il cliente spariscono i suoi ordini');
+  delete from public.durate;
+  execute 'reset role';
+
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');
