@@ -15,6 +15,9 @@ funzione da admin.
 | Scheda di chi usa l'app → **Nuovo link personale** | crea un link personale nuovo; quello vecchio smette di funzionare | per chi ha perso il suo link |
 | In fondo alle pagine → **Scarica la copia dei dati** | file `growup-copia-AAAA-MM-GG.json` con tutte le tabelle | copia di sicurezza mensile (procedura in `LEGGIMI.md`) |
 
+Gli admin **non vedono le liste** (pagina Persone) di nessuno, neanche nella copia di sicurezza: di ogni partner
+vedono solo i numeri della lista nella sua scheda, come ogni upline.
+
 Gli admin **vedono la struttura come tutti gli altri**: chi usa l'app nel proprio gruppo e le persone importate
 da loro. Le persone importate dagli altri le trovano solo nella copia di sicurezza.
 

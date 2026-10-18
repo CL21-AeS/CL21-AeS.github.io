@@ -36,6 +36,19 @@ Stefano ("non riempiamo le schermate"). Il calcolo (differenza di percentuale pe
 tornerà in una **sezione dedicata per analizzare e gestire la situazione di una persona**, da progettare. Il codice
 di riferimento è nel commit "il bonus di performance in VP" della storia del repository.
 
+**18 ottobre — Persone → Lista (fase 1 di "dal contatto al cliente")**. Il piano in breve:
+Si integrano le mini app Target, Lista e Clienti in Growup, una fase per PR: prima la **Lista** (fatta), poi il
+**Target** (porta d'ingresso per chi non conosci, a parte dalla Lista: "Metti in lista" / "Proponi come cliente";
+testi del metodo in un riquadro "Il metodo" a richiesta), poi i **Clienti** (ordini, riordini, verifiche,
+compleanni, messaggi). Decisioni: dati in Supabase visibili solo a chi li scrive; l'upline vede solo i numeri;
+nuova scheda **Persone** (`Obiettivo | Io | Persone | Gruppo`); semplicità prima di tutto.
+Fase 1 (migrazione `020_persone.sql`): tabelle `persone` e `passi`; percorso In lista → Contattato → Invitato →
+Piano → Follow-up → Chiusura (Partner · Cliente · Non ora · No) con le voci di "Dalla Lista al Sì"; un passo
+Contatto / Piano / Chiusura-Cliente **conta da solo** l'attività (trigger), togliendo il passo si toglie;
+"Da fare con la tua lista" su Io (in ritardo, oggi, prossimi giorni, ferme da 2 settimane); nella scheda partner
+"La sua lista: …" (solo numeri); importazione dal backup JSON della vecchia app (passi importati non contano
+attività); "Scarica la mia lista"; Partner chiuso → "Mandagli il tuo link d'invito". Informativa aggiornata.
+
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
    import, nascondi, scheda partner).

@@ -66,6 +66,7 @@ declare
   u7 constant uuid := '00000000-0000-0000-0000-0000000000a7';  -- telefono nuovo, poi D
   u8 constant uuid := '00000000-0000-0000-0000-0000000000a8';  -- E, aggiunta a mano, poi entra
   r uuid; a uuid; b uuid; c uuid; d uuid; e uuid; f uuid; g uuid; h uuid; k uuid; x record; mese_prec date;
+  pp uuid; pq uuid; att_prima int;
   k_r text; k_a text; k_a2 text; k_d text; k_e text;
 begin
   begin  -- tutto quello che succede qui dentro viene annullato alla fine
@@ -498,6 +499,50 @@ begin
   perform growup_test.ok((select cifra_mese from public.obiettivi where partner_id = b) = 400, 'A non ha cambiato l''obiettivo di B');
   perform growup_test.ok(not exists (select 1 from pg_proc where proname = 'obiettivi_gruppo' and 'perche' = any(proargnames)),
                          'obiettivi_gruppo non restituisce il perché');
+
+  -- ---- 020: la Lista — nomi solo miei, l'upline vede i numeri ----
+  execute 'reset role';
+  att_prima := (select count(*) from public.activities where partner_id = b);
+  perform growup_test.come(u3);  -- B
+  insert into public.persone (nome, contatto) values ('Persona Prova', '333') returning id into pp;
+  perform growup_test.ok((select proprietario = b and fase = 'lista' and esito is null from public.persone where id = pp), 'B aggiunge un nome alla sua lista');
+  insert into public.passi (persona_id, tipo, come, reazione) values (pp, 'contatto', 'Telefono', 'Aperto, incuriosito');
+  perform growup_test.ok((select fase = 'contattato' from public.persone where id = pp), 'il contatto porta la persona a Contattato');
+  insert into public.passi (persona_id, tipo) values (pp, 'piano') returning id into pq;
+  perform growup_test.ok((select fase = 'piano' from public.persone where id = pp), 'il piano porta la persona a Piano');
+  insert into public.passi (persona_id, tipo, esito) values (pp, 'chiusura', 'cliente');
+  perform growup_test.ok((select esito = 'cliente' from public.persone where id = pp), 'chiusura: cliente');
+  perform growup_test.deve_fallire(format('insert into public.passi (persona_id, tipo) values (%L, ''chiusura'')', pp), 'una chiusura senza esito è rifiutata');
+  perform growup_test.deve_fallire(format('update public.persone set fase = ''followup'' where id = %L', pp), 'la fase non si scrive a mano');
+  insert into public.passi (persona_id, tipo, data, importato) values (pp, 'contatto', date '2020-01-15', true);
+  execute 'reset role';
+  perform growup_test.ok((select count(*) from public.activities where partner_id = b) = att_prima + 3
+                         and exists (select 1 from public.activities where partner_id = b and tipo = 'cliente'),
+                         'contatto, piano e cliente contati da soli (non il passo importato)');
+  perform growup_test.come(u3);
+  insert into public.passi (persona_id, tipo) values (pp, 'riapri');
+  perform growup_test.ok((select esito is null from public.persone where id = pp), 'Riapri il percorso');
+  delete from public.passi where id = pq;
+  perform growup_test.ok((select fase = 'contattato' from public.persone where id = pp), 'togliendo il piano la fase torna indietro');
+  execute 'reset role';
+  perform growup_test.ok((select count(*) from public.activities where partner_id = b) = att_prima + 2, 'togliendo il passo si toglie anche l''attività contata');
+  perform growup_test.come(u2);  -- A, sponsor di B
+  perform growup_test.ok((select count(*) from public.persone) = 0 and (select count(*) from public.passi) = 0, 'lo sponsor non vede i nomi della lista di B');
+  perform growup_test.ok(growup_test.righe(format('update public.persone set nome = ''X'' where id = %L', pp)) = 0, 'lo sponsor non modifica la lista di B');
+  perform growup_test.deve_fallire(format('insert into public.passi (persona_id, tipo) values (%L, ''nota'')', pp), 'lo sponsor non segna passi sulla lista di B');
+  perform growup_test.ok((public.numeri_persone(b)->>'totale')::int = 1 and (public.numeri_persone(b)->>'in_corso')::int = 1,
+                         'lo sponsor vede solo i numeri della lista di B');
+  perform growup_test.come(u1);  -- R, admin
+  perform growup_test.ok((select count(*) from public.persone) = 0, 'neanche l''admin vede i nomi');
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.deve_fallire(format('select public.numeri_persone(%L)', b), 'un''altra linea non vede neanche i numeri');
+  perform growup_test.come(null);
+  perform growup_test.deve_fallire('select count(*) from public.persone', 'chi non è entrato non legge la lista');
+  perform growup_test.come(u3);
+  delete from public.persone where id = pp;
+  perform growup_test.ok((select count(*) from public.passi) = 0, 'cancellando un nome spariscono i suoi passi');
+  execute 'reset role';
+  perform growup_test.ok((select count(*) from public.activities where partner_id = b) = att_prima + 2, 'togliendo un nome i numeri già contati restano');
 
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A

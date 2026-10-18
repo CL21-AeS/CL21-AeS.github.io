@@ -260,7 +260,7 @@ ul.imp li:first-child{border-top:0}
 /* tre pagine: le schede stanno in una riga sotto il titolo, a tutta larghezza */
 .testata{flex-wrap:wrap;row-gap:14px}
 .testata>.schede{order:2;width:100%}
-.testata>.schede button{flex:1}
+.testata>.schede button{flex:1;padding:0 6px}
 .testata h1{color:var(--head-ink)}
 .testata .small{color:var(--head-ink2)}
 .testata .btn.link{color:var(--oro)}
@@ -287,6 +287,32 @@ ul.imp li:first-child{border-top:0}
 }
 @keyframes entra-destra{from{transform:translateX(28px);opacity:.4}to{transform:none;opacity:1}}
 @keyframes entra-sinistra{from{transform:translateX(-28px);opacity:.4}to{transform:none;opacity:1}}
+/* Persone: la lista */
+.persone{list-style:none;margin:8px 0 0;padding:0}
+.persone li{border-top:1px solid var(--line)}
+.persone li:first-child{border-top:0}
+.persona{display:flex;align-items:center;gap:10px;width:100%;padding:10px 0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.punti{display:flex;gap:3px;flex:none}
+.punti i{width:7px;height:7px;border-radius:50%;background:var(--traccia)}
+.punti i.on{background:var(--accent)}
+.da-fare-t{margin:10px 0 0;font-weight:700}
+.percorso-persona{list-style:none;display:flex;gap:4px;margin:14px 0 0;padding:0}
+.percorso-persona li{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;text-align:center;color:var(--ink2)}
+.percorso-persona li i{width:100%;height:6px;border-radius:3px;background:var(--traccia)}
+.percorso-persona li.fatta i,.percorso-persona li.qui i{background:var(--accent)}
+.percorso-persona li.qui{color:var(--ink);font-weight:700}
+.prossima{display:flex;flex-direction:column;margin-top:14px;padding:10px 12px;background:var(--bg);border-radius:10px}
+fieldset.field{border:0;padding:0;margin:14px 0 0;min-width:0}
+fieldset.field legend{padding:0;margin-bottom:6px;font-size:13px;font-weight:700;color:var(--ink2)}
+fieldset.field input[type=date],fieldset.field input[name=prossima_nota]{margin-top:8px}
+.opzioni{display:flex;flex-wrap:wrap;gap:6px}
+.opzioni.tipi{margin:4px 0 6px}
+.opzioni.tipi .btn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;pointer-events:none}
+.chip span{display:inline-block;padding:7px 12px;border:1px solid var(--line);border-radius:999px;font-size:14px;cursor:pointer}
+.chip input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
 .albero.struttura li.nascosta{opacity:.55}
 .imp-filtri{display:none}
 form:has(input[name=modo][value=filtri]:checked) .imp-filtri{display:block}
