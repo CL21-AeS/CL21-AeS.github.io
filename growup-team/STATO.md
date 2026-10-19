@@ -106,6 +106,12 @@ nella Lista già Contattato e il contatto conta nella settimana; se il nome è g
 lei. **+ Piano** chiede con chi (ricerca nella lista o un nome nuovo) e apre il passo Piano da compilare: conta nei piani
 della settimana. Tutti e due restano su Io e hanno "Senza nome" per contare solo il numero. **+ Ordine** invariato.
 In Clienti il primo filtro, selezionato all'apertura, è **Tutti**.
+**19 ottobre — la scheda della persona nella Lista**: dopo il follow-up il passo proposto è la **Chiusura**. Nella
+chiusura si vede solo quello che serve all'esito: **Partner** resta nella lista (con la prossima cosa e il link d'invito);
+**Cliente** esce dalla Lista (anche dai Chiusi) e si apre la sua scheda nei Clienti; **Non ora** chiede tra quanto
+risentirlo (1 mese · 3 mesi · 6 mesi · 1 anno o una data) e mette il promemoria 2 giorni prima, con la nota; **No** solo
+la nota. Il passo **Nota** è solo una finestra per scrivere: la nota (con la data) va nelle Note dei dati della persona.
+Il pulsante "Modifica i dati" in fondo non c'è più: i dati si modificano **toccando il nome** (✎).
 
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,

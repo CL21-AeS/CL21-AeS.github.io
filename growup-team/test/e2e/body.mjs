@@ -757,6 +757,7 @@ const righeCsv = [persona(1, "7654321", "1234567", "ROSSI, MARIO", "400,00"), pe
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await scegliFile(page, "altro.csv", "nome,cognome\nMario,Rossi\n");
+await page.locator(".sheet .errore").waitFor();
 check(await page.locator(".sheet .errore").getByText("non sembra il report").isVisible(), "import: file sbagliato riconosciuto");
 await page.setInputFiles("#file-report", { name:"altri.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, [persona(1, "1", "1234567", "ROSSI, MARIO", "1"), persona(2, "1234567", "9999999", "ALTRO, ALDO", "1")])) });
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
@@ -976,11 +977,17 @@ await page.click("button[data-act=passo]");
 await page.click(".sheet button[data-tipo=piano]");
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("Piano segnato").waitFor();
+check(await page.locator("button[data-act=passo]").innerText() === "Segna un passo · Follow-up", "dopo il piano si propone il follow-up");
 await page.click("button[data-act=passo]");
-await page.click(".sheet button[data-tipo=chiusura]");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Follow-up segnato").waitFor();
+check(await page.locator("button[data-act=passo]").innerText() === "Segna un passo · Chiusura", "dopo il follow-up si propone la chiusura");
+await page.click("button[data-act=passo]");
 await page.click(".sheet button:has-text('Salva')");
 check(await page.locator(".sheet .errore").getByText("Scegli com'è finita").isVisible(), "chiusura: serve l'esito");
+check(!await page.locator(".sheet [data-per-esito=partner]").isVisible() && !await page.locator(".sheet [data-per-esito=non_ora]").isVisible(), "chiusura: senza esito niente prossima cosa");
 await page.click(".sheet label.chip:has-text('Partner')");
+check(await page.locator(".sheet [data-per-esito=partner]").isVisible(), "Partner: c'è la prossima cosa");
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("Chiusura · Partner segnato").waitFor();
 check(await page.getByText("Mandagli il tuo link d'invito").isVisible(), "Partner: si manda il link d'invito di Growup");
@@ -997,11 +1004,67 @@ await page.evaluate(() => { const el = document.querySelector("#app");
   t("touchstart", 80); t("touchend", 320); });
 check(await page.locator(".card", { hasText:"La mia lista" }).isVisible() && !(await page.locator("button[data-act=passo]").count()), "scheda persona: col dito si torna alla lista");
 check(await page.getByText("Scarica una copia della mia lista").isVisible(), "la copia della lista è un piccolo link");
+// chiusure: Non ora (tra quanto e promemoria 2 giorni prima), No (solo la nota), Cliente (esce dalla lista, va nei Clienti)
+const chiudi = async (nome, esito) => {
+  await page.click("button[data-act=persona-nuova]");
+  await page.fill(".sheet input[name=nome]", nome);
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText(`${nome} nella tua lista`).waitFor();
+  await page.click("button[data-act=passo]");
+  await page.click(".sheet button[data-tipo=chiusura]");
+  await page.locator(".sheet label.chip").filter({ hasText:new RegExp(`^${esito}$`) }).click();
+};
+await chiudi("Nina Nonora", "Non ora");
+check(await page.locator(".sheet [data-per-esito=non_ora]").isVisible() && !await page.locator(".sheet [data-per-esito=partner]").isVisible()
+  && !await page.locator(".sheet input[name=prossima_nota]").isVisible(), "Non ora: tra quanto risentirlo, senza prossima cosa");
+await page.click(".sheet label.chip:has-text('1 mese')");
+await page.fill(".sheet input[name=nota]", "ora ha il trasloco");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Chiusura · Non ora segnato").waitFor();
+await sync(page);
+const nina = DB.persone.find(x => x.nome === "Nina Nonora");
+const traUnMese = (() => { const d = new Date(oggiStr + "T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + 1); return d.toISOString().slice(0, 10); })();
+const dueGiorniPrima = (() => { const d = new Date(traUnMese + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() - 2); return d.toISOString().slice(0, 10); })();
+check(nina.esito === "non_ora" && nina.prossima_data === dueGiorniPrima && /da risentire il/.test(nina.prossima_nota)
+  && DB.passi.some(x => x.persona_id === nina.id && x.nota === "ora ha il trasloco"), "Non ora: promemoria 2 giorni prima della scadenza, con la nota");
+// la nota: solo una finestra, e finisce nei dati della persona
+await page.click("button[data-act=passo]");
+await page.click(".sheet button[data-tipo=nota]");
+check(!await page.locator(".sheet input[name=data]").count() && !await page.locator(".sheet input[name=prossima_nota]").count(), "Nota: solo la finestra della nota");
+await page.fill(".sheet textarea[name=nota]", "preferisce essere chiamata la sera");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Nota salvata").waitFor();
+await sync(page);
+check(/preferisce essere chiamata la sera/.test(DB.persone.find(x => x.id === nina.id).note), "la nota è nei dati della persona");
+// i dati si modificano toccando il nome
+await page.screenshot({ path: S + "/e2e/33-persona.png" });
+check(!await page.locator(".card button[data-act=persona-modifica]", { hasText:"Modifica i dati" }).count(), "niente più pulsante Modifica i dati in fondo");
+await page.click("button.nome-modifica");
+check(await page.locator(".sheet h2", { hasText:"Modifica i dati" }).isVisible()
+  && /preferisce essere chiamata la sera/.test(await page.inputValue(".sheet textarea[name=note]")), "toccando il nome si modificano i dati, con le note");
+await page.click(".sheet button[data-act=chiudi]");
+await page.click("button[data-act=torna-lista]");
+await chiudi("Nico No", "No");
+check(!await page.locator(".sheet [data-per-esito=partner]").isVisible() && !await page.locator(".sheet [data-per-esito=non_ora]").isVisible()
+  && await page.locator(".sheet input[name=nota]").isVisible(), "No: resta solo la nota");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Chiusura · No segnato").waitFor();
+await page.click("button[data-act=torna-lista]");
+await chiudi("Carla Compra", "Cliente");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Carla è tra i tuoi clienti").waitFor();
+check(await page.locator("button[data-act=ordine-nuovo]").isVisible() && await page.locator("h2", { hasText:"Carla Compra" }).isVisible(), "Cliente: si apre la sua scheda nei Clienti");
+await page.click("button[data-act=torna-clienti]");
+await page.click("button[data-sez=lista]");
+await page.click("button[data-filtro=chiusi]");
+check(!await page.locator("button[data-act=apri-persona]", { hasText:"Carla Compra" }).count() && await page.locator("button[data-act=apri-persona]", { hasText:"Nico No" }).isVisible(),
+  "il cliente esce dalla lista (i chiusi con No restano)");
+await page.click("button[data-filtro=aperti]");
 await page.click("button[data-act=persone-tante]");
 await page.fill(".sheet textarea[name=righe]", "Marta Neri, 333 999, palestra\nLuigi Verdi");
 await page.click(".sheet button:has-text('Aggiungi')");
 await page.getByText("1 nome aggiunto").waitFor();
-check(await page.getByText("Chiusi · 1").isVisible() && await page.getByText("In lista · 1").isVisible(), "filtri con i conteggi");
+check(await page.getByText("Chiusi · 2").isVisible() && await page.getByText("In lista · 1").isVisible(), "filtri con i conteggi (il cliente non è tra i chiusi)");
 check(!(await page.locator(".persone button[data-act=togli-da-io]").count()), "nella lista nessuna × (quella è solo su Io)");
 await ctx.close();
 // lo sponsor vede solo i numeri della lista di chi sta sotto
