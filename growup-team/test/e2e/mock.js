@@ -230,6 +230,7 @@
       if(!o || o.proprietario !== mio().id) throw new Error("non_autorizzato");
       db.righe = (db.righe || []).concat([Object.assign({ proprietario:o.proprietario }, r)]); } salva(); },
     aggiornaOrdine: async (id, campi) => { const o = (db.ordini || []).find(y => y.id === id && y.proprietario === mio().id); if(o) Object.assign(o, campi); salva(); },
+    cancellaRighe: async ordineId => { db.righe = (db.righe || []).filter(y => y.ordine_id !== ordineId); salva(); },
     cancellaOrdine: async id => { db.ordini = (db.ordini || []).filter(y => y.id !== id); db.righe = (db.righe || []).filter(y => y.ordine_id !== id); salva(); },
     salvaDurata: async (codice, giorni) => { db.durate = (db.durate || []).filter(y => !(y.proprietario === mio().id && y.codice === codice))
       .concat([{ proprietario:mio().id, codice, giorni }]); salva(); },

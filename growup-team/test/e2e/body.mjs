@@ -1186,13 +1186,13 @@ await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
 await page.click("button[data-act=importa-ordini]");
 await page.setInputFiles("#file-ordini", { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) });
-await page.locator(".sheet h2", { hasText:"Ordini dal sito Amway" }).waitFor();
-check(await page.getByText("4 ordini nel file").isVisible() && await page.getByText("4 nuovi da importare").isVisible(), "anteprima: 4 ordini, tutti nuovi");
-check(await page.locator(".sheet .imp-sezione", { hasText:"Già tra i tuoi clienti" }).getByText("riconosciuto dal nome").isVisible(), "Gina riconosciuta dal nome");
+await page.locator(".sheet h2", { hasText:"Dal sito Amway" }).waitFor();
+check(await page.getByText("4 ordini nei file").isVisible() && await page.getByText("4 ordini nuovi").isVisible(), "anteprima: 4 ordini, tutti nuovi");
+check(await page.locator(".sheet .imp-sezione", { hasText:"Già in Growup" }).getByText("riconosciuto dal nome").isVisible(), "Gina riconosciuta dal nome");
 check(await page.locator(".sheet .scelte label", { hasText:"Lia Rossi" }).isVisible() && await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).isVisible(), "nuovi clienti proposti con il nome giusto");
 await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).locator("input").uncheck();
 await page.click(".sheet button:has-text('Importa')");
-await page.getByText("3 ordini importati, 1 nuovo cliente").waitFor();
+await page.getByText("3 ordini nello storico, 1 nuovo cliente").waitFor();
 await sync(page);
 const lia = DB.persone.find(x => x.nome === "Lia Rossi"), ginaI = DB.persone.find(x => x.nome === "Gina Cliente");
 check(lia && lia.esito === "cliente" && lia.codice_cliente === "7000000001" && ginaI.codice_cliente === "7000000002", "clienti collegati al codice cliente Amway");
@@ -1205,22 +1205,93 @@ check(await page.locator(".card", { hasText:"I tuoi clienti da sentire" }).getBy
 await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
 await page.click("button[data-act=importa-ordini]");
 await page.setInputFiles("#file-ordini", { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) });
-await page.locator(".sheet h2", { hasText:"Ordini dal sito Amway" }).waitFor();
-check(await page.getByText("1 nuovo da importare").isVisible() && await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).isVisible(),
+await page.locator(".sheet h2", { hasText:"Dal sito Amway" }).waitFor();
+check(await page.getByText("1 ordine nuovo", { exact:true }).isVisible() && await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).isVisible(),
   "reimport: gli ordini già importati si saltano, resta solo chi non era stato aggiunto");
 await page.click(".sheet button[data-act=chiudi]");
 // i prodotti aggiunti a un ordine importato
 await page.click("button[data-filtro=tutti]");
 await page.locator("button[data-act=apri-cliente]", { hasText:"Lia Rossi" }).click();
 check(await page.getByText(/Di solito ordina ogni/).isVisible(), "scheda: il ritmo degli ordini");
-await page.locator("button[data-act=ordine-prodotti]").first().click();
+await page.locator("button[data-act=ordine-modifica]", { hasText:"+ Aggiungi i prodotti" }).first().click();
 await page.fill("#cerca-prodotto", "double");
 await page.locator("#risultati-prodotto button[data-act=aggiungi-prodotto]").first().click();
 await page.click('.sheet button:has-text("Salva l\'ordine")');
-await page.getByText("Ordine salvato").waitFor();
+await page.getByText("Ordine modificato").waitFor();
 await sync(page);
 const oLia = DB.ordini.find(o => o.numero_amway === "170000002");
 check(DB.righe.some(r => r.ordine_id === oLia.id) && DB.ordini.filter(o => o.persona_id === lia.id).length === 2, "i prodotti si aggiungono all'ordine importato (nessun ordine nuovo)");
+
+// 26. Clienti: l'elenco dei clienti dal sito Amway (export Clienti, dati inventati), anche insieme al file degli ordini
+const clienteCsv = (nome, codice, ingresso, tel, ultimo) => `"'${nome}","'${codice}","'Preferito","'No","'${dataLungaT(ingresso)}",${tel ? `"'Principale: ${tel}"` : ""},"'finta@example.com","'Via Finta 1 | Paese | XX | 00000 | Italia","0","'0,00","'${ultimo ? dataLungaT(ultimo) : "--"}"`;
+const csvClienti = ['"Amway","CONFIDENZIALE - prova"', '"Mese di competenza","202610"',
+  '"Nome","Codice Cliente","Tipo","Nuovo cliente","Data di ingresso","Telefono","Email","Indirizzo","N. di ordini","VP Cliente","Data ultimo ordine"',
+  clienteCsv("Rossi, Lia", "7000000001", gg(-400), "+39 333 000 0001", gg(-40)),
+  clienteCsv("Rossi, Lia", "7000000009", gg(-900), "", ""),
+  clienteCsv("Bianchi, Ugo", "7000000005", gg(-300), "+39 333 000 0005", gg(-20)),
+  clienteCsv("Neri, Mai", "7000000006", gg(-500), "+39 333 000 0006", "")].join("\n") + "\n";
+await page.click("button[data-act=torna-clienti]");
+await page.click("button[data-act=importa-ordini]");
+await page.setInputFiles("#file-ordini", [{ name:"19102026_Cliente.csv", mimeType:"text/csv", buffer:Buffer.from(csvClienti) },
+  { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) }]);
+await page.locator(".sheet h2", { hasText:"Dal sito Amway" }).waitFor();
+check(await page.getByText("4 ordini e 4 clienti nei file").isVisible(), "i due file insieme: riconosciuti da soli");
+check(await page.locator(".sheet .imp-sezione", { hasText:"Già in Growup" }).getByText(/Lia Rossi · telefono/).isVisible(), "Lia: si aggiunge solo il telefono (l'ultimo ordine c'è già)");
+check(await page.locator(".sheet .scelte label", { hasText:"Ugo Bianchi" }).isVisible() && await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).isVisible(), "nuovi clienti: chi ha comprato");
+check(await page.locator(".sheet .imp-sezione", { hasText:"Mai comprato" }).locator(".scelte label", { hasText:"Mai Neri" }).locator("input").isChecked(), "mai comprato: con la spunta");
+check(!await page.locator(".sheet .scelte label", { hasText:"Lia Rossi" }).count(), "Lia con due codici: una persona sola");
+await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).locator("input").uncheck();
+await page.click(".sheet button:has-text('Importa')");
+await page.getByText("1 ordine nello storico, 1 nuovo cliente, 1 in Lista (mai comprato)").waitFor();
+await sync(page);
+const ugo = DB.persone.find(x => x.nome === "Ugo Bianchi"), mai = DB.persone.find(x => x.nome === "Mai Neri"), liaC = DB.persone.find(x => x.nome === "Lia Rossi");
+check(ugo && ugo.esito === "cliente" && ugo.contatto === "+39 333 000 0005" && ugo.codice_cliente === "7000000005", "nuovo cliente con telefono e codice");
+check(DB.ordini.filter(o => o.persona_id === ugo.id).length === 1 && !DB.ordini.find(o => o.persona_id === ugo.id).numero_amway, "l'ultimo ordine nello storico (ancora senza numero)");
+check(mai && !mai.esito && mai.codice_cliente === "7000000006", "chi non ha mai comprato va in Lista");
+check(liaC.contatto === "+39 333 000 0001" && liaC.codice_cliente === "7000000001", "telefono aggiunto, codice tenuto");
+check(!JSON.stringify(DB.persone).includes("example.com") && !JSON.stringify(DB.persone).includes("Via Finta"), "email e indirizzo non si salvano");
+// l'export ordini con l'ordine di Ugo: si unisce a quello già nello storico
+const csvOrdini2 = csvOrdini.trimEnd() + "\n" + ordineCsv("Bianchi, Ugo", "7000000005", gg(-20), "170000005", "10,00", "22,00") + "\n";
+await page.click("button[data-act=importa-ordini]");
+await page.setInputFiles("#file-ordini", { name:"19102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini2) });
+await page.locator(".sheet h2", { hasText:"Dal sito Amway" }).waitFor();
+await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).locator("input").uncheck();
+await page.click(".sheet button:has-text('Importa')");
+await page.getByText("1 ordine nello storico").waitFor();
+await sync(page);
+check(DB.ordini.filter(o => o.persona_id === ugo.id).length === 1 && DB.ordini.find(o => o.persona_id === ugo.id).numero_amway === "170000005"
+  && DB.ordini.find(o => o.persona_id === ugo.id).importo === 22, "l'ordine vero si unisce all'ultimo ordine: niente doppioni");
+// la Lista: l'etichetta "Mai comprato"
+await page.click("button[data-sez=lista]");
+check(await page.locator("button[data-act=apri-persona]", { hasText:"Mai Neri" }).getByText("Mai comprato").isVisible(), "Lista: etichetta Mai comprato");
+// modifica di un ordine: fatto da me → etichette da consegnare e da pagare
+await page.click("button[data-sez=clienti]"); await page.click("button[data-filtro=tutti]");
+await page.locator("button[data-act=apri-cliente]", { hasText:"Ugo Bianchi" }).click();
+await page.locator("button[data-act=ordine-modifica]", { hasText:"Modifica" }).first().click();
+check(await page.getByText("Ordine n. 170000005 dal sito Amway").isVisible(), "modifica: il numero dell'ordine Amway resta");
+await page.locator('.sheet label.chip:has-text("L\'ho fatto io")').click();
+await page.fill(".sheet input[name=nota]", "consegna a casa");
+await page.click('.sheet button:has-text("Salva l\'ordine")');
+await page.getByText("Ordine modificato").waitFor();
+await sync(page);
+check(DB.ordini.find(o => o.persona_id === ugo.id).modo === "io" && DB.ordini.find(o => o.persona_id === ugo.id).nota === "consegna a casa", "ordine modificato: modo e nota");
+check(await page.locator(".card .etichette").getByText("Da consegnare").isVisible() && await page.locator(".card .etichette").getByText("Da pagare").isVisible(), "scheda: da consegnare e da pagare");
+await page.click("button[data-act=ordine-consegnato]");
+await page.getByText("✓ Consegnato").waitFor();
+check(!await page.locator(".card .etichette").getByText("Da consegnare").count() && await page.locator(".card .etichette").getByText("Da pagare").isVisible(), "spuntato consegnato: resta solo da pagare");
+// modifica i dati dalla scheda del cliente
+await page.click("button[data-act=persona-modifica]");
+await page.fill(".sheet input[name=contatto]", "+39 333 000 0099");
+await page.fill(".sheet input[name=giorno]", "5");
+await page.selectOption(".sheet select[name=mese]", "3");
+await page.click('.sheet button:has-text("Salva")');
+await page.getByText("Dati salvati").waitFor();
+await sync(page);
+check(DB.persone.find(x => x.id === ugo.id).contatto === "+39 333 000 0099" && DB.persone.find(x => x.id === ugo.id).compleanno === "03-05", "Modifica i dati dalla scheda cliente: telefono e compleanno");
+check(await page.locator("h2", { hasText:"Ugo Bianchi" }).isVisible(), "dopo il salvataggio resta nella scheda del cliente");
+await page.click("button[data-act=torna-clienti]");
+check(await page.locator("button[data-act=apri-cliente]", { hasText:"Ugo Bianchi" }).getByText("Da pagare").isVisible(), "elenco clienti: etichetta da pagare");
+await page.screenshot({ path: S + "/e2e/32-clienti-amway.png", fullPage:true });
 await ctx.close();
 
 await browser.close();

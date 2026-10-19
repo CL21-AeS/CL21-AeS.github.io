@@ -590,13 +590,20 @@ begin
   update public.persone set codice_cliente = '7000000001' where id = pp;
   insert into public.ordini (persona_id, data, modo, numero_amway, importo, vp) values (pp, current_date - 30, 'sito', '170000001', 45.38, 20.05);
   perform growup_test.deve_fallire(format('insert into public.ordini (persona_id, numero_amway) values (%L, ''170000001'')', pp), 'lo stesso ordine Amway non si importa due volte');
+  -- 026: l'ultimo ordine dall'elenco clienti (senza numero) prende numero, valore e VP quando arriva l'export degli ordini
+  insert into public.ordini (persona_id, data, modo) values (pp, current_date - 60, 'sito') returning id into pq;
+  update public.ordini set numero_amway = '170000002', importo = 30, vp = 12 where id = pq;
+  perform growup_test.ok((select numero_amway = '170000002' from public.ordini where id = pq), 'B unisce l''ultimo ordine all''ordine Amway');
+  perform growup_test.deve_fallire(format('update public.ordini set numero_amway = ''170000001'' where id = %L', pq), 'due ordini non possono avere lo stesso numero Amway');
   perform growup_test.come(u2);  -- A, sponsor di B
   perform growup_test.ok((select count(*) from public.ordini) = 0 and (select count(*) from public.righe_ordine) = 0
                          and (select count(*) from public.durate) = 0, 'lo sponsor non vede ordini e durate di B');
   perform growup_test.deve_fallire(format('insert into public.ordini (persona_id) values (%L)', pp), 'lo sponsor non segna ordini sui clienti di B');
   perform growup_test.deve_fallire(format('insert into public.righe_ordine (ordine_id, codice, nome) values (%L, ''1'', ''x'')', pq), 'né righe sugli ordini di B');
   perform growup_test.ok((public.numeri_persone(b)->>'clienti')::int = 1, 'lo sponsor vede quanti clienti ha B');
+  update public.ordini set vp = 99, numero_amway = '170000009';
   perform growup_test.come(u3);
+  perform growup_test.ok((select count(*) from public.ordini where vp = 99 or numero_amway = '170000009') = 0, 'lo sponsor non cambia gli ordini di B');
   delete from public.persone where id = pp;
   perform growup_test.ok((select count(*) from public.ordini) = 0 and (select count(*) from public.righe_ordine) = 0, 'togliendo il cliente spariscono i suoi ordini');
   delete from public.durate;
