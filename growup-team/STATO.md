@@ -88,6 +88,16 @@ nome), nuovi clienti con la spunta (entrano chiusi come Cliente alla data del pr
 già importati (stesso numero) si saltano. Senza prodotti vale il **ritmo** (mediana degli intervalli tra gli ordini; con
 un ordine solo 30 giorni): "di solito ordina ogni 40 giorni, prossimo atteso il …" e su Io quando è il momento.
 "+ Aggiungi i prodotti" su un ordine importato (decisione di Stefano: i prodotti si possono sempre aggiungere a mano).
+**19 ottobre — anche l'elenco dei clienti dal sito Amway** (migrazione `026_clienti_da_amway.sql`): il pulsante in
+Clienti diventa "Dal sito Amway" e accetta l'export "Ordini", l'export "Clienti" o tutti e due insieme (li riconosce da
+solo; si può rifare quante volte si vuole, niente doppioni). Dal file Clienti si tengono solo nome, codice cliente,
+telefono (solo se manca, mai sovrascritto) e data dell'ultimo ordine: niente email, niente indirizzo. L'ultimo ordine
+entra nello storico senza numero e si unisce all'ordine vero quando arriva l'export Ordini. Chi non ha mai comprato entra
+nella **Lista con l'etichetta "Mai comprato"** (con la spunta, si sceglie chi); chi compare con due codici diventa una
+persona sola. Nella scheda cliente: **Modifica** su ogni ordine (data, modo, prodotti, prezzi, nota, elimina; il numero
+Amway resta), **Modifica i dati** (nome, telefono, come lo conosci, codice cliente, compleanno, note), le etichette
+**Da consegnare / Da pagare** per gli ordini fatti dal partner non spuntati (in elenco Clienti e nella scheda; non su Io,
+decisione di Stefano). Il report della rete resta un import separato.
 
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,

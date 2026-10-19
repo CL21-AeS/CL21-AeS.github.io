@@ -3598,6 +3598,14 @@ alter table public.ordini add column if not exists vp numeric(10,2) check (vp >=
 create unique index if not exists ordini_numero_amway_idx on public.ordini (proprietario, numero_amway) where numero_amway is not null;
 grant insert (numero_amway, importo, vp) on public.ordini to authenticated;
 
+-- Growup Team — 026: l'elenco dei clienti dal sito Amway (19 ottobre 2026).
+-- Oltre all'export "Ordini", il partner può caricare l'export "Clienti" (letto solo sul telefono): si prendono solo nome,
+-- codice cliente, telefono e data dell'ultimo ordine (niente email, niente indirizzo). L'ultimo ordine entra nello storico
+-- senza numero; quando poi arriva l'export "Ordini" con lo stesso ordine, l'app ci scrive numero, valore e VP invece di
+-- crearne un secondo: per questo servono i permessi di modifica su quelle tre colonne (sempre e solo sui propri ordini).
+
+grant update (numero_amway, importo, vp) on public.ordini to authenticated;
+
 -- ============================================================
 -- Growup Team — 010: Fase 2, blocco 3 — soglie delle etichette del gruppo
 -- Si tarano dal Table editor (tabella settings), senza toccare il codice.

@@ -68,7 +68,9 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     chi li scrive; all'upline il numero dei clienti
 22. `supabase/025_ordini_amway.sql` — gli ordini dei clienti importati dall'export "Ordini" del sito Amway (codice
     cliente, numero d'ordine per non importare due volte, importo e VP)
-23. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+23. `supabase/026_clienti_da_amway.sql` — l'elenco dei clienti dal sito Amway: l'ultimo ordine si unisce all'ordine vero
+    (numero, importo e VP modificabili, solo sui propri ordini)
+24. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 17. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 18. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
