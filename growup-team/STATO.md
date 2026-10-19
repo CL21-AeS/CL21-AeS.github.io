@@ -98,6 +98,9 @@ persona sola. Nella scheda cliente: **Modifica** su ogni ordine (data, modo, pro
 Amway resta), **Modifica i dati** (nome, telefono, come lo conosci, codice cliente, compleanno, note), le etichette
 **Da consegnare / Da pagare** per gli ordini fatti dal partner non spuntati (in elenco Clienti e nella scheda; non su Io,
 decisione di Stefano). Il report della rete resta un import separato.
+**19 ottobre — "Scrivigli" con più prodotti**: il messaggio "Sta finendo" nomina tutti i prodotti che finiscono entro
+i 7 giorni di preavviso (anche quelli già finiti), non solo il primo; se nessuno è così vicino, il primo che finisce
+(decisione di Stefano).
 
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
