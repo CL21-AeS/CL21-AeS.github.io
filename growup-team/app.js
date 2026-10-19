@@ -3499,12 +3499,16 @@ function messaggiCliente(p, tipo){
         { label:"Il regalo (dopo)", testo:`Ciao ${n}, ti devo ancora il regalo di compleanno. Ho pensato a [scrivi cosa: un campione, un prodotto in omaggio, lo sconto che puoi fare]: se ti va te lo porto con il prossimo ordine.` },
         { label:"Sul prodotto (dopo)", testo:`Ciao ${n}, per il tuo compleanno volevo farti un pensiero: su ${suggerito} posso lasciarti [scrivi cosa] fino a [data]. Dimmi se ti interessa e te lo metto da parte.` }] };
   }
-  const x = sc[0], prod = x ? x.nome : "quello che prendi di solito", quanti = x && x.quantita > 1 ? ` Te ne riporto ${x.quantita} come l'altra volta?` : "";
+  /* tutti i prodotti che finiscono entro il preavviso (anche quelli già finiti); se nessuno, il primo che finisce */
+  const vicini = sc.filter(x => x.tra <= PREAVVISO), l = vicini.length ? vicini : sc.slice(0, 1), tanti = l.length > 1;
+  const elenco = l.map(x => x.nome), prod = l.length ? (tanti ? elenco.slice(0, -1).join(", ") + " e " + elenco[elenco.length - 1] : elenco[0]) : "quello che prendi di solito";
+  const quanti = !tanti && l[0] && l[0].quantita > 1 ? ` Te ne riporto ${l[0].quantita} come l'altra volta?`
+    : tanti && l.some(x => x.quantita > 1) ? " Te li riporto nelle stesse quantità dell'altra volta?" : "";
   return { titolo:"Sta finendo", fatto:"",
     guida:"Chiedere non è insistere: se dice che ne ha ancora, usa «Rimanda» e la data si sposta senza perdere niente.",
-    varianti:[{ label:"Diretto", testo:`Ciao ${n}, se non ho sbagliato i conti ${prod} ti sta finendo in questi giorni. Te ne serve ancora?${quanti}` },
-      { label:"Con l'ordine", testo:`Ciao ${n}, sto per fare un ordine: ti aggiungo ${prod}? Dovrebbe essere più o meno il momento in cui finisce.` },
-      { label:"Dopo un silenzio", testo:`Ciao ${n}, mi sono accorto che non ci sentiamo da un po'. Come stai?\n\nIl ${prod} l'hai finito o hai deciso di lasciarlo? Dimmelo tranquillamente, non me la prendo — mi serve solo per non farti telefonate a vuoto.` }] };
+    varianti:[{ label:"Diretto", testo:`Ciao ${n}, se non ho sbagliato i conti ${prod} ${tanti ? "ti stanno finendo" : "ti sta finendo"} in questi giorni. ${tanti ? "Ti servono" : "Te ne serve"} ancora?${quanti}` },
+      { label:"Con l'ordine", testo:`Ciao ${n}, sto per fare un ordine: ti aggiungo ${prod}? Dovrebbe essere più o meno il momento in cui ${tanti ? "finiscono" : "finisce"}.` },
+      { label:"Dopo un silenzio", testo:`Ciao ${n}, mi sono accorto che non ci sentiamo da un po'. Come stai?\n\n${tanti ? `${prod}: li hai finiti o hai deciso di lasciarli?` : `Il ${prod} l'hai finito o hai deciso di lasciarlo?`} Dimmelo tranquillamente, non me la prendo — mi serve solo per non farti telefonate a vuoto.` }] };
 }
 function tipoMessaggio(p){
   const c = compleannoDi(p);

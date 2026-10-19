@@ -1095,7 +1095,7 @@ await ctxC2.close();
 
 // 24. Persone → Clienti: + Un cliente, ordine dal catalogo, durata, riordini, verifica, compleanno, messaggi
 const gg = n => new Intl.DateTimeFormat("en-CA", { timeZone:"Europe/Rome" }).format(new Date(Date.now() + n * 864e5));
-DB.ordini = []; DB.righe = []; DB.durate = [{ proprietario:"R", codice:"VV1", giorni:90 }];
+DB.ordini = []; DB.righe = []; DB.durate = [{ proprietario:"R", codice:"VV1", giorni:90 }, { proprietario:"R", codice:"UU2", giorni:16 }, { proprietario:"R", codice:"UU3", giorni:365 }];
 DB.persone.push(
   { id:"cu1", proprietario:"R", nome:"Ugo Riordino", contatto:"333 1112223", fase:"contattato", esito:"cliente", lasciati:[], creato_il:gg(-60) },
   { id:"cu2", proprietario:"R", nome:"Vera Verifica", fase:"contattato", esito:"cliente", lasciati:[], creato_il:gg(-60) },
@@ -1104,6 +1104,8 @@ DB.ordini.push({ id:"o1", proprietario:"R", persona_id:"cu1", data:gg(-27), modo
   { id:"o2", proprietario:"R", persona_id:"cu2", data:gg(-10), modo:"sito", creato_il:"b" },
   { id:"o3", proprietario:"R", persona_id:"cu3", data:gg(-5), modo:"sito", creato_il:"c", verificato:gg(-1) });
 DB.righe.push({ id:"r1", proprietario:"R", ordine_id:"o1", codice:"UU1", nome:"Prodotto Ugo", quantita:1, prezzo:20 },
+  { id:"r1b", proprietario:"R", ordine_id:"o1", codice:"UU2", nome:"Secondo Ugo", quantita:2, prezzo:10 },
+  { id:"r1c", proprietario:"R", ordine_id:"o1", codice:"UU3", nome:"Lungo Ugo", quantita:1, prezzo:5 },
   { id:"r2", proprietario:"R", ordine_id:"o2", codice:"VV1", nome:"Prodotto Vera", quantita:1, prezzo:30 },
   { id:"r3", proprietario:"R", ordine_id:"o3", codice:"VV1", nome:"Prodotto Vera", quantita:1, prezzo:30 });
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
@@ -1117,10 +1119,14 @@ await cardCli.locator("button[data-act=apri-cliente]", { hasText:"Ugo Riordino" 
 await page.getByText("Cosa usa").waitFor();
 await page.click("button[data-act=messaggio-cliente]");
 check(await page.locator("#testo-msg").inputValue().then(t => t.includes("Prodotto Ugo")), "messaggio pronto con il prodotto che finisce");
+check(await page.locator("#testo-msg").inputValue().then(t => t.includes("Prodotto Ugo e Secondo Ugo ti stanno finendo") && t.includes("stesse quantità") && !t.includes("Lungo Ugo")),
+  "Scrivigli: tutti i prodotti che finiscono entro 7 giorni, non gli altri");
 await page.evaluate(() => { window.open = u => { window.__aperto = u; }; });
 await page.click("button[data-act=manda-msg]");
 check((await page.evaluate(() => window.__aperto)).startsWith("https://wa.me/393331112223?text="), "il messaggio si apre nella chat WhatsApp del cliente");
 await page.click(".sheet button[data-act=chiudi]");
+await page.click("button[data-act=lascia-prodotto][data-codice=UU2]");
+await page.getByText("Non lo segue più").waitFor();
 await page.click("button[data-act=riordinato]");
 await page.getByText("Prodotto Ugo: riordinato oggi").waitFor();
 check(await page.locator(".card .pill", { hasText:"A posto" }).first().isVisible(), "Riordinato: Ugo torna a posto");
@@ -1186,7 +1192,7 @@ await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
 await page.click("button[data-act=importa-ordini]");
 await page.setInputFiles("#file-ordini", { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) });
-await page.locator(".sheet h2", { hasText:"Dal sito Amway" }).waitFor();
+await page.locator(".sheet form[data-form=importa-ordini]").waitFor();
 check(await page.getByText("4 ordini nei file").isVisible() && await page.getByText("4 ordini nuovi").isVisible(), "anteprima: 4 ordini, tutti nuovi");
 check(await page.locator(".sheet .imp-sezione", { hasText:"Già in Growup" }).getByText("riconosciuto dal nome").isVisible(), "Gina riconosciuta dal nome");
 check(await page.locator(".sheet .scelte label", { hasText:"Lia Rossi" }).isVisible() && await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).isVisible(), "nuovi clienti proposti con il nome giusto");
@@ -1205,7 +1211,7 @@ check(await page.locator(".card", { hasText:"I tuoi clienti da sentire" }).getBy
 await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
 await page.click("button[data-act=importa-ordini]");
 await page.setInputFiles("#file-ordini", { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) });
-await page.locator(".sheet h2", { hasText:"Dal sito Amway" }).waitFor();
+await page.locator(".sheet form[data-form=importa-ordini]").waitFor();
 check(await page.getByText("1 ordine nuovo", { exact:true }).isVisible() && await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).isVisible(),
   "reimport: gli ordini già importati si saltano, resta solo chi non era stato aggiunto");
 await page.click(".sheet button[data-act=chiudi]");
@@ -1234,7 +1240,7 @@ await page.click("button[data-act=torna-clienti]");
 await page.click("button[data-act=importa-ordini]");
 await page.setInputFiles("#file-ordini", [{ name:"19102026_Cliente.csv", mimeType:"text/csv", buffer:Buffer.from(csvClienti) },
   { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) }]);
-await page.locator(".sheet h2", { hasText:"Dal sito Amway" }).waitFor();
+await page.locator(".sheet form[data-form=importa-ordini]").waitFor();
 check(await page.getByText("4 ordini e 4 clienti nei file").isVisible(), "i due file insieme: riconosciuti da soli");
 check(await page.locator(".sheet .imp-sezione", { hasText:"Già in Growup" }).getByText(/Lia Rossi · telefono/).isVisible(), "Lia: si aggiunge solo il telefono (l'ultimo ordine c'è già)");
 check(await page.locator(".sheet .scelte label", { hasText:"Ugo Bianchi" }).isVisible() && await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).isVisible(), "nuovi clienti: chi ha comprato");
@@ -1254,7 +1260,7 @@ check(!JSON.stringify(DB.persone).includes("example.com") && !JSON.stringify(DB.
 const csvOrdini2 = csvOrdini.trimEnd() + "\n" + ordineCsv("Bianchi, Ugo", "7000000005", gg(-20), "170000005", "10,00", "22,00") + "\n";
 await page.click("button[data-act=importa-ordini]");
 await page.setInputFiles("#file-ordini", { name:"19102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini2) });
-await page.locator(".sheet h2", { hasText:"Dal sito Amway" }).waitFor();
+await page.locator(".sheet form[data-form=importa-ordini]").waitFor();
 await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).locator("input").uncheck();
 await page.click(".sheet button:has-text('Importa')");
 await page.getByText("1 ordine nello storico").waitFor();
