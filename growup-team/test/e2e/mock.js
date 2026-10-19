@@ -222,6 +222,10 @@
     nuovoOrdine: async r => { const pe = (db.persone || []).find(y => y.id === r.persona_id);
       if(!pe || pe.proprietario !== mio().id) throw new Error("non_autorizzato");
       db.ordini = (db.ordini || []).concat([Object.assign({ proprietario:pe.proprietario, consegnato:null, pagato:null, verificato:null, creato_il:new Date().toISOString() + Math.random() }, r)]); salva(); },
+    nuoviOrdini: async righe => { for(const r of righe){ const pe = (db.persone || []).find(y => y.id === r.persona_id);
+      if(!pe || pe.proprietario !== mio().id) throw new Error("non_autorizzato");
+      if(r.numero_amway && (db.ordini || []).some(y => y.proprietario === pe.proprietario && y.numero_amway === r.numero_amway)) throw new Error("duplicate key value");
+      db.ordini = (db.ordini || []).concat([Object.assign({ proprietario:pe.proprietario, consegnato:null, pagato:null, verificato:null, creato_il:new Date().toISOString() + Math.random() }, r)]); } salva(); },
     nuoveRighe: async righe => { for(const r of righe){ const o = (db.ordini || []).find(y => y.id === r.ordine_id);
       if(!o || o.proprietario !== mio().id) throw new Error("non_autorizzato");
       db.righe = (db.righe || []).concat([Object.assign({ proprietario:o.proprietario }, r)]); } salva(); },

@@ -587,6 +587,9 @@ begin
   perform growup_test.ok((select proprietario = b from public.ordini where id = pq)
                          and (select proprietario = b from public.righe_ordine where ordine_id = pq), 'B segna un ordine del suo cliente');
   update public.ordini set pagato = current_date, consegnato = current_date where id = pq;
+  update public.persone set codice_cliente = '7000000001' where id = pp;
+  insert into public.ordini (persona_id, data, modo, numero_amway, importo, vp) values (pp, current_date - 30, 'sito', '170000001', 45.38, 20.05);
+  perform growup_test.deve_fallire(format('insert into public.ordini (persona_id, numero_amway) values (%L, ''170000001'')', pp), 'lo stesso ordine Amway non si importa due volte');
   perform growup_test.come(u2);  -- A, sponsor di B
   perform growup_test.ok((select count(*) from public.ordini) = 0 and (select count(*) from public.righe_ordine) = 0
                          and (select count(*) from public.durate) = 0, 'lo sponsor non vede ordini e durate di B');

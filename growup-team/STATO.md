@@ -81,7 +81,13 @@ catalogo (quantità, prezzo modificabile, quanto dura: 30 giorni di base, si cam
 proposta) che si aprono nella chat WhatsApp del cliente, Rimanda (3 giorni … 1 mese), compleanno. Su Io "I tuoi clienti
 da sentire" (sta finendo / in ritardo, come si è trovato 8 giorni dopo un prodotto nuovo, compleanno entro 7 giorni).
 Gli ordini **non contano nei VP** (decisione di Stefano). All'upline il numero dei clienti nella scheda partner.
-Da fare se esiste: importazione degli ordini clienti dal sito Amway (Stefano verifica se c'è un'esportazione).
+**19 ottobre — ordini dal sito Amway** (migrazione `025_ordini_amway.sql`): in Clienti "Ordini dal sito" carica l'export
+"Ordini" del sito Amway (CSV: Nome "Cognome, Nome", Codice Cliente, Data ordine "18 agosto 2026", Numero ordine, VP, VV,
+Tipo ordine; senza prodotti; parte sempre da settembre). Anteprima: già tra i clienti (per codice cliente, altrimenti per
+nome), nuovi clienti con la spunta (entrano chiusi come Cliente alla data del primo ordine, senza contare oggi). Gli ordini
+già importati (stesso numero) si saltano. Senza prodotti vale il **ritmo** (mediana degli intervalli tra gli ordini; con
+un ordine solo 30 giorni): "di solito ordina ogni 40 giorni, prossimo atteso il …" e su Io quando è il momento.
+"+ Aggiungi i prodotti" su un ordine importato (decisione di Stefano: i prodotti si possono sempre aggiungere a mano).
 
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
