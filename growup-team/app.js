@@ -2503,7 +2503,7 @@ const PROSSIMA_CHIUSURA = { partner:"Primo passo insieme", cliente:"Quando risen
 const RISENTI = [["1", "1 mese"], ["3", "3 mesi"], ["6", "6 mesi"], ["12", "1 anno"]], RISENTI_PRIMA = 2;
 function piuMesi(d, m){ const x = new Date(d + "T00:00:00Z"); x.setUTCMonth(x.getUTCMonth() + m); return x.toISOString().slice(0, 10); }
 const FILTRI_LISTA = [
-  { id:"aperti", nome:"Aperti", ok:p => !p.esito || p.esito === "non_ora" },
+  { id:"aperti", nome:"Aperti", ok:p => !p.esito },
   { id:"lista", nome:"In lista", ok:p => !p.esito && p.fase === "lista" },
   { id:"corso", nome:"In corso", ok:p => !p.esito && p.fase !== "lista" },
   { id:"riprendere", nome:"Da riprendere", ok:p => p.esito === "non_ora" },
@@ -2721,7 +2721,7 @@ function vSheetPersone(s){
     <div class="opzioni tipi">${Object.keys(TIPI_PASSO).map(k => `<button type="button" class="btn small${k === tipo ? " on" : ""}" data-act="tipo-passo" data-tipo="${k}" aria-pressed="${k === tipo}">${TIPI_PASSO[k].nome}</button>`).join("")}</div>
     ${tipo === "nota" ? `<form data-form="passo" novalidate>
       <label class="field"><span>La nota</span><textarea name="nota" rows="5" maxlength="1000" aria-label="La nota"></textarea></label>
-      <p class="nota">Le note restano nei dati della persona (toccando il suo nome).</p>
+      <p class="nota">La nota compare tra i passi della scheda e nelle Note dei suoi dati (toccando il nome).</p>
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
     </form>` : `<form data-form="passo" novalidate>
       <label class="field"><span>Quando</span><input type="date" name="data" max="${oggi()}" value="${oggi()}"></label>
@@ -2836,8 +2836,9 @@ Object.assign(MODULI, {
       }
       const id = uuid();
       await api.nuovePersone([{ id, nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null }]);
-      st.personaId = id; st.vista = "persone";
+      st.vista = "persone";
       if(st.nuovoCliente){
+        st.personaId = id;
         /* un cliente nuovo: nella lista è chiuso come Cliente (e conta nei nuovi clienti del mese) */
         await api.nuoviPassi([{ id:uuid(), persona_id:id, tipo:"chiusura", esito:"cliente", data:oggi() }]);
         st.nuovoCliente = false; st.sezPersone = "clienti";
@@ -2897,6 +2898,8 @@ Object.assign(MODULI, {
       const t = f.nota.value.trim();
       if(!t){ mostraErroreForm(f, "Scrivi la nota."); return; }
       try{
+        /* la nota compare tra i passi della scheda e nelle Note dei dati */
+        await api.nuoviPassi([{ id:uuid(), persona_id:p.id, tipo:"nota", data:oggi(), nota:t }]);
         await api.modificaPersona(p.id, { note:(`${dataIt(oggi())}: ${t}` + (p.note ? "\n" + p.note : "")).slice(0, 2000) });
         await dopoPersone("Nota salvata");
       }catch(e){ mostraErroreForm(f, messaggio(e)); }
@@ -3069,12 +3072,14 @@ function linkTarget(inv){
   if(inv.scade){ const e = compattaT(inv.scade); p.push("e=" + e, "k=" + firmaT(inv.id, e)); }
   return base() + "#t&" + p.join("&");
 }
-function messaggioTarget(inv){
+function messaggioTarget(inv, link = linkTarget(inv)){
   return `Ciao ${inv.nome.split(" ")[0]}, come ci siamo detti.\n\n`
     + "Prima di vederci, ti mando otto domande: tre minuti. Servono a capire se quello che cerchi e quello che questa attività può darti coincidono.\n\n"
     + "Non c'è una risposta giusta e non devi dimostrare di essere adatto: rispondi di istinto. Se viene fuori che non fa per te lo vediamo subito e ci siamo risparmiati del tempo tutti e due.\n\n"
-    + linkTarget(inv) + "\n\nAlla fine ti compare un pulsante che mi rimanda le risposte. A dopo,\n" + nomeSaluto(st.profilo.nome);
+    + (link ? link + "\n\n" : "") + "Alla fine ti compare un pulsante che mi rimanda le risposte. A dopo,\n" + nomeSaluto(st.profilo.nome);
 }
+/* Telegram: il link va a parte (lo mette in cima al messaggio), il testo senza il link */
+function telegram(link, testo){ return `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(testo)}`; }
 function statoInvito(inv){
   if(inv.risposte){ const v = valutaTarget(inv.risposte); return { cl:v.band === "go" ? "v" : v.band === "care" ? "g" : "r", txt:`${v.breve} · ${v.tot}/${MASSIMO_TARGET}`, v }; }
   if(inv.bloccato) return { cl:"r", txt:"link bloccato" };
@@ -3149,9 +3154,10 @@ function vContatto(){
         <textarea id="ct-libero" rows="3" maxlength="600" placeholder="Due righe, se ti va">${esc(c.libero)}</textarea></label>
       <div class="row" style="gap:8px;margin-top:12px">
         <button class="btn wa grow" data-act="ct-invia">Invia su WhatsApp</button>
-        <button class="btn grow" data-act="ct-copia">Copia le risposte</button></div>
-      <p class="nota">${c.tel ? `Il messaggio si apre nella chat di ${c.sponsor ? esc(c.sponsor) : "chi ti ha mandato il link"}: basta inviarlo.`
-        : `Su WhatsApp scegli la chat di ${c.sponsor ? esc(c.sponsor) : "chi ti ha mandato il link"}.`} Codice: <b>${codice}</b></p>
+        <button class="btn tg grow" data-act="ct-invia-tg">Invia su Telegram</button></div>
+      <button class="btn ghost wide" style="margin-top:8px" data-act="ct-copia">Copia le risposte</button>
+      <p class="nota">${c.tel ? `Su WhatsApp il messaggio si apre nella chat di ${c.sponsor ? esc(c.sponsor) : "chi ti ha mandato il link"}: basta inviarlo.`
+        : `Su WhatsApp scegli la chat di ${c.sponsor ? esc(c.sponsor) : "chi ti ha mandato il link"}.`} Su Telegram scegli la sua chat. Codice: <b>${codice}</b></p>
     </div>
     <div class="card">
       <h2>Una cosa sola, prima di lasciarti</h2>
@@ -3197,8 +3203,9 @@ function vInvito(){
     <div class="spread"><h2>${esc(x.nome)}</h2><span class="pill ${s.cl}">${esc(s.txt)}</span></div>
     <p class="small" style="margin:4px 0 0">Invito del ${dataIt(String(x.creato_il).slice(0, 10))} · ${x.scade ? `il link vale fino al ${dataIt(x.scade)}` : "il link non scade"}</p>
     <div class="row" style="gap:8px;margin-top:12px">
-      <a class="btn wa grow" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(messaggioTarget(x))}">Manda su WhatsApp</a>
-      <button class="btn grow" data-act="target-copia">Copia il messaggio</button></div>
+      <a class="btn wa grow" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(messaggioTarget(x))}">WhatsApp</a>
+      <a class="btn tg grow" target="_blank" rel="noopener" href="${esc(telegram(linkTarget(x), messaggioTarget(x, "")))}">Telegram</a>
+      <button class="btn grow" data-act="target-copia">Copia</button></div>
     <p class="nota">Quando risponde ti arriva un messaggio con il link "Apri le risposte": aprilo da qui, oppure usa "Leggi una risposta".</p>
   </div>
   <div class="row" style="gap:6px;justify-content:center">
@@ -3292,6 +3299,8 @@ Object.assign(AZIONI, {
   },
   "ct-indietro"(){ if(st.ct.i > 0){ st.ct.i--; render(); } },
   "ct-invia"(){ window.open(`https://wa.me/${st.ct.tel || ""}?text=` + encodeURIComponent(messaggioContatto()), "_blank", "noopener"); },
+  "ct-invia-tg"(){ const m = messaggioContatto(), i = m.lastIndexOf("\n\nApri le risposte: ");
+    window.open(telegram(base() + "#r=" + codificaT(st.ct.ans, st.ct.id), m.slice(0, i) + "\n\nApri le risposte dal link qui sopra."), "_blank", "noopener"); },
   async "ct-copia"(){ try{ await navigator.clipboard.writeText(messaggioContatto()); toast("Copiato: incollalo nella chat"); }catch(e){ toast("Non riesco a copiare: usa Invia su WhatsApp"); } },
   "sez-persone"(el){ st.sezPersone = el.dataset.sez; st.personaId = null; st.invitoId = null; render(); },
   "apri-invito"(el){ st.vista = "persone"; st.sezPersone = "target"; st.invitoId = el.dataset.id; render(); window.scrollTo(0, 0); },
