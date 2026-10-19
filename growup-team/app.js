@@ -140,7 +140,7 @@ const st = {
   numeriLista: {},
   inviti: [], sezPersone: "lista", invitoId: null, archiviatiT: false,  // il Target (solo miei)
   ct: null,               // la pagina del contatto (le otto domande)
-  ordini: [], righe: [], durate: new Map(), filtroClienti: "sentire",   // i Clienti (solo miei)
+  ordini: [], righe: [], durate: new Map(), filtroClienti: "tutti",   // i Clienti (solo miei)
   impOrdini: null,         // l'import degli ordini dal sito Amway (anteprima)
   bozza: null, cercaProdotto: "", tipoMsg: "finendo", varianteMsg: 0, durataCodice: null, nuovoCliente: false,        // per la scheda partner: solo i numeri della sua lista
   conNascoste: false,     // struttura completa: le nascoste al loro posto, in grigio
@@ -1638,8 +1638,8 @@ function vInvita(){
 
 function vAzioni(){
   return `<div class="azioni"><div class="in">
-    <button class="btn primary c1" data-act="contatto">+ Contatto<b>${num(fattoSettimana("contatto"))} questa sett.</b></button>
-    <button class="btn primary c2" data-act="piano">+ Piano<b>${num(fattoSettimana("piano"))} questa sett.</b></button>
+    <button class="btn primary c1" data-act="contatto-rapido">+ Contatto<b>${num(fattoSettimana("contatto"))} questa sett.</b></button>
+    <button class="btn primary c2" data-act="piano-rapido">+ Piano<b>${num(fattoSettimana("piano"))} questa sett.</b></button>
     <button class="btn primary c3" data-act="ordine">+ Ordine<b>${num(vpMese(meseDi(oggi())))} VP nel mese</b></button>
   </div></div>`;
 }
@@ -2261,7 +2261,7 @@ const AZIONI = {
   },
   "mia-chiave"(){ st.sheet = "mia-chiave"; render(); },
   privacy(){ st.sheet = "privacy"; render(); },
-  chiudi(){ st.sheet = null; render(); },
+  chiudi(){ chiudiSheet(); render(); },
   "ho-gia"(){ st.invitoRiserva = st.invito; st.invito = null; st.fase = "benvenuto"; render(); },
   "torna-invito"(){ st.invito = st.invitoRiserva; st.invitoRiserva = null; st.fase = "ingresso"; render(); },
   "copia-gestito"(){ copiaTesto(base() + "#chiave=" + st.linkGestito.chiave, "Link copiato"); },
@@ -2661,12 +2661,27 @@ function leggiProssima(f){
   return { prossima_data:data, prossima_nota:data ? f.prossima_nota.value.trim() || null : null };
 }
 
+/* per + Piano: le persone ancora in percorso, prima quelle più avanti (invitate), poi per nome */
+function personePiano(q){
+  const t = senzaAccenti(q || "");
+  const l = st.persone.filter(p => aperta(p) && (!t || senzaAccenti(p.nome).includes(t)))
+    .sort((a, b) => indiceFase(b.fase) - indiceFase(a.fase) || a.nome.localeCompare(b.nome, "it")).slice(0, 8);
+  return l.length ? l.map(p => `<li><button type="button" class="persona" data-act="piano-con" data-id="${esc(p.id)}">
+      <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${FASI[indiceFase(p.fase)].nome}</span></span><b>›</b></button></li>`).join("")
+    : `<li class="muted small">${t ? "Nessun nome così nella lista." : "La lista è vuota."}</li>`;
+}
+document.addEventListener("input", e => {
+  if(e.target && e.target.id === "cerca-piano"){ st.cercaPiano = e.target.value; const u = document.getElementById("risultati-piano"); if(u) u.innerHTML = personePiano(e.target.value); }
+});
 function vSheetPersone(s){
   const p = st.persone.find(x => x.id === st.personaId);
   const annulla = `<button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>`;
   if(s === "persona-nuova" || (s === "persona-modifica" && p)){
     const m = s === "persona-modifica" ? p : {};
-    return `<h2>${m.id ? "Modifica i dati" : st.nuovoCliente ? "Un nuovo cliente" : "Un nome nella tua lista"}</h2>
+    const rapido = !m.id && st.rapido === "contatto";
+    return `<h2>${m.id ? "Modifica i dati" : st.nuovoCliente ? "Un nuovo cliente" : rapido ? "Un contatto" : "Un nome nella tua lista"}</h2>
+    ${rapido ? `<p class="small">Entra nella tua lista già come Contattato e conta nei contatti della settimana.
+      Se è già nella lista, scrivi il nome uguale: il contatto si segna su di lei.</p>` : ""}
     <form data-form="${s}" novalidate>
       <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc(m.nome || "")}" autocomplete="off"></label>
       <label class="field"><span>Telefono o contatto <i>(facoltativo)</i></span><input name="contatto" maxlength="80" inputmode="tel" value="${esc(m.contatto || "")}"></label>
@@ -2678,8 +2693,18 @@ function vSheetPersone(s){
           <label class="field grow"><span>Mese</span><select name="mese"><option value=""></option>${MESI_LUNGHI.map((x, i) => `<option value="${i + 1}"${Number(mm) === i + 1 ? " selected" : ""}>${x}</option>`).join("")}</select></label></div>`; })() : ""}
       ${m.id ? `<label class="field"><span>Note</span><textarea name="note" rows="3" maxlength="2000">${esc(m.note || "")}</textarea></label>` : ""}
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
+      ${rapido ? `<button type="button" class="btn ghost wide" style="margin-top:8px" data-act="senza-nome" data-tipo="contatto">Senza nome: conta solo il contatto</button>` : ""}
     </form>`;
   }
+  if(s === "piano-chi") return `<h2>Un piano: con chi?</h2>
+    <p class="small">Scegli la persona e compila il piano: conta nei piani della settimana.</p>
+    <input type="search" id="cerca-piano" class="cerca" placeholder="Cerca nella tua lista…" autocomplete="off" value="${esc(st.cercaPiano || "")}">
+    <ul class="persone" id="risultati-piano">${personePiano(st.cercaPiano)}</ul>
+    <form data-form="piano-nuovo" novalidate style="margin-top:10px">
+      <label class="field"><span>Non è nella lista? Scrivi il nome</span><input name="nome" maxlength="80" autocomplete="off"></label>
+      <div class="row" style="margin-top:8px">${annulla}<button class="btn primary grow">Avanti</button></div>
+    </form>
+    <button type="button" class="btn ghost wide" style="margin-top:8px" data-act="senza-nome" data-tipo="piano">Senza nome: conta solo il piano</button>`;
   if(s === "persone-tante") return `<h2>Più nomi insieme</h2>
     <p class="small">Uno per riga. Se vuoi, dopo una virgola il telefono e come lo conosci: <i>Mario Rossi, 333 1234567, collega</i></p>
     <form data-form="persone-tante" novalidate>
@@ -2708,8 +2733,13 @@ function vSheetPersone(s){
   return "";
 }
 
+/* chiudendo un foglio aperto dai pulsanti rapidi di Io non resta niente di mezzo */
+function chiudiSheet(){ st.sheet = null; if(st.rapido === "piano"){ st.personaId = null; st.passoTipo = null; } st.rapido = null; }
 async function dopoPersone(msg){
+  /* + Piano da Io: finito il passo si resta su Io, senza una scheda aperta in Persone */
+  if(st.rapido === "piano"){ st.rapido = null; st.personaId = null; }
   await caricaPersone();
+  aggiornaAttivita();     // i passi contano contatti e piani della settimana
   await caricaInviti();   // togliendo una persona, il suo invito Target si scollega
   await caricaClienti();  // e i suoi ordini
   st.sheet = null; st.passoTipo = null; render();
@@ -2722,7 +2752,12 @@ Object.assign(AZIONI, {
   "apri-persona"(el){ st.vista = "persone"; st.sezPersone = "lista"; st.invitoId = null; st.personaId = el.dataset.id; render(); window.scrollTo(0, 0); },
   "torna-lista"(){ st.personaId = null; render(); window.scrollTo(0, 0); },
   "filtro-lista"(el){ st.filtroLista = el.dataset.filtro; render(); },
-  "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.sheet = "persona-nuova"; render(); },
+  "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = null; st.sheet = "persona-nuova"; render(); },
+  /* i pulsanti rapidi di Io: + Contatto apre "un nome", + Piano apre il passo Piano di una persona */
+  "contatto-rapido"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = "contatto"; st.sheet = "persona-nuova"; render(); },
+  "piano-rapido"(){ st.errore = ""; st.rapido = "piano"; st.cercaPiano = ""; st.sheet = "piano-chi"; render(); },
+  "piano-con"(el){ st.personaId = el.dataset.id; st.passoTipo = "piano"; st.sheet = "passo"; render(); },
+  async "senza-nome"(el){ const tipo = el.dataset.tipo; st.rapido = null; st.sheet = null; render(); await registra(tipo); },
   "persone-tante"(){ st.errore = ""; st.sheet = "persone-tante"; render(); },
   "persona-modifica"(){ st.errore = ""; st.sheet = "persona-modifica"; render(); },
   passo(){ st.passoTipo = null; st.errore = ""; st.sheet = "passo"; render(); },
@@ -2775,6 +2810,17 @@ Object.assign(MODULI, {
     const nome = f.nome.value.trim();
     if(!nome){ mostraErroreForm(f, "Scrivi il nome."); return; }
     try{
+      /* + Contatto da Io: la persona entra già contattata (il passo conta il contatto della settimana) e si resta su Io;
+         se il nome è già nella lista il contatto si segna su di lei */
+      if(st.rapido === "contatto"){
+        const gia = st.persone.find(p => senzaAccenti(p.nome) === senzaAccenti(nome)), pid = gia ? gia.id : uuid();
+        if(!gia) await api.nuovePersone([{ id:pid, nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null }]);
+        await api.nuoviPassi([{ id:uuid(), persona_id:pid, tipo:"contatto", data:oggi() }]);
+        if(gia && gia.nascosta_io) await api.modificaPersona(pid, { nascosta_io:false });
+        st.rapido = null;
+        await dopoPersone(`Contatto con ${nomeSaluto(nome)} registrato`);
+        return;
+      }
       const id = uuid();
       await api.nuovePersone([{ id, nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null }]);
       st.personaId = id; st.vista = "persone";
@@ -2786,6 +2832,15 @@ Object.assign(MODULI, {
         return;
       }
       await dopoPersone(`${nome} nella tua lista`);
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async "piano-nuovo"(f){
+    const nome = f.nome.value.trim();
+    if(!nome){ mostraErroreForm(f, "Scrivi il nome, oppure scegli una persona qui sopra."); return; }
+    try{
+      const gia = st.persone.find(p => senzaAccenti(p.nome) === senzaAccenti(nome)), id = gia ? gia.id : uuid();
+      if(!gia){ await api.nuovePersone([{ id, nome }]); await caricaPersone(); }
+      st.personaId = id; st.passoTipo = "piano"; st.sheet = "passo"; render();
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
   async "persona-modifica"(f){
@@ -3291,8 +3346,8 @@ document.addEventListener("input", e => { if(e.target && e.target.id === "ct-lib
 const DURATA_BASE = 30, PREAVVISO = 7, FERMO_DOPO = 45, VERIFICA_DOPO = 8, FINESTRA_VERIFICA = 30, COMPLEANNO_PRIMA = 7;
 const MESI_LUNGHI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
 const FILTRI_CLIENTI = [
-  { id:"sentire", nome:"Da sentire", ok:p => !p.non_compra && ["ritardo", "ora", "fermo", "mai"].includes(statoCliente(p).key) },
   { id:"tutti", nome:"Tutti", ok:p => !p.non_compra },
+  { id:"sentire", nome:"Da sentire", ok:p => !p.non_compra && ["ritardo", "ora", "fermo", "mai"].includes(statoCliente(p).key) },
   { id:"fermi", nome:"Fermi", ok:p => !p.non_compra && statoCliente(p).key === "fermo" },
   { id:"mai", nome:"Mai ordinato", ok:p => !p.non_compra && statoCliente(p).key === "mai" },
   { id:"persi", nome:"Non comprano più", ok:p => p.non_compra }];
@@ -3920,7 +3975,7 @@ document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]");
   if(!el) return;
   const act = el.dataset.act;
-  if(act === "chiudi-fuori"){ if(e.target === el){ st.sheet = null; render(); } return; }
+  if(act === "chiudi-fuori"){ if(e.target === el){ chiudiSheet(); render(); } return; }
   if(AZIONI[act]){ e.preventDefault(); AZIONI[act](el); }
 });
 
