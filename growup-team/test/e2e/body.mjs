@@ -57,8 +57,35 @@ await page.click("text=Fatto, l'ho salvato");
 check(await page.getByText(/Mancano \d+ giorni per non pagare/).isVisible(), "conto alla rovescia");
 
 // 2. Attività (regressione)
-await page.click("button[data-act=contatto]"); await page.getByText("Contatto registrato").waitFor();
-check(await page.locator("button[data-act=contatto] b").innerText() === "1 questa sett.", "contatto +1");
+// + Contatto: apre "un nome", la persona entra già contattata e il contatto conta nella settimana; si resta su Io
+await page.click("button[data-act=contatto-rapido]");
+check(await page.locator(".sheet h2", { hasText:"Un contatto" }).isVisible(), "+ Contatto apre l'inserimento di un nome");
+await page.fill(".sheet input[name=nome]", "Paolo Rapido");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Contatto con Paolo registrato").waitFor();
+await page.locator("button[data-act=contatto-rapido] b", { hasText:"1 questa sett." }).waitFor();
+await sync(page);
+const paoloR = DB.persone.find(x => x.nome === "Paolo Rapido");
+check(paoloR && paoloR.fase === "contattato" && DB.activities.filter(a => a.partner_id === paoloR.proprietario && a.tipo === "contatto").length === 1, "contatto +1, Paolo nella lista come Contattato");
+check(await page.locator("#azioni button[data-act=piano-rapido]").isVisible(), "dopo il contatto si resta su Io");
+// + Piano: si sceglie la persona e si compila il piano; conta nella settimana
+await page.click("button[data-act=piano-rapido]");
+await page.fill("#cerca-piano", "paolo");
+await page.locator("#risultati-piano button[data-act=piano-con]", { hasText:"Paolo Rapido" }).click();
+check(await page.locator(".sheet h2", { hasText:"segna un passo" }).isVisible() && await page.locator(".sheet button.on", { hasText:"Piano" }).isVisible(), "+ Piano apre il passo Piano della persona");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Piano segnato").waitFor();
+await page.locator("button[data-act=piano-rapido] b", { hasText:"1 questa sett." }).waitFor();
+await sync(page);
+check(DB.persone.find(x => x.id === paoloR.id).fase === "piano" && DB.activities.filter(a => a.partner_id === paoloR.proprietario && a.tipo === "piano").length === 1, "piano +1, Paolo a Piano fatto");
+// senza nome: conta solo il piano, poi si annulla
+await page.click("button[data-act=piano-rapido]");
+await page.click(".sheet button[data-act=senza-nome]");
+await page.getByText("Piano mostrato registrato").waitFor();
+check(await page.locator("button[data-act=piano-rapido] b").innerText() === "2 questa sett.", "senza nome: piano +1");
+await page.getByRole("button", { name:"Annulla" }).last().click();
+await page.getByText("Annullato").waitFor();
+check(await page.locator("button[data-act=piano-rapido] b").innerText() === "1 questa sett.", "annullato: di nuovo 1");
 await page.click("button[data-act=ordine]");
 check(await page.inputValue(".sheet input[name=vp]") === "" && await page.getAttribute(".sheet input[name=vp]", "placeholder") === "0", "ordine: campo vuoto con lo 0 grigio");
 await page.click(".sheet button:has-text('Salva')");
@@ -1132,6 +1159,7 @@ await page.getByText("Prodotto Ugo: riordinato oggi").waitFor();
 check(await page.locator(".card .pill", { hasText:"A posto" }).first().isVisible(), "Riordinato: Ugo torna a posto");
 // Vera: fatto il "come ti sei trovato"
 await page.click("button[data-act=torna-clienti]");
+check(await page.locator("button[data-filtro=tutti].on").isVisible() && await page.locator(".scelte-rapide button[data-filtro]").first().getAttribute("data-filtro") === "tutti", "Clienti: Tutti è il primo filtro e parte selezionato");
 await page.click("button[data-filtro=tutti]");
 await page.locator("button[data-act=apri-cliente]", { hasText:"Vera Verifica" }).click();
 await page.click("button[data-act=verifica-fatta]");

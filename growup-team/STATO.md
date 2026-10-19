@@ -101,6 +101,11 @@ decisione di Stefano). Il report della rete resta un import separato.
 **19 ottobre — "Scrivigli" con più prodotti**: il messaggio "Sta finendo" nomina tutti i prodotti che finiscono entro
 i 7 giorni di preavviso (anche quelli già finiti), non solo il primo; se nessuno è così vicino, il primo che finisce
 (decisione di Stefano).
+**19 ottobre — pulsanti rapidi di Io**: **+ Contatto** apre l'inserimento di un nome (come "+ Un nome"): la persona entra
+nella Lista già Contattato e il contatto conta nella settimana; se il nome è già nella lista il contatto si segna su di
+lei. **+ Piano** chiede con chi (ricerca nella lista o un nome nuovo) e apre il passo Piano da compilare: conta nei piani
+della settimana. Tutti e due restano su Io e hanno "Senza nome" per contare solo il numero. **+ Ordine** invariato.
+In Clienti il primo filtro, selezionato all'apertura, è **Tutti**.
 
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
