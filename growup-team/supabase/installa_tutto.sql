@@ -3864,7 +3864,8 @@ alter table public.listino enable row level security;
 revoke all on public.listino from anon, authenticated;
 grant select on public.listino to authenticated;
 grant insert (codice, nome, formato, categoria, prezzo_cliente, prezzo_partner, vp, attivo) on public.listino to authenticated;
-grant update (nome, formato, categoria, prezzo_cliente, prezzo_partner, vp, attivo) on public.listino to authenticated;
+-- anche codice: il salvataggio dall'app è un "inserisci o aggiorna" (upsert) che riscrive tutte le colonne
+grant update (codice, nome, formato, categoria, prezzo_cliente, prezzo_partner, vp, attivo) on public.listino to authenticated;
 drop policy if exists listino_leggo on public.listino;
 create policy listino_leggo on public.listino for select to authenticated using (public.my_partner_id() is not null);
 drop policy if exists listino_admin_nuovo on public.listino;

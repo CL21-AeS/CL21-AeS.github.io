@@ -683,12 +683,19 @@ begin
   perform growup_test.come(u1);  -- R admin
   insert into public.listino (codice, nome, formato, prezzo_cliente, prezzo_partner, vp) values ('900001', 'Prodotto prova', '1 pz', 10, 8.33, 3.5);
   update public.listino set prezzo_cliente = 11 where codice = '900001';
+  -- come fa l'app: inserisci o aggiorna (upsert) su tutte le colonne
+  insert into public.listino (codice, nome, formato, categoria, prezzo_cliente, prezzo_partner, vp, attivo)
+  values ('900001', 'Prodotto prova', '1 pz', null, 11, 9.17, 3.6, true)
+  on conflict (codice) do update set codice = excluded.codice, nome = excluded.nome, formato = excluded.formato, categoria = excluded.categoria,
+    prezzo_cliente = excluded.prezzo_cliente, prezzo_partner = excluded.prezzo_partner, vp = excluded.vp, attivo = excluded.attivo;
+  perform growup_test.ok((select vp from public.listino where codice = '900001') = 3.6, 'l''admin aggiorna il listino come fa l''app (upsert)');
   perform growup_test.ok((select prezzo_cliente from public.listino where codice = '900001') = 11, 'l''admin scrive il listino');
   perform growup_test.deve_fallire('delete from public.listino', 'il listino non si cancella (si mette non attivo)');
   perform growup_test.come(u2);  -- A
   perform growup_test.ok((select count(*) from public.listino where codice = '900001') = 1, 'chi usa l''app legge il listino');
   perform growup_test.deve_fallire($q$insert into public.listino (codice, nome) values ('900002', 'x')$q$, 'chi non è admin non aggiunge prodotti');
   update public.listino set prezzo_cliente = 0 where codice = '900001';
+  perform growup_test.deve_fallire($q$insert into public.listino (codice, nome) values ('900001', 'x') on conflict (codice) do update set nome = excluded.nome$q$, 'chi non è admin non fa upsert sul listino');
   execute 'reset role';
   perform growup_test.ok((select prezzo_cliente from public.listino where codice = '900001') = 11, 'chi non è admin non cambia i prezzi');
   update public.partners set bloccato_il = now() where id = b;
