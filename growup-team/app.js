@@ -47,6 +47,13 @@ function creaApi(){
     /* io e tutta la mia downline: la RLS restituisce solo quella */
     /* io e chi vedo, ognuno sotto il primo sopra di lui che vedo (struttura "ricucita" nel database) */
     struttura:    () => q(sb.rpc("struttura_visibile")),
+    /* chi è da confermare dal report Amway e chi è bloccato (per chi vedo) */
+    accessiStruttura: () => q(sb.rpc("accessi_struttura")),
+    statoAccesso: () => q(sb.rpc("stato_accesso")),
+    togliDallaStruttura: pid => q(sb.rpc("togli_dalla_struttura", { p_partner:pid })),
+    bloccaApp:    (pid, blocca) => q(sb.rpc("blocca_app", { p_partner:pid, p_blocca:blocca })),
+    codiciTolti:  () => q(sb.rpc("codici_tolti_elenco")),
+    sbloccaCodice: codice => q(sb.rpc("sblocca_codice", { p_codice:codice })),
     creaInvitoSopra: (pid, altri) => q(sb.rpc("crea_invito_sopra", { p_partner:pid, p_altri:altri })),
     modificaPartenza: args => q(sb.rpc("modifica_partenza", args)),
     preferiti:    () => q(sb.from("preferiti").select("preferito_id")),
@@ -133,6 +140,7 @@ const st = {
   invito: null,           // codice dello sponsor dal link d'invito
   invitoRiserva: null,    // l'invito lasciato per "entra con il tuo link": si può tornare indietro
   struttura: [],          // io e la mia downline
+  accessi: new Map(),     // chi è da confermare o bloccato, tra chi vedo
   linkGestito: null,      // { nome, chiave }: nuovo link personale creato dall'admin per chi l'ha perso
   nascosti: new Set(),    // persone nascoste dalla mia struttura (solo loro: chi sta sotto resta)
   persone: [], passi: [], // la mia lista (solo mia) e i suoi passi
@@ -220,6 +228,8 @@ const MESSAGGI_ERRORE = {
   import_di_altri: "Questo report non è il tuo: ognuno importa il report scaricato dal proprio accesso al sito Amway.",
   codice_amway_attivo: "Con questo codice Amway c'è già qualcuno che usa l'app: entra con il tuo link personale (quello che ti eri salvato).",
   codice_amway_altra_linea: "Questo codice Amway è nella struttura di un altro gruppo: chiedi il link d'invito al tuo sponsor.",
+  codice_tolto: "Questo codice Amway è stato tolto dalla struttura: per rientrare chiedi a Stefano e Alessia di sbloccarlo.",
+  gia_confermato: "È già confermata dal report Amway: non si può più togliere dalla struttura.",
   non_autenticato: "Sessione scaduta: apri di nuovo il tuo link personale."
 };
 function messaggio(e){
@@ -527,6 +537,7 @@ async function vaiHome(profilo){
 
 async function caricaStruttura(){
   st.struttura = await api.struttura() || [];
+  try{ st.accessi = new Map((await api.accessiStruttura() || []).map(r => [r.id, r])); }catch(e){ st.accessi = new Map(); }
   try{ st.preferiti = new Set((await api.preferiti() || []).map(r => r.preferito_id)); }catch(e){}
   try{ st.nascosti = new Set((await api.nascosti() || []).map(r => r.nascosto_id)); }catch(e){}
 }
@@ -575,6 +586,8 @@ async function avvio(){
     if(s){
       const p = await api.collega();
       if(p && p.id){ await vaiHome(p); render(); rispostaInAttesa(); return; }
+      /* tolto dalla struttura o bloccato da un admin: il telefono non entra più */
+      if(await accessoNegato()) return;
     }
     const invito = (dalLink && dalLink.invito) || leggiLocale(CHIAVE_INVITO);
     if(invito) await apriInvito(invito);
@@ -622,7 +635,7 @@ function render(){
   const app = document.getElementById("app");
   const viste = { avvio:vAvvio, config:vConfig, benvenuto:vBenvenuto, chiave_errata:vChiaveErrata,
                   ingresso:vIngresso, privacy_primo:vPrivacyPrimo, obiettivo_primo:vObiettivoPrimo, home:vHome, errore:vErrore,
-                  contatto:vContatto };
+                  contatto:vContatto, bloccato:vAccessoNegato, tolto:vAccessoNegato };
   const html = (viste[st.fase] || vAvvio)();
   if(html !== ultimoApp){ app.innerHTML = html; ultimoApp = html; }
   const conAzioni = st.fase === "home" && st.vista === "io";
@@ -669,6 +682,29 @@ function vBenvenuto(){
   </div>`;
 }
 
+async function accessoNegato(){
+  let stato = null;
+  try{ stato = await api.statoAccesso(); }catch(e){}
+  if(stato !== "bloccato" && stato !== "tolto") return false;
+  st.fase = stato; st.sheet = null; st.profilo = null; render();
+  return true;
+}
+function vAccessoNegato(){
+  const bloccato = st.fase === "bloccato";
+  return `<div class="centro">
+    ${marchio()}
+    <h1 style="margin-top:6px">${bloccato ? "Accesso sospeso" : "Accesso tolto"}</h1>
+    <p class="muted">${bloccato ? "Il tuo accesso a Growup è sospeso. Per sapere di più parla con Stefano e Alessia."
+      : "Questo accesso a Growup è stato tolto. Parla con chi ti ha invitato."}</p>
+  </div>`;
+}
+/* "Da confermare" (il suo codice Amway non è ancora comparso in un report importato) e "Bloccato" */
+function accessoDi(p){ return p && p.stato !== "gestito" && st.accessi ? st.accessi.get(p.id) : null; }
+function daConfermare(p){ const a = accessoDi(p); return !!a && !a.confermato_il && !a.is_admin && p.id !== st.profilo.id; }
+function bloccato(p){ const a = accessoDi(p); return !!a && !!a.bloccato_il; }
+function etichetteAccesso(p){
+  return `${bloccato(p) ? `<span class="pill r" title="App bloccata da un admin">Bloccato</span>` : ""}${daConfermare(p) ? `<span class="pill g" title="Il suo codice Amway non è ancora comparso in un report importato">Da confermare</span>` : ""}`;
+}
 function vChiaveErrata(){
   return `<div class="centro">
     <h1>Link non più valido</h1>
@@ -811,6 +847,7 @@ function vFondo(){
       <button class="btn small ghost" data-act="esci">Esci</button>
     </div>
     ${st.profilo.is_admin ? vCopiaDati() : ""}
+    ${st.profilo.is_admin ? `<div class="row" style="justify-content:center;margin-top:6px"><button class="btn small ghost" data-act="codici-tolti">Codici Amway tolti</button></div>` : ""}
     <p class="nota" style="text-align:center">${esc(st.profilo.nome)} · codice d'invito <b>${esc(st.profilo.codice_invito)}</b><br>
       ${st.profilo.codice_amway ? `Codice Amway Partner <b>${esc(st.profilo.codice_amway)}</b>` : "Codice Amway Partner non ancora scritto"}
       ${st.profilo.is_admin ? `<button class="btn link small" data-act="codice" data-id="${esc(st.profilo.id)}" style="min-height:0;padding:0 4px">Correggi</button>` : ""}<br>
@@ -1317,6 +1354,7 @@ function vStruttura(){
       ${quanti ? `<button class="piega" data-act="piega" data-id="${esc(p.id)}" data-quanti="${quanti}" aria-expanded="${!chiuso}"
         aria-label="${chiuso ? "Mostra" : "Nascondi"} il gruppo di ${esc(p.nome)}">${chiuso ? "▸" : "▾"} ${quanti}</button>` : ""}
       ${p.fuori_report_dal ? `<span class="pill g" title="Non più nel report Amway">fuori</span>` : ""}
+      ${etichetteAccesso(p)}
       ${completa ? (nascosta ? `<button class="btn small" data-act="mostra" data-id="${esc(p.id)}">Mostra</button>`
         : `<button class="btn small ghost" data-act="nascondi-qui" data-id="${esc(p.id)}">Nascondi</button>`)
         : `<span class="pill ${sp.cl}">${sp.txt}</span>`}</li>`; }).join("")}</ul>
@@ -1530,7 +1568,7 @@ function vScheda(){
     <div class="spread"><h2>${esc(p.nome)}</h2><span class="row" style="gap:8px">
       <button class="stella${st.preferiti.has(p.id) ? " on" : ""}" data-act="preferito" data-id="${esc(p.id)}" aria-pressed="${st.preferiti.has(p.id)}"
         aria-label="${st.preferiti.has(p.id) ? "Togli dai preferiti" : "Aggiungi ai preferiti"}" title="Preferiti">${st.preferiti.has(p.id) ? "★" : "☆"}</button>
-      <span class="pill ${sp.cl}">${sp.txt}</span></span></div>
+      ${etichetteAccesso(p)}<span class="pill ${sp.cl}">${sp.txt}</span></span></div>
     <p class="small" style="margin:2px 0 0">${gestito ? "importata da te dal report Amway: la vedi solo tu, i suoi numeri li aggiorni tu"
       : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</p>
     ${p.stato === "gestito" ? "" : `<p class="small" style="margin:6px 0 0">${rigaObiettivoDi(p.id)}</p>`}
@@ -1574,6 +1612,7 @@ function vScheda(){
       <p class="nota">Solo per chi ha perso il suo link: quello vecchio smette di funzionare e i suoi telefoni vanno ricollegati.</p>` : ""}
   </div>`}
   ${st.profilo.is_admin ? vInvitiAdmin(p) : ""}
+  ${vAccessoScheda(p)}
   <div class="card">
     <span class="eyebrow">Struttura</span>
     ${p.fuori_report_dal ? `<p class="small" style="margin:6px 0 0"><span class="pill g">non più nel report</span> da ${nomeMese(meseDi(p.fuori_report_dal))}</p>` : ""}
@@ -1583,6 +1622,25 @@ function vScheda(){
     <p class="nota">Nascosta sparisce solo per te, e solo lei: chi sta sotto di lei resta visibile. I suoi VP contano lo stesso
       nei numeri personali e di gruppo.
       La rimetti quando vuoi da «Nascoste». Nell'app nessuno si cancella: la struttura rispecchia il report Amway.</p>
+  </div>`;
+}
+
+/* Da confermare: sponsor, upline e admin la possono togliere. Bloccare l'app: solo admin. */
+function vAccessoScheda(p){
+  const a = accessoDi(p);
+  if(!a || p.id === st.profilo.id) return "";
+  const togli = daConfermare(p), blocca = st.profilo.is_admin && !a.is_admin;
+  if(!togli && !blocca && !a.bloccato_il) return "";
+  return `<div class="card">
+    <span class="eyebrow">Accesso all'app</span>
+    ${togli ? `<p class="small" style="margin:6px 0 0"><span class="pill g">Da confermare</span> il suo codice Amway non è ancora comparso in un
+      report mappe importato. Finché non lo è, puoi toglierla dalla struttura.</p>
+      <button class="btn wide" style="margin-top:10px" data-act="togli-struttura" data-id="${esc(p.id)}">Togli dalla struttura</button>
+      <p class="nota">Si cancellano il suo profilo e tutti i suoi dati, l'app sul suo telefono si blocca e con lo stesso codice Amway non può
+        rientrare finché un admin non lo sblocca. Chi ha invitato passa sotto ${p.sponsor_id === st.profilo.id ? "di te" : "il suo sponsor"}.</p>` : ""}
+    ${a.bloccato_il ? `<p class="small" style="margin:8px 0 0"><span class="pill r">Bloccato</span> l'app è bloccata dal ${dataIt(String(a.bloccato_il).slice(0, 10))}.</p>` : ""}
+    ${blocca ? `<button class="btn wide${a.bloccato_il ? "" : " ghost"}" style="margin-top:10px" data-act="blocca-app" data-id="${esc(p.id)}" data-blocca="${a.bloccato_il ? "" : "1"}">${a.bloccato_il ? "Sblocca l'app" : "Blocca l'app"}</button>
+      <p class="nota">Solo admin. Chi è bloccato non vede più niente; i suoi dati restano e i suoi VP contano. Sponsor e upline vedono "Bloccato".</p>` : ""}
   </div>`;
 }
 
@@ -1908,6 +1966,13 @@ function vSheet(){
   const s = st.sheet;
   const sp = vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s);
   if(sp) return sp;
+  if(s === "codici-tolti") return `<h2>Codici Amway tolti</h2>
+    <p class="small">Le persone tolte dalla struttura prima della conferma: con questi codici non si entra finché non li sblocchi.</p>
+    ${(st.codiciTolti || []).length ? `<ul class="oggi">${st.codiciTolti.map(c => `<li><span class="grow"><b>${esc(c.nome || "")}</b><br>
+      <span class="small">${esc(c.codice_amway)} · tolto il ${dataIt(String(c.tolto_il).slice(0, 10))}</span></span>
+      <button class="btn small" data-act="sblocca-codice" data-codice="${esc(c.codice_amway)}">Sblocca</button></li>`).join("")}</ul>`
+      : `<p class="muted">Nessun codice tolto.</p>`}
+    <button class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>`;
   const err = st.errore ? `<p class="errore">${esc(st.errore)}</p>` : "";
   const piede = `<div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
         <button class="btn primary grow">Salva</button></div>`;
@@ -2257,6 +2322,29 @@ const AZIONI = {
     const p = st.struttura.find(x => x.id === el.dataset.id);
     if(!p || !confirm(`Creare un nuovo link personale per ${p.nome}? Quello vecchio smetterà di funzionare.`)) return;
     try{ st.linkGestito = { nome:p.nome, chiave: await api.nuovaChiavePer(p.id), nuovo:true }; st.sheet = "link-gestito"; render(); }
+    catch(e){ toast(messaggio(e)); }
+  },
+  async "togli-struttura"(el){
+    const p = st.struttura.find(x => x.id === el.dataset.id);
+    if(!p || !confirm(`Togliere ${p.nome} dalla struttura?\n\nSi cancellano il suo profilo e tutti i suoi dati e l'app sul suo telefono si blocca. Non si può annullare.`)) return;
+    try{
+      await api.togliDallaStruttura(p.id);
+      st.schedaId = null; st.vista = "gruppo";
+      await caricaTutto(); render(); toast(`${p.nome} tolta dalla struttura`);
+    }catch(e){ toast(messaggio(e)); }
+  },
+  async "blocca-app"(el){
+    const p = st.struttura.find(x => x.id === el.dataset.id), blocca = !!el.dataset.blocca;
+    if(!p || (blocca && !confirm(`Bloccare l'app di ${p.nome}? Non vedrà più niente finché non la sblocchi.`))) return;
+    try{ await api.bloccaApp(p.id, blocca); await caricaStruttura(); render(); toast(blocca ? `App di ${p.nome} bloccata` : `App di ${p.nome} sbloccata`); }
+    catch(e){ toast(messaggio(e)); }
+  },
+  async "codici-tolti"(){
+    try{ st.codiciTolti = await api.codiciTolti() || []; st.sheet = "codici-tolti"; render(); }catch(e){ toast(messaggio(e)); }
+  },
+  async "sblocca-codice"(el){
+    if(!confirm(`Sbloccare il codice ${el.dataset.codice}? Con questo codice si potrà di nuovo entrare con un link d'invito.`)) return;
+    try{ await api.sbloccaCodice(el.dataset.codice); st.codiciTolti = await api.codiciTolti() || []; render(); toast("Codice sbloccato"); }
     catch(e){ toast(messaggio(e)); }
   },
   "mia-chiave"(){ st.sheet = "mia-chiave"; render(); },
@@ -4106,7 +4194,12 @@ function scorri(azione, verso){
 }
 
 /* Tornando sull'app (da un altro dispositivo si è magari scritto qualcosa) si ricarica. */
-document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") aggiornaAttivita(); });
+document.addEventListener("visibilitychange", async () => {
+  if(document.visibilityState !== "visible") return;
+  /* tornando sull'app: se nel frattempo l'accesso è stato tolto o bloccato, si vede subito */
+  if(st.fase === "home" && st.profilo){ try{ if(!(await api.collega()) && await accessoNegato()) return; }catch(e){} }
+  aggiornaAttivita();
+});
 
 /* Un link aperto mentre l'app è già aperta (es. il link personale toccato in WhatsApp). */
 window.addEventListener("hashchange", () => {
