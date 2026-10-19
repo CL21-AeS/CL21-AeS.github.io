@@ -1376,8 +1376,9 @@ check(await page.locator(".card .etichette").getByText("Da consegnare").isVisibl
 await page.click("button[data-act=ordine-consegnato]");
 await page.getByText("✓ Consegnato").waitFor();
 check(!await page.locator(".card .etichette").getByText("Da consegnare").count() && await page.locator(".card .etichette").getByText("Da pagare").isVisible(), "spuntato consegnato: resta solo da pagare");
-// modifica i dati dalla scheda del cliente
-await page.click("button[data-act=persona-modifica]");
+// modifica i dati dalla scheda del cliente: toccando il nome
+check(!await page.locator("button[data-act=persona-modifica]", { hasText:"Modifica i dati" }).count(), "scheda cliente: niente pulsante Modifica i dati in fondo");
+await page.click("button.nome-modifica");
 await page.fill(".sheet input[name=contatto]", "+39 333 000 0099");
 await page.fill(".sheet input[name=giorno]", "5");
 await page.selectOption(".sheet select[name=mese]", "3");
