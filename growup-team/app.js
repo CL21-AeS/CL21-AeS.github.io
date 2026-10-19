@@ -3523,7 +3523,7 @@ function vCliente(){
   const tel = numeroWa(p.contatto);
   return `${indietro}
   <div class="card">
-    <div class="spread"><h2>${esc(p.nome)}</h2><span class="etichette">${etichetteOrdini(p)}<span class="pill ${s.cl}">${esc(s.txt)}</span></span></div>
+    <div class="spread"><h2><button class="nome-modifica" data-act="persona-modifica" aria-label="Modifica i dati di ${esc(p.nome)}">${esc(p.nome)} <span aria-hidden="true">✎</span></button></h2><span class="etichette">${etichetteOrdini(p)}<span class="pill ${s.cl}">${esc(s.txt)}</span></span></div>
     <p class="small" style="margin:2px 0 0">${[p.contatto, abitudine(p), c ? `compleanno ${c.testo}` : "", p.codice_cliente ? `codice cliente ${p.codice_cliente}` : ""].filter(Boolean).map(esc).join(" · ")}</p>
     ${tel ? `<div class="row" style="gap:6px;margin-top:8px">
       <a class="btn small" href="tel:+${esc(tel)}">Chiama</a>
@@ -3569,7 +3569,6 @@ function vCliente(){
         <button class="btn small ghost" data-act="ordine-modifica" data-id="${esc(o.id)}">Modifica</button></li>`; }).join("")}</ul>
   </div>` : ""}
   <div class="row wrap" style="gap:6px;justify-content:center">
-    <button class="btn small ghost" data-act="persona-modifica">Modifica i dati</button>
     <button class="btn small ghost" data-act="apri-persona" data-id="${esc(p.id)}">Il suo percorso nella lista</button>
     <button class="btn small ghost" data-act="cliente-non-compra">${p.non_compra ? "Torna cliente" : "Non compra più"}</button>
   </div>`;

@@ -111,7 +111,7 @@ chiusura si vede solo quello che serve all'esito: **Partner** resta nella lista 
 **Cliente** esce dalla Lista (anche dai Chiusi) e si apre la sua scheda nei Clienti; **Non ora** chiede tra quanto
 risentirlo (1 mese · 3 mesi · 6 mesi · 1 anno o una data) e mette il promemoria 2 giorni prima, con la nota; **No** solo
 la nota. Il passo **Nota** è solo una finestra per scrivere: la nota (con la data) va nelle Note dei dati della persona.
-Il pulsante "Modifica i dati" in fondo non c'è più: i dati si modificano **toccando il nome** (✎).
+Il pulsante "Modifica i dati" in fondo non c'è più: i dati si modificano **toccando il nome** (✎). Lo stesso nella scheda del cliente.
 
 **Prima del lancio al gruppo** (Stefano sceglie da dove partire):
 1. **Prova su iPhone con Alessia**: Claude prepara una lista di ~10 controlli (ingresso, installazione sulla Home,
