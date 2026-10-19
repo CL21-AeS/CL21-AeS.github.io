@@ -259,7 +259,8 @@ await page.click("button[data-act=vista-gruppo]");
 check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isVisible()
   && !(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).count()), "la radice vede chi usa l'app, non le persone importate da Anna");
 // niente conferme: Bea (pin 12%) ha dichiarato un punto di partenza, lo sponsor lo vede soltanto
-check(!(await page.getByText("Da confermare").count()) && !(await page.locator("button[data-act=conferma]").count()), "nessun riquadro Da confermare");
+check(!(await page.locator("button[data-act=conferma]").count()), "nessuna conferma del punto di partenza");
+check(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).getByText("Da confermare").isVisible(), "chi è appena entrato è Da confermare");
 await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).locator("button[data-act=apri-scheda]").click();
 check(await page.getByText("Punto di partenza dichiarato: 12%").isVisible() && !(await page.locator("button[data-act=conferma]").count()),
   "scheda: punto di partenza solo come informazione");
@@ -1404,6 +1405,57 @@ check(await page.locator("h2", { hasText:"Ugo Bianchi" }).isVisible(), "dopo il 
 await page.click("button[data-act=torna-clienti]");
 check(await page.locator("button[data-act=apri-cliente]", { hasText:"Ugo Bianchi" }).getByText("Da pagare").isVisible(), "elenco clienti: etichetta da pagare");
 await page.screenshot({ path: S + "/e2e/32-clienti-amway.png", fullPage:true });
+await ctx.close();
+
+// 28. Da confermare: si toglie dalla struttura; l'admin blocca l'app (dati inventati)
+({ ctx, page } = await apri({}, "#RRRR22"));
+await page.getByText("Benvenuto in Growup").waitFor();
+await page.fill("input[name=nome]", "Dino Prova");
+await page.fill("input[name=codice_amway]", "2000099");
+await page.selectOption("select[name=qualifica]", "pin:6");
+await page.check("input[name=privacy]"); await page.click("form button.primary");
+await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
+await page.getByText("Ciao Dino").waitFor();
+const sessDino = await page.evaluate(() => localStorage.getItem("mock.session"));
+await sync(page); await ctx.close();
+const telefonoDino = () => apri({ storageState:{ cookies:[], origins:[{ origin:"http://127.0.0.1:8765", localStorage:[{ name:"mock.session", value:sessDino }] }] } }, "");
+const radice = async () => { ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await page.click("button[data-act=vista-gruppo]"); };
+await radice();
+const rigaDino = page.locator(".albero.struttura li", { hasText:"Dino Prova" });
+check(await rigaDino.getByText("Da confermare").isVisible(), "struttura: Dino da confermare");
+await rigaDino.locator("button[data-act=apri-scheda]").click();
+check(await page.locator("button[data-act=togli-struttura]").isVisible() && await page.locator("button[data-act=blocca-app]", { hasText:"Blocca l'app" }).isVisible(),
+  "scheda: Togli dalla struttura e (admin) Blocca l'app");
+await page.click("button[data-act=blocca-app]");
+await page.getByText("App di Dino Prova bloccata").waitFor();
+check(await page.locator(".card .pill.r", { hasText:"Bloccato" }).first().isVisible(), "scheda: Bloccato");
+await sync(page); await ctx.close();
+({ ctx, page } = await telefonoDino());
+await page.getByText("Accesso sospeso").waitFor();
+check(!(await page.getByText("Ciao Dino").count()), "il telefono di Dino bloccato non entra");
+await ctx.close();
+await radice();
+await page.locator(".albero.struttura li", { hasText:"Dino Prova" }).locator("button[data-act=apri-scheda]").click();
+await page.click("button[data-act=blocca-app]");
+await page.getByText("App di Dino Prova sbloccata").waitFor();
+await page.click("button[data-act=togli-struttura]");
+await page.getByText("Dino Prova tolta dalla struttura").waitFor();
+await page.click("button[data-act=vista-gruppo]").catch(() => {});
+check(!(await page.locator(".albero.struttura li", { hasText:"Dino Prova" }).count()), "Dino non è più nella struttura");
+await sync(page);
+check(!DB.partners.some(p => p.nome === "Dino Prova"), "il profilo di Dino è cancellato");
+await page.click("button[data-act=codici-tolti]");
+check(await page.locator(".sheet li", { hasText:"2000099" }).isVisible(), "l'admin vede il codice tolto");
+await ctx.close();
+({ ctx, page } = await telefonoDino());
+await page.getByText("Accesso tolto").waitFor(); check(true, "il telefono di Dino: accesso tolto");
+await ctx.close();
+await radice();
+await page.click("button[data-act=codici-tolti]");
+await page.locator(".sheet li", { hasText:"2000099" }).locator("button[data-act=sblocca-codice]").click();
+await page.getByText("Codice sbloccato").waitFor();
+check(!(await page.locator(".sheet li", { hasText:"2000099" }).count()), "codice sbloccato");
 await ctx.close();
 
 await browser.close();

@@ -6,7 +6,9 @@
   const uid = () => "id" + Math.random().toString(36).slice(2, 10);
   const codiceInvito = () => Array.from({length:6}, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random()*32)]).join("");
   const hex = () => Array.from({length:32}, () => "0123456789abcdef"[Math.floor(Math.random()*16)]).join("");
-  const mio = () => { const a = session && db.accessi.find(x => x.user_id === session.user.id); return a ? db.partners.find(p => p.id === a.partner_id) : null; };
+  /* come my_partner_id(): un profilo bloccato non risponde */
+  const mio = () => { const a = session && db.accessi.find(x => x.user_id === session.user.id); const p = a && db.partners.find(p => p.id === a.partner_id);
+    return p && !p.bloccato_il ? p : null; };
   const pub = p => { if(!p) return null; const c = Object.assign({}, p); delete c.chiave; return c; };
   const salva = () => { window.__DBOUT = db; };
   /* come nel database: vedo me, chi usa l'app nel mio gruppo e le persone che ho importato io */
@@ -36,6 +38,28 @@
     sponsorName: async c => { const i = (db.invitiAdmin || []).find(x => x.codice === c && !x.usato);
       const p = db.partners.find(p => p.codice_invito === c) || (i && db.partners.find(p => p.id === i.sponsor_id)); return p ? p.nome : null; },
     collega: async () => pub(mio()),
+    accessiStruttura: async () => { const io = mio(); if(!io) return [];
+      return db.partners.filter(p => p.stato !== "gestito" && vedo(io, p)).map(p => ({ id:p.id, confermato_il:p.confermato_il || null, bloccato_il:p.bloccato_il || null, is_admin:!!p.is_admin })); },
+    statoAccesso: async () => { if(!session) return null;
+      const a = db.accessi.find(x => x.user_id === session.user.id), p = a && db.partners.find(y => y.id === a.partner_id);
+      return p && p.bloccato_il ? "bloccato" : (db.accessiTolti || []).includes(session.user.id) ? "tolto" : null; },
+    togliDallaStruttura: async pid => { const io = mio(), t = db.partners.find(p => p.id === pid);
+      if(!io || !t || t.stato === "gestito" || t.id === io.id || t.is_admin || !(io.is_admin || sotto(io.id).some(x => x.id === t.id))) throw new Error("non_autorizzato");
+      if(t.confermato_il) throw new Error("gia_confermato");
+      const via = db.partners.filter(p => p.gestore_id === t.id && p.stato === "gestito").map(p => p.id).concat([t.id]);
+      db.partners.filter(p => via.includes(p.sponsor_id) && !via.includes(p.id)).forEach(p => { p.sponsor_id = t.sponsor_id; });
+      if(t.codice_amway) db.codiciTolti = (db.codiciTolti || []).filter(c => c.codice_amway !== t.codice_amway)
+        .concat([{ codice_amway:t.codice_amway, nome:t.nome, tolto_il:new Date().toISOString() }]);
+      db.accessiTolti = (db.accessiTolti || []).concat(db.accessi.filter(x => x.partner_id === t.id).map(x => x.user_id));
+      db.accessi = db.accessi.filter(x => !via.includes(x.partner_id));
+      db.activities = db.activities.filter(x => !via.includes(x.partner_id));
+      db.partners = db.partners.filter(p => !via.includes(p.id)); salva(); },
+    bloccaApp: async (pid, blocca) => { const io = mio(), t = db.partners.find(p => p.id === pid);
+      if(!io || !io.is_admin || !t || t.stato === "gestito" || t.id === io.id || t.is_admin) throw new Error("non_autorizzato");
+      t.bloccato_il = blocca ? (t.bloccato_il || new Date().toISOString()) : null; salva(); },
+    codiciTolti: async () => { const io = mio(); if(!io || !io.is_admin) throw new Error("non_autorizzato"); return (db.codiciTolti || []).slice(); },
+    sbloccaCodice: async c => { const io = mio(); if(!io || !io.is_admin) throw new Error("non_autorizzato");
+      db.codiciTolti = (db.codiciTolti || []).filter(x => x.codice_amway !== c); salva(); },
     entra: async k => {
       if(!session) throw new Error("non_autenticato");
       const p = db.partners.find(p => p.chiave === k); if(!p) throw new Error("chiave_non_valida");
@@ -49,6 +73,7 @@
       if(!sp) throw new Error("codice_non_valido");
       if(!a.p_codice_amway) throw new Error("codice_amway_mancante");
       if(db.partners.some(p => p.codice_amway === a.p_codice_amway && p.stato !== "gestito")) throw new Error("codice_amway_attivo");
+      if((db.codiciTolti || []).some(c => c.codice_amway === a.p_codice_amway)) throw new Error("codice_tolto");
       const dati = { nome:a.p_nome, chiave:hex(), stato:"attivo", data_iscrizione:a.p_data_iscrizione,
         qualifica_iniziale:a.p_qualifica, qualifica_iniziale_mese:a.p_qualifica_mese, pagamenti_iniziali:a.p_pagamenti,
         percentuale_iniziale:a.p_percentuale, privacy_accettata_il:new Date().toISOString(),
@@ -60,7 +85,7 @@
         if(!sotto.length) throw new Error("codice_amway_altra_linea");
         p = sotto.find(c => c.gestore_id === sp.id) || sotto[0];
         for(const c of copie) if(c !== p){ db.partners.filter(x => x.sponsor_id === c.id).forEach(x => { x.sponsor_id = p.id; }); db.partners = db.partners.filter(x => x !== c); }
-        Object.assign(p, dati, { gestore_id:null, sponsor_id:antenatoConApp(p) });
+        Object.assign(p, dati, { gestore_id:null, sponsor_id:antenatoConApp(p), confermato_il:new Date().toISOString() });
       }else{
         p = Object.assign({ id:uid(), sponsor_id:sp.id, codice_amway:a.p_codice_amway,
           codice_invito:"N" + Math.random().toString(36).slice(2,7).toUpperCase() }, dati);
@@ -120,7 +145,9 @@
     importaRete: async a => { const io = mio();
       if(io.codice_amway && io.codice_amway !== a.p_io.codice) throw new Error("import_di_altri");
       io.codice_amway = a.p_io.codice;
-      const salvaNumeri = (pid, r) => { if(r.vpg == null) return; const m = a.p_mese.slice(0, 7);
+      const salvaNumeri = (pid, r) => { const pp = db.partners.find(y => y.id === pid);
+        if(pp && pp.stato !== "gestito" && !pp.confermato_il) pp.confermato_il = new Date().toISOString();
+        if(r.vpg == null) return; const m = a.p_mese.slice(0, 7);
         db.numeri = (db.numeri || []).filter(x => !(x.visto_da === io.id && x.partner_id === pid && x.mese === m))
           .concat([{ visto_da:io.id, partner_id:pid, mese:m, vpg:r.vpg, percentuale:r.percentuale, linee:r.linee || [], nascoste:!!r.nascoste }]); };
       salvaNumeri(io.id, a.p_io);
@@ -148,6 +175,7 @@
       }
       for(const r of a.p_attivi){
         const x = attivo(r.codice); if(!x || x.id === io.id) continue;
+        if(!vedo(io, x)) continue;
         salvaNumeri(x.id, r);
         const sp = !r.sponsor || r.sponsor === io.codice_amway ? io.id : (attivo(r.sponsor) || {}).id;
         if(!sp || sp === x.sponsor_id || giu(x.id).includes(sp)) continue;

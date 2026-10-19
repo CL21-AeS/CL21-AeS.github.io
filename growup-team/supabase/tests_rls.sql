@@ -609,6 +609,69 @@ begin
   delete from public.durate;
   execute 'reset role';
 
+  -- ---- 027: da confermare, togli dalla struttura, blocco dell'app ----
+  execute 'reset role';
+  insert into auth.users (id, aud, role) values ('00000000-0000-0000-0000-0000000000d1', 'authenticated', 'authenticated'),
+    ('00000000-0000-0000-0000-0000000000d2', 'authenticated', 'authenticated');
+  perform growup_test.come('00000000-0000-0000-0000-0000000000d1');
+  g := (public.entra_con_invito('AAAA22', 'Zeta Test', '2000077')->'profilo'->>'id')::uuid;
+  perform growup_test.ok(public.stato_accesso() is null, 'chi è appena entrato ha l''accesso');
+  execute 'reset role';
+  update public.partners set codice_invito = 'ZZZZ77' where id = g;
+  perform growup_test.come('00000000-0000-0000-0000-0000000000d2');
+  h := (public.entra_con_invito('ZZZZ77', 'Ypsilon Test', '2000078')->'profilo'->>'id')::uuid;
+  perform growup_test.come(u2);  -- A, sponsor di Z
+  perform growup_test.ok((select confermato_il is null from public.accessi_struttura() where id = g), 'Z è da confermare');
+  perform growup_test.deve_fallire('select public.salva_numeri_report(null, null, current_date, ''{}'')', 'nessuno conferma a mano dall''app');
+  perform growup_test.come(u3);  -- B, di lato
+  perform growup_test.deve_fallire(format('select public.togli_dalla_struttura(%L)', g), 'chi è di lato non toglie');
+  perform growup_test.come('00000000-0000-0000-0000-0000000000d2');  -- Y, sotto Z
+  perform growup_test.deve_fallire(format('select public.togli_dalla_struttura(%L)', g), 'chi sta sotto non toglie il suo sponsor');
+  perform growup_test.come(u2);
+  perform public.togli_dalla_struttura(g);
+  execute 'reset role';
+  perform growup_test.ok(not exists (select 1 from public.partners where id = g) and (select sponsor_id from public.partners where id = h) = a,
+                         'lo sponsor toglie Z: chi aveva invitato passa sotto lo sponsor');
+  perform growup_test.come('00000000-0000-0000-0000-0000000000d1');
+  perform growup_test.ok(public.collega_profilo() is null and public.stato_accesso() = 'tolto', 'il telefono di Z: accesso tolto');
+  perform growup_test.deve_fallire($q$select public.entra_con_invito('AAAA22', 'Zeta Test', '2000077')$q$, 'il codice tolto non rientra');
+  perform growup_test.come(u2);
+  perform growup_test.deve_fallire('select * from public.codici_tolti_elenco()', 'solo l''admin vede i codici tolti');
+  perform growup_test.deve_fallire('select public.sblocca_codice(''2000077'')', 'solo l''admin sblocca un codice');
+  perform growup_test.come(u1);  -- R admin
+  perform growup_test.ok(exists (select 1 from public.codici_tolti_elenco() where codice_amway = '2000077'), 'l''admin vede il codice tolto');
+  perform public.sblocca_codice('2000077');
+  perform growup_test.come('00000000-0000-0000-0000-0000000000d1');
+  g := (public.entra_con_invito('AAAA22', 'Zeta Test', '2000077')->'profilo'->>'id')::uuid;
+  perform growup_test.ok(g is not null, 'sbloccato il codice, Z rientra');
+  -- confermato dal report: non si toglie più
+  execute 'reset role';
+  perform public.salva_numeri_report(a, g, current_date, '{}');
+  perform growup_test.come(u2);
+  perform growup_test.ok((select confermato_il is not null from public.accessi_struttura() where id = g), 'il report conferma Z');
+  perform growup_test.deve_fallire(format('select public.togli_dalla_struttura(%L)', g), 'confermato: non si toglie più');
+  perform growup_test.come(u1);
+  perform public.togli_dalla_struttura(h);
+  perform growup_test.ok(not exists (select 1 from public.partners where id = h), 'l''admin toglie chi è da confermare');
+  perform growup_test.deve_fallire(format('select public.togli_dalla_struttura(%L)', r), 'nessuno toglie un admin');
+  -- il blocco dell'app: solo admin
+  perform growup_test.come(u2);
+  perform growup_test.deve_fallire(format('select public.blocca_app(%L, true)', b), 'solo l''admin blocca');
+  perform growup_test.come(u1);
+  perform growup_test.deve_fallire(format('select public.blocca_app(%L, true)', r), 'l''admin non blocca sé stesso');
+  perform public.blocca_app(b, true);
+  perform growup_test.come(u3);  -- B bloccato
+  perform growup_test.ok(public.collega_profilo() is null and public.stato_accesso() = 'bloccato', 'B bloccato: niente profilo, accesso sospeso');
+  perform growup_test.ok((select count(*) from public.partners) = 0 and (select count(*) from public.activities) = 0, 'B bloccato non vede niente');
+  perform growup_test.deve_fallire(format('insert into public.activities (partner_id, tipo) values (%L, ''contatto'')', b), 'B bloccato non scrive');
+  perform growup_test.come(u2);  -- A, sponsor di B
+  perform growup_test.ok((select bloccato_il is not null from public.accessi_struttura() where id = b), 'lo sponsor vede che B è bloccato');
+  perform growup_test.come(u1);
+  perform public.blocca_app(b, false);
+  perform growup_test.come(u3);
+  perform growup_test.ok((public.collega_profilo()->>'id')::uuid = b, 'sbloccato: B ritrova il suo profilo');
+  execute 'reset role';
+
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');

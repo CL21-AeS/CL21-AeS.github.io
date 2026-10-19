@@ -112,6 +112,14 @@ chiusura si vede solo quello che serve all'esito: **Partner** resta nella lista 
 risentirlo (1 mese · 3 mesi · 6 mesi · 1 anno o una data) e mette il promemoria 2 giorni prima, con la nota; **No** solo
 la nota. Il passo **Nota** è solo una finestra per scrivere: la nota (con la data) va nelle Note dei dati della persona.
 Il pulsante "Modifica i dati" in fondo non c'è più: i dati si modificano **toccando il nome** (✎). Lo stesso nella scheda del cliente.
+**19 ottobre — conferma dal report e blocco dell'app** (migrazione `027_conferma_e_blocco.sql`): chi usa l'app è
+**Da confermare** finché il suo codice Amway non compare in un report mappe importato (da lui, dal suo sponsor o da un
+upline); chi prende il posto di una persona già importata è confermato subito. Decisione di Stefano: anche chi è già
+nell'app riparte da confermare (gli admin no). Finché è da confermare, **sponsor, upline e admin** lo possono **togliere
+dalla struttura**: si cancellano profilo e dati, il telefono vede "Accesso tolto", chi aveva invitato passa al suo
+sponsor e il codice Amway non rientra finché un admin non lo sblocca ("Codici Amway tolti" in fondo alla pagina).
+L'**admin blocca e sblocca l'app** di chiunque (non di sé né di un altro admin): il telefono vede "Accesso sospeso", i dati
+restano e i VP contano; sponsor e upline vedono l'etichetta "Bloccato" (decisione di Stefano, per trasparenza).
 **19 ottobre — ritocchi alla Lista e al Target**: con "+ Un nome" si resta nella lista (non si apre la scheda).
 Il filtro **Aperti** non comprende più i "Non ora", che stanno solo in **Da riprendere**. La **Nota** compare anche tra i
 passi della scheda (oltre che nelle Note dei dati). Nel **Target** l'invito si manda anche su **Telegram**, e il contatto
