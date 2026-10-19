@@ -672,6 +672,32 @@ begin
   perform growup_test.ok((public.collega_profilo()->>'id')::uuid = b, 'sbloccato: B ritrova il suo profilo');
   execute 'reset role';
 
+  -- ---- 028: il listino: lo leggono solo gli utenti dell'app, lo scrive solo l'admin ----
+  perform growup_test.come(null);
+  perform growup_test.deve_fallire('select * from public.listino', 'anon non legge il listino');
+  perform growup_test.come(u7);
+  execute 'reset role';
+  insert into auth.users (id, aud, role) values ('00000000-0000-0000-0000-0000000000e1', 'authenticated', 'authenticated');
+  perform growup_test.come('00000000-0000-0000-0000-0000000000e1');
+  perform growup_test.ok((select count(*) from public.listino) = 0, 'un telefono non collegato non legge il listino');
+  perform growup_test.come(u1);  -- R admin
+  insert into public.listino (codice, nome, formato, prezzo_cliente, prezzo_partner, vp) values ('900001', 'Prodotto prova', '1 pz', 10, 8.33, 3.5);
+  update public.listino set prezzo_cliente = 11 where codice = '900001';
+  perform growup_test.ok((select prezzo_cliente from public.listino where codice = '900001') = 11, 'l''admin scrive il listino');
+  perform growup_test.deve_fallire('delete from public.listino', 'il listino non si cancella (si mette non attivo)');
+  perform growup_test.come(u2);  -- A
+  perform growup_test.ok((select count(*) from public.listino where codice = '900001') = 1, 'chi usa l''app legge il listino');
+  perform growup_test.deve_fallire($q$insert into public.listino (codice, nome) values ('900002', 'x')$q$, 'chi non è admin non aggiunge prodotti');
+  update public.listino set prezzo_cliente = 0 where codice = '900001';
+  execute 'reset role';
+  perform growup_test.ok((select prezzo_cliente from public.listino where codice = '900001') = 11, 'chi non è admin non cambia i prezzi');
+  update public.partners set bloccato_il = now() where id = b;
+  perform growup_test.come(u3);  -- B bloccato
+  perform growup_test.ok((select count(*) from public.listino) = 0, 'chi è bloccato non legge il listino');
+  execute 'reset role';
+  update public.partners set bloccato_il = null where id = b;
+  delete from public.listino where codice = '900001';
+
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');

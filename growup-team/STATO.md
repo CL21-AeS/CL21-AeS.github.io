@@ -120,6 +120,15 @@ dalla struttura**: si cancellano profilo e dati, il telefono vede "Accesso tolto
 sponsor e il codice Amway non rientra finché un admin non lo sblocca ("Codici Amway tolti" in fondo alla pagina).
 L'**admin blocca e sblocca l'app** di chiunque (non di sé né di un altro admin): il telefono vede "Accesso sospeso", i dati
 restano e i VP contano; sponsor e upline vedono l'etichetta "Bloccato" (decisione di Stefano, per trasparenza).
+**20 ottobre — il listino nel database** (migrazione `028_listino.sql`, file `listino.js` con la lettura del PDF): il listino
+Amway è "per l'incaricato", quindi `catalogo.js` è tolto dal repository pubblico e i prodotti stanno nella tabella `listino`
+(la leggono solo gli utenti dell'app; la scrive solo l'admin). Per ogni prodotto prezzo al cliente, prezzo Partner e VP
+(decisione di Stefano); nell'ordine del cliente ogni riga li mostra e in fondo ci sono i totali (cliente · Partner · VP);
+le righe li tengono. I VP del mese restano quelli dell'import delle mappe. In fondo alla pagina, solo admin, **Listino**:
+cerca e correggi un prodotto, **+ Prodotto** (i nuovi, 5-6 volte l'anno), **Aggiorna dal PDF** (il "Listino prezzi per
+l'incaricato": letto sul telefono con pdf.js, anteprima di nuovi, prezzi cambiati e usciti con la spunta; gli usciti non si
+cancellano, diventano "non nel listino"). Provato sul PDF di aprile 2026: 348 prodotti su 348, con le varianti (colori,
+gusti) e le descrizioni che vanno a capo.
 **19 ottobre — ritocchi alla Lista e al Target**: con "+ Un nome" si resta nella lista (non si apre la scheda).
 Il filtro **Aperti** non comprende più i "Non ora", che stanno solo in **Da riprendere**. La **Nota** compare anche tra i
 passi della scheda (oltre che nelle Note dei dati). Nel **Target** l'invito si manda anche su **Telegram**, e il contatto

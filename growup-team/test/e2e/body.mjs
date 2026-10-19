@@ -50,6 +50,7 @@ await page.click("button[data-act=vista-io]");
 await page.getByText("Ciao Anna").waitFor();
 check(await page.locator(".obiettivo-breve").getByText("300 €").isVisible(), "su Io: il riquadro del mio obiettivo");
 check(await page.locator("button[data-act=copia-dati]").count() === 0, "chi non è admin non vede la copia dei dati");
+check(await page.locator("button[data-act=listino]").count() === 0, "chi non è admin non vede il listino");
 await sync(page);
 const anna = DB.partners.find(p => p.nome === "Anna Bianchi");
 check(anna.sponsor_id === "R", "Anna sotto Stefano e Alessia");
@@ -1258,6 +1259,11 @@ await page.locator("#risultati-prodotto button[data-act=aggiungi-prodotto]").fir
 await page.click(".sheet button[data-act=riga-piu]");
 await page.fill(".sheet input[data-campo=giorni]", "31");
 await page.click('.sheet label.chip:has-text("L\'ho fatto io")');
+const totOrdine = await page.locator("#totale-ordine").innerText();
+check(/Cliente 160 €/.test(totOrdine) && /Partner 133 €/.test(totOrdine) && /53 VP/.test(totOrdine), "ordine: totali al cliente, Partner e VP");
+await page.fill("#cerca-prodotto", "vecchio");
+check(!(await page.locator("#risultati-prodotto button[data-act=aggiungi-prodotto]").count()), "i prodotti non più nel listino non si trovano");
+await page.fill("#cerca-prodotto", "");
 await page.click('.sheet button:has-text("Salva l\'ordine")');
 await page.getByText("Ordine salvato").waitFor();
 await sync(page);
@@ -1265,6 +1271,7 @@ const gina = DB.persone.find(x => x.nome === "Gina Cliente"), oG = DB.ordini.fin
 check(gina.esito === "cliente" && DB.activities.filter(a => a.partner_id === "R" && a.tipo === "cliente").length === clientiPrima + 1, "+ Un cliente conta nei nuovi clienti");
 check(oG.modo === "io" && rG.quantita === 2 && rG.prezzo > 0 && /double/i.test(rG.nome), "ordine dal catalogo: prodotto, quantità 2, prezzo di listino");
 check(DB.durate.some(d => d.codice === rG.codice && d.giorni === 31), "la durata scelta resta per tutti i clienti");
+check(rG.prezzo === 80 && rG.prezzo_partner === 66.5 && rG.vp === 26.5, "la riga tiene prezzo al cliente, prezzo Partner e VP del listino");
 check(await page.getByText(`finisce il ${await page.evaluate(d => { const [y, m, g] = d.split("-").map(Number); return g + " " + ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"][m - 1]; }, gg(62))}`).first().isVisible()
   || await page.getByText(/finisce il/).first().isVisible(), "quando finisce: 2 × 31 giorni");
 await page.click("button[data-act=ordine-pagato]");
@@ -1456,6 +1463,50 @@ await page.click("button[data-act=codici-tolti]");
 await page.locator(".sheet li", { hasText:"2000099" }).locator("button[data-act=sblocca-codice]").click();
 await page.getByText("Codice sbloccato").waitFor();
 check(!(await page.locator(".sheet li", { hasText:"2000099" }).count()), "codice sbloccato");
+await ctx.close();
+
+// 29. Il listino (solo admin): un prodotto a mano e l'aggiornamento dal PDF (PDF finto, prodotti inventati)
+const pdfFinto = n => { const pagina = []; let y = 560;
+  const el = (str, x, h, w) => ({ str, transform:[h, 0, 0, h, x, y], width:w });
+  pagina.push(el("Integratori prova", 40, 13.5, 120)); y -= 14;
+  for(let i = 0; i < n; i++){
+    const codice = i === 0 ? "900001" : String(900100 + i), prezzo = i === 0 ? "82,00" : "10,00";
+    pagina.push(el(`${codice} Prodotto Pdf ${i === 0 ? "Double Prova (31 giorni)" : i}`, 40, 8.5, 200), el("100 g", 300, 8.5, 20), el(prezzo, 360, 8.5, 20),
+      el("1,50", 400, 8.5, 18), el(i === 0 ? "68,00" : "8,33", 440, 8.5, 20), el("3,40", 520, 8.5, 18), el("7,70", 560, 8.5, 18));
+    y -= 11;
+  }
+  return pagina; };
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.evaluate(items => { window.pdfjsWorker = {}; window.pdfjsLib = { GlobalWorkerOptions:{},
+  getDocument: () => ({ promise:Promise.resolve({ numPages:1, getPage: async () => ({ getTextContent: async () => ({ items }) }) }) }) }; }, pdfFinto(60));
+await page.click("button[data-act=listino]");
+await page.fill("#cerca-listino", "shampoo");
+await page.locator("#risultati-listino button[data-act=prodotto-apri]").first().click();
+await page.fill(".sheet input[name=prezzo_partner]", "10,50");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Prodotto salvato").waitFor();
+await page.click("button[data-act=prodotto-nuovo]");
+await page.fill(".sheet input[name=codice]", "900010"); await page.fill(".sheet input[name=nome]", "Novità Prova");
+await page.fill(".sheet input[name=prezzo_cliente]", "20"); await page.fill(".sheet input[name=prezzo_partner]", "16,67"); await page.fill(".sheet input[name=vp]", "6,8");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Prodotto salvato").waitFor();
+await sync(page);
+check(DB.listino.find(x => x.codice === "900002").prezzo_partner === 10.5 && DB.listino.find(x => x.codice === "900010").vp === 6.8, "l'admin corregge e aggiunge prodotti");
+await page.setInputFiles("#file-listino", { name:"listino.pdf", mimeType:"application/pdf", buffer:Buffer.from("%PDF-finto") });
+await page.locator(".sheet form[data-form=listino-pdf]").waitFor();
+check(await page.getByText("60 prodotti letti").isVisible() && await page.locator(".imp-sezione h3", { hasText:"Nuovi · 59" }).isVisible()
+  && await page.locator(".imp-sezione h3", { hasText:"Prezzi cambiati · 1" }).isVisible(), "PDF: anteprima con nuovi e prezzi cambiati");
+check(await page.locator(".sheet .scelte label", { hasText:"Novità Prova" }).isVisible() && await page.locator(".sheet .scelte label", { hasText:"Shampoo Prova" }).isVisible(),
+  "PDF: chi non è più nel listino, con la spunta");
+await page.locator(".sheet .scelte label", { hasText:"Novità Prova" }).locator("input").uncheck();
+await page.click(".sheet button:has-text('Aggiorna il listino')");
+await page.getByText(/Listino aggiornato/).waitFor();
+await sync(page);
+const L = c => DB.listino.find(x => x.codice === c);
+check(L("900001").prezzo_cliente === 82 && L("900001").prezzo_partner === 68 && L("900001").vp === 3.4 && L("900150").attivo === true && L("900150").categoria === "Integratori prova",
+  "PDF: prezzi aggiornati e prodotti nuovi con la categoria");
+check(L("900002").attivo === false && L("900010").attivo === true, "PDF: chi esce non si cancella, chi è senza spunta resta nel listino");
 await ctx.close();
 
 await browser.close();

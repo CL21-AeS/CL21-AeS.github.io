@@ -246,6 +246,9 @@
       return !x ? "sconosciuto" : x.bloccato ? "bloccato" : x.risposte ? "usato" : x.scade && x.scade < new Date().toISOString().slice(0, 10) ? "scaduto" : "ok"; },
     ordini: async () => (db.ordini || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
     righeOrdini: async () => (db.righe || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
+    listino: async () => { if(!mio()) throw new Error("non_autenticato"); return (db.listino || []).map(x => Object.assign({}, x)).sort((a, b) => a.nome < b.nome ? -1 : 1); },
+    salvaListino: async righe => { const io = mio(); if(!io || !io.is_admin) throw new Error("new row violates row-level security policy");
+      for(const r of righe){ db.listino = (db.listino || []).filter(x => x.codice !== r.codice).concat([Object.assign({}, r)]); } salva(); },
     durate: async () => (db.durate || []).filter(x => x.proprietario === mio().id).map(x => ({ codice:x.codice, giorni:x.giorni })),
     nuovoOrdine: async r => { const pe = (db.persone || []).find(y => y.id === r.persona_id);
       if(!pe || pe.proprietario !== mio().id) throw new Error("non_autorizzato");
