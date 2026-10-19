@@ -2499,6 +2499,9 @@ const TIPI_PASSO = {
   nota: { nome:"Nota", prossima:"Prossima cosa da fare" }
 };
 const PROSSIMA_CHIUSURA = { partner:"Primo passo insieme", cliente:"Quando risentirlo", non_ora:"Quando riprovare", no:"" };
+/* "Non ora": tra quanti mesi risentirlo (il promemoria arriva 2 giorni prima) */
+const RISENTI = [["1", "1 mese"], ["3", "3 mesi"], ["6", "6 mesi"], ["12", "1 anno"]], RISENTI_PRIMA = 2;
+function piuMesi(d, m){ const x = new Date(d + "T00:00:00Z"); x.setUTCMonth(x.getUTCMonth() + m); return x.toISOString().slice(0, 10); }
 const FILTRI_LISTA = [
   { id:"aperti", nome:"Aperti", ok:p => !p.esito || p.esito === "non_ora" },
   { id:"lista", nome:"In lista", ok:p => !p.esito && p.fase === "lista" },
@@ -2518,7 +2521,7 @@ function passiDi(id){ return st.passi.filter(s => s.persona_id === id).sort((a, 
 function indiceFase(f){ return Math.max(0, FASI.findIndex(x => x.id === f)); }
 function aperta(p){ return !p.esito || p.esito === "non_ora"; }
 function passoProposto(p){
-  return p.esito ? "nota" : { lista:"contatto", contattato:"invito", invitato:"piano", piano:"followup", followup:"followup" }[p.fase] || "contatto";
+  return p.esito ? "nota" : { lista:"contatto", contattato:"invito", invitato:"piano", piano:"followup", followup:"chiusura" }[p.fase] || "contatto";
 }
 function testoProssima(p){
   if(!p.prossima_data) return "";
@@ -2569,7 +2572,9 @@ function vPersone(){
   if(st.personaId) return vPersona();
   const filtro = FILTRI_LISTA.find(x => x.id === st.filtroLista) || FILTRI_LISTA[0];
   const q = senzaAccenti(st.cercaLista || "");
-  const l = st.persone.filter(filtro.ok).filter(p => !q || senzaAccenti(p.nome + " " + (p.origine || "")).includes(q))
+  /* i clienti stanno in Clienti, non nella lista */
+  const nellaLista = st.persone.filter(p => p.esito !== "cliente");
+  const l = nellaLista.filter(filtro.ok).filter(p => !q || senzaAccenti(p.nome + " " + (p.origine || "")).includes(q))
     .sort((a, b) => (a.prossima_data || "9999") < (b.prossima_data || "9999") ? -1 : (a.prossima_data || "9999") > (b.prossima_data || "9999") ? 1
       : a.nome.localeCompare(b.nome, "it"));
   return `${vSezioniPersone()}<div class="card">
@@ -2579,7 +2584,7 @@ function vPersone(){
     ${st.persone.length ? `
     <input type="search" id="cerca-lista" class="cerca" placeholder="Cerca un nome…" autocomplete="off" aria-label="Cerca un nome" value="${esc(st.cercaLista || "")}">
     <div class="row wrap scelte-rapide" style="gap:6px;margin-top:8px">${FILTRI_LISTA.map(x => {
-      const n = st.persone.filter(x.ok).length;
+      const n = nellaLista.filter(x.ok).length;
       return `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-lista" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${n}</button>`; }).join("")}</div>
     ${l.length ? `<ul class="persone">${l.map(p => rigaPersona(p)).join("")}</ul>` : `<p class="muted" style="margin:10px 0 0">Nessun nome qui.</p>`}`
     : `<p class="muted" style="margin:8px 0 0">La tua lista è vuota. Scrivi i nomi delle persone che conosci: amici, parenti,
@@ -2596,7 +2601,7 @@ function vPersona(){
   const telefono = tel.replace(/\D/g, "").length >= 6;
   return `<button class="btn link" data-act="torna-lista" style="padding:0">‹ La mia lista</button>
   <div class="card">
-    <div class="spread"><h2>${esc(p.nome)}</h2>${maiComprato(p) ? `<span class="pill g">Mai comprato</span>` : ""}${p.esito ? `<span class="pill ${p.esito === "partner" || p.esito === "cliente" ? "v" : p.esito === "no" ? "r" : "g"}">${ESITI[p.esito]}</span>` : ""}</div>
+    <div class="spread"><h2><button class="nome-modifica" data-act="persona-modifica" aria-label="Modifica i dati di ${esc(p.nome)}">${esc(p.nome)} <span aria-hidden="true">✎</span></button></h2>${maiComprato(p) ? `<span class="pill g">Mai comprato</span>` : ""}${p.esito ? `<span class="pill ${p.esito === "partner" || p.esito === "cliente" ? "v" : p.esito === "no" ? "r" : "g"}">${ESITI[p.esito]}</span>` : ""}</div>
     ${p.contatto || p.origine ? `<p class="small" style="margin:2px 0 0">${[p.contatto, p.origine].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
     ${(() => { const x = p.invito_target_id && st.inviti.find(y => y.id === p.invito_target_id);
       return x ? `<p class="small" style="margin:6px 0 0">Target: <b>${esc(statoInvito(x).txt)}</b>
@@ -2632,7 +2637,6 @@ function vPersona(){
   </div>
   <div class="row" style="gap:6px;justify-content:center">
     ${p.fase !== "lista" ? `<button class="btn small ghost" data-act="${p.nascosta_io ? "rimetti-in-io" : "togli-da-io"}" data-id="${esc(p.id)}">${p.nascosta_io ? "Rimetti in Io" : "Togli da Io"}</button>` : ""}
-    <button class="btn small ghost" data-act="persona-modifica">Modifica i dati</button>
     <button class="btn small ghost" data-act="persona-cancella">Togli dalla lista</button>
   </div>`;
 }
@@ -2715,15 +2719,24 @@ function vSheetPersone(s){
     const tipo = st.passoTipo || passoProposto(p), t = TIPI_PASSO[tipo];
     return `<h2>${esc(nomeSaluto(p.nome))}: segna un passo</h2>
     <div class="opzioni tipi">${Object.keys(TIPI_PASSO).map(k => `<button type="button" class="btn small${k === tipo ? " on" : ""}" data-act="tipo-passo" data-tipo="${k}" aria-pressed="${k === tipo}">${TIPI_PASSO[k].nome}</button>`).join("")}</div>
-    <form data-form="passo" novalidate>
+    ${tipo === "nota" ? `<form data-form="passo" novalidate>
+      <label class="field"><span>La nota</span><textarea name="nota" rows="5" maxlength="1000" aria-label="La nota"></textarea></label>
+      <p class="nota">Le note restano nei dati della persona (toccando il suo nome).</p>
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
+    </form>` : `<form data-form="passo" novalidate>
       <label class="field"><span>Quando</span><input type="date" name="data" max="${oggi()}" value="${oggi()}"></label>
       ${t.come ? `<fieldset class="field"><legend>Come</legend>${opzioni("come", t.come)}</fieldset>
         <fieldset class="field"><legend>${tipo === "piano" ? "Com'è andato" : "Come ha reagito"}</legend>${opzioni("reazione", t.reazione)}</fieldset>` : ""}
       ${tipo === "chiusura" ? `<fieldset class="field"><legend>Com'è finita</legend>${opzioni("esito", Object.values(ESITI))}</fieldset>` : ""}
       <label class="field"><span>Nota <i>(facoltativa)</i></span><input name="nota" maxlength="1000"></label>
-      ${tipo === "chiusura" ? campiProssima("Prossima cosa (per Partner, Cliente o Non ora)", null) : campiProssima(t.prossima, null)}
+      ${tipo === "chiusura" ? `<div data-per-esito="partner" hidden>${campiProssima("Prossima cosa", null)}</div>
+        <fieldset class="field" data-per-esito="non_ora" hidden><legend>Tra quanto lo risenti</legend>
+          <div class="opzioni">${RISENTI.map(([v, t]) => `<label class="chip"><input type="radio" name="risenti" value="${v}"${v === "3" ? " checked" : ""}><span>${t}</span></label>`).join("")}</div>
+          <input type="date" name="risenti_data" min="${piuGiorni(oggi(), 3)}" aria-label="Oppure scegli il giorno">
+          <p class="nota">Te lo ricordo 2 giorni prima.</p></fieldset>`
+        : campiProssima(t.prossima, null)}
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
-    </form>`;
+    </form>`}`;
   }
   if(s === "prossima" && p) return `<h2>Prossima cosa con ${esc(nomeSaluto(p.nome))}</h2>
     <form data-form="prossima" novalidate>
@@ -2879,18 +2892,38 @@ Object.assign(MODULI, {
     const p = st.persone.find(x => x.id === st.personaId);
     if(!p) return;
     const tipo = st.passoTipo || passoProposto(p);
+    /* la nota va nei dati della persona (con la data davanti), non tra i passi */
+    if(tipo === "nota"){
+      const t = f.nota.value.trim();
+      if(!t){ mostraErroreForm(f, "Scrivi la nota."); return; }
+      try{
+        await api.modificaPersona(p.id, { note:(`${dataIt(oggi())}: ${t}` + (p.note ? "\n" + p.note : "")).slice(0, 2000) });
+        await dopoPersone("Nota salvata");
+      }catch(e){ mostraErroreForm(f, messaggio(e)); }
+      return;
+    }
     const scelto = n => (f.querySelector(`input[name=${n}]:checked`) || {}).value || null;
     const esitoTesto = scelto("esito"), esito = esitoTesto ? Object.keys(ESITI).find(k => ESITI[k] === esitoTesto) : null;
     if(tipo === "chiusura" && !esito){ mostraErroreForm(f, "Scegli com'è finita."); return; }
     const data = f.data.value || oggi();
     if(data > oggi()){ mostraErroreForm(f, "Il passo non può essere nel futuro: per quello c'è la prossima cosa."); return; }
-    const pr = leggiProssima(f);
+    let pr = { prossima_data:null, prossima_nota:null };
+    if(tipo !== "chiusura" || esito === "partner") pr = leggiProssima(f);
+    if(tipo === "chiusura" && esito === "non_ora"){
+      const quando = f.risenti_data.value || piuMesi(oggi(), Number(scelto("risenti") || 3));
+      if(quando <= oggi()){ mostraErroreForm(f, "Scegli un giorno nel futuro."); return; }
+      const ricordo = piuGiorni(quando, -RISENTI_PRIMA);
+      pr = { prossima_data:ricordo > oggi() ? ricordo : oggi(), prossima_nota:`da risentire il ${dataIt(quando)}` };
+    }
     try{
       await api.nuoviPassi([{ id:uuid(), persona_id:p.id, tipo, data, come:scelto("come"), reazione:scelto("reazione"),
         esito:tipo === "chiusura" ? esito : null, nota:f.nota.value.trim() || null }]);
       /* un passo nuovo riporta la persona su Io, se l'avevo tolta */
-      await api.modificaPersona(p.id, Object.assign((tipo === "chiusura" && esito === "no") ? { prossima_data:null, prossima_nota:null } : pr, { nascosta_io:false }));
-      await dopoPersone(`${TIPI_PASSO[tipo].nome}${tipo === "chiusura" ? " · " + ESITI[esito] : ""} segnato`);
+      await api.modificaPersona(p.id, Object.assign(pr, { nascosta_io:false }));
+      /* chiuso come Cliente: esce dalla lista ed entra nei Clienti, con la sua scheda */
+      if(tipo === "chiusura" && esito === "cliente"){ st.vista = "persone"; st.sezPersone = "clienti"; st.filtroClienti = "tutti"; }
+      await dopoPersone(tipo === "chiusura" && esito === "cliente" ? `${nomeSaluto(p.nome)} è tra i tuoi clienti`
+        : `${TIPI_PASSO[tipo].nome}${tipo === "chiusura" ? " · " + ESITI[esito] : ""} segnato`);
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
   async prossima(f){
@@ -2900,6 +2933,14 @@ Object.assign(MODULI, {
 });
 
 document.addEventListener("change", e => {
+  /* nella chiusura si vede solo quello che serve all'esito scelto */
+  if(e.target && e.target.name === "esito" && e.target.form){
+    const k = Object.keys(ESITI).find(x => ESITI[x] === e.target.value);
+    e.target.form.querySelectorAll("[data-per-esito]").forEach(d => { d.hidden = d.dataset.perEsito !== k; });
+  }
+  if(e.target && e.target.name === "risenti" && e.target.form) e.target.form.risenti_data.value = "";
+  if(e.target && e.target.name === "risenti_data" && e.target.value && e.target.form)
+    e.target.form.querySelectorAll("input[name=risenti]").forEach(r => { r.checked = false; });
   /* scegliendo "Domani / Tra 3 giorni…" la data scritta a mano si svuota, e viceversa */
   if(e.target && e.target.name === "tra" && e.target.form) e.target.form.prossima_data.value = "";
   if(e.target && e.target.name === "prossima_data" && e.target.value && e.target.form){
