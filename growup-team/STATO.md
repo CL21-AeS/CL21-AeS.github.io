@@ -1,7 +1,36 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 17 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 20 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
+
+## Ripartire da qui (fermi la notte tra il 19 e il 20 ottobre 2026)
+
+**Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
+dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **028** (027 incollata da
+Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla #73; **#74 aperta** (solo il permesso
+del listino nei file: su Supabase è già attivo). Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
+
+**Fatto il 19-20 ottobre** (dettagli più sotto, in ordine di data): import da Amway degli ordini e dell'elenco clienti
+(telefono, ultimo ordine, "Mai comprato" in Lista); Modifica dell'ordine e dei dati del cliente; etichette Da consegnare /
+Da pagare; "Scrivigli" con tutti i prodotti che finiscono entro 7 giorni; + Contatto e + Piano di Io che aprono il nome e
+il passo; scheda della persona (chiusura dopo il follow-up, Non ora con promemoria 2 giorni prima, Nota nei dati, dati
+modificabili toccando il nome, anche per i clienti); "+ Un nome" resta nella lista; Target anche su Telegram; "Non ora"
+solo in Da riprendere; Da confermare / Togli dalla struttura / Blocca l'app; listino nel database con prezzo Partner e
+VP negli ordini e aggiornamento dal PDF.
+
+**Da fare / in sospeso per Stefano**:
+- Unire la PR #74.
+- **Importare subito il report mappe**: dalla 027 tutti (tranne gli admin) sono "Da confermare" e chi ha qualcuno sotto
+  lo può togliere; il primo import conferma chi è nel report.
+- Provare con dati veri Target, Lista, Clienti (import ordini e clienti) e i tempi (preavviso 7 giorni, fermo dopo 45,
+  verifica dopo 8).
+- Prima del lancio: prova su iPhone con Alessia, copia di sicurezza, pilota con 2-3 leader, messaggio al gruppo.
+- Sicurezza: verifica in due passaggi su GitHub, Supabase e Google; privacy dell'email su GitHub; richiesta al supporto
+  GitHub di pulire la storia (dati reali di prima e ora anche `catalogo.js`, il listino per l'incaricato).
+- In futuro: una sezione "analisi della persona" (bonus per linea), fuori dalle schermate di tutti i giorni.
+
+**Nota tecnica per Claude**: il connettore Supabase non applica le istruzioni con cancellazioni (`drop`, `delete`):
+va in timeout. Si applicano a pezzi senza `drop` (oggetti nuovi) e il resto lo incolla Stefano nell'SQL Editor.
 
 ## Ripartire da qui (fermi la sera del 17 ottobre 2026)
 
