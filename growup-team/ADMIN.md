@@ -14,6 +14,7 @@ funzione da admin.
 | Scheda di un partner → **Correggi il codice Amway** | cambia il codice Amway di chi usa l'app (o il proprio, in fondo alla pagina Io) | solo per un errore di battitura all'ingresso: l'import di quella persona lo segnala ("chiedi a Stefano e Alessia di correggerlo") |
 | Scheda di chi usa l'app → **Blocca l'app / Sblocca l'app** | blocca o sblocca l'app di chiunque (non di sé né di un altro admin) | chi è bloccato non vede più niente; i dati restano e i VP contano; sponsor e upline vedono "Bloccato" |
 | Scheda di chi è **Da confermare** → **Togli dalla struttura** | lo possono fare anche sponsor e upline | cancella profilo e dati di chi non è ancora confermato dal report Amway; il suo telefono vede "accesso tolto" |
+| In fondo alle pagine → **Listino** | cerca, corregge e aggiunge prodotti (prezzo al cliente, prezzo Partner, VP); **Aggiorna dal PDF** legge il listino Amway sul telefono e mostra nuovi, prezzi cambiati e usciti prima di salvare | prodotti nuovi (5-6 volte l'anno) a mano; cambio prezzi annuale dal PDF |
 | In fondo alle pagine → **Codici Amway tolti** | elenco dei codici delle persone tolte, con **Sblocca** | con un codice tolto non si rientra finché non lo sblocchi |
 | Scheda di chi usa l'app → **Nuovo link personale** | crea un link personale nuovo; quello vecchio smette di funzionare | per chi ha perso il suo link |
 | In fondo alle pagine → **Scarica la copia dei dati** | file `growup-copia-AAAA-MM-GG.json` con tutte le tabelle | copia di sicurezza mensile (procedura in `LEGGIMI.md`) |
@@ -71,5 +72,5 @@ Dal telefono nessuno può darsi il ruolo da solo (il campo `is_admin` non si scr
 ## Funzioni del database riservate agli admin
 
 `sono_admin()` è il controllo. Lo usano: `nuova_chiave_per`, `copia_dati`, `imposta_codice_amway` (per gli altri),
-`crea_invito_sopra`, `blocca_app`, `codici_tolti_elenco`, `sblocca_codice`, e le policy di scrittura di `stage_requirements`, `settings`, `percent_levels`.
+`crea_invito_sopra`, la scrittura del `listino`, `blocca_app`, `codici_tolti_elenco`, `sblocca_codice`, e le policy di scrittura di `stage_requirements`, `settings`, `percent_levels`.
 Funzioni da admin tolte nel tempo: `cambia_sponsor` (17 ottobre 2026: la posizione la decide il report Amway).

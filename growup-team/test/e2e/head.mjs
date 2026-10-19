@@ -12,6 +12,10 @@ const stages = [
  {ordine:7,chiave:"builder_18",nome:"Bronze Builder 18%",vp_personali:200,vp_gruppo:7000,linee:3,vp_linea:600,pagamenti_max:12,mesi_finestra:18,guadagno_mese:1980,struttura_calcolo:"x"},
  {ordine:8,chiave:"argento",nome:"Argento 21%",vp_personali:0,vp_gruppo:10000,linee:2,linee_obiettivo:3,guadagno_mese:3750,struttura_calcolo:"200 VP personali + 3 linee da 4.100 VP"}];
 const DB = { partners:[{id:"R",nome:"Stefano e Alessia",codice_invito:"RRRR22",chiave:"a".repeat(32),stato:"gestito",is_admin:true}],
+  /* il listino (prodotti inventati) */
+  listino:[{codice:"900001",nome:"Double Prova (31 giorni)",formato:"140 g",categoria:"Integratori",prezzo_cliente:80,prezzo_partner:66.5,vp:26.5,attivo:true},
+    {codice:"900002",nome:"Shampoo Prova",formato:"250 ml",categoria:"Capelli",prezzo_cliente:12.4,prezzo_partner:10.3,vp:4.1,attivo:true},
+    {codice:"900003",nome:"Vecchio Prova",formato:"1 pz",categoria:"Casa",prezzo_cliente:5,prezzo_partner:4,vp:1.5,attivo:false}],
   accessi:[], aggiunti:[], anon:0, activities:[], goals:[], mgoals:[], joins:[], stages,
   settings:[{chiave:"obiettivi_proposti",valore:{contatti:10,piani:3,vp_mese:100}},{chiave:"fonte_guadagni",valore:"Simulatore di reddito ufficiale Amway, ottobre 2026"},{chiave:"avviso_guadagni",valore:"Cifre indicative."}]};
 const errori = [];

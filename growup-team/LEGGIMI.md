@@ -73,7 +73,9 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 24. `supabase/027_conferma_e_blocco.sql` — "Da confermare" finché il codice Amway non compare in un report importato;
     togliere dalla struttura chi non è confermato (sponsor, upline, admin); l'admin blocca l'app. Ha delle
     cancellazioni: si incolla nell'SQL Editor (si può rilanciare)
-25. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+25. `supabase/028_listino.sql` — il listino Amway nel database (lo leggono gli utenti dell'app, lo scrive l'admin);
+    prezzo Partner e VP anche sulle righe degli ordini
+26. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 17. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 18. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.

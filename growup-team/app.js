@@ -18,6 +18,7 @@ const CHIAVE_SALVATA = "growup-team.chiave-salvata";
 const CHIAVE_INSTALLA_NO = "growup-team.installa-no";
 const CHIAVE_ULTIMA_COPIA = "growup-team.ultima-copia";
 const CHIAVE_RISPOSTA_T = "growup-team.risposta-target";
+const CHIAVE_LISTINO = "growup-team.listino";          // l'ultimo listino letto, per cercare i prodotti anche con poco segnale
 const CHIAVE_WA = "growup-team.whatsapp";              // il mio numero WhatsApp (solo su questo telefono) per le risposte del Target  // risposte Target aperte prima di entrare
 const FORMA_CODICE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
 const FORMA_CHIAVE = /^[0-9a-f]{32}$/;
@@ -94,6 +95,9 @@ function creaApi(){
     ordini:       () => q(sb.from("ordini").select("*")),
     righeOrdini:  () => q(sb.from("righe_ordine").select("*")),
     durate:       () => q(sb.from("durate").select("codice, giorni")),
+    /* il listino Amway: lo leggono gli utenti dell'app, lo scrive solo l'admin (RLS) */
+    listino:      () => q(sb.from("listino").select("codice, nome, formato, categoria, prezzo_cliente, prezzo_partner, vp, attivo").order("nome").range(0, 4999)),
+    salvaListino: righe => q(sb.from("listino").upsert(righe, { onConflict:"codice" })),
     nuovoOrdine:  riga => q(sb.from("ordini").insert(riga)),
     nuoviOrdini:  righe => q(sb.from("ordini").insert(righe)),
     nuoveRighe:   righe => q(sb.from("righe_ordine").insert(righe)),
@@ -148,6 +152,7 @@ const st = {
   numeriLista: {},
   inviti: [], sezPersone: "lista", invitoId: null, archiviatiT: false,  // il Target (solo miei)
   ct: null,               // la pagina del contatto (le otto domande)
+  listino: [],            // il listino Amway (dal database; una copia sul telefono)
   ordini: [], righe: [], durate: new Map(), filtroClienti: "tutti",   // i Clienti (solo miei)
   impOrdini: null,         // l'import degli ordini dal sito Amway (anteprima)
   bozza: null, cercaProdotto: "", tipoMsg: "finendo", varianteMsg: 0, durataCodice: null, nuovoCliente: false,        // per la scheda partner: solo i numeri della sua lista
@@ -439,6 +444,7 @@ async function caricaTutto(){
   await caricaPersone();
   await caricaInviti();
   await caricaClienti();
+  await caricaListino();
 
   /* nuova settimana / nuovo mese: si riparte dall'ultimo obiettivo scelto */
   const g = (goals || [])[0];
@@ -847,7 +853,8 @@ function vFondo(){
       <button class="btn small ghost" data-act="esci">Esci</button>
     </div>
     ${st.profilo.is_admin ? vCopiaDati() : ""}
-    ${st.profilo.is_admin ? `<div class="row" style="justify-content:center;margin-top:6px"><button class="btn small ghost" data-act="codici-tolti">Codici Amway tolti</button></div>` : ""}
+    ${st.profilo.is_admin ? `<div class="row" style="justify-content:center;margin-top:6px;gap:6px"><button class="btn small ghost" data-act="listino">Listino</button>
+      <button class="btn small ghost" data-act="codici-tolti">Codici Amway tolti</button></div>` : ""}
     <p class="nota" style="text-align:center">${esc(st.profilo.nome)} · codice d'invito <b>${esc(st.profilo.codice_invito)}</b><br>
       ${st.profilo.codice_amway ? `Codice Amway Partner <b>${esc(st.profilo.codice_amway)}</b>` : "Codice Amway Partner non ancora scritto"}
       ${st.profilo.is_admin ? `<button class="btn link small" data-act="codice" data-id="${esc(st.profilo.id)}" style="min-height:0;padding:0 4px">Correggi</button>` : ""}<br>
@@ -1964,7 +1971,7 @@ async function eseguiImport(f){
 /* ---- 10. Fogli in basso ---- */
 function vSheet(){
   const s = st.sheet;
-  const sp = vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s);
+  const sp = vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s) || vSheetListino(s);
   if(sp) return sp;
   if(s === "codici-tolti") return `<h2>Codici Amway tolti</h2>
     <p class="small">Le persone tolte dalla struttura prima della conferma: con questi codici non si entra finché non li sblocchi.</p>
@@ -3490,6 +3497,10 @@ const FILTRI_CLIENTI = [
   { id:"mai", nome:"Mai ordinato", ok:p => !p.non_compra && statoCliente(p).key === "mai" },
   { id:"persi", nome:"Non comprano più", ok:p => p.non_compra }];
 
+async function caricaListino(){
+  try{ st.listino = await api.listino() || []; salvaLocale(CHIAVE_LISTINO, JSON.stringify(st.listino)); }
+  catch(e){ try{ st.listino = JSON.parse(leggiLocale(CHIAVE_LISTINO) || "[]"); }catch(x){ st.listino = []; } }
+}
 async function caricaClienti(){
   try{
     const [ordini, righe, durate] = await Promise.all([api.ordini(), api.righeOrdini(), api.durate()]);
@@ -3501,8 +3512,19 @@ function clientiTutti(){ return st.persone.filter(p => p.esito === "cliente"); }
 function ordiniDi(pid){ return st.ordini.filter(o => o.persona_id === pid).sort((a, b) => a.data < b.data ? 1 : a.data > b.data ? -1 : a.creato_il < b.creato_il ? 1 : -1); }
 function righeDi(oid){ return st.righe.filter(r => r.ordine_id === oid); }
 function giorniDi(codice){ return st.durate.get(codice) || DURATA_BASE; }
-function prodottoCatalogo(codice){ const r = (window.CATALOGO_AMWAY || []).find(x => x[0] === codice); return r ? { codice:r[0], nome:r[1], formato:r[2], prezzo:r[4] } : null; }
-function totaleOrdine(o){ return righeDi(o.id).reduce((t, r) => t + (Number(r.prezzo) || 0) * r.quantita, 0); }
+function prodottoCatalogo(codice){ const r = st.listino.find(x => x.codice === codice);
+  return r ? { codice:r.codice, nome:r.nome, formato:r.formato, prezzo:numOrNull(r.prezzo_cliente), prezzo_partner:numOrNull(r.prezzo_partner), vp:numOrNull(r.vp) } : null; }
+function numOrNull(v){ return v == null || v === "" || isNaN(Number(v)) ? null : Number(v); }
+/* i totali di un ordine: al cliente, Partner e VP (VP e prezzo Partner dal listino: informazione, i VP del mese restano quelli del report) */
+function totaliRighe(righe){
+  const t = { cliente:0, partner:0, vp:0, conPartner:false, conVp:false };
+  for(const r of righe){ const q = Number(r.quantita) || 0;
+    t.cliente += (numOrNull(r.prezzo) || 0) * q;
+    if(numOrNull(r.prezzo_partner) != null){ t.partner += Number(r.prezzo_partner) * q; t.conPartner = true; }
+    if(numOrNull(r.vp) != null){ t.vp += Number(r.vp) * q; t.conVp = true; } }
+  return t;
+}
+function testoTotali(t){ return [`Cliente <b>${euro(t.cliente)}</b>`, t.conPartner ? `Partner <b>${euro(t.partner)}</b>` : "", t.conVp ? `<b>${num(t.vp)}</b> VP` : ""].filter(Boolean).join(" · "); }
 /* i prodotti che segue: per ognuno l'ultimo acquisto, e quando finisce (giorni × quantità) */
 function scaffale(p){
   const ultimo = new Map();
@@ -3655,8 +3677,11 @@ function vCliente(){
   </div>
   ${ord.length ? `<div class="card">
     <span class="eyebrow">Ordini</span>
-    <ul class="oggi">${ord.map(o => { const t = totaleOrdine(o) || Number(o.importo) || 0, rr = righeDi(o.id);
-      return `<li><span class="grow"><b>${dataIt(o.data)}</b> · ${o.modo === "io" ? "fatto da me" : "dal sito"}${t ? ` · ${euro(t)}` : ""}${o.vp ? ` · ${num(o.vp)} VP` : ""}<br>
+    <ul class="oggi">${ord.map(o => { const rr = righeDi(o.id), tr = totaliRighe(rr);
+      /* con i prodotti: i totali dalle righe (i VP dell'ordine importato restano quelli di Amway); senza: valore e VP del sito */
+      const totali = rr.length ? ` · ${euro(tr.cliente)}${tr.conPartner ? ` · Partner ${euro(tr.partner)}` : ""}${o.vp ? ` · ${num(o.vp)} VP` : tr.conVp ? ` · ${num(tr.vp)} VP` : ""}`
+        : `${Number(o.importo) ? ` · ${euro(o.importo)}` : ""}${o.vp ? ` · ${num(o.vp)} VP` : ""}`;
+      return `<li><span class="grow"><b>${dataIt(o.data)}</b> · ${o.modo === "io" ? "fatto da me" : "dal sito"}${totali}<br>
         <span class="small">${rr.length ? rr.map(r => esc(r.nome) + (r.quantita > 1 ? ` × ${r.quantita}` : "")).join(", ")
           : `<button class="btn link small" data-act="ordine-modifica" data-id="${esc(o.id)}" style="min-height:0;padding:0">+ Aggiungi i prodotti</button>`}
           ${o.nota ? `<br>${esc(o.nota)}` : ""}</span>
@@ -3713,7 +3738,7 @@ function vSheetClienti(s){
   const p = st.persone.find(x => x.id === st.personaId);
   const annulla = `<button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>`;
   if(s === "ordine" && p){
-    const b = st.bozza, tot = b.righe.reduce((t, r) => t + (Number(r.prezzo) || 0) * r.quantita, 0);
+    const b = st.bozza;
     return `<h2>${b.ordineId ? "Modifica l'ordine" : `Ordine di ${esc(nomeSaluto(p.nome))}`}</h2>
     <form data-form="ordine-cliente" novalidate>
       ${b.numero ? `<p class="small">Ordine n. ${esc(b.numero)} dal sito Amway${b.vp ? ` · ${num(b.vp)} VP` : ""}: il numero resta quello.
@@ -3724,11 +3749,12 @@ function vSheetClienti(s){
           `<label class="chip"><input type="radio" name="modo" value="${v}" data-bozza="modo"${b.modo === v ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>
       <fieldset class="field"><legend>Prodotti</legend>
         ${b.righe.length ? `<ul class="righe-ordine">${b.righe.map((r, i) => `<li>
-          <span class="grow"><b>${esc(r.nome)}</b><br><span class="small">dura <input class="mini" type="number" min="1" max="3650" inputmode="numeric" value="${r.giorni}" data-riga="${i}" data-campo="giorni" aria-label="Giorni che dura"> giorni</span></span>
+          <span class="grow"><b>${esc(r.nome)}</b>${r.prezzo_partner != null || r.vp != null ? `<br><span class="small">${[r.prezzo_partner != null ? "Partner " + euro(r.prezzo_partner) : "",
+            r.vp != null ? num(r.vp) + " VP" : ""].filter(Boolean).join(" · ")}</span>` : ""}<br><span class="small">dura <input class="mini" type="number" min="1" max="3650" inputmode="numeric" value="${r.giorni}" data-riga="${i}" data-campo="giorni" aria-label="Giorni che dura"> giorni</span></span>
           <span class="qta"><button type="button" class="btn small ghost" data-act="riga-meno" data-i="${i}" aria-label="Uno in meno">−</button><b>${r.quantita}</b>
             <button type="button" class="btn small ghost" data-act="riga-piu" data-i="${i}" aria-label="Uno in più">+</button></span>
           <input class="mini prezzo" type="text" inputmode="decimal" value="${r.prezzo != null ? String(r.prezzo).replace(".", ",") : ""}" placeholder="€" data-riga="${i}" data-campo="prezzo" aria-label="Prezzo"></li>`).join("")}</ul>
-          <p class="small" style="margin:6px 0 0">Totale <b id="totale-ordine">${euro(tot)}</b></p>` : `<p class="small muted">Cerca i prodotti qui sotto.</p>`}
+          <p class="small" style="margin:6px 0 0" id="totale-ordine">Totale · ${testoTotali(totaliRighe(b.righe))}</p>` : `<p class="small muted">Cerca i prodotti qui sotto.</p>`}
         <input type="search" id="cerca-prodotto" class="cerca" placeholder="Cerca un prodotto Amway (nome o codice)…" autocomplete="off" value="${esc(st.cercaProdotto || "")}">
         <ul class="risultati-prodotto" id="risultati-prodotto">${risultatiProdotto(st.cercaProdotto)}</ul>
       </fieldset>
@@ -3780,14 +3806,18 @@ function vSheetClienti(s){
 function risultatiProdotto(q){
   const t = senzaAccenti(q || "");
   if(t.length < 2) return "";
-  const cat = (window.CATALOGO_AMWAY || []).filter(r => senzaAccenti(r[0] + " " + r[1]).includes(t)).slice(0, 8);
-  return cat.map(r => `<li><button type="button" class="persona" data-act="aggiungi-prodotto" data-codice="${esc(r[0])}">
-      <span class="grow">${esc(r[1])}<br><span class="small">${esc([r[0], r[2], euro(r[4])].filter(Boolean).join(" · "))}</span></span><b>+</b></button></li>`).join("")
+  const cat = st.listino.filter(r => r.attivo !== false && senzaAccenti(r.codice + " " + r.nome).includes(t)).slice(0, 8);
+  return cat.map(r => `<li><button type="button" class="persona" data-act="aggiungi-prodotto" data-codice="${esc(r.codice)}">
+      <span class="grow">${esc(r.nome)}<br><span class="small">${esc([r.codice, r.formato, r.prezzo_cliente != null ? euro(r.prezzo_cliente) : "",
+        r.prezzo_partner != null ? "Partner " + euro(r.prezzo_partner) : "", r.vp != null ? num(r.vp) + " VP" : ""].filter(Boolean).join(" · "))}</span></span><b>+</b></button></li>`).join("")
     + `<li><button type="button" class="persona" data-act="aggiungi-libero"><span class="grow"><i>Non c'è: aggiungi "${esc(q.trim())}"</i></span><b>+</b></button></li>`;
 }
 function nuovaBozza(righe){
-  return { data:oggi(), modo:"sito", nota:"", righe:(righe || []).map(r => ({ codice:r.codice, nome:r.nome, quantita:r.quantita || 1,
-    prezzo:r.prezzo != null ? Number(r.prezzo) : (prodottoCatalogo(r.codice) || {}).prezzo ?? null, giorni:giorniDi(r.codice) })) };
+  return { data:oggi(), modo:"sito", nota:"", righe:(righe || []).map(r => { const c = prodottoCatalogo(r.codice) || {};
+    return { codice:r.codice, nome:r.nome, quantita:r.quantita || 1,
+      prezzo:r.prezzo != null ? Number(r.prezzo) : c.prezzo ?? null,
+      prezzo_partner:r.prezzo_partner != null ? Number(r.prezzo_partner) : c.prezzo_partner ?? null,
+      vp:r.vp != null ? Number(r.vp) : c.vp ?? null, giorni:giorniDi(r.codice) }; }) };
 }
 async function salvaOrdine(pid, b){
   /* un ordine che c'è già (anche importato dal sito): si cambiano data, modo e nota, e i prodotti si riscrivono */
@@ -3795,7 +3825,7 @@ async function salvaOrdine(pid, b){
   if(b.ordineId){ await api.aggiornaOrdine(id, campi); await api.cancellaRighe(id); }
   else await api.nuovoOrdine(Object.assign({ id, persona_id:pid }, campi));
   if(b.righe.length) await api.nuoveRighe(b.righe.map(r => ({ id:uuid(), ordine_id:id, codice:r.codice, nome:r.nome.slice(0, 160), quantita:r.quantita,
-    prezzo:r.prezzo === "" || r.prezzo == null || isNaN(Number(r.prezzo)) ? null : Number(r.prezzo) })));
+    prezzo:numOrNull(r.prezzo), prezzo_partner:numOrNull(r.prezzo_partner), vp:numOrNull(r.vp) })));
   /* la durata scelta vale per tutti i miei clienti */
   for(const r of b.righe){ const g = Math.max(1, Math.min(3650, Number(r.giorni) || DURATA_BASE));
     if(g !== giorniDi(r.codice)) await api.salvaDurata(r.codice, g); }
@@ -3833,14 +3863,15 @@ Object.assign(AZIONI, {
     if(!c) return;
     const r = st.bozza.righe.find(y => y.codice === c.codice);
     if(r) r.quantita = Math.min(99, r.quantita + 1);
-    else st.bozza.righe.push({ codice:c.codice, nome:c.nome + (c.formato ? ` (${c.formato})` : ""), quantita:1, prezzo:c.prezzo, giorni:giorniDi(c.codice) });
+    else st.bozza.righe.push({ codice:c.codice, nome:c.nome + (c.formato ? ` (${c.formato})` : ""), quantita:1, prezzo:c.prezzo,
+      prezzo_partner:c.prezzo_partner, vp:c.vp, giorni:giorniDi(c.codice) });
     st.cercaProdotto = ""; render();
   },
   "aggiungi-libero"(){
     const nome = (st.cercaProdotto || "").trim();
     if(!nome) return;
     const codice = "P-" + senzaAccenti(nome).replace(/[^a-z0-9]+/g, "").slice(0, 18);
-    st.bozza.righe.push({ codice, nome:nome.slice(0, 160), quantita:1, prezzo:null, giorni:giorniDi(codice) });
+    st.bozza.righe.push({ codice, nome:nome.slice(0, 160), quantita:1, prezzo:null, prezzo_partner:null, vp:null, giorni:giorniDi(codice) });
     st.cercaProdotto = ""; render();
   },
   "riga-piu"(el){ const r = st.bozza.righe[Number(el.dataset.i)]; r.quantita = Math.min(99, r.quantita + 1); render(); },
@@ -3911,7 +3942,7 @@ document.addEventListener("input", e => {
     const r = st.bozza.righe[Number(t.dataset.riga)];
     if(t.dataset.campo === "prezzo") r.prezzo = t.value.trim() ? numIt(t.value) : null; else r.giorni = Number(t.value) || DURATA_BASE;
     const tot = document.getElementById("totale-ordine");
-    if(tot) tot.textContent = euro(st.bozza.righe.reduce((s, x) => s + (Number(x.prezzo) || 0) * x.quantita, 0));
+    if(tot) tot.innerHTML = "Totale · " + testoTotali(totaliRighe(st.bozza.righe));
   }
 });
 document.addEventListener("change", e => { const t = e.target; if(t && st.bozza && t.dataset && t.dataset.bozza) st.bozza[t.dataset.bozza] = t.value; });
@@ -4106,6 +4137,153 @@ Object.assign(MODULI, {
   }
 });
 document.addEventListener("change", e => { if(e.target && e.target.id === "file-ordini") leggiFileOrdini(e.target.files && [...e.target.files]); });
+
+/* ---- 11f. Il listino Amway (solo admin): prodotti a mano e aggiornamento dal PDF ----
+   Il PDF si legge sul telefono con pdf.js (caricato solo qui, con il controllo d'integrità); non si salva.
+   I prodotti usciti dal listino non si cancellano: diventano "non nel listino" e spariscono dalla ricerca. */
+const PDFJS = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/";
+const PDFJS_FILE = [["pdf.min.js", "sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e"],
+                    ["pdf.worker.min.js", "sha384-SnzOobpRMLXZ52iJvZm/C0fYw0OQemTXzTjIsdsfMcrCtCEe9qgzxTd3RSklO5x2"]];
+function caricaScript(src, integrity){
+  return new Promise((ok, ko) => { const el = document.createElement("script");
+    el.src = src; el.integrity = integrity; el.crossOrigin = "anonymous"; el.onload = ok; el.onerror = () => ko(new Error("pdfjs"));
+    document.head.appendChild(el); });
+}
+/* il lettore e il suo "worker" nella pagina stessa (niente worker separati: la sicurezza della pagina non li permette) */
+async function caricaPdfJs(){
+  if(window.pdfjsLib && window.pdfjsWorker) return;
+  for(const [f, h] of PDFJS_FILE) await caricaScript(PDFJS + f, h);
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js";
+}
+const PREZZI_LISTINO = ["prezzo_cliente", "prezzo_partner", "vp"];
+function rigaListino(p, attivo){ return { codice:p.codice, nome:String(p.nome).slice(0, 200), formato:(p.formato || "").slice(0, 80) || null,
+  categoria:(p.categoria || "").slice(0, 120) || null, prezzo_cliente:numOrNull(p.prezzo_cliente), prezzo_partner:numOrNull(p.prezzo_partner),
+  vp:numOrNull(p.vp), attivo }; }
+function confrontaListino(prodotti){
+  const ora = new Map(st.listino.map(x => [x.codice, x])), nelPdf = new Set(prodotti.map(p => p.codice));
+  const nuovi = prodotti.filter(p => !ora.has(p.codice) || ora.get(p.codice).attivo === false);
+  const cambiati = prodotti.filter(p => { const x = ora.get(p.codice);
+    return x && x.attivo !== false && PREZZI_LISTINO.some(k => numOrNull(x[k]) !== numOrNull(p[k])); });
+  const usciti = st.listino.filter(x => x.attivo !== false && !nelPdf.has(x.codice));
+  return { prodotti, nuovi, cambiati, usciti };
+}
+async function leggiPdfListino(file){
+  if(!file) return;
+  st.errore = ""; st.occupato = true; render();
+  try{
+    await caricaPdfJs();
+    const doc = await window.pdfjsLib.getDocument({ data:new Uint8Array(await file.arrayBuffer()), isEvalSupported:false, disableFontFace:true }).promise;
+    const righe = [];
+    for(let i = 1; i <= doc.numPages; i++){ const c = await (await doc.getPage(i)).getTextContent(); righe.push(...righePdf(c.items)); }
+    const r = leggiListino(righe);
+    if(r.prodotti.length < 50) throw new Error("non_listino");
+    st.impListino = Object.assign(confrontaListino(r.prodotti), { dubbi:r.dubbi });
+    st.sheet = "listino-pdf";
+  }catch(e){
+    st.errore = /pdfjs/.test(e.message) ? "Non riesco a caricare il lettore dei PDF: controlla la connessione e riprova."
+      : e.message === "non_listino" ? "Questo PDF non sembra il listino prezzi Amway (non trovo le righe dei prodotti)."
+      : "Non riesco a leggere il PDF.";
+  }
+  st.occupato = false; render();
+}
+function rigaProdotto(x){
+  return `<li><button type="button" class="persona" data-act="prodotto-apri" data-codice="${esc(x.codice)}">
+    <span class="grow"><b>${esc(x.nome)}</b>${x.attivo === false ? ` <span class="pill mini">non nel listino</span>` : ""}<br>
+      <span class="small">${esc([x.codice, x.formato, x.prezzo_cliente != null ? euro(x.prezzo_cliente) : "", x.prezzo_partner != null ? "Partner " + euro(x.prezzo_partner) : "",
+        x.vp != null ? num(x.vp) + " VP" : ""].filter(Boolean).join(" · "))}</span></span><b>›</b></button></li>`;
+}
+function risultatiListino(q){
+  const t = senzaAccenti(q || "");
+  if(t.length < 2) return "";
+  const l = st.listino.filter(x => senzaAccenti(x.codice + " " + x.nome).includes(t)).slice(0, 12);
+  return l.length ? l.map(rigaProdotto).join("") : `<li class="muted small">Nessun prodotto così.</li>`;
+}
+function vSheetListino(s){
+  if(s === "listino") return `<h2>Listino Amway</h2>
+    <p class="small">${plur(st.listino.filter(x => x.attivo !== false).length, "prodotto", "prodotti")} nel listino. Lo vedono solo gli utenti dell'app;
+      lo cambi solo tu. Prezzo al cliente, prezzo Partner e VP finiscono negli ordini dei clienti.</p>
+    <input type="search" id="cerca-listino" class="cerca" placeholder="Cerca un prodotto (nome o codice)…" autocomplete="off" value="${esc(st.cercaListino || "")}">
+    <ul class="persone" id="risultati-listino">${risultatiListino(st.cercaListino)}</ul>
+    <div class="row" style="gap:8px;margin-top:12px">
+      <button class="btn grow" data-act="prodotto-nuovo">+ Prodotto</button>
+      <label class="btn primary grow">${st.occupato ? "Leggo il PDF…" : "Aggiorna dal PDF"}<input type="file" id="file-listino" accept=".pdf,application/pdf" hidden></label></div>
+    <p class="nota">Aggiorna dal PDF: scegli il "Listino prezzi per l'incaricato" di Amway. Il file resta sul telefono; prima di cambiare
+      qualcosa vedi cosa cambia.</p>
+    ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
+    <button class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>`;
+  if(s === "prodotto"){
+    const x = st.listino.find(y => y.codice === st.prodottoCodice) || {}, nuovo = !x.codice;
+    const campo = (n, t, v, extra) => `<label class="field grow"><span>${t}</span><input name="${n}" value="${esc(v == null ? "" : String(v).replace(".", ","))}" ${extra || ""}></label>`;
+    return `<h2>${nuovo ? "Un prodotto nuovo" : "Il prodotto"}</h2>
+    <form data-form="prodotto" novalidate>
+      ${campo("codice", "Codice Amway", x.codice, `inputmode="numeric" maxlength="10"${nuovo ? "" : " readonly"}`)}
+      ${campo("nome", "Nome", x.nome, `maxlength="200"`)}
+      <div class="row" style="gap:8px">${campo("formato", "Contenuto", x.formato, `maxlength="80" placeholder="es. 140 g"`)}
+        ${campo("categoria", "Categoria", x.categoria, `maxlength="120"`)}</div>
+      <div class="row" style="gap:8px">${campo("prezzo_cliente", "Prezzo al cliente €", x.prezzo_cliente, `inputmode="decimal"`)}
+        ${campo("prezzo_partner", "Prezzo Partner €", x.prezzo_partner, `inputmode="decimal"`)}
+        ${campo("vp", "VP", x.vp, `inputmode="decimal"`)}</div>
+      <label class="check"><input type="checkbox" name="attivo"${x.attivo === false ? "" : " checked"}> Nel listino (si trova negli ordini)</label>
+      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="listino">Indietro</button><button class="btn primary grow">Salva</button></div>
+    </form>`;
+  }
+  if(s === "listino-pdf" && st.impListino){
+    const a = st.impListino, quanti = (l, n) => l.slice(0, n).map(p => esc(p.nome)).join(", ") + (l.length > n ? ` e altri ${l.length - n}` : "");
+    const prima = new Map(st.listino.map(x => [x.codice, x]));
+    return `<h2>Listino dal PDF</h2>
+    <p class="small">${plur(a.prodotti.length, "prodotto letto", "prodotti letti")} nel PDF.</p>
+    <form data-form="listino-pdf" novalidate>
+      <div class="imp-sezione"><h3>Nuovi · ${a.nuovi.length}</h3>${a.nuovi.length ? `<p class="small">${quanti(a.nuovi, 12)}</p>` : ""}</div>
+      <div class="imp-sezione"><h3>Prezzi cambiati · ${a.cambiati.length}</h3>${a.cambiati.length ? `<ul class="oggi">${a.cambiati.slice(0, 8).map(p => { const x = prima.get(p.codice);
+        return `<li><span class="grow">${esc(p.nome)}<br><span class="small">${PREZZI_LISTINO.filter(k => numOrNull(x[k]) !== numOrNull(p[k])).map(k =>
+          `${{ prezzo_cliente:"cliente", prezzo_partner:"Partner", vp:"VP" }[k]} ${x[k] != null ? (k === "vp" ? num(x[k]) : euro(x[k])) : "–"} → ${p[k] != null ? (k === "vp" ? num(p[k]) : euro(p[k])) : "–"}`).join(" · ")}</span></span></li>`; }).join("")}</ul>
+        ${a.cambiati.length > 8 ? `<p class="small">e altri ${a.cambiati.length - 8}</p>` : ""}` : ""}</div>
+      ${a.usciti.length ? `<div class="imp-sezione"><h3>Non più nel listino · ${a.usciti.length}</h3>
+        <p class="small">Spariscono dalla ricerca dei nuovi ordini (restano negli ordini già fatti). Togli la spunta a chi vuoi tenere.</p>
+        <div class="scelte">${a.usciti.map(x => `<label><input type="checkbox" name="esce" value="${esc(x.codice)}" checked><span>${esc(x.nome)}<br><span class="small">${esc(x.codice)}</span></span></label>`).join("")}</div></div>` : ""}
+      ${a.dubbi.length ? `<p class="nota">${plur(a.dubbi.length, "riga non letta", "righe non lette")} (senza prezzi): controllale nel PDF.</p>` : ""}
+      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="listino">Annulla</button>
+        <button class="btn primary grow">Aggiorna il listino</button></div>
+    </form>`;
+  }
+  return "";
+}
+
+Object.assign(AZIONI, {
+  listino(){ st.errore = ""; st.impListino = null; st.sheet = "listino"; render(); },
+  "prodotto-nuovo"(){ st.prodottoCodice = null; st.errore = ""; st.sheet = "prodotto"; render(); },
+  "prodotto-apri"(el){ st.prodottoCodice = el.dataset.codice; st.errore = ""; st.sheet = "prodotto"; render(); }
+});
+Object.assign(MODULI, {
+  async prodotto(f){
+    const prezzo = n => { const v = f[n].value.trim(); return v ? numIt(v) : null; };
+    const x = { codice:f.codice.value.replace(/\D/g, ""), nome:f.nome.value.trim(), formato:f.formato.value.trim(), categoria:f.categoria.value.trim(),
+      prezzo_cliente:prezzo("prezzo_cliente"), prezzo_partner:prezzo("prezzo_partner"), vp:prezzo("vp") };
+    if(!/^\d{4,10}$/.test(x.codice)){ mostraErroreForm(f, "Il codice Amway è fatto di cifre (es. 121576)."); return; }
+    if(!x.nome){ mostraErroreForm(f, "Scrivi il nome del prodotto."); return; }
+    if(PREZZI_LISTINO.some(k => x[k] != null && !(x[k] >= 0))){ mostraErroreForm(f, "Controlla i prezzi e i VP (es. 87,66)."); return; }
+    if(!st.prodottoCodice && st.listino.some(y => y.codice === x.codice)){ mostraErroreForm(f, "Questo codice è già nel listino: cercalo e modificalo."); return; }
+    try{
+      await api.salvaListino([rigaListino(x, f.attivo.checked)]);
+      await caricaListino(); st.cercaListino = x.nome; st.sheet = "listino"; render(); toast("Prodotto salvato");
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
+  async "listino-pdf"(f){
+    const a = st.impListino, escono = new Set([...f.querySelectorAll("input[name=esce]:checked")].map(i => i.value));
+    const righe = a.prodotti.map(p => rigaListino(p, true)).concat(a.usciti.filter(x => escono.has(x.codice)).map(x => rigaListino(x, false)));
+    st.occupato = true;
+    try{
+      for(let i = 0; i < righe.length; i += 500) await api.salvaListino(righe.slice(i, i + 500));
+      st.occupato = false; st.impListino = null;
+      await caricaListino(); st.sheet = "listino"; render();
+      toast(`Listino aggiornato: ${plur(a.nuovi.length, "nuovo", "nuovi")}, ${plur(a.cambiati.length, "prezzo cambiato", "prezzi cambiati")}`);
+    }catch(e){ st.occupato = false; mostraErroreForm(f, messaggio(e)); }
+  }
+});
+document.addEventListener("change", e => { if(e.target && e.target.id === "file-listino") leggiPdfListino(e.target.files && e.target.files[0]); });
+document.addEventListener("input", e => {
+  if(e.target && e.target.id === "cerca-listino"){ st.cercaListino = e.target.value; const u = document.getElementById("risultati-listino"); if(u) u.innerHTML = risultatiListino(e.target.value); }
+});
 
 /* ---- 12. Eventi ---- */
 document.addEventListener("click", e => {
