@@ -88,6 +88,7 @@ function creaApi(){
     righeOrdini:  () => q(sb.from("righe_ordine").select("*")),
     durate:       () => q(sb.from("durate").select("codice, giorni")),
     nuovoOrdine:  riga => q(sb.from("ordini").insert(riga)),
+    nuoviOrdini:  righe => q(sb.from("ordini").insert(righe)),
     nuoveRighe:   righe => q(sb.from("righe_ordine").insert(righe)),
     aggiornaOrdine: (id, campi) => q(sb.from("ordini").update(campi).eq("id", id)),
     cancellaOrdine: id => q(sb.from("ordini").delete().eq("id", id)),
@@ -139,6 +140,7 @@ const st = {
   inviti: [], sezPersone: "lista", invitoId: null, archiviatiT: false,  // il Target (solo miei)
   ct: null,               // la pagina del contatto (le otto domande)
   ordini: [], righe: [], durate: new Map(), filtroClienti: "sentire",   // i Clienti (solo miei)
+  impOrdini: null,         // l'import degli ordini dal sito Amway (anteprima)
   bozza: null, cercaProdotto: "", tipoMsg: "finendo", varianteMsg: 0, durataCodice: null, nuovoCliente: false,        // per la scheda partner: solo i numeri della sua lista
   conNascoste: false,     // struttura completa: le nascoste al loro posto, in grigio
   filtroNascoste: "nascoste", // elenco "Chi vedi": nascoste | visibili
@@ -1903,7 +1905,7 @@ async function eseguiImport(f){
 /* ---- 10. Fogli in basso ---- */
 function vSheet(){
   const s = st.sheet;
-  const sp = vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s);
+  const sp = vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s);
   if(sp) return sp;
   const err = st.errore ? `<p class="errore">${esc(st.errore)}</p>` : "";
   const piede = `<div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
@@ -3303,12 +3305,24 @@ function scaffale(p){
     return { codice:r.codice, nome:r.nome, quantita:r.quantita, prezzo:r.prezzo, data, finisce, tra:giorniTra(oggi(), finisce) };
   }).sort((a, b) => a.finisce < b.finisce ? -1 : 1);
 }
+/* Senza prodotti segnati (ordini importati dal sito Amway): ogni quanto ordina. È la mediana degli intervalli tra
+   un ordine e l'altro; con un ordine solo vale la durata di base. Il prossimo è atteso dopo l'ultimo + il ritmo. */
+function ritmoDi(p){
+  const date = [...new Set(ordiniDi(p.id).map(o => o.data))].sort();
+  if(!date.length) return null;
+  const salti = date.slice(1).map((d, i) => giorniTra(date[i], d)).filter(g => g > 0).sort((a, b) => a - b);
+  const giorni = salti.length ? salti[Math.floor((salti.length - 1) / 2)] : DURATA_BASE;
+  const finisce = piuGiorni(date[date.length - 1], giorni);
+  return { giorni, stimato:!salti.length, finisce, tra:giorniTra(oggi(), finisce), nome:"il solito ordine", codice:"" };
+}
 /* lo stato in una parola: chi non compra più, chi non ha mai ordinato, chi è rimandato, fermo, in ritardo, sta finendo, a posto */
 function statoCliente(p){
   if(p.non_compra) return { key:"perso", txt:"Non compra più", cl:"" };
   const o = ordiniDi(p.id);
   if(!o.length) return { key:"mai", txt:"Mai ordinato", cl:"g" };
-  const s = scaffale(p);
+  let s = scaffale(p);
+  /* nessun prodotto segnato: vale il ritmo degli ordini */
+  if(!s.length && !o.some(x => righeDi(x.id).length)) s = [ritmoDi(p)];
   if(!s.length) return { key:"senza", txt:"Nessun prodotto seguito", cl:"" };
   if(p.prossima_data && p.prossima_data > oggi()) return { key:"rinviato", txt:`Da risentire il ${dataIt(p.prossima_data)}`, cl:"", primo:s[0] };
   const ultima = s.reduce((m, x) => x.finisce > m ? x.finisce : m, s[0].finisce);
@@ -3347,7 +3361,8 @@ function clientiDaSentire(){
     const s = statoCliente(p), v = verificaDi(p), c = compleannoDi(p);
     if(c && !c.fatto && c.tra <= COMPLEANNO_PRIMA) out.push({ p, ordine:c.tra, motivo:c.tra === 0 ? "Compleanno oggi" : `Compleanno il ${c.testo}` });
     else if(v) out.push({ p, ordine:1, motivo:`Come si è trovato con ${v.nuovi[0].nome}` });
-    else if(s.key === "ritardo" || s.key === "ora") out.push({ p, ordine:s.primo.tra, motivo:`${s.txt}: ${s.primo.nome}` });
+    else if(s.key === "ritardo" || s.key === "ora") out.push({ p, ordine:s.primo.tra,
+      motivo:s.primo.codice ? `${s.txt}: ${s.primo.nome}` : `${s.key === "ritardo" ? "Doveva riordinare" : "Riordino atteso"}: di solito ordina ogni ${s.primo.giorni} giorni` });
   }
   return out.sort((a, b) => a.ordine - b.ordine);
 }
@@ -3369,12 +3384,13 @@ function vClienti(){
     return (sa.primo ? sa.primo.finisce : "9999") < (sb.primo ? sb.primo.finisce : "9999") ? -1 : 1; });
   return `${vSezioniPersone()}<div class="card">
     <div class="spread"><span class="eyebrow">I miei clienti</span>
-      <button class="btn small primary" data-act="cliente-nuovo">+ Un cliente</button></div>
+      <span class="row" style="gap:6px"><button class="btn small" data-act="importa-ordini">Ordini dal sito</button>
+      <button class="btn small primary" data-act="cliente-nuovo">+ Un cliente</button></span></div>
     ${tutti.length ? `<div class="row wrap scelte-rapide" style="gap:6px;margin-top:10px">${FILTRI_CLIENTI.map(x =>
       `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-clienti" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${tutti.filter(x.ok).length}</button>`).join("")}</div>
     ${l.length ? `<ul class="persone">${l.map(p => { const s = statoCliente(p);
       return `<li><button class="persona" data-act="apri-cliente" data-id="${esc(p.id)}">
-        <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${s.primo && s.key !== "fermo" ? `${esc(s.primo.nome)} · finisce il ${dataIt(s.primo.finisce)}` : esc(abitudine(p) || "nessun ordine")}</span></span>
+        <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${s.primo && s.key !== "fermo" ? (s.primo.codice ? `${esc(s.primo.nome)} · finisce il ${dataIt(s.primo.finisce)}` : `prossimo ordine atteso il ${dataIt(s.primo.finisce)}`) : esc(abitudine(p) || "nessun ordine")}</span></span>
         <span class="pill ${s.cl}">${esc(s.txt)}</span></button></li>`; }).join("")}</ul>`
       : `<p class="muted" style="margin:10px 0 0">${filtro.id === "sentire" ? "Nessuno da sentire adesso." : "Nessun cliente qui."}</p>`}`
     : `<p class="muted" style="margin:8px 0 0">Ancora nessun cliente. Entrano da qui con "+ Un cliente", oppure dalla Lista quando chiudi una persona come Cliente.</p>`}
@@ -3418,13 +3434,17 @@ function vCliente(){
           <button class="btn link small" data-act="durata-prodotto" data-codice="${esc(x.codice)}" style="min-height:0;padding:0 2px">cambia</button></span></span>
       <button class="btn small" data-act="riordinato" data-codice="${esc(x.codice)}">Riordinato</button>
       <button class="x" data-act="lascia-prodotto" data-codice="${esc(x.codice)}" aria-label="Non lo prende più">×</button></li>`).join("")}</ul>`
+      : ord.length && !ord.some(o => righeDi(o.id).length) ? (() => { const r = ritmoDi(p);
+          return `<p class="small" style="margin:6px 0 0">${r.stimato ? "Un ordine solo: il prossimo lo aspetto dopo" : "Di solito ordina ogni"} <b>${r.giorni} giorni</b>:
+            prossimo atteso il <b>${dataIt(r.finisce)}</b>.</p><p class="nota">Gli ordini dal sito Amway non hanno i prodotti: se li aggiungi, l'app ti dice anche cosa finisce.</p>`; })()
       : `<p class="muted" style="margin:6px 0 0">${ord.length ? "Nessun prodotto seguito." : "Ancora nessun ordine: segna il primo con + Ordine."}</p>`}
   </div>
   ${ord.length ? `<div class="card">
     <span class="eyebrow">Ordini</span>
-    <ul class="oggi">${ord.map(o => { const t = totaleOrdine(o);
-      return `<li><span class="grow"><b>${dataIt(o.data)}</b> · ${o.modo === "io" ? "fatto da me" : "dal sito"}${t ? ` · ${euro(t)}` : ""}<br>
-        <span class="small">${righeDi(o.id).map(r => esc(r.nome) + (r.quantita > 1 ? ` × ${r.quantita}` : "")).join(", ")}</span>
+    <ul class="oggi">${ord.map(o => { const t = totaleOrdine(o) || Number(o.importo) || 0, rr = righeDi(o.id);
+      return `<li><span class="grow"><b>${dataIt(o.data)}</b> · ${o.modo === "io" ? "fatto da me" : "dal sito"}${t ? ` · ${euro(t)}` : ""}${o.vp ? ` · ${num(o.vp)} VP` : ""}<br>
+        <span class="small">${rr.length ? rr.map(r => esc(r.nome) + (r.quantita > 1 ? ` × ${r.quantita}` : "")).join(", ")
+          : `<button class="btn link small" data-act="ordine-prodotti" data-id="${esc(o.id)}" style="min-height:0;padding:0">+ Aggiungi i prodotti</button>`}</span>
         ${o.modo === "io" ? `<br><span class="row" style="gap:6px;margin-top:4px">
           <button class="btn small${o.consegnato ? " on" : " ghost"}" data-act="ordine-consegnato" data-id="${esc(o.id)}">${o.consegnato ? "✓ Consegnato" : "Consegnato?"}</button>
           <button class="btn small${o.pagato ? " on" : " ghost"}" data-act="ordine-pagato" data-id="${esc(o.id)}">${o.pagato ? "✓ Pagato" : "Pagato?"}</button></span>` : ""}</span>
@@ -3475,12 +3495,13 @@ function vSheetClienti(s){
   const annulla = `<button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>`;
   if(s === "ordine" && p){
     const b = st.bozza, tot = b.righe.reduce((t, r) => t + (Number(r.prezzo) || 0) * r.quantita, 0);
-    return `<h2>Ordine di ${esc(nomeSaluto(p.nome))}</h2>
+    return `<h2>${b.ordineId ? `I prodotti dell'ordine del ${dataIt(b.data)}` : `Ordine di ${esc(nomeSaluto(p.nome))}`}</h2>
     <form data-form="ordine-cliente" novalidate>
+      ${b.ordineId ? `<p class="small">L'ordine è arrivato dal sito Amway: aggiungi cosa ha preso, così l'app sa quando finisce.</p>` : `
       <label class="field"><span>Quando</span><input type="date" name="data" max="${oggi()}" value="${esc(b.data)}" data-bozza="data"></label>
       <fieldset class="field"><legend>Come ha ordinato</legend>
         <div class="opzioni">${[["sito", "Da solo, dal sito Amway"], ["io", "L'ho fatto io"]].map(([v, t]) =>
-          `<label class="chip"><input type="radio" name="modo" value="${v}" data-bozza="modo"${b.modo === v ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>
+          `<label class="chip"><input type="radio" name="modo" value="${v}" data-bozza="modo"${b.modo === v ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>`}
       <fieldset class="field"><legend>Prodotti</legend>
         ${b.righe.length ? `<ul class="righe-ordine">${b.righe.map((r, i) => `<li>
           <span class="grow"><b>${esc(r.nome)}</b><br><span class="small">dura <input class="mini" type="number" min="1" max="3650" inputmode="numeric" value="${r.giorni}" data-riga="${i}" data-campo="giorni" aria-label="Giorni che dura"> giorni</span></span>
@@ -3491,7 +3512,7 @@ function vSheetClienti(s){
         <input type="search" id="cerca-prodotto" class="cerca" placeholder="Cerca un prodotto Amway (nome o codice)…" autocomplete="off" value="${esc(st.cercaProdotto || "")}">
         <ul class="risultati-prodotto" id="risultati-prodotto">${risultatiProdotto(st.cercaProdotto)}</ul>
       </fieldset>
-      <label class="field"><span>Nota <i>(facoltativa)</i></span><input name="nota" maxlength="500" value="${esc(b.nota || "")}" data-bozza="nota"></label>
+      ${b.ordineId ? "" : `<label class="field"><span>Nota <i>(facoltativa)</i></span><input name="nota" maxlength="500" value="${esc(b.nota || "")}" data-bozza="nota"></label>`}
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva l'ordine</button></div>
     </form>`;
   }
@@ -3548,15 +3569,18 @@ function nuovaBozza(righe){
     prezzo:r.prezzo != null ? Number(r.prezzo) : (prodottoCatalogo(r.codice) || {}).prezzo ?? null, giorni:giorniDi(r.codice) })) };
 }
 async function salvaOrdine(pid, b){
-  const id = uuid();
-  await api.nuovoOrdine({ id, persona_id:pid, data:b.data, modo:b.modo, nota:(b.nota || "").trim() || null });
+  /* un ordine importato dal sito: si aggiungono solo i prodotti */
+  const id = b.ordineId || uuid();
+  if(!b.ordineId){
+    await api.nuovoOrdine({ id, persona_id:pid, data:b.data, modo:b.modo, nota:(b.nota || "").trim() || null });
+  }
   await api.nuoveRighe(b.righe.map(r => ({ id:uuid(), ordine_id:id, codice:r.codice, nome:r.nome.slice(0, 160), quantita:r.quantita,
     prezzo:r.prezzo === "" || r.prezzo == null || isNaN(Number(r.prezzo)) ? null : Number(r.prezzo) })));
   /* la durata scelta vale per tutti i miei clienti */
   for(const r of b.righe){ const g = Math.max(1, Math.min(3650, Number(r.giorni) || DURATA_BASE));
     if(g !== giorniDi(r.codice)) await api.salvaDurata(r.codice, g); }
   /* un ordine nuovo: niente più rinvio */
-  await api.modificaPersona(pid, { prossima_data:null, prossima_nota:null });
+  if(!b.ordineId) await api.modificaPersona(pid, { prossima_data:null, prossima_nota:null });
 }
 async function dopoClienti(msg){ await caricaClienti(); await caricaPersone(); st.sheet = null; render(); if(msg) toast(msg); }
 function apriWa(tel, testo){ window.open(`https://wa.me/${tel || ""}?text=` + encodeURIComponent(testo), "_blank", "noopener"); }
@@ -3567,6 +3591,11 @@ Object.assign(AZIONI, {
   "filtro-clienti"(el){ st.filtroClienti = el.dataset.filtro; render(); },
   "cliente-nuovo"(){ st.errore = ""; st.nuovoCliente = true; st.sheet = "persona-nuova"; render(); },
   "ordine-nuovo"(){ st.bozza = nuovaBozza([]); st.cercaProdotto = ""; st.sheet = "ordine"; render(); },
+  "ordine-prodotti"(el){
+    const o = st.ordini.find(x => x.id === el.dataset.id);
+    st.bozza = nuovaBozza([]); st.bozza.ordineId = o.id; st.bozza.data = o.data; st.bozza.modo = o.modo; st.cercaProdotto = ""; st.sheet = "ordine"; render();
+  },
+  "importa-ordini"(){ st.errore = ""; st.impOrdini = null; st.sheet = "importa-ordini"; render(); },
   "ordine-ripeti"(){
     const o = ordiniDi(st.personaId)[0];
     st.bozza = nuovaBozza(righeDi(o.id)); st.bozza.modo = o.modo; st.cercaProdotto = ""; st.sheet = "ordine"; render();
@@ -3664,6 +3693,116 @@ document.addEventListener("input", e => {
   }
 });
 document.addEventListener("change", e => { const t = e.target; if(t && st.bozza && t.dataset && t.dataset.bozza) st.bozza[t.dataset.bozza] = t.value; });
+
+/* ---- 11e. Clienti: gli ordini dal sito Amway (export "Ordini", letto solo sul telefono) ----
+   Righe: Nome ("Cognome, Nome"), Codice Cliente, Data ordine ("18 agosto 2026"), Numero ordine, VP, VV, Tipo ordine.
+   L'export parte sempre da settembre: gli ordini già importati (stesso numero d'ordine) si saltano. */
+function dataLunga(v){
+  const m = pulito(v).toLowerCase().match(/^(\d{1,2})\s+([a-zà]+)\s+(\d{4})$/);
+  if(!m) return null;
+  const mese = MESI_LUNGHI.indexOf(m[2]);
+  return mese < 0 ? null : `${m[3]}-${String(mese + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+}
+function nomeAmway(v){ const t = pulito(v); const [cognome, nome] = t.split(",").map(x => x.trim()); return nome ? `${nome} ${cognome}` : t; }
+function maiuscole(t){ return t.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()); }
+function leggiOrdiniAmway(testo){
+  const righe = righeCsv(testo);
+  const h = righe.findIndex(r => r.some(c => /codice cliente/i.test(c)) && r.some(c => /numero ordine/i.test(c)));
+  if(h < 0) return { errore:"Questo file non sembra l'export degli ordini del sito Amway (mancano Codice Cliente e Numero ordine)." };
+  const col = n => righe[h].findIndex(c => c.trim().toLowerCase() === n);
+  const c = { nome:col("nome"), codice:col("codice cliente"), data:col("data ordine"), numero:col("numero ordine"), vp:col("vp"), vv:col("vv"), tipo:col("tipo ordine") };
+  if(Object.values(c).slice(0, 4).some(i => i < 0)) return { errore:"Nel file mancano alcune colonne (Nome, Codice Cliente, Data ordine, Numero ordine)." };
+  const ordini = [];
+  for(const r of righe.slice(h + 1)){
+    const codice = pulito(r[c.codice]).replace(/\D/g, ""), numero = pulito(r[c.numero]).replace(/\D/g, ""), data = dataLunga(r[c.data]);
+    if(!codice || !numero || !data) continue;
+    ordini.push({ nome:maiuscole(nomeAmway(r[c.nome])), codice, numero, data,
+      vp:c.vp >= 0 ? numReport(r[c.vp]) || 0 : 0, vv:c.vv >= 0 ? numReport(r[c.vv]) || 0 : 0, tipo:c.tipo >= 0 ? pulito(r[c.tipo]) : "" });
+  }
+  if(!ordini.length) return { errore:"Nel file non ci sono ordini." };
+  return { ordini };
+}
+/* chi è già tra i miei clienti (per codice, altrimenti per nome), chi è nuovo, quali ordini mancano */
+function analizzaOrdiniAmway(r){
+  const gia = new Set(st.ordini.map(o => o.numero_amway).filter(Boolean));
+  const persone = st.persone, perCodice = new Map(persone.filter(p => p.codice_cliente).map(p => [p.codice_cliente, p]));
+  const clienti = new Map();
+  for(const o of r.ordini){
+    if(!clienti.has(o.codice)) clienti.set(o.codice, { codice:o.codice, nome:o.nome, ordini:[] });
+    clienti.get(o.codice).ordini.push(o);
+  }
+  const trovati = [], nuovi = [];
+  for(const x of clienti.values()){
+    x.daImportare = x.ordini.filter(o => !gia.has(o.numero));
+    let p = perCodice.get(x.codice), perNome = false;
+    if(!p){ const k = senzaAccenti(x.nome); p = persone.find(y => !y.codice_cliente && senzaAccenti(y.nome) === k); perNome = !!p; }
+    if(p) trovati.push(Object.assign(x, { p, perNome })); else nuovi.push(x);
+  }
+  return { trovati, nuovi, totale:r.ordini.length, daImportare:[...clienti.values()].reduce((n, x) => n + x.daImportare.length, 0) };
+}
+function vSheetOrdiniAmway(s){
+  if(s !== "importa-ordini") return "";
+  const a = st.impOrdini;
+  if(!a) return `<h2>Ordini dei clienti dal sito Amway</h2>
+    <p class="small">Sul sito Amway scarica l'export degli <b>Ordini</b> dei clienti (in CSV) e sceglilo qui. Il file resta sul telefono: si salvano
+      solo nome, codice cliente, data, numero e importo degli ordini. Quelli già importati si saltano.</p>
+    <label class="btn primary wide" style="margin-top:12px">Scegli il file CSV
+      <input type="file" id="file-ordini" accept=".csv,text/csv,text/comma-separated-values" hidden></label>
+    ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
+    <button class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>`;
+  return `<h2>Ordini dal sito Amway</h2>
+    <p class="small">${plur(a.totale, "ordine", "ordini")} nel file · <b>${plur(a.daImportare, "nuovo da importare", "nuovi da importare")}</b>.</p>
+    <form data-form="importa-ordini" novalidate>
+      ${a.trovati.length ? `<div class="imp-sezione"><h3>Già tra i tuoi clienti · ${a.trovati.length}</h3>
+        <p class="small">${a.trovati.map(x => `${esc(x.p.nome)}${x.perNome ? " <i>(riconosciuto dal nome)</i>" : ""}${x.daImportare.length ? ` · ${x.daImportare.length} nuovi` : ""}`).join(", ")}</p></div>` : ""}
+      ${a.nuovi.length ? `<div class="imp-sezione"><h3>Nuovi clienti · ${a.nuovi.length}</h3>
+        <p class="small">Hanno ordinato con il tuo link ma non sono tra i tuoi clienti. Togli la spunta a chi non vuoi aggiungere.</p>
+        <div class="scelte">${a.nuovi.map(x => `<label><input type="checkbox" name="nuovo" value="${esc(x.codice)}" checked>
+          <span>${esc(x.nome)}<br><span class="small">${plur(x.ordini.length, "ordine", "ordini")} · l'ultimo il ${dataIt(x.ordini.map(o => o.data).sort().pop())}</span></span></label>`).join("")}</div></div>` : ""}
+      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
+        <button class="btn primary grow"${a.daImportare ? "" : " disabled"}>Importa</button></div>
+      ${a.daImportare ? "" : `<p class="nota">Niente di nuovo: questi ordini sono già tutti in Growup.</p>`}
+    </form>`;
+}
+async function leggiFileOrdini(file){
+  if(!file) return;
+  let r;
+  try{ r = /\.xlsx?$/i.test(file.name) ? { errore:"Questo è il file Excel: sul sito Amway scegli il formato CSV." } : leggiOrdiniAmway(await file.text()); }
+  catch(e){ r = { errore:"Non riesco a leggere il file." }; }
+  if(r.errore){ st.errore = r.errore; st.impOrdini = null; render(); return; }
+  st.errore = ""; st.impOrdini = analizzaOrdiniAmway(r); render();
+}
+
+Object.assign(MODULI, {
+  async "importa-ordini"(f){
+    const a = st.impOrdini, scelti = new Set([...f.querySelectorAll("input[name=nuovo]:checked")].map(i => i.value));
+    st.occupato = true;
+    try{
+      /* i nuovi clienti: nella lista chiusi come Cliente alla data del primo ordine (passo importato: non conta oggi) */
+      const nuovi = a.nuovi.filter(x => scelti.has(x.codice)).map(x => Object.assign(x, { id:uuid() }));
+      if(nuovi.length){
+        await api.nuovePersone(nuovi.map(x => ({ id:x.id, nome:x.nome.slice(0, 80), codice_cliente:x.codice, origine:"Sito Amway" })));
+        await api.nuoviPassi(nuovi.map(x => ({ id:uuid(), persona_id:x.id, tipo:"chiusura", esito:"cliente", importato:true,
+          data:x.ordini.map(o => o.data).sort()[0], come:"Sito Amway" })));
+      }
+      for(const x of a.trovati){
+        if(!x.p.codice_cliente) await api.modificaPersona(x.p.id, { codice_cliente:x.codice });
+        /* era nella lista ma non ancora cliente: ha ordinato, quindi è cliente (dalla data del primo ordine) */
+        if(x.p.esito !== "cliente") await api.nuoviPassi([{ id:uuid(), persona_id:x.p.id, tipo:"chiusura", esito:"cliente", importato:true,
+          data:x.ordini.map(o => o.data).sort()[0], come:"Sito Amway" }]);
+      }
+      const ordini = a.trovati.map(x => ({ id:x.p.id, l:x.daImportare })).concat(nuovi.map(x => ({ id:x.id, l:x.daImportare })))
+        .flatMap(({ id, l }) => l.map(o => ({ id:uuid(), persona_id:id, data:o.data, modo:"sito", numero_amway:o.numero,
+          importo:o.vv || null, vp:o.vp || null })));
+      for(let i = 0; i < ordini.length; i += 200) await api.nuoviOrdini(ordini.slice(i, i + 200));
+      st.occupato = false; st.impOrdini = null;
+      await caricaPersone(); await caricaClienti();
+      st.sheet = null; st.vista = "persone"; st.sezPersone = "clienti"; st.personaId = null; render();
+      toast(`${plur(ordini.length, "ordine importato", "ordini importati")}${nuovi.length ? `, ${plur(nuovi.length, "nuovo cliente", "nuovi clienti")}` : ""}`);
+    }catch(e){ st.occupato = false; mostraErroreForm(f, messaggio(e)); }
+  }
+});
+document.addEventListener("change", e => { if(e.target && e.target.id === "file-ordini") leggiFileOrdini(e.target.files && e.target.files[0]); });
 
 /* ---- 12. Eventi ---- */
 document.addEventListener("click", e => {

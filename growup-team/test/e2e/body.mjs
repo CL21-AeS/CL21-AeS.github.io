@@ -1171,6 +1171,58 @@ check(await page.getByText("Non comprano più · 1").isVisible(), "filtro: non c
 await page.screenshot({ path: S + "/e2e/31-clienti.png", fullPage:true });
 await ctx.close();
 
+// 25. Clienti: gli ordini dal sito Amway (export Ordini, dati inventati)
+const MESI_IT = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
+const dataLungaT = iso => { const [y, m, d] = iso.split("-"); return `${d} ${MESI_IT[Number(m) - 1]} ${y}`; };
+const ordineCsv = (nome, codice, data, numero, vp, vv) => `"'${nome}","'${codice}","'${dataLungaT(data)}","'${numero}","'${vp}","'${vv}","'Ordine",`;
+const csvOrdini = ['"Amway","CONFIDENZIALE - prova"', '"Mese di competenza","202610"',
+  '"Nome","Codice Cliente","Data ordine","Numero ordine","VP","VV","Tipo ordine","Dettagli VeCV"',
+  ordineCsv("Rossi, Lia", "7000000001", gg(-40), "170000002", "20,05", "45,38"),
+  ordineCsv("Rossi, Lia", "7000000001", gg(-80), "170000001", "16,30", "36,16"),
+  ordineCsv("Cliente, Gina", "7000000002", gg(-3), "170000003", "42,60", "96,38"),
+  ordineCsv("VERDI, NUOVO", "7000000003", gg(-10), "170000004", "6,18", "13,96")].join("\n") + "\n";
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
+await page.click("button[data-act=importa-ordini]");
+await page.setInputFiles("#file-ordini", { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) });
+await page.locator(".sheet h2", { hasText:"Ordini dal sito Amway" }).waitFor();
+check(await page.getByText("4 ordini nel file").isVisible() && await page.getByText("4 nuovi da importare").isVisible(), "anteprima: 4 ordini, tutti nuovi");
+check(await page.locator(".sheet .imp-sezione", { hasText:"Già tra i tuoi clienti" }).getByText("riconosciuto dal nome").isVisible(), "Gina riconosciuta dal nome");
+check(await page.locator(".sheet .scelte label", { hasText:"Lia Rossi" }).isVisible() && await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).isVisible(), "nuovi clienti proposti con il nome giusto");
+await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).locator("input").uncheck();
+await page.click(".sheet button:has-text('Importa')");
+await page.getByText("3 ordini importati, 1 nuovo cliente").waitFor();
+await sync(page);
+const lia = DB.persone.find(x => x.nome === "Lia Rossi"), ginaI = DB.persone.find(x => x.nome === "Gina Cliente");
+check(lia && lia.esito === "cliente" && lia.codice_cliente === "7000000001" && ginaI.codice_cliente === "7000000002", "clienti collegati al codice cliente Amway");
+check(!DB.persone.some(x => x.nome === "Nuovo Verdi") && !DB.ordini.some(o => o.numero_amway === "170000004"), "chi non è spuntato non entra");
+check(DB.ordini.filter(o => o.numero_amway).length === 3 && DB.ordini.find(o => o.numero_amway === "170000003").importo === 96.38, "ordini dal sito con data e importo");
+// il ritmo: Lia ordina ogni 40 giorni, il prossimo è atteso oggi
+await page.click("button[data-act=vista-io]");
+check(await page.locator(".card", { hasText:"I tuoi clienti da sentire" }).getByText("di solito ordina ogni 40 giorni").isVisible(), "Io: Lia da sentire, ordina ogni 40 giorni");
+// reimport dello stesso file (l'export parte sempre da settembre): niente doppi
+await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
+await page.click("button[data-act=importa-ordini]");
+await page.setInputFiles("#file-ordini", { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) });
+await page.locator(".sheet h2", { hasText:"Ordini dal sito Amway" }).waitFor();
+check(await page.getByText("1 nuovo da importare").isVisible() && await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).isVisible(),
+  "reimport: gli ordini già importati si saltano, resta solo chi non era stato aggiunto");
+await page.click(".sheet button[data-act=chiudi]");
+// i prodotti aggiunti a un ordine importato
+await page.click("button[data-filtro=tutti]");
+await page.locator("button[data-act=apri-cliente]", { hasText:"Lia Rossi" }).click();
+check(await page.getByText(/Di solito ordina ogni/).isVisible(), "scheda: il ritmo degli ordini");
+await page.locator("button[data-act=ordine-prodotti]").first().click();
+await page.fill("#cerca-prodotto", "double");
+await page.locator("#risultati-prodotto button[data-act=aggiungi-prodotto]").first().click();
+await page.click('.sheet button:has-text("Salva l\'ordine")');
+await page.getByText("Ordine salvato").waitFor();
+await sync(page);
+const oLia = DB.ordini.find(o => o.numero_amway === "170000002");
+check(DB.righe.some(r => r.ordine_id === oLia.id) && DB.ordini.filter(o => o.persona_id === lia.id).length === 2, "i prodotti si aggiungono all'ordine importato (nessun ordine nuovo)");
+await ctx.close();
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
