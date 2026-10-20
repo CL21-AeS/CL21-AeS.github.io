@@ -281,12 +281,6 @@ ul.imp li:first-child{border-top:0}
 .sheet{position:fixed;inset:0;background:rgba(8,10,14,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
 .sheet-box{background:var(--card);width:100%;max-width:640px;max-height:90vh;overflow:auto;border-radius:18px 18px 0 0;
   padding:18px var(--pad) calc(18px + env(safe-area-inset-bottom))}
-@media (prefers-reduced-motion: no-preference){
-  #app.da-destra{animation:entra-destra .22s ease-out}
-  #app.da-sinistra{animation:entra-sinistra .22s ease-out}
-}
-@keyframes entra-destra{from{transform:translateX(28px);opacity:.4}to{transform:none;opacity:1}}
-@keyframes entra-sinistra{from{transform:translateX(-28px);opacity:.4}to{transform:none;opacity:1}}
 /* Persone: i Clienti */
 .avviso-cliente{border-left:4px solid var(--giallo)}
 .righe-ordine{list-style:none;margin:0;padding:0}
@@ -367,6 +361,19 @@ form:has(input[name=modo][value=filtri]:checked) .imp-filtri{display:block}
   background:var(--ink);color:var(--bg);padding:10px 10px 10px 16px;border-radius:12px;font-size:14px;font-weight:600;
   display:flex;align-items:center;gap:12px;max-width:calc(100% - 32px);box-shadow:0 6px 24px rgba(0,0,0,.2)}
 .toast button{border:0;background:none;color:var(--bg);font:inherit;font-weight:800;text-decoration:underline;cursor:pointer;min-height:34px;padding:0 6px}
+/* Il movimento ("Vivace"; tra le pagine "Sobria", in app.js): i pulsanti si premono e tornano su elastici */
+@media (prefers-reduced-motion: no-preference){
+  .btn,.azioni .btn,.stella,.schede button{transition:transform .28s cubic-bezier(.34,1.56,.64,1)}
+  .btn:active,.azioni .btn:active,.stella:active{transform:scale(.92);transition-duration:.08s}
+  button.persona{transition:transform .28s cubic-bezier(.34,1.56,.64,1)}
+  button.persona:active{transform:scale(.98);transition-duration:.08s}
+}
+/* I traguardi: coriandoli su tutto lo schermo e l'annuncio al centro */
+.coriandoli{position:fixed;inset:0;width:100%;height:100%;z-index:80;pointer-events:none}
+.annuncio-festa{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:81;pointer-events:none;width:min(330px,calc(100% - 32px));
+  background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:18px;padding:16px 18px;text-align:center;box-shadow:0 16px 40px rgba(0,0,0,.25)}
+.annuncio-festa b{display:block;font:700 26px/1.15 var(--f-titoli);text-wrap:balance}
+.annuncio-festa span{font-size:13px;color:var(--ink3)}
 </style>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"

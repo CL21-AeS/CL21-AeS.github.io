@@ -210,7 +210,10 @@ function toast(msg, annulla){
   clearTimeout(toastT);
   toastAnnulla = annulla || null;
   t.innerHTML = `<div class="toast" role="status"><span>${esc(msg)}</span>${annulla ? `<button data-act="annulla">Annulla</button>` : ""}</div>`;
-  toastT = setTimeout(() => { t.innerHTML = ""; toastAnnulla = null; }, annulla ? 5000 : 3000);
+  const el = t.firstElementChild;
+  anima(el, [{ opacity:0, transform:"translate(-50%, 18px)" }, { opacity:1, transform:"translate(-50%, 0)" }], VIVACE);
+  toastT = setTimeout(() => { anima(el, [{ opacity:1 }, { opacity:0 }], { dur:180 }).then(() => { if(t.firstElementChild === el){ t.innerHTML = ""; toastAnnulla = null; } }); },
+    annulla ? 5000 : 3000);
 }
 
 const MESSAGGI_ERRORE = {
@@ -643,12 +646,16 @@ function render(){
                   ingresso:vIngresso, privacy_primo:vPrivacyPrimo, obiettivo_primo:vObiettivoPrimo, home:vHome, errore:vErrore,
                   contatto:vContatto, bloccato:vAccessoNegato, tolto:vAccessoNegato };
   const html = (viste[st.fase] || vAvvio)();
+  const prima = fotoMovimento();
   if(html !== ultimoApp){ app.innerHTML = html; ultimoApp = html; }
   const conAzioni = st.fase === "home" && st.vista === "io";
   document.body.classList.toggle("con-azioni", conAzioni);
   document.getElementById("azioni").innerHTML = conAzioni ? vAzioni() : "";
-  document.getElementById("sheet").innerHTML = st.sheet ? `<div class="sheet" data-act="chiudi-fuori"><div class="sheet-box" role="dialog" aria-modal="true">${vSheet()}</div></div>` : "";
+  const foglio = document.getElementById("sheet");
+  if(!st.sheet) chiudiFoglioPiano(foglio);
+  foglio.innerHTML = st.sheet ? `<div class="sheet" data-act="chiudi-fuori"><div class="sheet-box" role="dialog" aria-modal="true">${vSheet()}</div></div>` : "";
   applicaRicerca();
+  muoviDopo(prima);
 }
 
 function vAvvio(){ return `<div class="centro"><p class="muted">Caricamento…</p></div>`; }
@@ -4286,6 +4293,143 @@ document.addEventListener("input", e => {
   if(e.target && e.target.id === "cerca-listino"){ st.cercaListino = e.target.value; const u = document.getElementById("risultati-listino"); if(u) u.innerHTML = risultatiListino(e.target.value); }
 });
 
+/* ---- 11g. Il movimento (scelta di Stefano dalla tavola di prova: "Vivace", ma tra le pagine "Sobria") ----
+   Tra le pagine e le schede: uno scivolamento breve nella direzione del tocco. Tutto il resto (pulsanti, numeri, barre,
+   finestre dal basso, messaggi) ha un leggero rimbalzo. Ai traguardi personali i coriandoli, una volta sola per periodo.
+   Con "riduci animazioni" attivo sul telefono non si muove niente (il traguardo si scrive e basta). */
+const SOBRIA = { dur:180, ease:"cubic-bezier(.2,.7,.2,1)", sposta:12 };
+const VIVACE = { dur:280, ease:"cubic-bezier(.34,1.56,.64,1)", salto:1.32 };
+const FESTE = { piccola:{ pezzi:130, misura:[7, 12], tempo:1900, cannoni:false }, grande:{ pezzi:240, misura:[7, 13], tempo:2600, cannoni:true } };
+const ORDINE_PAGINE = ["obiettivo", "io", "persone", "gruppo", "scheda"], ORDINE_SEZIONI = ["target", "lista", "clienti"];
+const fermo = () => !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+function anima(el, frame, m, opz){
+  if(!el || !el.animate || fermo()) return Promise.resolve();
+  m = m || SOBRIA;
+  return el.animate(frame, Object.assign({ duration:m.dur, easing:m.ease || "ease-out" }, opz)).finished.catch(() => {});
+}
+/* prima di ridisegnare: dove eravamo, le barre e i numeri, il foglio aperto */
+function fotoMovimento(){
+  const f = { barre:new Map(), numeri:new Map(), foglio:st.foglioPrima || null };
+  document.querySelectorAll("#app .bar[aria-label]").forEach(b => f.barre.set(b.getAttribute("aria-label"), Number(b.getAttribute("aria-valuenow"))));
+  document.querySelectorAll("#app .obiettivo, #azioni button[data-act]").forEach(el => {
+    const k = el.dataset.act || (el.querySelector(".bar") || {}).getAttribute?.("aria-label"), n = el.querySelector(".num, b");
+    if(k && n) f.numeri.set(k, n.textContent); });
+  return f;
+}
+/* dove eravamo all'ultimo disegno (lo stato cambia prima di render, quindi si confronta con questo) */
+let vistaPrima = null;
+function muoviDopo(prima){
+  const dettaglio = !!(st.personaId || st.invitoId || st.schedaId);
+  const ora = { chiave:[st.fase, st.vista, st.sezPersone, st.personaId, st.schedaId, st.invitoId].join("|"), pagina:st.vista, sez:st.sezPersone, dettaglio };
+  const app = document.getElementById("app"), v = vistaPrima;
+  if(v && v.chiave !== ora.chiave && st.fase === "home" && v.chiave.startsWith("home|")){
+    /* la direzione: verso destra si va avanti (pagina dopo, una scheda che si apre), verso sinistra si torna */
+    let verso = ORDINE_PAGINE.indexOf(st.vista) - ORDINE_PAGINE.indexOf(v.pagina);
+    if(!verso && st.vista === "persone") verso = dettaglio !== v.dettaglio ? (dettaglio ? 1 : -1) : ORDINE_SEZIONI.indexOf(st.sezPersone) - ORDINE_SEZIONI.indexOf(v.sez);
+    verso = Math.sign(verso) || 1;
+    anima(app, [{ opacity:.35, transform:`translateX(${verso * SOBRIA.sposta * 2}px)` }, { opacity:1, transform:"none" }], SOBRIA);
+    [...app.querySelectorAll(".card, ul.persone > li")].slice(0, 14).forEach((el, k) =>
+      anima(el, [{ opacity:0, transform:"translateY(8px)" }, { opacity:1, transform:"none" }], SOBRIA, { delay:30 + k * 25, fill:"backwards" }));
+  }
+  /* le barre si riempiono scorrendo (anche quando si apre la pagina), i numeri cambiati fanno un salto */
+  document.querySelectorAll("#app .bar[aria-label]").forEach(b => {
+    const k = b.getAttribute("aria-label"), adesso = Number(b.getAttribute("aria-valuenow")), dPrima = prima.barre.has(k) ? prima.barre.get(k) : 0;
+    if(dPrima !== adesso) anima(b.firstElementChild, [{ width:dPrima + "%" }, { width:adesso + "%" }], { dur:VIVACE.dur * 2.4, ease:VIVACE.ease });
+  });
+  document.querySelectorAll("#app .obiettivo, #azioni button[data-act]").forEach(el => {
+    const k = el.dataset.act || (el.querySelector(".bar") || {}).getAttribute?.("aria-label"), n = el.querySelector(".num, b");
+    if(k && n && prima.numeri.has(k) && prima.numeri.get(k) !== n.textContent)
+      anima(n, [{ transform:"scale(1)" }, { transform:`scale(${VIVACE.salto})`, offset:.4 }, { transform:"scale(1)" }], { dur:VIVACE.dur * 2.2, ease:VIVACE.ease });
+  });
+  /* il foglio dal basso: sale quando si apre */
+  const box = document.querySelector("#sheet .sheet-box");
+  if(st.sheet && !prima.foglio && box){
+    anima(box.parentNode, [{ opacity:0 }, { opacity:1 }], { dur:200 });
+    anima(box, [{ transform:"translateY(100%)" }, { transform:"none" }], { dur:VIVACE.dur * 1.5, ease:"cubic-bezier(.34,1.25,.64,1)" });
+  }
+  st.foglioPrima = st.sheet || null;
+  vistaPrima = ora;
+  controllaTraguardi();
+}
+/* il foglio chiuso scende: se ne fa una copia che scivola via mentre l'app va avanti */
+function chiudiFoglioPiano(contenitore){
+  const vecchio = contenitore.firstElementChild;
+  if(!vecchio || fermo()) return;
+  const copia = vecchio.cloneNode(true);
+  copia.removeAttribute("data-act"); copia.style.pointerEvents = "none"; copia.setAttribute("aria-hidden", "true");
+  document.body.appendChild(copia);
+  anima(copia.firstElementChild, [{ transform:"none" }, { transform:"translateY(100%)" }], { dur:220, ease:"cubic-bezier(.4,0,1,1)" });
+  anima(copia, [{ opacity:1 }, { opacity:0 }], { dur:240 }).then(() => copia.remove());
+}
+
+/* I traguardi personali: obiettivo contatti e piani della settimana (piccola festa), VP del mese, nuova tappa del
+   percorso, primo cliente e primo partner dalla lista (grande festa). Si festeggia solo nel momento in cui succede. */
+let traguardiPrima = null;
+function valoriTraguardi(){
+  const p = percorso(), m = meseDi(oggi());
+  return { contatti:fattoSettimana("contatto"), piani:fattoSettimana("piano"), vp:vpMese(m), tappa:p.indice, nomeTappa:(p.raggiunta || {}).nome,
+    clienti:st.persone.filter(x => x.esito === "cliente").length, partner:st.persone.filter(x => x.esito === "partner").length,
+    obContatti:Number(st.goal.obiettivo_contatti) || 0, obPiani:Number(st.goal.obiettivo_piani) || 0, obVp:Number(st.goalMese.obiettivo_vp) || 0, settimana:settimana(), mese:m };
+}
+function controllaTraguardi(){
+  if(st.fase !== "home" || !st.profilo || !st.goal || !st.goalMese){ traguardiPrima = null; return; }
+  const v = valoriTraguardi(), a = traguardiPrima;
+  traguardiPrima = v;
+  if(!a || a.settimana !== v.settimana && a.mese !== v.mese) return;
+  const una = (chiave, tipo, titolo, sotto) => {
+    const k = `growup-team.festa.${st.profilo.id}.${chiave}`;
+    if(leggiLocale(k)) return;
+    salvaLocale(k, "1"); festeggia(tipo, titolo, sotto);
+  };
+  const passato = (x, y, ob) => ob > 0 && x < ob && y >= ob;
+  if(passato(a.vp, v.vp, v.obVp) && a.mese === v.mese) una(`vp.${v.mese}`, "grande", "Obiettivo VP del mese raggiunto!", `${num(v.vp)} VP personali a ${nomeMese(v.mese).split(" ")[0]}`);
+  else if(v.tappa > a.tappa && v.nomeTappa) una(`tappa.${v.tappa}`, "grande", `Nuova tappa: ${v.nomeTappa}!`, "Il tuo percorso va avanti");
+  else if(a.clienti === 0 && v.clienti > 0) una("primo-cliente", "grande", "Il tuo primo cliente!", "Dalla tua lista");
+  else if(a.partner === 0 && v.partner > 0) una("primo-partner", "grande", "Il tuo primo partner!", "Dalla tua lista");
+  else if(passato(a.contatti, v.contatti, v.obContatti) && a.settimana === v.settimana)
+    una(`contatti.${v.settimana}`, "piccola", "Obiettivo contatti raggiunto!", `${plur(v.contatti, "contatto", "contatti")} questa settimana`);
+  else if(passato(a.piani, v.piani, v.obPiani) && a.settimana === v.settimana)
+    una(`piani.${v.settimana}`, "piccola", "Obiettivo piani raggiunto!", `${plur(v.piani, "piano", "piani")} questa settimana`);
+}
+
+/* I coriandoli: disegnati qui, senza librerie, nei colori dell'app; con un "tic" del telefono (Android) */
+const COLORI_FESTA = ["#13795b", "#34c08f", "#c26a3d", "#e08a5a", "#e2a46f", "#f3d9a8", "#0a3a2c"];
+function festeggia(tipo, titolo, sotto){
+  const f = FESTE[tipo] || FESTE.piccola;
+  const avviso = document.createElement("div");
+  avviso.className = "annuncio-festa"; avviso.setAttribute("role", "status");
+  avviso.innerHTML = `<b>${esc(titolo)}</b><span>${esc(sotto || "")}</span>`;
+  document.body.appendChild(avviso);
+  anima(avviso, [{ opacity:0, transform:`translate(-50%, -50%) scale(${tipo === "grande" ? .8 : .9})` }, { opacity:1, transform:"translate(-50%, -50%) scale(1)" }],
+    { dur:VIVACE.dur * 1.8, ease:VIVACE.ease });
+  setTimeout(() => anima(avviso, [{ opacity:1 }, { opacity:0 }], { dur:220 }).then(() => avviso.remove()), f.tempo);
+  try{ if(navigator.vibrate) navigator.vibrate(tipo === "grande" ? [30, 40, 30] : 25); }catch(e){}
+  if(fermo()) return;
+  const cv = document.createElement("canvas"), k = window.devicePixelRatio || 1;
+  cv.className = "coriandoli"; cv.setAttribute("aria-hidden", "true"); document.body.appendChild(cv);
+  const W = cv.width = innerWidth * k, H = cv.height = innerHeight * k, ctx = cv.getContext("2d"), pezzi = [], rnd = (a, b) => a + Math.random() * (b - a);
+  if(!ctx){ cv.remove(); return; }
+  const spara = (x, y, n, ang, apertura, forza) => { for(let i = 0; i < n; i++){ const a = ang + rnd(-apertura, apertura), v = rnd(.55, 1) * forza * k;
+    pezzi.push({ x, y, vx:Math.cos(a) * v, vy:Math.sin(a) * v, r:rnd(0, 6.28), vr:rnd(-.25, .25), m:rnd(f.misura[0], f.misura[1]) * k,
+      c:COLORI_FESTA[i % COLORI_FESTA.length], forma:Math.random() < .25 ? "nastro" : Math.random() < .3 ? "tondo" : "foglio", oscilla:rnd(0, 6.28) }); } };
+  spara(W / 2, H * .36, f.pezzi, -Math.PI / 2, Math.PI, 15);
+  if(f.cannoni){ spara(0, H * .8, 70, -Math.PI / 3.2, .35, 21); spara(W, H * .8, 70, -Math.PI + Math.PI / 3.2, .35, 21); }
+  const inizio = performance.now();
+  (function giro(t){
+    const p = (t - inizio) / f.tempo;
+    ctx.clearRect(0, 0, W, H);
+    for(const q of pezzi){
+      q.vx *= .985; q.vy = q.vy * .985 + .32 * k; q.oscilla += .12; q.x += q.vx + Math.sin(q.oscilla) * .6 * k; q.y += q.vy; q.r += q.vr;
+      ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, (1 - p) * 2.2)); ctx.translate(q.x, q.y); ctx.rotate(q.r); ctx.fillStyle = q.c;
+      if(q.forma === "tondo"){ ctx.beginPath(); ctx.arc(0, 0, q.m * .4, 0, 6.28); ctx.fill(); }
+      else if(q.forma === "nastro") ctx.fillRect(-q.m * .15, -q.m * 1.2, q.m * .3, q.m * 2.4);
+      else ctx.fillRect(-q.m / 2, -q.m * .3 * Math.abs(Math.cos(q.oscilla)) - .5, q.m, q.m * .6 * Math.abs(Math.cos(q.oscilla)) + 1);
+      ctx.restore();
+    }
+    if(p < 1) requestAnimationFrame(giro); else cv.remove();
+  })(inizio);
+}
+
 /* ---- 12. Eventi ---- */
 document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]");
@@ -4356,21 +4500,17 @@ document.addEventListener("touchend", e => {
   tocco = null;
   if(Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8 || ms > 800) return;
   /* ordine delle pagine: Obiettivo | Io | Gruppo */
-  if(dx < 0 && st.vista === "obiettivo") scorri("vista-io", "da-destra");
-  else if(dx < 0 && st.vista === "io") scorri("vista-persone", "da-destra");
-  else if(dx < 0 && st.vista === "persone" && !st.personaId && !st.invitoId) scorri("vista-gruppo", "da-destra");
-  else if(dx > 0 && st.vista === "persone" && st.invitoId) scorri("torna-target", "da-sinistra");
-  else if(dx > 0 && st.vista === "persone" && st.personaId) scorri(st.sezPersone === "clienti" ? "torna-clienti" : "torna-lista", "da-sinistra");
-  else if(dx > 0 && st.vista === "persone") scorri("vista-io", "da-sinistra");
-  else if(dx > 0 && st.vista === "io") scorri("vista-obiettivo", "da-sinistra");
-  else if(dx > 0 && st.vista === "gruppo") scorri("vista-persone", "da-sinistra");
-  else if(dx > 0 && st.vista === "scheda") scorri("vista-gruppo", "da-sinistra");
+  if(dx < 0 && st.vista === "obiettivo") scorri("vista-io");
+  else if(dx < 0 && st.vista === "io") scorri("vista-persone");
+  else if(dx < 0 && st.vista === "persone" && !st.personaId && !st.invitoId) scorri("vista-gruppo");
+  else if(dx > 0 && st.vista === "persone" && st.invitoId) scorri("torna-target");
+  else if(dx > 0 && st.vista === "persone" && st.personaId) scorri(st.sezPersone === "clienti" ? "torna-clienti" : "torna-lista");
+  else if(dx > 0 && st.vista === "persone") scorri("vista-io");
+  else if(dx > 0 && st.vista === "io") scorri("vista-obiettivo");
+  else if(dx > 0 && st.vista === "gruppo") scorri("vista-persone");
+  else if(dx > 0 && st.vista === "scheda") scorri("vista-gruppo");
 }, { passive:true });
-function scorri(azione, verso){
-  AZIONI[azione]();
-  const app = document.getElementById("app");
-  app.classList.remove("da-destra", "da-sinistra"); void app.offsetWidth; app.classList.add(verso);
-}
+function scorri(azione){ AZIONI[azione](); }   // il movimento della pagina lo fa render (muoviDopo)
 
 /* Tornando sull'app (da un altro dispositivo si è magari scritto qualcosa) si ricarica. */
 document.addEventListener("visibilitychange", async () => {

@@ -22,7 +22,8 @@ const errori = [];
 let ok = 0; const check = (c, m) => { if(!c){ console.log("FAIL:", m); process.exitCode = 1; } else { ok++; } };
 const browser = await chromium.launch();
 async function apri(ctxOpts, hash){
-  const ctx = await browser.newContext(Object.assign({ viewport:{width:390,height:844}, locale:"it-IT", timezoneId:"Europe/Rome", bypassCSP:true }, ctxOpts));
+  /* di base "riduci animazioni": i controlli non aspettano i movimenti; il movimento ha il suo test */
+  const ctx = await browser.newContext(Object.assign({ viewport:{width:390,height:844}, locale:"it-IT", timezoneId:"Europe/Rome", bypassCSP:true, reducedMotion:"reduce" }, ctxOpts));
   await ctx.route(/cdn\.jsdelivr\.net/, r => r.abort());
   /* captcha finto: risponde subito con un gettone di prova (o con un errore se DB.captchaKo) */
   await ctx.route(/challenges\.cloudflare\.com/, r => r.fulfill({ contentType:"text/javascript", body:
