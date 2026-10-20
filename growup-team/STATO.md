@@ -7,8 +7,7 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
 dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **028** (027 incollata da
-Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla #73; **#74 aperta** (solo il permesso
-del listino nei file: su Supabase è già attivo). Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
+Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla #74. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
 **Fatto il 19-20 ottobre** (dettagli più sotto, in ordine di data): import da Amway degli ordini e dell'elenco clienti
 (telefono, ultimo ordine, "Mai comprato" in Lista); Modifica dell'ordine e dei dati del cliente; etichette Da consegnare /
@@ -19,7 +18,6 @@ solo in Da riprendere; Da confermare / Togli dalla struttura / Blocca l'app; lis
 VP negli ordini e aggiornamento dal PDF.
 
 **Da fare / in sospeso per Stefano**:
-- Unire la PR #74.
 - **Importare subito il report mappe**: dalla 027 tutti (tranne gli admin) sono "Da confermare" e chi ha qualcuno sotto
   lo può togliere; il primo import conferma chi è nel report.
 - Provare con dati veri Target, Lista, Clienti (import ordini e clienti) e i tempi (preavviso 7 giorni, fermo dopo 45,
@@ -28,6 +26,10 @@ VP negli ordini e aggiornamento dal PDF.
 - Sicurezza: verifica in due passaggi su GitHub, Supabase e Google; privacy dell'email su GitHub; richiesta al supporto
   GitHub di pulire la storia (dati reali di prima e ora anche `catalogo.js`, il listino per l'incaricato).
 - In futuro: una sezione "analisi della persona" (bonus per linea), fuori dalle schermate di tutti i giorni.
+
+**20 ottobre — ultimo ordine dall'elenco clienti**: si somma agli ordini già nell'app. Prima, se il cliente aveva un
+ordine "fatto da me" più recente, l'ultimo ordine del sito veniva saltato: ora contano solo gli ordini "dal sito" (con la
+stessa data o dopo) e l'export Ordini; reimportando lo stesso file non si aggiunge due volte.
 
 **Nota tecnica per Claude**: il connettore Supabase non applica le istruzioni con cancellazioni (`drop`, `delete`):
 va in timeout. Si applicano a pezzi senza `drop` (oggetti nuovi) e il resto lo incolla Stefano nell'SQL Editor.
