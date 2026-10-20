@@ -4029,7 +4029,8 @@ function analizzaAmway(r){
     g.primo = date.sort()[0] || null;
     g.compra = !!date.length;
     /* l'ultimo ordine dall'elenco clienti entra nello storico se non c'è già un ordine da quella data in poi */
-    const giaDopo = (p ? ordiniDi(p.id).map(o => o.data) : []).concat(g.ordini.map(o => o.data)).some(d => d >= g.ultimo);
+    /* si guardano solo gli ordini fatti sul sito: quelli "fatti da me" non sono nell'elenco Amway del cliente e non lo sostituiscono */
+    const giaDopo = (p ? ordiniDi(p.id).filter(o => o.modo === "sito").map(o => o.data) : []).concat(g.ordini.map(o => o.data)).some(d => d >= g.ultimo);
     g.ultimoDaAggiungere = g.ultimo && !giaDopo ? g.ultimo : null;
     ordiniNuovi += g.daImportare.length + (g.ultimoDaAggiungere ? 1 : 0);
     if(p){

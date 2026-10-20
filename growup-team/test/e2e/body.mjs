@@ -1412,6 +1412,41 @@ check(await page.locator("h2", { hasText:"Ugo Bianchi" }).isVisible(), "dopo il 
 await page.click("button[data-act=torna-clienti]");
 check(await page.locator("button[data-act=apri-cliente]", { hasText:"Ugo Bianchi" }).getByText("Da pagare").isVisible(), "elenco clienti: etichetta da pagare");
 await page.screenshot({ path: S + "/e2e/32-clienti-amway.png", fullPage:true });
+// l'ultimo ordine dell'elenco clienti si somma agli ordini che ci sono già (anche a uno "fatto da me" più recente), senza doppioni
+await page.click("button[data-act=cliente-nuovo]");
+await page.fill(".sheet input[name=nome]", "Gino Somma");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Gino Somma tra i tuoi clienti").waitFor();
+await page.click("button[data-act=ordine-nuovo]");
+await page.fill("#cerca-prodotto", "double");
+await page.locator("#risultati-prodotto button[data-act=aggiungi-prodotto]").first().click();
+await page.click('.sheet label.chip:has-text("L\'ho fatto io")');
+await page.click('.sheet button:has-text("Salva l\'ordine")');
+await page.getByText("Ordine salvato").waitFor();
+await page.click("button.nome-modifica");
+await page.fill(".sheet input[name=codice_cliente]", "7000000020");
+await page.click('.sheet button:has-text("Salva")');
+await page.getByText("Dati salvati").waitFor();
+const csvGino = ['"Nome","Codice Cliente","Tipo","Nuovo cliente","Data di ingresso","Telefono","Email","Indirizzo","N. di ordini","VP Cliente","Data ultimo ordine"',
+  clienteCsv("Somma, Gino", "7000000020", gg(-200), "+39 333 000 0020", gg(-5))].join("\n") + "\n";
+for(const volta of [1, 2]){
+  await page.click("button[data-act=torna-clienti]").catch(() => {});
+  await page.click("button[data-act=importa-ordini]");
+  await page.setInputFiles("#file-ordini", { name:"20102026_Cliente.csv", mimeType:"text/csv", buffer:Buffer.from(csvGino) });
+  await page.locator(".sheet form[data-form=importa-ordini]").waitFor();
+  if(volta === 1){
+    check(await page.locator(".sheet .imp-sezione", { hasText:"Già in Growup" }).getByText(/Gino Somma · ultimo ordine/).isVisible(), "import: l'ultimo ordine del sito si aggiunge al cliente");
+    await page.click(".sheet button:has-text('Importa')");
+    await page.getByText("1 ordine nello storico").waitFor();
+  }else{
+    check(await page.getByText("Niente di nuovo: è già tutto in Growup.").isVisible(), "reimport: l'ultimo ordine non si aggiunge due volte");
+    await page.click(".sheet button[data-act=chiudi]");
+  }
+}
+await sync(page);
+const gino = DB.persone.find(x => x.nome === "Gino Somma"), ordGino = DB.ordini.filter(o => o.persona_id === gino.id);
+check(ordGino.length === 2 && ordGino.some(o => o.modo === "io" && o.data === oggiStr) && ordGino.some(o => o.modo === "sito" && o.data === gg(-5)),
+  "il cliente ha l'ordine fatto da me e l'ultimo ordine del sito");
 await ctx.close();
 
 // 28. Da confermare: si toglie dalla struttura; l'admin blocca l'app (dati inventati)
