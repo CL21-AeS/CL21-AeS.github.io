@@ -48,6 +48,11 @@ del mese, una nuova tappa del percorso, il primo cliente e il primo partner dall
 una volta sola per periodo (ricordato sul telefono). Con "riduci animazioni" attivo sul telefono non si muove niente
 (l'annuncio del traguardo resta). Solo traguardi personali (decisione di Stefano).
 
+**20 ottobre — il passaggio tra le schede "una sopra l'altra"** (scelta di Stefano dalla tavola di prova, al posto
+dello scivolamento "Sobria"): andando avanti la pagina nuova scorre da destra sopra la vecchia, che si sposta un poco e si
+scurisce; tornando indietro quella di sopra scivola via. Vale per le schede in alto, le sezioni di Persone e
+l'apertura/chiusura di persone, clienti, inviti e partner, anche con il dito.
+
 **Nota tecnica per Claude**: il connettore Supabase non applica le istruzioni con cancellazioni (`drop`, `delete`):
 va in timeout. Si applicano a pezzi senza `drop` (oggetti nuovi) e il resto lo incolla Stefano nell'SQL Editor.
 

@@ -647,6 +647,7 @@ function render(){
                   contatto:vContatto, bloccato:vAccessoNegato, tolto:vAccessoNegato };
   const html = (viste[st.fase] || vAvvio)();
   const prima = fotoMovimento();
+  prima.pagina = cambioPagina() ? fotoPagina(app) : null;
   if(html !== ultimoApp){ app.innerHTML = html; ultimoApp = html; }
   const conAzioni = st.fase === "home" && st.vista === "io";
   document.body.classList.toggle("con-azioni", conAzioni);
@@ -4293,11 +4294,13 @@ document.addEventListener("input", e => {
   if(e.target && e.target.id === "cerca-listino"){ st.cercaListino = e.target.value; const u = document.getElementById("risultati-listino"); if(u) u.innerHTML = risultatiListino(e.target.value); }
 });
 
-/* ---- 11g. Il movimento (scelta di Stefano dalla tavola di prova: "Vivace", ma tra le pagine "Sobria") ----
-   Tra le pagine e le schede: uno scivolamento breve nella direzione del tocco. Tutto il resto (pulsanti, numeri, barre,
+/* ---- 11g. Il movimento (scelte di Stefano dalla tavola di prova: "Vivace"; tra le schede "Una sopra l'altra") ----
+   Tra le pagine e le schede: andando avanti la nuova scorre da destra sopra la vecchia, che si sposta un poco e si
+   scurisce; tornando indietro quella di sopra scivola via e lascia vedere quella sotto. Tutto il resto (pulsanti, numeri, barre,
    finestre dal basso, messaggi) ha un leggero rimbalzo. Ai traguardi personali i coriandoli, una volta sola per periodo.
    Con "riduci animazioni" attivo sul telefono non si muove niente (il traguardo si scrive e basta). */
-const SOBRIA = { dur:180, ease:"cubic-bezier(.2,.7,.2,1)", sposta:12 };
+const SOBRIA = { dur:180, ease:"cubic-bezier(.2,.7,.2,1)" };
+const SCORRE = { dur:340, ease:"cubic-bezier(.32,.72,0,1)" };
 const VIVACE = { dur:280, ease:"cubic-bezier(.34,1.56,.64,1)", salto:1.32 };
 const FESTE = { piccola:{ pezzi:130, misura:[7, 12], tempo:1900, cannoni:false }, grande:{ pezzi:240, misura:[7, 13], tempo:2600, cannoni:true } };
 const ORDINE_PAGINE = ["obiettivo", "io", "persone", "gruppo", "scheda"], ORDINE_SEZIONI = ["target", "lista", "clienti"];
@@ -4326,10 +4329,7 @@ function muoviDopo(prima){
     /* la direzione: verso destra si va avanti (pagina dopo, una scheda che si apre), verso sinistra si torna */
     let verso = ORDINE_PAGINE.indexOf(st.vista) - ORDINE_PAGINE.indexOf(v.pagina);
     if(!verso && st.vista === "persone") verso = dettaglio !== v.dettaglio ? (dettaglio ? 1 : -1) : ORDINE_SEZIONI.indexOf(st.sezPersone) - ORDINE_SEZIONI.indexOf(v.sez);
-    verso = Math.sign(verso) || 1;
-    anima(app, [{ opacity:.35, transform:`translateX(${verso * SOBRIA.sposta * 2}px)` }, { opacity:1, transform:"none" }], SOBRIA);
-    [...app.querySelectorAll(".card, ul.persone > li")].slice(0, 14).forEach((el, k) =>
-      anima(el, [{ opacity:0, transform:"translateY(8px)" }, { opacity:1, transform:"none" }], SOBRIA, { delay:30 + k * 25, fill:"backwards" }));
+    if(prima.pagina) unaSopraLAltra(app, prima.pagina, Math.sign(verso) || 1);
   }
   /* le barre si riempiono scorrendo (anche quando si apre la pagina), i numeri cambiati fanno un salto */
   document.querySelectorAll("#app .bar[aria-label]").forEach(b => {
@@ -4350,6 +4350,36 @@ function muoviDopo(prima){
   st.foglioPrima = st.sheet || null;
   vistaPrima = ora;
   controllaTraguardi();
+}
+/* la pagina di prima: se ne tiene una copia ferma dove era (con lo scorrimento), per farle passare sopra la nuova */
+function cambioPagina(){
+  const v = vistaPrima;
+  return !!v && st.fase === "home" && v.chiave.startsWith("home|") && !fermo()
+    && v.chiave !== [st.fase, st.vista, st.sezPersone, st.personaId, st.schedaId, st.invitoId].join("|");
+}
+function fotoPagina(app){
+  document.querySelectorAll(".pagina-prima").forEach(x => x.remove());
+  const copia = document.createElement("div");
+  copia.className = "pagina-prima"; copia.setAttribute("aria-hidden", "true");
+  const dentro = app.cloneNode(true); dentro.removeAttribute("id"); dentro.style.marginTop = -window.scrollY + "px";
+  dentro.querySelectorAll("[id]").forEach(x => x.removeAttribute("id"));
+  copia.appendChild(dentro);
+  return copia;
+}
+function unaSopraLAltra(app, copia, verso){
+  document.body.appendChild(copia);
+  const fine = () => { copia.remove(); app.classList.remove("in-cima", "sotto"); };
+  if(verso > 0){
+    /* avanti: la nuova scorre sopra */
+    app.classList.add("in-cima");
+    anima(app, [{ transform:"translateX(100%)" }, { transform:"none" }], SCORRE);
+    anima(copia, [{ transform:"none", filter:"brightness(1)" }, { transform:"translateX(-25%)", filter:"brightness(.8)" }], SCORRE).then(fine);
+  } else {
+    /* indietro: quella di sopra scivola via */
+    copia.classList.add("sopra"); app.classList.add("sotto");
+    anima(app, [{ transform:"translateX(-25%)", filter:"brightness(.8)" }, { transform:"none", filter:"brightness(1)" }], SCORRE);
+    anima(copia, [{ transform:"none" }, { transform:"translateX(100%)" }], SCORRE).then(fine);
+  }
 }
 /* il foglio chiuso scende: se ne fa una copia che scivola via mentre l'app va avanti */
 function chiudiFoglioPiano(contenitore){
