@@ -3,11 +3,11 @@
 Ultimo aggiornamento: 20 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
-## Ripartire da qui (fermi la notte tra il 19 e il 20 ottobre 2026)
+## Ripartire da qui (fermi la sera del 20 ottobre 2026)
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
 dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **028** (027 incollata da
-Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla #74. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
+Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#76** (nessuna aperta). Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
 **Fatto il 19-20 ottobre** (dettagli più sotto, in ordine di data): import da Amway degli ordini e dell'elenco clienti
 (telefono, ultimo ordine, "Mai comprato" in Lista); Modifica dell'ordine e dei dati del cliente; etichette Da consegnare /
@@ -17,9 +17,16 @@ modificabili toccando il nome, anche per i clienti); "+ Un nome" resta nella lis
 solo in Da riprendere; Da confermare / Togli dalla struttura / Blocca l'app; listino nel database con prezzo Partner e
 VP negli ordini e aggiornamento dal PDF.
 
+**Fatto il 20 ottobre**: l'ultimo ordine dell'elenco clienti si somma agli ordini già presenti (anche con un ordine
+"fatto da me" più recente), senza doppioni; decisione di Stefano: i partner caricano l'export **Ordini** (lo storico vero),
+l'import accetta Clienti e Ordini insieme. **App in movimento**: tavola di prova "Growup Team in movimento" su claude.ai,
+scelta **Vivace** con le pagine **Sobria**; coriandoli ai traguardi personali (contatti e piani della settimana, VP del
+mese, nuova tappa, primo cliente e primo partner), una volta sola per periodo; "riduci animazioni" rispettato.
+
 **Da fare / in sospeso per Stefano**:
 - **Importare subito il report mappe**: dalla 027 tutti (tranne gli admin) sono "Da confermare" e chi ha qualcuno sotto
   lo può togliere; il primo import conferma chi è nel report.
+- Provare sul telefono le animazioni e i coriandoli (Android e iPhone di Alessia).
 - Provare con dati veri Target, Lista, Clienti (import ordini e clienti) e i tempi (preavviso 7 giorni, fermo dopo 45,
   verifica dopo 8).
 - Prima del lancio: prova su iPhone con Alessia, copia di sicurezza, pilota con 2-3 leader, messaggio al gruppo.
