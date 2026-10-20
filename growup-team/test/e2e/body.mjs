@@ -1544,6 +1544,31 @@ check(L("900001").prezzo_cliente === 82 && L("900001").prezzo_partner === 68 && 
 check(L("900002").attivo === false && L("900010").attivo === true, "PDF: chi esce non si cancella, chi è senza spunta resta nel listino");
 await ctx.close();
 
+// 30. Il movimento (senza "riduci animazioni"): pagine, foglio dal basso, coriandoli al traguardo, una volta sola
+({ ctx, page } = await apri({ reducedMotion:"no-preference" }, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.click("button[data-act=vista-gruppo]");
+check(await page.evaluate(() => document.getAnimations().length > 0), "cambiando pagina il contenuto si muove");
+await page.click("button[data-act=vista-io]");
+const fatti = Number((await page.locator("button[data-act=contatto-rapido] b").innerText()).match(/\d+/)[0]);
+await page.click("button[data-act=obiettivi]");
+check(await page.evaluate(() => document.querySelector("#sheet .sheet-box").getAnimations().length > 0), "il foglio sale dal basso");
+await page.fill(".sheet input[name=contatti]", String(fatti + 1));
+await page.fill(".sheet input[name=piani]", "50");
+await page.click(".sheet button:has-text('Salva')");
+await page.locator("#sheet .sheet").waitFor({ state:"detached" });
+await page.click("button[data-act=contatto-rapido]");
+await page.click(".sheet button[data-act=senza-nome]");
+await page.locator(".annuncio-festa", { hasText:"Obiettivo contatti raggiunto!" }).waitFor();
+check(await page.locator("canvas.coriandoli").count() === 1, "al traguardo i coriandoli su tutto lo schermo");
+await page.locator("canvas.coriandoli").waitFor({ state:"detached", timeout:6000 });
+await page.click("button[data-act=contatto-rapido]");
+await page.click(".sheet button[data-act=senza-nome]");
+await page.getByText("Contatto registrato").waitFor();
+await page.waitForTimeout(400);
+check(!(await page.locator("canvas.coriandoli").count()) && !(await page.locator(".annuncio-festa").count()), "lo stesso traguardo si festeggia una volta sola");
+await ctx.close();
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

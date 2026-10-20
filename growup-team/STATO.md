@@ -31,6 +31,16 @@ VP negli ordini e aggiornamento dal PDF.
 ordine "fatto da me" più recente, l'ultimo ordine del sito veniva saltato: ora contano solo gli ordini "dal sito" (con la
 stessa data o dopo) e l'export Ordini; reimportando lo stesso file non si aggiunge due volte.
 
+**20 ottobre — l'app in movimento** (tavola di prova "Growup Team in movimento" su claude.ai; scelta di Stefano:
+**Vivace**, ma tra le pagine **Sobria**): cambio pagina e apertura/chiusura di una scheda scivolano brevi nella direzione del
+tocco, con le card che compaiono una dopo l'altra; pulsanti che si premono e tornano su elastici; numeri che saltano e barre
+che si riempiono scorrendo; fogli dal basso che salgono e scendono; messaggi che salgono. **Coriandoli** su tutto lo schermo
+(disegnati nell'app, senza librerie) con un annuncio al centro e un "tic" del telefono (Android) ai traguardi personali:
+piccola festa per gli obiettivi contatti e piani della settimana, grande festa (con due spari dai lati) per l'obiettivo VP
+del mese, una nuova tappa del percorso, il primo cliente e il primo partner dalla lista. Solo nel momento in cui succede e
+una volta sola per periodo (ricordato sul telefono). Con "riduci animazioni" attivo sul telefono non si muove niente
+(l'annuncio del traguardo resta). Solo traguardi personali (decisione di Stefano).
+
 **Nota tecnica per Claude**: il connettore Supabase non applica le istruzioni con cancellazioni (`drop`, `delete`):
 va in timeout. Si applicano a pezzi senza `drop` (oggetti nuovi) e il resto lo incolla Stefano nell'SQL Editor.
 
