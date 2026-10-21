@@ -1461,6 +1461,7 @@ function vPreferiti(){
       ${righe.map(x => `<div class="obiettivo${debole === x.k ? " debole" : ""}"><div class="spread"><span>${x.nome} <span class="small">${x.nota}</span></span>
         <span class="num">${num(x.v)} / ${num(x.ob)}</span></div>
         <div class="bar${x.v >= x.ob ? " fatto" : ""}"><i style="width:${Math.min(100, x.ob ? Math.round(x.v / x.ob * 100) : 0)}%"></i></div></div>`).join("")}
+      ${p.stato === "gestito" ? "" : vNumeriLista(chiediNumeriLista(p.id))}
     </li>` };
   }).sort((a, b) => a.ordine - b.ordine || a.p.nome.localeCompare(b.p.nome));
   return `<div class="card">
@@ -2747,6 +2748,15 @@ function vPersona(){
   </div>`;
 }
 
+/* I numeri della lista di chi è nei Preferiti: si chiedono una volta sola, poi si ridisegna */
+const numeriChiesti = new Set();
+function chiediNumeriLista(pid){
+  if(!numeriChiesti.has(pid)){
+    numeriChiesti.add(pid);
+    api.numeriPersone(pid).then(n => { st.numeriLista[pid] = n; render(); }).catch(() => {});
+  }
+  return pid;
+}
 /* Il numero della lista di una persona del gruppo (per sponsor e upline: mai i nomi) */
 function vNumeriLista(pid){
   const n = st.numeriLista[pid];
