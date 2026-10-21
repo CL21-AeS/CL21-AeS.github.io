@@ -1802,6 +1802,73 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(g2.qualifica_iniziale === "platino" && g2.prossima_qualifica === "rubino", "salvati Platino e la prossima qualifica");
 }
 
+// 34. «Come arrivarci» da Argento a Platino (testi della tavola v2, dati inventati)
+{
+  const mm = n => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7); };
+  const chiaveLea = "c0".repeat(16);
+  DB.partners.push({ id:"lea", nome:"Lea Prova", sponsor_id:"R", stato:"attivo", chiave:chiaveLea, codice_invito:"LEALEA", codice_amway:"7300001",
+    qualifica_iniziale:"argento", qualifica_iniziale_mese:mm(-2) + "-01", privacy_accettata_il:"2026-10-01T00:00:00Z",
+    partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() });
+  DB.partners.push({ id:"la1", nome:"Linea Uno", sponsor_id:"lea", stato:"gestito", gestore_id:"lea", codice_amway:"7300002", codice_invito:"LA1LA1", creato_il:new Date().toISOString() });
+  const numeriLea = (chi, m, vpg, perc, linee) => { DB.numeri = DB.numeri.filter(x => !(x.visto_da === "lea" && x.partner_id === chi && x.mese === m))
+    .concat([{ visto_da:"lea", partner_id:chi, mese:m, vpg, percentuale:perc, linee:linee || [] }]); };
+  const consigliLea = async () => {
+    ({ ctx, page } = await apri({}, "#chiave=" + chiaveLea));
+    await page.getByText("Ciao Lea").waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+    await page.click("button[role=tab][data-act=vista-obiettivo]");
+    const c = page.locator("details.consigli"); await c.waitFor(); await c.locator("summary").click();
+    return c;
+  };
+  // manca il report del mese scorso
+  numeriLea("lea", mm(-2), 10500, 21);
+  let c = await consigliLea();
+  check(await c.getAttribute("data-chiave") === "report_mancanti" && await c.getByText(`Prima di tutto importa il report di`).isVisible(), "Argento: prima i report mancanti");
+  check(await c.getByText("Mesi da Argento negli ultimi 12 mesi: 1 su 3 per Oro").isVisible(), "la riga fissa dei mesi da Argento");
+  await ctx.close();
+  // vicino al 21% questo mese (8.500 VPG)
+  numeriLea("lea", mm(-1), 7000, 18); numeriLea("lea", mm(0), 8500, 18, [{ codice:"7300002", vpg:3000 }]); numeriLea("la1", mm(0), 3000, 12);
+  c = await consigliLea();
+  check(await c.getAttribute("data-chiave") === "mese_vicino" && await c.getByText("per il 21% ne mancano 1.500. Lavora con le tue linee").isVisible(), "vicino al 21%: mancano 1.500 VP");
+  check(await c.locator("th", { hasText:/^%$/ }).count() === 1 && (await c.locator("tr", { hasText:"Linea Uno" }).locator("td").nth(1).innerText()) === "12%", "la tabellina con la % della linea");
+  await ctx.close();
+  // una linea al 21% e meno di 4.000 VP di gruppo
+  numeriLea("lea", mm(0), 3000, 15, [{ codice:"7300002", vpg:10400 }]); numeriLea("la1", mm(0), 10400, 21);
+  c = await consigliLea();
+  check(await c.getAttribute("data-chiave") === "linea_21" && await c.getByText("La linea di Linea Uno è al 21%").isVisible() && await c.getByText("ne mancano 1.000").isVisible(),
+    "una linea al 21%: bastano 4.000 VP, ne mancano 1.000");
+  await ctx.close();
+  // una linea vicina al 21%
+  numeriLea("lea", mm(0), 5000, 15, [{ codice:"7300002", vpg:8200 }]); numeriLea("la1", mm(0), 8200, 18);
+  c = await consigliLea();
+  check(await c.getAttribute("data-chiave") === "linea_verso_21" && await c.getByText("Affiancala: aiutare Linea Uno a diventare Argento").isVisible(), "una linea vicina al 21%");
+  await ctx.close();
+  // questo mese al 21%
+  numeriLea("lea", mm(0), 10200, 21, [{ codice:"7300002", vpg:3000 }]); numeriLea("la1", mm(0), 3000, 12);
+  c = await consigliLea();
+  check(await c.getAttribute("data-chiave") === "mese_ok" && await c.getByText("con questo mese arrivi a 2 su 3 per Oro").isVisible()
+    && !(await c.getByText("tienilo").count()), "questo mese al 21%: 2 su 3 per Oro");
+  await ctx.close();
+  // lo sponsor: nella scheda di Lea, in terza persona
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.click("button[data-act=vista-gruppo]");
+  await page.locator(".albero.struttura li", { hasText:"Lea Prova" }).first().locator("button[data-act=apri-scheda]").first().click();
+  await page.locator(".card h2", { hasText:"Lea Prova" }).waitFor();
+  const lui = page.locator("details.consigli"); await lui.waitFor(); await lui.locator("summary").click();
+  check((await lui.getAttribute("data-chiave")).startsWith("mese_lontano") && await lui.getByText(/^Gli mancano .* VP di gruppo per il 21%/).isVisible(), "scheda: da Argento a Oro, in terza persona");
+  await ctx.close();
+  // 6 mesi ma non 3 di fila: tappa Platino, fila in corso 1
+  const lea = DB.partners.find(p => p.id === "lea"); lea.qualifica_iniziale_mese = mm(-11) + "-01";
+  for(let k = -11; k <= -1; k++) numeriLea("lea", mm(k), k % 2 ? 10500 : 7000, k % 2 ? 21 : 18);
+  numeriLea("lea", mm(0), 5000, 15, []);
+  c = await consigliLea();
+  check(await c.getAttribute("data-chiave") === "fila" && await c.getByText("Hai 6 mesi da Argento, ma non ancora 3 di fila").isVisible()
+    && await c.getByText("Hai già 1 mese di fila: il prossimo è il secondo dei 3.").isVisible(), "6 mesi senza 3 di fila: il prossimo è il secondo dei 3");
+  check(await c.getByText("· 3 di fila ○ (1 su 3)").isVisible(), "riga fissa: 3 di fila non ancora");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

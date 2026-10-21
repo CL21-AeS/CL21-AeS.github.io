@@ -489,6 +489,39 @@ const CONSIGLI = {
       "{vicine} tra 50 e 99 VP: con un cliente in più si arriva a 100. Partirei da lì."],
     lui:["Gli mancano {manca} VP di gruppo; nel suo gruppo tante persone sono a 0 o sotto 50 VP.", "Il lavoro è sul fatturato di chi c'è: ordine personale e clienti delle persone.",
       "{vicine} tra 50 e 99 VP: è da lì che conviene partire."] },
+  /* da Argento a Platino: i mesi al 21% (testi approvati da Stefano, tavola "Da Argento a Platino" v2) */
+  report_mancanti:{
+    io:["Prima di tutto importa {report_di}: finché manca, quei mesi non si contano e potresti essere più avanti di quanto vedi."] },
+  mese_ok:{
+    io:["Questo mese sei al 21%: con questo mese arrivi a {mesi} su {servono} per {tappa}.",
+      "Il lavoro che ti ha portato qui (clienti, ordini, linee che crescono) va ripetuto ogni mese: è la costanza che fa Platino."],
+    lui:["Questo mese è al 21%: con questo arriva a {mesi} su {servono} per {tappa}.", "È il momento di riconoscerglielo e di aiutarlo a tenere il ritmo il mese prossimo."] },
+  fila:{
+    io:["Hai {mesi} mesi da Argento, ma non ancora 3 di fila: per Platino ne servono 3 consecutivi al 21%. {fila_testo}"],
+    lui:["Ha {mesi} mesi da Argento ma non ancora 3 di fila. {fila_testo}", "Aiutalo a pianificare i prossimi mesi insieme, mese per mese."] },
+  linea_21:{
+    io:["La linea di {nome_linea} è al 21%: con una linea al 21% per il tuo mese da Argento bastano 4.000 VP di gruppo. Ne hai {vpg}: ne mancano {manca}.",
+      "Guarda le altre linee nella tabella: la più vicina è quella da sentire per prima."],
+    lui:["La linea di {nome_linea} è al 21%: gli bastano 4.000 VP di gruppo. Ne ha {vpg}, ne mancano {manca}.", "Guardate insieme le sue altre linee: la più vicina è la prima da aiutare."] },
+  mese_vicino:{
+    io:["Questo mese sei a {vpg} VP di gruppo: per il 21% ne mancano {manca}. Lavora con le tue linee: un ordine o un cliente in più per linea fa la differenza.",
+      "{vicine} tra 50 e 99 VP: con un cliente in più si arriva a 100. Partirei da lì."],
+    lui:["Questo mese è a {vpg} VP di gruppo: per il 21% ne mancano {manca}.", "Lavorate insieme con le sue linee: basta poco per linea.",
+      "{vicine} tra 50 e 99 VP: è da lì che conviene partire."] },
+  linea_verso_21:{
+    io:["La linea di {nome_linea} è a {vpg_linea} VP, vicina al 21%. Affiancala: aiutare {nome_linea} a diventare Argento è il traguardo più importante per lei e per tutta la sua linea.",
+      "Lavora con le persone della sua linea: i loro clienti e i loro ordini sono i passi che la portano al 21%."],
+    lui:["La linea di {nome_linea} è a {vpg_linea} VP, vicina al 21%: al 21% diventa la sua prima linea Argento."] },
+  "mese_lontano.persone":{
+    io:["Ti mancano {manca} VP di gruppo per il 21%. Chi c'è nelle tue linee fattura già bene: servono persone nuove.",
+      "Aiuta i tuoi frontali ad allargare la loro linea, con nuovi clienti e nuovi partner: è il numero di persone che porta ai 10.000."],
+    lui:["Gli mancano {manca} VP di gruppo per il 21%; nelle sue linee chi c'è fattura già bene.", "Il lavoro è l'espansione: aiutarlo ad allargare le sue linee."] },
+  "mese_lontano.fatturato":{
+    io:["Ti mancano {manca} VP di gruppo per il 21%, e nelle tue linee tante persone sono a 0 o sotto 50 VP.",
+      "La strada più breve è il fatturato di chi c'è già: il loro ordine personale e i loro primi clienti.",
+      "{vicine} tra 50 e 99 VP: con un cliente in più si arriva a 100. Partirei da lì."],
+    lui:["Gli mancano {manca} VP di gruppo per il 21%; nel suo gruppo tante persone sono a 0 o sotto 50 VP.", "Il lavoro è sul fatturato di chi c'è: ordine personale e clienti delle persone.",
+      "{vicine} tra 50 e 99 VP: è da lì che conviene partire."] },
   pronto:{
     io:["Questo mese i numeri della tappa ci sono tutti. Tienili fino a fine mese: la qualifica conta i numeri di chiusura.",
       "Intanto guarda la tappa dopo, nel percorso qui sopra: ti dice cosa servirà."],
@@ -545,7 +578,8 @@ function situazione(pid){
   const io = pid === st.profilo.id;
   if(io){
     const a = percorso().attuale;
-    if(!a || oltreArgento(a)) return null;
+    if(!a) return null;
+    if(oltreArgento(a)) return situazioneArgento(pid, a, st.mesiReport);
     if(a.chiave === "primo_ordine"){
       const f = finestraPrimoOrdine(a), vp = f ? f.vp : vpMese(meseDi(oggi()));
       return { chiave:"primo_ordine", tappa:a, linee:[], dati:{ manca:num(Math.max(0, a.vp_personali - vp)), entro:f ? dataIt(f.fine) : "fine mese" },
@@ -555,6 +589,15 @@ function situazione(pid){
       const c = clientiTotali(), m = Math.max(0, (a.clienti || 0) - c);
       return { chiave:"primi_clienti", tappa:a, linee:[], dati:{ mancano:m === 1 ? "manca" : "mancano", manca_clienti:plur(m, "cliente", "clienti") },
         sintesi:`${num(Math.min(c, a.clienti))} clienti su ${a.clienti}` };
+    }
+  }
+  if(!io){
+    /* nella scheda: chi è tra Argento e Platino (dichiarato o con un mese al 21% nei miei report) */
+    const p = st.struttura.find(x => x.id === pid) || {}, righe = st.mesiScheda[pid] || [];
+    if(daPlatino(p.qualifica_iniziale)) return null;
+    if(ordineDi(p.qualifica_iniziale) >= ordineDi("argento") || righe.some(x => Number(x.percentuale) >= 21)){
+      const x = mesiArgento(righe), t = st.stages.find(s => s.chiave === (x.mesi >= MESI_ARGENTO.oro || p.qualifica_iniziale === "oro" ? "platino" : "oro"));
+      return t ? situazioneArgento(pid, t, righe) : null;
     }
   }
   const t = tappaDaGuardare(pid), n = numeriDi(pid);
@@ -1347,20 +1390,75 @@ function vProssimaQualifica(){
 }
 
 /* "Come arrivarci": chiuso finché non lo si tocca. chi: "io" (per me, in Obiettivo) o "lui" (per lo sponsor, nella scheda) */
+/* Da Argento a Platino: un mese da Argento = 21% nel report (10.000 VP di gruppo, o 1 linea al 21% e 4.000 VP,
+   o 2 linee al 21%). Vince la prima situazione che scatta. */
+const ARGENTO_VPG = 10000, ARGENTO_VPG_CON_LINEA = 4000, ARGENTO_VICINO = 8000;
+function filaInCorso(righe){
+  const per = new Map((righe || []).map(x => [meseDi(x.mese), Number(x.percentuale) || 0]));
+  let n = 0;
+  for(let m = spostaMese(meseDi(oggi()), -1); (per.get(m) || 0) >= 21 && n < 12; m = spostaMese(m, -1)) n++;
+  return n;
+}
+function situazioneArgento(pid, t, righe){
+  const io = pid === st.profilo.id, n = numeriDi(pid);
+  if(!n) return null;
+  const r = rigaDi(st.riep, pid) || {};
+  const x = mesiArgento(righe), servono = MESI_ARGENTO[t.chiave] || 0;
+  const pct = Math.max(Number(io ? n.percentuale : r.percentuale) || 0,
+    Number(((righe || []).find(y => meseDi(y.mese) === meseDi(oggi())) || {}).percentuale) || 0);
+  const linee = n.linee.map(l => Object.assign(analisiLinea(l, 0), { pct:l.id ? Number((rigaDi(st.riep, l.id) || {}).percentuale) || null : null }));
+  const dati = { tappa:t.nome, mesi:x.mesi, servono, vpg:num(n.gruppo) };
+  const s = { tappa:t, linee, annuale:true, personali:n.personali, dati, mesi:x,
+    sintesi:`questo mese ${num(n.gruppo)} VP di gruppo${pct ? ` (${pct}%)` : ""}` };
+  const mancanti = io ? mesiDaImportare().filter(m => !m.fatto) : [];
+  const l21 = linee.find(l => l.pct >= 21), verso = linee.find(l => l.vp >= ARGENTO_VICINO && !(l.pct >= 21));
+  const vicine = k => k.vicine ? plur(k.vicine, "persona è", "persone sono") : "";
+  if(mancanti.length){
+    s.chiave = "report_mancanti";
+    dati.report_di = (mancanti.length === 1 ? "il report di " : "i report di ") + mancanti.map(m => nomeMese(m.mese)).join(", ");
+  }
+  else if(pct >= 21){
+    /* il mese in corso conta già se il suo report al 21% è importato, altrimenti si aggiunge */
+    const giaContato = (righe || []).some(y => meseDi(y.mese) === meseDi(oggi()) && Number(y.percentuale) >= 21);
+    s.chiave = "mese_ok"; dati.mesi = Math.min(x.mesi + (giaContato ? 0 : 1), servono);
+  }
+  else if(t.chiave === "platino" && x.mesi >= servono && x.fila < 3){
+    const f = Math.min(filaInCorso(righe), 2), tu = io ? "Hai" : "Ha";
+    s.chiave = "fila";
+    dati.fila_testo = f === 0 ? "Il prossimo mese al 21% è il primo dei 3."
+      : f === 1 ? `${tu} già 1 mese di fila: il prossimo è il secondo dei 3.` : `${tu} già 2 mesi di fila: il prossimo è il terzo, quello che fa Platino.`;
+  }
+  else if(l21 && n.gruppo < ARGENTO_VPG_CON_LINEA){
+    s.chiave = "linea_21"; Object.assign(dati, { nome_linea:l21.nome, manca:num(ARGENTO_VPG_CON_LINEA - n.gruppo) });
+  }
+  else if(n.gruppo >= ARGENTO_VICINO){
+    s.chiave = "mese_vicino"; Object.assign(dati, { manca:num(ARGENTO_VPG - n.gruppo), vicine:vicine(tipoLinee(linee)) });
+  }
+  else if(verso){ s.chiave = "linea_verso_21"; Object.assign(dati, { nome_linea:verso.nome, vpg_linea:num(verso.vp) }); }
+  else{
+    const k = tipoLinee(linee);
+    s.chiave = "mese_lontano." + k.tipo; Object.assign(dati, { manca:num(ARGENTO_VPG - n.gruppo), vicine:vicine(k) });
+  }
+  return s;
+}
 function vComeArrivarci(pid, chi){
   const s = situazione(pid);
   if(!s) return "";
   const testi = (CONSIGLI[s.chiave] || {})[chi] || [];
   const t = s.tappa, vpp = Number(t.vp_personali) || 0;
-  const promemoria = !TAPPE_DI_PERCORSO.includes(t.chiave) && vpp > 0
+  const promemoria = s.annuale
+    ? `<p class="promemoria">Mesi da Argento negli ultimi 12 mesi: ${s.mesi.mesi} su ${s.dati.servono} per ${esc(t.nome)}${s.mesi.mesi >= s.dati.servono ? " ✓" : ""}${
+        t.chiave === "platino" ? ` · 3 di fila ${s.mesi.fila >= 3 ? "✓" : `○ (${Math.min(s.mesi.fila, 3)} su 3)`}` : ""}</p>`
+    : !TAPPE_DI_PERCORSO.includes(t.chiave) && vpp > 0
     ? `<p class="promemoria">Ricorda: per ${esc(t.nome)} servono anche ${num(vpp)} VP personali nel mese ·
         ${chi === "io" ? "ne hai" : "ne ha"} ${num(s.personali)}${s.personali >= vpp ? " ✓" : `, mancano ${num(vpp - s.personali)}`}</p>` : "";
   const cella = v => `<td class="num">${v == null ? "–" : num(v)}</td>`;
+  const an = !!s.annuale;   // da Argento a Platino: la % della linea al posto di "manca"
   const tabella = s.linee.length ? `<div class="tab-consigli"><table>
-      <thead><tr><th>Linea</th><th>VP</th><th>persone</th><th>a 0</th><th>&lt; 50</th><th>50-99</th><th>100-199</th><th>200+</th><th>VP medio</th><th>manca</th></tr></thead>
+      <thead><tr><th>Linea</th>${an ? "<th>%</th>" : ""}<th>VP</th><th>persone</th><th>a 0</th><th>&lt; 50</th><th>50-99</th><th>100-199</th><th>200+</th><th>VP medio</th>${an ? "" : "<th>manca</th>"}</tr></thead>
       <tbody>${s.linee.map(l => { const f = l.fasce || [];
-        return `<tr><td>${esc(l.nome)}</td>${cella(l.vp)}${cella(l.persone)}${cella(l.zero)}${cella(f[0])}${cella(f[1])}${cella(f[2])}${cella(f[3])}${cella(l.media)}
-        <td class="num${l.manca ? " sotto" : ""}">${l.manca ? num(l.manca) + " VP" : "✓"}</td></tr>`; }).join("")}</tbody>
+        return `<tr><td>${esc(l.nome)}</td>${an ? `<td class="num">${l.pct ? l.pct + "%" : "–"}</td>` : ""}${cella(l.vp)}${cella(l.persone)}${cella(l.zero)}${cella(f[0])}${cella(f[1])}${cella(f[2])}${cella(f[3])}${cella(l.media)}
+        ${an ? "" : `<td class="num${l.manca ? " sotto" : ""}">${l.manca ? num(l.manca) + " VP" : "✓"}</td>`}</tr>`; }).join("")}</tbody>
     </table></div>` : "";
   const aperto = st.consigliAperti.has(pid);
   return `<details class="card metodo consigli" data-chiave="${esc(s.chiave)}" data-id="${esc(pid)}"${aperto ? " open" : ""}>
