@@ -1619,6 +1619,67 @@ await page.waitForTimeout(400);
 check(!(await page.locator("canvas.coriandoli").count()) && !(await page.locator(".annuncio-festa").count()), "lo stesso traguardo si festeggia una volta sola");
 await ctx.close();
 
+// 31. "Come arrivarci": i consigli a richiesta, in Obiettivo (per me) e nella scheda partner (per lo sponsor)
+{
+  const R = DB.partners.find(p => p.id === "R");
+  Object.assign(R, { qualifica_iniziale:"path_to_bronze", codice_amway:"7000000" });
+  DB.partners = [R]; DB.activities = []; DB.numeri = []; DB.storico = []; DB.nascosti = []; DB.obiettivi = [];
+  const G = (id, nome, sponsor, codice) => DB.partners.push({ id, nome, sponsor_id:sponsor, stato:"gestito", gestore_id:"R", codice_invito:id.toUpperCase() + "QQQQ", codice_amway:codice || null });
+  const V = (pid, vp) => DB.activities.push({ id:"ca" + DB.activities.length, partner_id:pid, tipo:"ordine", quantita:1, vp, data:oggiStr, inserito_il:new Date().toISOString() });
+  G("ca", "Linea Alfa", "R", "7000001"); G("cb", "Linea Beta", "R", "7000002"); G("cb1", "Beta Uno", "cb"); G("cb2", "Beta Due", "cb"); G("cb3", "Beta Tre", "cb");
+  G("cc", "Linea Gamma", "R", "7000003");
+  V("R", 120); V("cb2", 5); V("cb3", 55); V("cc", 150);
+  const report = linee => { DB.numeri = [{ visto_da:"R", partner_id:"R", mese:oggiStr.slice(0, 7), vpg:120 + linee.reduce((t, l) => t + l.vpg, 0), percentuale:null, linee }]; };
+  /* il report: Alfa 0, Beta 60, Gamma 150, più una linea che non è nell'app */
+  report([{ codice:"7000001", vpg:0 }, { codice:"7000002", vpg:60 }, { codice:"7000003", vpg:150 }, { codice:"7000099", vpg:40 }]);
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  check(!(await page.locator(".consigli").count()), "nessun consiglio nella pagina Io");
+  await page.click("button[role=tab][data-act=vista-obiettivo]");
+  const cons = page.locator("details.consigli");
+  await cons.waitFor();
+  check(!(await cons.evaluate(d => d.open)) && !(await page.getByText("Hai due strade").isVisible()), "Come arrivarci: chiuso finché non lo tocchi");
+  await cons.locator("summary").click();
+  check(await cons.getAttribute("data-chiave") === "linee_crescere", "Come arrivarci: manca una linea (linee_crescere)");
+  check(await cons.getByText("Ricorda: per Bronze Foundation 9% servono anche 100 VP personali nel mese · ne hai 120 ✓").isVisible(), "il promemoria fisso dei VP personali");
+  check(await cons.getByText("Ti mancano 3 linee da 200 VP. Hai due strade").isVisible(), "il testo per me, con i numeri veri");
+  const cel = async (nome, i) => (await cons.locator("tr", { hasText:nome }).locator("td").nth(i).innerText()).trim();
+  check(await cel("Linea Beta", 2) === "4" && await cel("Linea Beta", 3) === "2" && await cel("Linea Beta", 4) === "1" && await cel("Linea Beta", 5) === "1"
+    && await cel("Linea Beta", 8) === "30" && await cel("Linea Beta", 9) === "140 VP", "la linea Beta: 4 persone, 2 a 0, 1 sotto 50, 1 tra 50 e 99, media 30, mancano 140");
+  check(await cel("Linea Gamma", 6) === "1" && await cel("non nell'app", 2) === "–" && await cel("non nell'app", 9) === "160 VP", "Gamma attiva; la linea fuori dall'app solo con VP e quanto manca");
+  await page.screenshot({ path: S + "/e2e/34-come-arrivarci.png", fullPage:true });
+  // lo sponsor nella scheda: in terza persona; Gamma non ha linee, Beta è ferma
+  await page.click("button[data-act=vista-gruppo]");
+  await page.locator(".albero.struttura li", { hasText:"Linea Gamma" }).first().locator("button[data-act=apri-scheda]").first().click();
+  await page.locator(".card h2", { hasText:"Linea Gamma" }).waitFor();
+  const lui = page.locator("details.consigli");
+  await lui.locator("summary").click();
+  check(await lui.getAttribute("data-chiave") === "linee_zero" && await lui.getByText("Non ha ancora linee attive: gli servono i primi 3 frontali.").isVisible()
+    && await lui.getByText("Ricorda: per Path to Bronze servono anche 100 VP personali nel mese · ne ha 150 ✓").isVisible(), "scheda partner: i consigli in terza persona");
+  await page.click("button[data-act=vista-gruppo]");
+  check(!(await page.locator(".consigli").count()), "nessun consiglio nell'elenco del gruppo");
+  await page.locator(".albero.struttura li", { hasText:"Linea Beta" }).first().locator("button[data-act=apri-scheda]").first().click();
+  await page.locator(".card h2", { hasText:"Linea Beta" }).waitFor();
+  check(await page.locator("details.consigli").getAttribute("data-chiave") === "fermo", "chi non ha VP personali nel mese: fermo");
+  await ctx.close();
+  /* le tre linee ci sono (100+) ma Beta è sotto i 200: tante persone a 0, una vicina ai 100 → fatturato basso */
+  report([{ codice:"7000001", vpg:400 }, { codice:"7000002", vpg:120 }, { codice:"7000003", vpg:250 }]);
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.click("button[role=tab][data-act=vista-obiettivo]");
+  await page.locator("details.consigli summary").click();
+  check(await page.locator("details.consigli").getAttribute("data-chiave") === "linea_vp.fatturato"
+    && await page.getByText("1 persona è tra 50 e 99 VP: con un cliente in più si arriva a 100.").isVisible(), "linea sotto i 200: fatturato basso, con le vicine ai 100");
+  await ctx.close();
+  /* tutto a posto per la tappa */
+  report([{ codice:"7000001", vpg:400 }, { codice:"7000002", vpg:400 }, { codice:"7000003", vpg:450 }]);
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.click("button[role=tab][data-act=vista-obiettivo]");
+  check(await page.locator("details.consigli").getAttribute("data-chiave") === "pronto", "con tutti i numeri della tappa: pronto");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

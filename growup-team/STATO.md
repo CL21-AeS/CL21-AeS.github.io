@@ -1,13 +1,13 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 20 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 21 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
 ## Ripartire da qui (fermi la sera del 20 ottobre 2026)
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
 dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **028** (027 incollata da
-Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#76** (nessuna aperta). Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
+Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#85**. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
 **Fatto il 19-20 ottobre** (dettagli più sotto, in ordine di data): import da Amway degli ordini e dell'elenco clienti
 (telefono, ultimo ordine, "Mai comprato" in Lista); Modifica dell'ordine e dei dati del cliente; etichette Da consegnare /
@@ -22,6 +22,16 @@ VP negli ordini e aggiornamento dal PDF.
 l'import accetta Clienti e Ordini insieme. **App in movimento**: tavola di prova "Growup Team in movimento" su claude.ai,
 scelta **Vivace** con le pagine **Sobria**; coriandoli ai traguardi personali (contatti e piani della settimana, VP del
 mese, nuova tappa, primo cliente e primo partner), una volta sola per periodo; "riduci animazioni" rispettato.
+
+**21 ottobre — «Come arrivarci»** (testi dalla tavola "Come arrivarci", versione 2): un riquadro chiuso nella pagina
+Obiettivo (per sé, "tu") e nella scheda partner (per sponsor e upline, in terza persona). Una situazione alla volta, la
+prima che scatta: primo ordine · primi clienti (solo per sé) · fermo (0 VP personali) · VP personali · nessuna linea ·
+manca una linea · linee sotto il VP della tappa · VP di gruppo · tutto a posto. La tappa guardata è la prima dal Path to
+Bronze in su non ancora chiusa (qualifica dichiarata o mese chiuso). In cima, dal Path to Bronze in su, la riga fissa
+"Ricorda: per X servono anche N VP personali nel mese". Sotto, la tabellina delle linee: VP, persone (chi apre la linea e
+chi ha sotto), a 0, sotto 50, 50-99, 100-199, 200+, VP medio di chi fattura, quanto manca. **Mancano persone** se almeno
+1 persona su 4 è attiva (100 VP e oltre) nelle linee considerate, altrimenti **fatturato basso**, con le persone tra 50 e
+99 nominate a parte. I testi stanno in `CONSIGLI` (app.js): si cambiano lì. Nessun dato nuovo nel database.
 
 **Da fare / in sospeso per Stefano**:
 - **Importare subito il report mappe**: dalla 027 tutti (tranne gli admin) sono "Da confermare" e chi ha qualcuno sotto
@@ -334,6 +344,8 @@ dall'SQL Editor perché contiene un `delete`):
 - **Principio (16 ottobre 2026): l'app non dà suggerimenti.** Rende evidenti i dati, il percorso e le eventuali
   mancanze di quello che viene fatto; come muoversi lo decide ogni partner, da solo. Niente frasi del tipo "allenate…",
   "costruisci…", "lavorate su…", niente azioni suggerite: solo numeri, soglie e cosa manca.
+  **Eccezione (21 ottobre)**: il riquadro «Come arrivarci», chiuso finché non lo si tocca, in Obiettivo e nella scheda
+  partner. Resta valido tutto il resto: nessun consiglio in Io, Persone, Gruppo, Mese.
 
 - **Niente email**: si entra dal link d'invito dello sponsor (`#CODICE`) e poi dal link personale (`#chiave=…`),
   che il partner si manda da solo su WhatsApp (chat con sé stesso) o Telegram (Messaggi salvati).

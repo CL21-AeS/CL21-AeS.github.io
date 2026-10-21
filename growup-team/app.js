@@ -151,6 +151,7 @@ const st = {
   personaId: null, filtroLista: "aperti", cercaLista: "", passoTipo: null,
   numeriLista: {},
   schedaPila: [],          // le schede aperte scendendo lungo le linee, per "Indietro"
+  consigliAperti: new Set(),  // "Come arrivarci" aperto (per persona), così resta aperto quando la pagina si ridisegna
   inviti: [], sezPersone: "lista", invitoId: null, archiviatiT: false,  // il Target (solo miei)
   ct: null,               // la pagina del contatto (le otto domande)
   listino: [],            // il listino Amway (dal database; una copia sul telefono)
@@ -395,6 +396,148 @@ function requisiti(t){
   }
   if(t.vp_gruppo) out.push({ ok: n.gruppo >= t.vp_gruppo, txt: `${num(t.vp_gruppo)} VP di gruppo nel mese`, val: `${num(n.gruppo)} / ${num(t.vp_gruppo)}` });
   return out;
+}
+
+/* ---- "Come arrivarci": i consigli, solo a richiesta (pagina Obiettivo e scheda partner) ----
+   È l'unica parte dell'app che dà suggerimenti. Una situazione alla volta, la prima che scatta. */
+const ATTIVE_MIN = 0.25;   // almeno 1 persona su 4 a 100 VP e oltre: "mancano persone", sotto: "fatturato basso"
+const CONSIGLI = {
+  primo_ordine:{
+    io:["Il primo passo è usare tu i prodotti: scegli quelli che ti servono davvero in casa e arriva ai {manca} VP che mancano entro il {entro}.",
+      "Fallo con il tuo sponsor: ti aiuta a scegliere e a capire come ordinare dal sito."] },
+  primi_clienti:{
+    io:["Ti {mancano} {manca_clienti}. Parti da chi ti conosce bene e da chi ha già visto i prodotti in casa tua: amici, parenti, colleghi.",
+      "Proponi un prodotto che usi tu e racconta come ti trovi: è il modo più semplice per iniziare."] },
+  fermo:{
+    io:["Questo mese non ci sono ancora VP personali: si riparte dal tuo ordine e da quelli dei tuoi clienti.",
+      "Guarda i clienti da sentire nella pagina Io: chi sta finendo un prodotto è il primo da chiamare."],
+    lui:["Questo mese non ha ancora VP personali.", "Più che i numeri, conta capire come sta: fissa una chiamata e ascolta prima di proporre."] },
+  personali:{
+    io:["Per la tappa servono {vp_personali} VP personali: te ne mancano {manca}.",
+      "Il fatturato personale si costruisce con i clienti: chi ha già comprato e chi sta finendo un prodotto. Un nuovo cliente al mese cambia la base."],
+    lui:["Gli mancano {manca} VP personali per la tappa ({vp_personali}).", "Guardate insieme i suoi clienti: chi sta finendo un prodotto, chi non ha mai comprato."] },
+  linee_zero:{
+    io:["Per {tappa} servono {linee} frontali con almeno {vp_linea} VP di gruppo ciascuno. Inizia dai primi {linee} frontali.",
+      "Parti dalla tua lista: le persone in corso sono le più vicine. Mostra il piano a chi ha detto sì all'incontro."],
+    lui:["Non ha ancora linee attive: gli servono i primi {linee} frontali.", "Aiutalo a scegliere dalla sua lista le persone a cui mostrare il piano e affiancalo nei primi incontri."] },
+  linee_crescere:{
+    io:["Ti {mancano} {manca_linee} da {vp_linea} VP. Hai due strade: far crescere la linea più vicina alla soglia, oppure aprire una linea nuova.",
+      "Nella tabella sotto vedi a quanto è ogni linea: la più vicina è quella che si sblocca prima."],
+    lui:["Gli {mancano} {manca_linee} da {vp_linea} VP.", "Guardate insieme la linea più vicina alla soglia: lì spesso basta un cliente o un ordine in più. Se nessuna è vicina, serve una linea nuova."] },
+  "linea_vp.persone":{
+    io:["Le persone nelle tue linee fatturano già bene: quello che manca è il numero di persone.",
+      "Aiuta i tuoi frontali a portare nuove persone (clienti e partner) nella loro linea: è l'espansione che fa crescere il gruppo."],
+    lui:["Nelle sue linee chi c'è fattura già bene: mancano persone.", "Il lavoro è aiutare i suoi frontali ad allargare la loro linea, con nuovi clienti e nuovi partner."] },
+  "linea_vp.fatturato":{
+    io:["Nelle tue linee ci sono già persone, ma molte hanno fatturato basso o zero.",
+      "Prima di cercare persone nuove, aiuta chi c'è: i loro primi clienti, il loro ordine personale. Ogni persona che arriva a 100 VP sposta la linea.",
+      "{vicine} tra 50 e 99 VP: con un cliente in più si arriva a 100. Partirei da lì."],
+    lui:["Nelle sue linee ci sono persone, ma tante a 0 o sotto 50 VP.", "Il lavoro è sul fatturato di chi c'è già: clienti e ordine personale delle persone, più che nuovi ingressi.",
+      "{vicine} tra 50 e 99 VP: è da lì che conviene partire."] },
+  "gruppo.persone":{
+    io:["Ti mancano {manca} VP di gruppo. Chi c'è nelle tue linee fattura già bene: serve allargare il gruppo.",
+      "Aiuta le tue linee a trovare nuovi clienti e nuovi partner: è il numero di persone che fa la differenza adesso."],
+    lui:["Gli mancano {manca} VP di gruppo; nelle sue linee chi c'è fattura già bene.", "Il lavoro è l'espansione: aiutarlo ad allargare le sue linee."] },
+  "gruppo.fatturato":{
+    io:["Ti mancano {manca} VP di gruppo, e nel tuo gruppo ci sono tante persone a 0 o sotto 50 VP.",
+      "La strada più breve è il fatturato di chi c'è già: aiuta ognuno a fare il suo ordine e a trovare i primi clienti. Il VP medio di chi fattura ti dice quanto vale una persona attiva in più.",
+      "{vicine} tra 50 e 99 VP: con un cliente in più si arriva a 100. Partirei da lì."],
+    lui:["Gli mancano {manca} VP di gruppo; nel suo gruppo tante persone sono a 0 o sotto 50 VP.", "Il lavoro è sul fatturato di chi c'è: ordine personale e clienti delle persone.",
+      "{vicine} tra 50 e 99 VP: è da lì che conviene partire."] },
+  pronto:{
+    io:["Questo mese i numeri della tappa ci sono tutti. Tienili fino a fine mese: la qualifica conta i numeri di chiusura.",
+      "Intanto guarda la tappa dopo, nel percorso qui sopra: ti dice cosa servirà."],
+    lui:["Questo mese ha tutti i numeri della tappa.", "È il momento di riconoscerglielo e di guardare insieme la tappa dopo."] }
+};
+/* i paragrafi con un dato che manca (per esempio nessuna persona tra 50 e 99) non si mostrano */
+function riempi(s, dati){
+  let manca = false;
+  const out = s.replace(/\{(\w+)\}/g, (x, k) => { if(dati[k] == null || dati[k] === "") { manca = true; return ""; } return dati[k]; });
+  return manca ? "" : out;
+}
+/* le linee frontali di una persona: dal report Amway se c'è, altrimenti dai suoi frontali nell'app */
+function lineeDi(pid, r){
+  return r && r.da_report ? lineeReport(r)
+    : st.riep.filter(x => x.sponsor_id === pid).map(x => ({ id:x.partner_id, nome:nomeDi(x.partner_id), vp:Number(x.vp_gruppo) || 0 }))
+      .sort((a, b) => b.vp - a.vp);
+}
+/* { personali, gruppo, linee } del mese in corso: per me dal vivo, per gli altri dal riepilogo */
+function numeriDi(pid){
+  if(pid === st.profilo.id) return numeriMese(meseDi(oggi()));
+  const r = rigaDi(st.riep, pid);
+  if(!r) return null;
+  return { personali:Number(r.vp_personali) || 0, gruppo:Number(r.vp_gruppo) || 0, linee:lineeDi(pid, r) };
+}
+/* una linea vista persona per persona: chi la apre e tutto il suo gruppo nella mia struttura (VP personali del mese) */
+function analisiLinea(l, vpLinea){
+  const out = { id:l.id, nome:l.nome, vp:l.vp, manca:Math.max(0, vpLinea - l.vp), persone:null };
+  if(!l.id || !st.struttura.some(p => p.id === l.id)) return out;
+  const vp = [l.id].concat(alberoSotto(l.id, 0).map(x => x.p.id)).map(id => Number((rigaDi(st.riep, id) || {}).vp_personali) || 0);
+  const fatt = vp.filter(v => v > 0);
+  return Object.assign(out, { persone:vp.length, zero:vp.length - fatt.length,
+    fasce:[vp.filter(v => v > 0 && v < 50).length, vp.filter(v => v >= 50 && v < 100).length,
+           vp.filter(v => v >= 100 && v < 200).length, vp.filter(v => v >= 200).length],
+    media:fatt.length ? Math.round(totale(fatt) / fatt.length) : null });
+}
+function totale(n){ return n.reduce((t, x) => t + x, 0); }
+/* "mancano persone" o "fatturato basso" nelle linee indicate */
+function tipoLinee(linee){
+  const conPersone = linee.filter(l => l.persone != null);
+  const tot = totale(conPersone.map(l => l.persone));
+  const attive = totale(conPersone.map(l => l.fasce[2] + l.fasce[3]));
+  const vicine = totale(conPersone.map(l => l.fasce[1]));
+  return { tipo: !tot || attive / tot >= ATTIVE_MIN ? "persone" : "fatturato", vicine };
+}
+/* la tappa da guardare: la prima dal Path to Bronze in su non ancora chiusa (qualifica dichiarata o mesi chiusi) */
+function tappaDaGuardare(pid){
+  const S = st.stages, p = st.struttura.find(x => x.id === pid) || (pid === st.profilo.id ? st.profilo : {});
+  let chiusa = ordineDi(p.qualifica_iniziale);
+  if(pid === st.profilo.id) for(const r of st.storico) chiusa = Math.max(chiusa, ordineDi(r.qualifica));
+  return S.find(s => !TAPPE_DI_PERCORSO.includes(s.chiave) && s.ordine > chiusa) || null;
+}
+/* { chiave, tappa, dati, sintesi, linee, vpLinea } oppure null (percorso finito o numeri non disponibili) */
+function situazione(pid){
+  const io = pid === st.profilo.id;
+  if(io){
+    const a = percorso().attuale;
+    if(!a) return null;
+    if(a.chiave === "primo_ordine"){
+      const f = finestraPrimoOrdine(a), vp = f ? f.vp : vpMese(meseDi(oggi()));
+      return { chiave:"primo_ordine", tappa:a, linee:[], dati:{ manca:num(Math.max(0, a.vp_personali - vp)), entro:f ? dataIt(f.fine) : "fine mese" },
+        sintesi:`${num(vp)} VP personali su ${num(a.vp_personali)}` };
+    }
+    if(a.chiave === "primi_clienti"){
+      const c = clientiTotali(), m = Math.max(0, (a.clienti || 0) - c);
+      return { chiave:"primi_clienti", tappa:a, linee:[], dati:{ mancano:m === 1 ? "manca" : "mancano", manca_clienti:plur(m, "cliente", "clienti") },
+        sintesi:`${num(Math.min(c, a.clienti))} clienti su ${a.clienti}` };
+    }
+  }
+  const t = tappaDaGuardare(pid), n = numeriDi(pid);
+  if(!t || !n) return null;
+  const vpLinea = Number(t.vp_linea) || soglia();
+  const linee = n.linee.map(l => analisiLinea(l, vpLinea));
+  const manc = mancanze(t, n);
+  const dati = { tappa:t.nome, linee:t.linee, vp_linea:num(vpLinea), vp_personali:num(t.vp_personali) };
+  const s = { tappa:t, linee, vpLinea, personali:n.personali, dati,
+    sintesi:manc.length ? manc.join(" · ") : "tutti i numeri del mese ci sono" };
+  const okSoglia = n.linee.filter(l => l.vp >= soglia()).length, okLinea = n.linee.filter(l => l.vp >= vpLinea).length;
+  if(!n.personali) s.chiave = "fermo";
+  else if(Number(t.vp_personali) > n.personali){ s.chiave = "personali"; dati.manca = num(t.vp_personali - n.personali); }
+  else if(t.linee && okSoglia < t.linee){
+    const m = t.linee - okLinea;
+    s.chiave = n.linee.some(l => l.vp > 0) ? "linee_crescere" : "linee_zero";
+    Object.assign(dati, { mancano:m === 1 ? "manca" : "mancano", manca_linee:plur(m, "linea", "linee") });
+  }
+  else if(t.linee && okLinea < t.linee){
+    const k = tipoLinee(linee.filter(l => l.manca > 0));
+    s.chiave = "linea_vp." + k.tipo; dati.vicine = k.vicine ? plur(k.vicine, "persona è", "persone sono") : "";
+  }
+  else if(t.vp_gruppo && n.gruppo < t.vp_gruppo){
+    const k = tipoLinee(linee);
+    s.chiave = "gruppo." + k.tipo; dati.manca = num(t.vp_gruppo - n.gruppo); dati.vicine = k.vicine ? plur(k.vicine, "persona è", "persone sono") : "";
+  }
+  else s.chiave = "pronto";
+  return s;
 }
 
 /* Foundation e Builder: dal primo mese qualificato, massimo 12 pagamenti entro 18 mesi.
@@ -1062,7 +1205,7 @@ function vObiettivo(){
     <h2 style="margin-top:4px">Quanto vorresti guadagnare al mese?</h2>
     <p class="small">Scrivi la cifra e per quando: qui vedrai la tappa che la vale e il percorso per arrivarci.</p>
     <button class="btn primary wide" style="margin-top:8px" data-act="obiettivo-modifica">Scrivi il tuo obiettivo</button>
-  </div>${vVisione()}`;
+  </div>${vComeArrivarci(st.profilo.id, "io")}${vVisione()}`;
   const t = tappaPerCifra(o.cifra_mese), S = st.stages, { indice } = percorso();
   const fino = t ? S.findIndex(s => s.chiave === t.tappa.chiave) : -1;
   const giaFatto = fino >= 0 && indice > fino;
@@ -1096,7 +1239,38 @@ function vObiettivo(){
               <span class="grow">${esc(r.txt)}</span>${r.val ? `<span class="num">${esc(r.val)}</span>` : ""}</li>`).join("")}</ul>`
             : stato === "dopo" ? `<p class="small" style="margin:2px 0 0">${esc(requisitiTesto(s))}</p>` : ""}</div></li>`; }).join("")}</ol>
   </div>` : ""}
+  ${vComeArrivarci(st.profilo.id, "io")}
   ${vVisione()}`;
+}
+
+/* "Come arrivarci": chiuso finché non lo si tocca. chi: "io" (per me, in Obiettivo) o "lui" (per lo sponsor, nella scheda) */
+function vComeArrivarci(pid, chi){
+  const s = situazione(pid);
+  if(!s) return "";
+  const testi = (CONSIGLI[s.chiave] || {})[chi] || [];
+  const t = s.tappa, vpp = Number(t.vp_personali) || 0;
+  const promemoria = !TAPPE_DI_PERCORSO.includes(t.chiave) && vpp > 0
+    ? `<p class="promemoria">Ricorda: per ${esc(t.nome)} servono anche ${num(vpp)} VP personali nel mese ·
+        ${chi === "io" ? "ne hai" : "ne ha"} ${num(s.personali)}${s.personali >= vpp ? " ✓" : `, mancano ${num(vpp - s.personali)}`}</p>` : "";
+  const cella = v => `<td class="num">${v == null ? "–" : num(v)}</td>`;
+  const tabella = s.linee.length ? `<div class="tab-consigli"><table>
+      <thead><tr><th>Linea</th><th>VP</th><th>persone</th><th>a 0</th><th>&lt; 50</th><th>50-99</th><th>100-199</th><th>200+</th><th>VP medio</th><th>manca</th></tr></thead>
+      <tbody>${s.linee.map(l => { const f = l.fasce || [];
+        return `<tr><td>${esc(l.nome)}</td>${cella(l.vp)}${cella(l.persone)}${cella(l.zero)}${cella(f[0])}${cella(f[1])}${cella(f[2])}${cella(f[3])}${cella(l.media)}
+        <td class="num${l.manca ? " sotto" : ""}">${l.manca ? num(l.manca) + " VP" : "✓"}</td></tr>`; }).join("")}</tbody>
+    </table></div>
+    <p class="nota">VP di gruppo di ogni linea; persone: chi apre la linea e chi ha sotto, con i VP personali del mese.
+      VP medio: di chi ha fatturato. Da attivare: 0 o sotto 50 · vicine ai 100: 50-99 · attive: 100 e oltre.
+      «Manca»: VP che servono alla linea per ${esc(t.nome)} (${num(s.vpLinea)}).</p>` : "";
+  const aperto = st.consigliAperti.has(pid);
+  return `<details class="card metodo consigli" data-chiave="${esc(s.chiave)}" data-id="${esc(pid)}"${aperto ? " open" : ""}>
+    <summary><span class="eyebrow">Come arrivarci</span></summary>
+    ${promemoria}
+    <p class="small" style="margin:8px 0 0">${TAPPE_DI_PERCORSO.includes(t.chiave) ? "Tappa" : "Prossima tappa"}: <b>${esc(t.nome)}</b> · ${esc(s.sintesi)}</p>
+    ${testi.map(x => riempi(x, s.dati)).filter(Boolean).map(x => `<p>${esc(x)}</p>`).join("")}
+    ${tabella}
+    <p class="nota">Calcolato sui numeri del mese fino a oggi. Sono spunti: la strada la decidete voi.</p>
+  </details>`;
 }
 
 function vVisione(){
@@ -1586,7 +1760,6 @@ function vScheda(){
   const gestito = p.stato === "gestito";
   const m = meseDi(oggi());
   const recenti = st.attScheda.slice().sort((a, b) => a.inserito_il < b.inserito_il ? 1 : -1).slice(0, 12);
-  const frontali = st.riep.filter(x => x.sponsor_id === p.id);
   /* scendendo lungo le linee: "‹ Indietro" torna alla scheda di prima, "Il mio gruppo" all'elenco */
   return `${st.schedaPila.length ? `<div class="spread"><button class="btn link" data-act="scheda-indietro" style="padding:0">‹ Indietro</button>
     <button class="btn link" data-act="vista-gruppo" style="padding:0">Il mio gruppo</button></div>`
@@ -1609,7 +1782,7 @@ function vScheda(){
     </div>
     ${r.da_report ? `<p class="nota" style="margin:6px 0 0">VP di gruppo, linee e percentuale dal report Amway${r.linee_nascoste
       ? ". Linee non visibili nel report (il suo gruppo Amway non lo mostra): la qualifica non può contarle" : ""}.</p>` : ""}
-    ${(() => { const l = r.da_report ? lineeReport(r) : frontali.map(x => ({ id:x.partner_id, nome:nomeDi(x.partner_id), vp:Number(x.vp_gruppo) }));
+    ${(() => { const l = lineeDi(p.id, r);
       /* le linee frontali: chi è nella mia struttura si apre toccando il nome */
       return l.length ? `<p class="small" style="margin:12px 0 0"><b>Le sue linee frontali</b> · VP di gruppo di ogni linea${r.da_report ? ", dal report Amway" : ""}</p>
       <ul class="linee">${l.map(x => { const apri = x.id && x.id !== p.id && st.struttura.some(y => y.id === x.id);
@@ -1619,6 +1792,7 @@ function vScheda(){
     ${gestito ? "" : vNumeriLista(p.id)}
     <button class="btn wide" style="margin-top:12px" data-act="chiamata" data-id="${esc(p.id)}">Fissa una chiamata</button>
   </div>
+  ${vComeArrivarci(p.id, "lui")}
   ${vConfronto(p)}
   ${gestito ? `<div class="card">
     <span class="eyebrow">I suoi numeri · ${nomeMese(m)}</span>
@@ -3526,6 +3700,9 @@ Object.assign(MODULI, {
   }
 });
 
+/* "Come arrivarci" aperto o chiuso: lo ricordo, perché la pagina si ridisegna */
+document.addEventListener("toggle", e => { const d = e.target;
+  if(d && d.classList && d.classList.contains("consigli")) d.open ? st.consigliAperti.add(d.dataset.id) : st.consigliAperti.delete(d.dataset.id); }, true);
 document.addEventListener("input", e => { if(e.target && e.target.id === "ct-libero" && st.ct) st.ct.libero = e.target.value; });
 
 /* ---- 11d. Persone: i Clienti (dalla mini app "Clienti e Riordini") ----
