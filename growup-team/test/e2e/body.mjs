@@ -431,6 +431,20 @@ check(await page.getByText("Le sue linee frontali").isVisible(), "scheda partner
 await page.locator(".linee button[data-act=apri-scheda]", { hasText:"Sotto Uno" }).click();
 await page.locator(".card h2", { hasText:"Sotto Uno" }).waitFor();
 check(true, "toccando il nome di una linea si apre la sua scheda");
+check(await page.locator("button[data-act=scheda-indietro]", { hasText:"Indietro" }).isVisible() && await page.locator("button[data-act=vista-gruppo]", { hasText:"Il mio gruppo" }).isVisible(),
+  "scendendo lungo una linea: Indietro e Il mio gruppo");
+await page.click("button[data-act=scheda-indietro]");
+await page.locator(".card h2", { hasText:"Linea Uno" }).waitFor();
+check(!(await page.locator("button[data-act=scheda-indietro]").count()), "Indietro torna alla scheda di prima");
+await page.locator(".linee button[data-act=apri-scheda]", { hasText:"Sotto Uno" }).click();
+await page.locator(".card h2", { hasText:"Sotto Uno" }).waitFor();
+await page.evaluate(() => { const el = document.querySelector("#app");
+  const t = (tipo, x) => { const k = new Touch({ identifier:1, target:el, clientX:x, clientY:400 });
+    el.dispatchEvent(new TouchEvent(tipo, { bubbles:true, cancelable:true, touches:tipo === "touchend" ? [] : [k], changedTouches:[k] })); };
+  t("touchstart", 80); t("touchend", 320); });
+await page.locator(".card h2", { hasText:"Linea Uno" }).waitFor();
+check(true, "con il dito si torna alla scheda di prima");
+await page.click("button[data-act=vista-gruppo]");
 await sync(page); await ctx.close();
 // la terza linea arriva a 120: Path to Bronze fatto; poi tanti VP su una sola linea: 9% ma non Foundation
 O("l3", 40, "rettifica"); O("l1b", 700);
