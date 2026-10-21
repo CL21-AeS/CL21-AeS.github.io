@@ -3601,7 +3601,7 @@ function compleannoDi(p){
 function clientiDaSentire(){
   const out = [];
   for(const p of clientiTutti()){
-    if(p.non_compra) continue;
+    if(p.non_compra || p.nascosta_io) continue;
     const s = statoCliente(p), v = verificaDi(p), c = compleannoDi(p);
     if(c && !c.fatto && c.tra <= COMPLEANNO_PRIMA) out.push({ p, ordine:c.tra, motivo:c.tra === 0 ? "Compleanno oggi" : `Compleanno il ${c.testo}` });
     else if(v) out.push({ p, ordine:1, motivo:`Come si è trovato con ${v.nuovi[0].nome}` });
@@ -3615,8 +3615,9 @@ function vClientiDaSentire(){
   if(!l.length) return "";
   return `<div class="card">
     <span class="eyebrow">I tuoi clienti da sentire</span>
-    <ul class="persone">${l.map(x => `<li><button class="persona" data-act="apri-cliente" data-id="${esc(x.p.id)}">
-      <span class="grow"><b>${esc(x.p.nome)}</b><br><span class="small">${esc(x.motivo)}</span></span></button></li>`).join("")}</ul>
+    <ul class="persone">${l.map(x => `<li class="su-io"><button class="persona" data-act="apri-cliente" data-id="${esc(x.p.id)}">
+      <span class="grow"><b>${esc(x.p.nome)}</b><br><span class="small">${esc(x.motivo)}</span></span></button>
+      <button class="x" data-act="togli-da-io" data-id="${esc(x.p.id)}" aria-label="Togli ${esc(x.p.nome)} da Io">×</button></li>`).join("")}</ul>
   </div>`;
 }
 
@@ -3700,6 +3701,7 @@ function vCliente(){
   </div>` : ""}
   <div class="row wrap" style="gap:6px;justify-content:center">
     <button class="btn small ghost" data-act="apri-persona" data-id="${esc(p.id)}">Il suo percorso nella lista</button>
+    <button class="btn small ghost" data-act="${p.nascosta_io ? "rimetti-in-io" : "togli-da-io"}" data-id="${esc(p.id)}">${p.nascosta_io ? "Rimetti in Io" : "Togli da Io"}</button>
     <button class="btn small ghost" data-act="cliente-non-compra">${p.non_compra ? "Torna cliente" : "Non compra più"}</button>
   </div>`;
 }
@@ -3838,7 +3840,7 @@ async function salvaOrdine(pid, b){
   for(const r of b.righe){ const g = Math.max(1, Math.min(3650, Number(r.giorni) || DURATA_BASE));
     if(g !== giorniDi(r.codice)) await api.salvaDurata(r.codice, g); }
   /* un ordine nuovo: niente più rinvio */
-  if(!b.ordineId) await api.modificaPersona(pid, { prossima_data:null, prossima_nota:null });
+  if(!b.ordineId) await api.modificaPersona(pid, { prossima_data:null, prossima_nota:null, nascosta_io:false });   // un ordine nuovo la riporta su Io
 }
 async function dopoClienti(msg){ await caricaClienti(); await caricaPersone(); st.sheet = null; render(); if(msg) toast(msg); }
 function apriWa(tel, testo){ window.open(`https://wa.me/${tel || ""}?text=` + encodeURIComponent(testo), "_blank", "noopener"); }
@@ -3925,7 +3927,7 @@ Object.assign(MODULI, {
   },
   async "rimanda-cliente"(f){
     const g = Number((f.querySelector("input[name=giorni]:checked") || {}).value || 7);
-    try{ await api.modificaPersona(st.personaId, { prossima_data:piuGiorni(oggi(), g), prossima_nota:f.nota.value.trim() || null }); await dopoClienti("Rimandato"); }
+    try{ await api.modificaPersona(st.personaId, { prossima_data:piuGiorni(oggi(), g), prossima_nota:f.nota.value.trim() || null, nascosta_io:false }); await dopoClienti("Rimandato"); }
     catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
   async "compleanno-cliente"(f){
@@ -4069,6 +4071,8 @@ function vSheetOrdiniAmway(s){
   const cosa = g => [g.daImportare.length ? plur(g.daImportare.length, "ordine nuovo", "ordini nuovi") : "", g.ultimoDaAggiungere ? "ultimo ordine" : "",
     g.telDaAggiungere ? "telefono" : "", g.diventaCliente ? "diventa cliente" : ""].filter(Boolean).join(", ");
   const cambiano = a.trovati.filter(g => g.cambia);
+  /* una spunta sola per mettere o togliere tutte le spunte della sezione */
+  const tutti = nome => `<label class="check tutti"><input type="checkbox" data-tutti="${nome}" checked> Seleziona tutti</label>`;
   return `<h2>Dal sito Amway</h2>
     <p class="small">${[a.ordini ? plur(a.ordini, "ordine", "ordini") : "", a.clienti ? plur(a.clienti, "cliente", "clienti") : ""].filter(Boolean).join(" e ")} nei file ·
       <b>${plur(a.ordiniNuovi, "ordine nuovo", "ordini nuovi")}</b> da aggiungere allo storico.</p>
@@ -4078,10 +4082,10 @@ function vSheetOrdiniAmway(s){
           : "Per loro non c'è niente di nuovo."}</p></div>` : ""}
       ${a.nuovi.length ? `<div class="imp-sezione"><h3>Nuovi clienti · ${a.nuovi.length}</h3>
         <p class="small">Hanno ordinato con il tuo link ma non sono in Growup. Togli la spunta a chi non vuoi aggiungere.</p>
-        <div class="scelte">${a.nuovi.map(g => scelta("nuovo", g, `${g.ordini.length ? plur(g.ordini.length, "ordine", "ordini") + " · " : ""}l'ultimo il ${dataIt([g.ultimo, ...g.ordini.map(o => o.data)].filter(Boolean).sort().pop())}`)).join("")}</div></div>` : ""}
+        ${tutti("nuovo")}<div class="scelte">${a.nuovi.map(g => scelta("nuovo", g, `${g.ordini.length ? plur(g.ordini.length, "ordine", "ordini") + " · " : ""}l'ultimo il ${dataIt([g.ultimo, ...g.ordini.map(o => o.data)].filter(Boolean).sort().pop())}`)).join("")}</div></div>` : ""}
       ${a.mai.length ? `<div class="imp-sezione"><h3>Mai comprato · ${a.mai.length}</h3>
         <p class="small">Registrati come tuoi clienti ma senza nessun ordine: entrano nella Lista con l'etichetta "Mai comprato". Togli la spunta a chi non vuoi.</p>
-        <div class="scelte">${a.mai.map(g => scelta("mai", g, g.ingresso ? `registrato il ${dataIt(g.ingresso)}` : "")).join("")}</div></div>` : ""}
+        ${tutti("mai")}<div class="scelte">${a.mai.map(g => scelta("mai", g, g.ingresso ? `registrato il ${dataIt(g.ingresso)}` : "")).join("")}</div></div>` : ""}
       <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
         <button class="btn primary grow"${a.cambi ? "" : " disabled"}>Importa</button></div>
       ${a.cambi ? "" : `<p class="nota">Niente di nuovo: è già tutto in Growup.</p>`}
@@ -4116,6 +4120,7 @@ Object.assign(MODULI, {
         const campi = {};
         if(!g.p.codice_cliente) campi.codice_cliente = g.codice;
         if(g.telDaAggiungere) campi.contatto = g.telDaAggiungere;
+        if(g.p.nascosta_io && (g.daImportare.length || g.ultimoDaAggiungere)) campi.nascosta_io = false;   // ordini nuovi: di nuovo su Io
         if(Object.keys(campi).length) await api.modificaPersona(g.p.id, campi);
         /* era nella lista ma non ancora cliente: ha comprato, quindi è cliente (dalla data del primo ordine) */
         if(g.diventaCliente) passi.push(passo(g.p.id, g.primo));
@@ -4143,6 +4148,15 @@ Object.assign(MODULI, {
       toast([plur(ordini.length + uniti, "ordine", "ordini") + " nello storico", nc ? plur(nc, "nuovo cliente", "nuovi clienti") : "",
         nm ? `${nm} in Lista (mai comprato)` : ""].filter(Boolean).join(", "));
     }catch(e){ st.occupato = false; mostraErroreForm(f, messaggio(e)); }
+  }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if(!t || !t.form) return;
+  if(t.dataset.tutti) t.form.querySelectorAll(`input[name=${t.dataset.tutti}]`).forEach(i => { i.checked = t.checked; });
+  else if(t.name === "nuovo" || t.name === "mai"){
+    const tutte = [...t.form.querySelectorAll(`input[name=${t.name}]`)], capo = t.form.querySelector(`input[data-tutti=${t.name}]`);
+    if(capo){ const n = tutte.filter(i => i.checked).length; capo.checked = n === tutte.length; capo.indeterminate = n > 0 && n < tutte.length; }
   }
 });
 document.addEventListener("change", e => { if(e.target && e.target.id === "file-ordini") leggiFileOrdini(e.target.files && [...e.target.files]); });
