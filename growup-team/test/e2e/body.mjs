@@ -88,6 +88,9 @@ check(await page.locator("button[data-act=piano-rapido] b").innerText() === "2 q
 await page.getByRole("button", { name:"Annulla" }).last().click();
 await page.getByText("Annullato").waitFor();
 check(await page.locator("button[data-act=piano-rapido] b").innerText() === "1 questa sett.", "annullato: di nuovo 1");
+const oggiCard = page.locator(".card", { hasText:"Oggi" }).filter({ has:page.locator("ul.oggi") }).first();
+check(await oggiCard.getByText("Contatto: Paolo Rapido").isVisible() && await oggiCard.getByText("Piano mostrato: Paolo Rapido").isVisible(),
+  "Oggi: contatto e piano con il nome della persona");
 await page.click("button[data-act=ordine]");
 check(await page.inputValue(".sheet input[name=vp]") === "" && await page.getAttribute(".sheet input[name=vp]", "placeholder") === "0", "ordine: campo vuoto con lo 0 grigio");
 await page.click(".sheet button:has-text('Salva')");

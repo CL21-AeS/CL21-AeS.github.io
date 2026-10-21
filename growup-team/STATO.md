@@ -77,6 +77,10 @@ stesso carattere dei nomi. Aprendo una linea da un'altra scheda, in alto ci sono
 copia dei dati, Listino, Codici Amway tolti, Correggi il codice Amway, Nuovo link personale, Invita sotto / chi manca sopra,
 Blocca/Sblocca l'app). "Togli dalla struttura" no: lo usano anche sponsor e upline.
 
+**21 ottobre — Oggi con i nomi**: in Io → Oggi le attività contate da un passo della lista hanno il nome della persona
+("Contatto: Nome", "Piano mostrato: Nome", e allo stesso modo "Nuovo cliente: Nome"); senza nome resta "Contatto".
+Si vede solo nella propria pagina Io.
+
 **Nota tecnica per Claude**: il connettore Supabase non applica le istruzioni con cancellazioni (`drop`, `delete`):
 va in timeout. Si applicano a pezzi senza `drop` (oggetti nuovi) e il resto lo incolla Stefano nell'SQL Editor.
 
