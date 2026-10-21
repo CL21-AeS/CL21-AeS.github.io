@@ -65,6 +65,10 @@ resta com'è (per chi non usa Google Calendar; su iPhone il pulsante Calendario 
 **21 ottobre — Preferiti**: sotto le barre di ogni persona (che usa l'app) anche la riga "La sua lista" della scheda
 partner (in lista, in corso, piani e sì del mese, clienti), solo numeri.
 
+**21 ottobre — i "sì" divisi** (migrazione `029_si_divisi.sql`, applicata): nella riga "La sua lista" (scheda partner e
+Preferiti) al posto di "N piani e N sì" ci sono "N piani, N partner e N clienti nuovi · N clienti in tutto". I clienti
+aggiunti con "+ Un cliente" e quelli importati dal sito Amway restano contati tra i clienti nuovi (decisione di Stefano).
+
 **Nota tecnica per Claude**: il connettore Supabase non applica le istruzioni con cancellazioni (`drop`, `delete`):
 va in timeout. Si applicano a pezzi senza `drop` (oggetti nuovi) e il resto lo incolla Stefano nell'SQL Editor.
 

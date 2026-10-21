@@ -271,6 +271,8 @@
       return { in_lista:l.filter(x => !x.esito && x.fase === "lista").length, in_corso:l.filter(x => !x.esito && x.fase !== "lista").length,
         piani_mese:(db.passi || []).filter(x => x.proprietario === pid && x.tipo === "piano" && x.data.slice(0, 7) === m).length,
         si_mese:(db.passi || []).filter(x => x.proprietario === pid && x.tipo === "chiusura" && ["partner", "cliente"].includes(x.esito) && x.data.slice(0, 7) === m).length,
+        partner_mese:(db.passi || []).filter(x => x.proprietario === pid && x.tipo === "chiusura" && x.esito === "partner" && x.data.slice(0, 7) === m).length,
+        clienti_mese:(db.passi || []).filter(x => x.proprietario === pid && x.tipo === "chiusura" && x.esito === "cliente" && x.data.slice(0, 7) === m).length,
         clienti:l.filter(x => x.esito === "cliente" && !x.non_compra).length, totale:l.length }; },
     addActivity: async row => { const r = Object.assign({ id:uid(), inserito_il:new Date().toISOString(), inserito_da:mio().id }, row); db.activities.push(r); salva(); return r; },
     deleteActivity: async id => { db.activities = db.activities.filter(a => a.id !== id); salva(); },

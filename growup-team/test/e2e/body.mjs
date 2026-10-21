@@ -498,7 +498,7 @@ const prefIvo = pref.locator("li.preferito", { hasText:"Ivo Invito" });
 check(await prefIvo.getByText("Piani sotto soglia").isVisible() && await prefIvo.locator(".obiettivo.debole", { hasText:"Piani" }).isVisible()
   && (await prefIvo.locator(".obiettivo", { hasText:"Contatti" }).locator(".num").innerText()).trim() === "25 / 40", "Ivo nei preferiti: 25 / 40 contatti, piani sotto soglia evidenziati");
 await prefIvo.getByText("La sua lista").waitFor();
-check(/La sua lista: 1 in lista · 1 in corso/.test(await prefIvo.innerText()) && !/Nome Uno|Nome Due/.test(await prefIvo.innerText()), "Ivo nei preferiti: i numeri della sua lista, senza nomi");
+check(/La sua lista: 1 in lista · 1 in corso · questo mese 0 piani, 0 partner e 0 clienti nuovi · 0 clienti in tutto/.test((await prefIvo.innerText()).replace(/\s+/g, " ")) && !/Nome Uno|Nome Due/.test(await prefIvo.innerText()), "Ivo nei preferiti: i numeri della sua lista, senza nomi");
 const prefGino = pref.locator("li.preferito", { hasText:"Gino Senza App" });
 check(await prefGino.getByText("senza app · numeri inseriti dallo sponsor").isVisible() && await prefGino.locator(".obiettivo.debole").count() === 0
   && !(await prefGino.getByText("La sua lista").count()), "Gino nei preferiti: senza etichetta e senza lista");

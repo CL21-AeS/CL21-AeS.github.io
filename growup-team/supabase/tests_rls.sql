@@ -601,6 +601,8 @@ begin
   perform growup_test.deve_fallire(format('insert into public.ordini (persona_id) values (%L)', pp), 'lo sponsor non segna ordini sui clienti di B');
   perform growup_test.deve_fallire(format('insert into public.righe_ordine (ordine_id, codice, nome) values (%L, ''1'', ''x'')', pq), 'né righe sugli ordini di B');
   perform growup_test.ok((public.numeri_persone(b)->>'clienti')::int = 1, 'lo sponsor vede quanti clienti ha B');
+  perform growup_test.ok((public.numeri_persone(b)->>'clienti_mese')::int = 1 and (public.numeri_persone(b)->>'partner_mese')::int = 0,
+                         '029: i sì del mese divisi in nuovi clienti e nuovi partner');
   update public.ordini set vp = 99, numero_amway = '170000009';
   perform growup_test.come(u3);
   perform growup_test.ok((select count(*) from public.ordini where vp = 99 or numero_amway = '170000009') = 0, 'lo sponsor non cambia gli ordini di B');

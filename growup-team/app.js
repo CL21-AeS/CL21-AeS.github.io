@@ -2762,7 +2762,9 @@ function vNumeriLista(pid){
   const n = st.numeriLista[pid];
   if(!n || !Number(n.totale)) return "";
   return `<p class="small" style="margin:8px 0 0">La sua lista: <b>${num(n.in_lista)}</b> in lista · <b>${num(n.in_corso)}</b> in corso ·
-    questo mese <b>${num(n.piani_mese)}</b> ${Number(n.piani_mese) === 1 ? "piano" : "piani"} e <b>${num(n.si_mese)}</b> sì${n.clienti != null ? ` · <b>${num(n.clienti)}</b> ${Number(n.clienti) === 1 ? "cliente" : "clienti"}` : ""}</p>`;
+    questo mese <b>${num(n.piani_mese)}</b> ${Number(n.piani_mese) === 1 ? "piano" : "piani"}${n.partner_mese != null
+      ? `, <b>${num(n.partner_mese)}</b> partner e <b>${num(n.clienti_mese)}</b> ${Number(n.clienti_mese) === 1 ? "cliente nuovo" : "clienti nuovi"}`
+      : ` e <b>${num(n.si_mese)}</b> sì`}${n.clienti != null ? ` · <b>${num(n.clienti)}</b> ${Number(n.clienti) === 1 ? "cliente" : "clienti"} in tutto` : ""}</p>`;
 }
 
 function opzioni(nome, valori, scelto){
