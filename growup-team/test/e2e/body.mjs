@@ -473,6 +473,8 @@ A("lino", "contatto", 3);
 A("ivo", "contatto", 25); A("ivo", "piano", 2);
 A("fede", "contatto", 22); A("fede", "piano", 6); A("fede", "ordine", 1, 20);
 A("cri", "contatto", 25); A("cri", "piano", 6); A("cri", "ordine", 2, 60);
+DB.persone = (DB.persone || []).concat([{ id:"pv1", proprietario:"ivo", nome:"Nome Uno", fase:"lista", esito:null },
+  { id:"pv2", proprietario:"ivo", nome:"Nome Due", fase:"invitato", esito:null }]);
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.click("button[data-act=vista-gruppo]");
@@ -495,8 +497,11 @@ const pref = page.locator(".card", { hasText:"Preferiti" });
 const prefIvo = pref.locator("li.preferito", { hasText:"Ivo Invito" });
 check(await prefIvo.getByText("Piani sotto soglia").isVisible() && await prefIvo.locator(".obiettivo.debole", { hasText:"Piani" }).isVisible()
   && (await prefIvo.locator(".obiettivo", { hasText:"Contatti" }).locator(".num").innerText()).trim() === "25 / 40", "Ivo nei preferiti: 25 / 40 contatti, piani sotto soglia evidenziati");
+await prefIvo.getByText("La sua lista").waitFor();
+check(/La sua lista: 1 in lista · 1 in corso/.test(await prefIvo.innerText()) && !/Nome Uno|Nome Due/.test(await prefIvo.innerText()), "Ivo nei preferiti: i numeri della sua lista, senza nomi");
 const prefGino = pref.locator("li.preferito", { hasText:"Gino Senza App" });
-check(await prefGino.getByText("senza app · numeri inseriti dallo sponsor").isVisible() && await prefGino.locator(".obiettivo.debole").count() === 0, "Gino nei preferiti: senza etichetta");
+check(await prefGino.getByText("senza app · numeri inseriti dallo sponsor").isVisible() && await prefGino.locator(".obiettivo.debole").count() === 0
+  && !(await prefGino.getByText("La sua lista").count()), "Gino nei preferiti: senza etichetta e senza lista");
 await page.screenshot({ path: S + "/e2e/14-preferiti.png", fullPage:true });
 // tolgo Gino
 await prefGino.locator("button[data-act=apri-scheda]").click();

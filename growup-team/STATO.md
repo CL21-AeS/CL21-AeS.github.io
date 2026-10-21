@@ -62,6 +62,9 @@ scheda del cliente.
 linea, dal report Amway"; chi è nella mia struttura si apre toccando il nome (›). "Scarica il file" in Fissa una chiamata
 resta com'è (per chi non usa Google Calendar; su iPhone il pulsante Calendario usa già il file).
 
+**21 ottobre — Preferiti**: sotto le barre di ogni persona (che usa l'app) anche la riga "La sua lista" della scheda
+partner (in lista, in corso, piani e sì del mese, clienti), solo numeri.
+
 **Nota tecnica per Claude**: il connettore Supabase non applica le istruzioni con cancellazioni (`drop`, `delete`):
 va in timeout. Si applicano a pezzi senza `drop` (oggetti nuovi) e il resto lo incolla Stefano nell'SQL Editor.
 
