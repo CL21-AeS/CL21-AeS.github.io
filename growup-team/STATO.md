@@ -53,6 +53,11 @@ dello scivolamento "Sobria"): andando avanti la pagina nuova scorre da destra so
 scurisce; tornando indietro quella di sopra scivola via. Vale per le schede in alto, le sezioni di Persone e
 l'apertura/chiusura di persone, clienti, inviti e partner, anche con il dito.
 
+**21 ottobre**: nell'import dei clienti dal sito Amway, sopra "Nuovi clienti" e "Mai comprato" c'è **Seleziona tutti**
+(mette o toglie tutte le spunte della sezione). In Io i **clienti da sentire** si tolgono con la × come le persone della
+lista; tornano da soli con un ordine nuovo (a mano o importato) o con "Rimanda", oppure con **Rimetti in Io** dalla
+scheda del cliente.
+
 **Nota tecnica per Claude**: il connettore Supabase non applica le istruzioni con cancellazioni (`drop`, `delete`):
 va in timeout. Si applicano a pezzi senza `drop` (oggetti nuovi) e il resto lo incolla Stefano nell'SQL Editor.
 

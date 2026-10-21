@@ -1287,6 +1287,19 @@ await page.click("button[data-act=cliente-non-compra]");
 await page.getByText("Segnato: non compra più").waitFor();
 await page.click("button[data-act=torna-clienti]");
 check(await page.getByText("Non comprano più · 1").isVisible(), "filtro: non comprano più");
+// un cliente si toglie da Io (come la lista) e si rimette dalla sua scheda
+await page.click("button[data-act=vista-io]");
+const cardSentire = page.locator(".card", { hasText:"I tuoi clienti da sentire" });
+await cardSentire.locator("li", { hasText:"Bea Compleanno" }).locator("button[data-act=togli-da-io]").click();
+await page.getByText("Bea tolto da Io").waitFor();
+check(!(await page.locator(".card", { hasText:"I tuoi clienti da sentire" }).locator("li", { hasText:"Bea Compleanno" }).count()), "Io: il cliente tolto non compare più");
+await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]"); await page.click("button[data-filtro=tutti]");
+await page.locator("button[data-act=apri-cliente]", { hasText:"Bea Compleanno" }).click();
+await page.click("button[data-act=rimetti-in-io]");
+await page.getByText("Di nuovo in Io").waitFor();
+await page.click("button[data-act=vista-io]");
+check(await page.locator(".card", { hasText:"I tuoi clienti da sentire" }).locator("li", { hasText:"Bea Compleanno" }).isVisible(), "dalla scheda del cliente: Rimetti in Io");
+await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
 await page.screenshot({ path: S + "/e2e/31-clienti.png", fullPage:true });
 await ctx.close();
 
@@ -1358,6 +1371,11 @@ check(await page.getByText("4 ordini e 4 clienti nei file").isVisible(), "i due 
 check(await page.locator(".sheet .imp-sezione", { hasText:"Già in Growup" }).getByText(/Lia Rossi · telefono/).isVisible(), "Lia: si aggiunge solo il telefono (l'ultimo ordine c'è già)");
 check(await page.locator(".sheet .scelte label", { hasText:"Ugo Bianchi" }).isVisible() && await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).isVisible(), "nuovi clienti: chi ha comprato");
 check(await page.locator(".sheet .imp-sezione", { hasText:"Mai comprato" }).locator(".scelte label", { hasText:"Mai Neri" }).locator("input").isChecked(), "mai comprato: con la spunta");
+const sezMai = page.locator(".sheet .imp-sezione", { hasText:"Mai comprato" });
+await sezMai.locator("input[data-tutti=mai]").uncheck();
+check(!(await sezMai.locator(".scelte label", { hasText:"Mai Neri" }).locator("input").isChecked()), "Seleziona tutti: toglie tutte le spunte");
+await sezMai.locator("input[data-tutti=mai]").check();
+check(await sezMai.locator(".scelte label", { hasText:"Mai Neri" }).locator("input").isChecked(), "Seleziona tutti: rimette tutte le spunte");
 check(!await page.locator(".sheet .scelte label", { hasText:"Lia Rossi" }).count(), "Lia con due codici: una persona sola");
 await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).locator("input").uncheck();
 await page.click(".sheet button:has-text('Importa')");
