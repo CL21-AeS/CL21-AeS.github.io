@@ -726,6 +726,25 @@ begin
   perform public.modifica_partenza('path_to_bronze');
   execute 'reset role';
 
+  -- ---- 031: i mesi da Argento, anche dai report dei mesi passati (solo numeri) ----
+  mese_prec := (date_trunc('month', (now() at time zone 'Europe/Rome')::date) - interval '2 months')::date;
+  perform growup_test.come(u2);  -- A
+  perform growup_test.ok(public.salva_report_passato(mese_prec, '{"codice":"2000001","vpp":120,"vpg":10500,"percentuale":21,"linee":[]}',
+    '[{"codice":"2000002","vpp":50,"vpg":300,"percentuale":9},{"codice":"2000003","vpg":900,"percentuale":12}]') = 2,
+    'report passato: salvati i numeri miei e di chi vedo (C, in un''altra linea, no)');
+  perform growup_test.ok((select percentuale from public.mesi_report(a) where mese = mese_prec) = 21, 'A legge il suo mese al 21%');
+  perform growup_test.ok((select count(*) from public.mesi_report(b)) >= 1, 'A legge i mesi di B (sua downline)');
+  perform growup_test.deve_fallire(format('select * from public.mesi_report(%L)', c), 'A non legge i mesi di C (altra linea)');
+  perform growup_test.deve_fallire($q$select public.salva_report_passato(current_date, '{"codice":"2000001"}', '[]')$q$, 'il mese in corso non è un report passato');
+  perform growup_test.deve_fallire(format($q$select public.salva_report_passato(%L, '{"codice":"1000000"}', '[]')$q$, mese_prec), 'il report di un altro non si salva');
+  perform growup_test.come(u1);  -- R
+  perform growup_test.ok(not exists (select 1 from public.mesi_report(b) where mese = mese_prec), 'i numeri importati da A li vede solo A');
+  perform growup_test.come(null);
+  perform growup_test.deve_fallire(format('select * from public.mesi_report(%L)', a), 'anon non legge i mesi');
+  execute 'reset role';
+  perform growup_test.ok((select sponsor_id from public.partners where id = b) = a, 'il report passato non sposta nessuno');
+  delete from public.numeri_report where mese = mese_prec;
+
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');

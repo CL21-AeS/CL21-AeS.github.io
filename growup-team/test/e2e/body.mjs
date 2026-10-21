@@ -796,8 +796,9 @@ await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
 await page.click(".sheet button[data-act=chiudi]");
 const meseVecchio = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - 3); return d.toISOString().slice(0, 7).replace("-", ""); })();
 await scegliFile(page, "vecchio.csv", creaCsv(meseVecchio, righeCsv));
-await page.locator(".sheet .errore").waitFor();
-check(await page.locator(".sheet .errore").getByText("quel mese è già chiuso").isVisible(), "import: mese chiuso rifiutato");
+await page.locator(".sheet .errore, .sheet button:has-text('Salva i numeri')").first().waitFor();
+check(await page.getByText("Prima importa il report del mese in corso").isVisible() || await page.getByText("È un mese chiuso: salvo solo i numeri").isVisible(),
+  "import: un mese chiuso salva solo i numeri (serve prima il codice dal mese in corso)");
 await page.setInputFiles("#file-report", { name:"report.xlsx", mimeType:"application/octet-stream", buffer:Buffer.from("PK") });
 check(await page.locator(".sheet .errore").getByText("sul sito Amway scegli il formato CSV").isVisible(), "import: il file Excel non va, serve il CSV");
 await page.setInputFiles("#file-report", { name:"los.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, righeCsv)) });
@@ -1730,10 +1731,76 @@ await page.click("button[role=tab][data-act=vista-obiettivo]");
 await page.click(".prossima-qualifica button[data-act=partenza]");
 check(await page.locator(".sheet select[name=prossima]").inputValue() === "smeraldo", "Modifica: la prossima qualifica già scelta");
 await page.selectOption(".sheet select[name=qualifica]", "oro");
+check(await page.locator(".sheet [data-etichetta-mese]").innerText() === "Mese della prima qualifica Argento", "con Oro si chiede il mese della prima qualifica Argento");
+await page.click(".sheet button.primary");
+check((await page.locator(".sheet .errore").innerText()).includes("mese della prima qualifica argento"), "il mese della prima Argento è obbligatorio");
+await page.fill(".sheet input[name=mese]", mesePrec);
 await page.click(".sheet button.primary");
 await page.getByText("Punto di partenza aggiornato").waitFor();
 await sync(page); await ctx.close();
 check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scendendo sotto Platino la prossima qualifica si toglie");
+
+// 33. Il percorso oltre Argento: Argento → Oro (3 mesi al 21%) → Platino (6 mesi, 3 di fila), report dei mesi passati
+{
+  const mm = n => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7); };
+  ({ ctx, page } = await apri({}, "#RRRR22"));
+  await page.getByText("Benvenuto in Growup").waitFor();
+  await page.fill("input[name=nome]", "Gaia Prova"); await page.fill("input[name=codice_amway]", "7200001");
+  await page.selectOption("select[name=qualifica]", "argento");
+  check(await page.locator("[data-etichetta-mese]").innerText() === "Mese della prima qualifica Argento" && await page.locator("[data-mostra=pagamenti]").isHidden(),
+    "Argento: si chiede il mese della prima qualifica Argento (senza pagamenti)");
+  await page.fill("input[name=mese]", mm(-3));
+  await page.check("input[name=privacy]"); await page.click("form button.primary");
+  await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
+  await page.getByText("Ciao Gaia").waitFor();
+  const reqOro = page.locator(".req li", { hasText:"Mesi da Argento (21%)" });
+  check(await page.locator(".card h2", { hasText:/^Oro$/ }).isVisible() && (await reqOro.locator(".num").innerText()) === "0 / 3", "dopo Argento la tappa è Oro: 0 mesi su 3");
+  check(await page.locator(".report-da-importare .mesi-report li").count() === 3 && !(await page.locator(".report-da-importare li.ok").count()),
+    "report da importare: i 3 mesi dalla prima qualifica Argento");
+  // il report di un mese chiuso: solo numeri
+  const gaia = persona(1, "1000000", "7200001", "PROVA, GAIA", "120"); gaia[10] = "'10.500,00"; gaia[13] = "'21%";
+  await scegliFile(page, "passato.csv", creaCsv(mm(-3).replace("-", ""), [gaia]));
+  await page.locator(".sheet button", { hasText:"Salva i numeri" }).waitFor();
+  check(await page.getByText("È un mese chiuso: salvo solo i numeri").isVisible(), "report di un mese chiuso: si salvano solo i numeri");
+  await page.click(".sheet button:has-text('Salva i numeri')");
+  await page.getByText(/Numeri di .* salvati/).waitFor();
+  check((await reqOro.locator(".num").innerText()) === "1 / 3" && await page.locator(".report-da-importare li.ok").count() === 1, "un mese al 21%: 1 su 3, il mese segnato ✓");
+  const sessGaia = await page.evaluate(() => localStorage.getItem("mock.session"));
+  await sync(page); await ctx.close();
+  const gaiaId = DB.partners.find(p => p.nome === "Gaia Prova").id;
+  const numeroG = (chi, m, perc) => { DB.numeri = DB.numeri.filter(x => !(x.visto_da === chi && x.partner_id === gaiaId && x.mese === m))
+    .concat([{ visto_da:chi, partner_id:gaiaId, mese:m, vpg:10500, percentuale:perc, linee:[] }]); };
+  numeroG(gaiaId, mm(-2), 21); numeroG(gaiaId, mm(-1), 21);
+  const telefonoGaia = () => apri({ storageState:{ cookies:[], origins:[{ origin:"http://127.0.0.1:8765", localStorage:[{ name:"mock.session", value:sessGaia }] }] } }, "");
+  ({ ctx, page } = await telefonoGaia());
+  await page.getByText("Ciao Gaia").waitFor();
+  check(await page.getByText("✓ Oro").isVisible() && await page.locator(".card h2", { hasText:/^Platino$/ }).isVisible()
+    && (await page.locator(".req li", { hasText:"Mesi da Argento (21%)" }).locator(".num").innerText()) === "3 / 6", "3 mesi al 21%: Oro fatto, tappa Platino 3 su 6");
+  check(!(await page.locator(".report-da-importare").count()), "tutti i report importati: il riquadro sparisce");
+  await ctx.close();
+  // lo sponsor: i mesi da Argento dai report che ha importato lui
+  numeroG("R", mm(-2), 21); numeroG("R", mm(-1), 21);
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.click("button[data-act=vista-gruppo]");
+  await page.locator(".albero.struttura li", { hasText:"Gaia Prova" }).first().locator("button[data-act=apri-scheda]").first().click();
+  await page.locator(".mesi-argento").waitFor();
+  check((await page.locator(".mesi-argento").innerText()).startsWith("Mesi da Argento: 2 su 3 per Oro"), "lo sponsor vede i mesi da Argento nella scheda");
+  await ctx.close();
+  // altri 3 mesi al 21%: 6 mesi, 3 di fila → Platino riconosciuto e la domanda della prossima qualifica
+  numeroG(gaiaId, mm(-6), 21); numeroG(gaiaId, mm(-5), 21); numeroG(gaiaId, mm(-4), 21);
+  ({ ctx, page } = await telefonoGaia());
+  await page.getByText("Ciao Gaia").waitFor();
+  await page.locator(".sheet h2", { hasText:"Platino! Qual è la tua prossima qualifica?" }).waitFor();
+  check(!(await page.locator(".sheet select[name=prossima] option", { hasText:/^Oro$/ }).count()), "Platino riconosciuto: la prossima qualifica, solo sopra Platino");
+  await page.selectOption(".sheet select[name=prossima]", "rubino");
+  await page.click(".sheet button.primary");
+  await page.getByText("Prossima qualifica salvata").waitFor();
+  check(await page.getByText("Platino raggiunto 🎉").isVisible() && await page.getByText("Prossima qualifica: Rubino").isVisible(), "Io: Platino raggiunto, prossima Rubino");
+  await sync(page); await ctx.close();
+  const g2 = DB.partners.find(p => p.id === gaiaId);
+  check(g2.qualifica_iniziale === "platino" && g2.prossima_qualifica === "rubino", "salvati Platino e la prossima qualifica");
+}
 
 await browser.close();
 console.log(`controlli superati: ${ok}`);

@@ -140,6 +140,19 @@
     impostaProssima: async k => { const p = mio(); const ord = c => (db.stages.find(x => x.chiave === c) || {}).ordine || 0;
       if(k && (ord(p.qualifica_iniziale) < ord("platino") || ord(k) <= ord(p.qualifica_iniziale))) throw new Error("qualifica_non_valida");
       p.prossima_qualifica = k || null; salva(); return pub(p); },
+    mesiReport: async pid => { const io = mio(); if(!io) throw new Error("non_autorizzato");
+      return (db.numeri || []).filter(x => x.visto_da === io.id && x.partner_id === pid)
+        .map(x => ({ mese:x.mese + "-01", percentuale:x.percentuale, vpg:x.vpg })).sort((a, b) => a.mese < b.mese ? -1 : 1); },
+    /* come nel database: solo numeri, per me e per chi vedo; nessuno si sposta */
+    salvaReportPassato: async a => { const io = mio(); const m = a.p_mese.slice(0, 7);
+      if(!io.codice_amway) throw new Error("codice_mancante");
+      if(a.p_io.codice !== io.codice_amway) throw new Error("import_di_altri");
+      const metti = (pid, r) => { db.numeri = (db.numeri || []).filter(x => !(x.visto_da === io.id && x.partner_id === pid && x.mese === m))
+        .concat([{ visto_da:io.id, partner_id:pid, mese:m, vpg:r.vpg, percentuale:r.percentuale, linee:r.linee || [], nascoste:!!r.nascoste }]); };
+      metti(io.id, a.p_io);
+      const vis = visibiliRicuciti(io);
+      for(const r of a.p_altri){ const x = vis.find(p => p.id !== io.id && p.codice_amway === r.codice); if(x) metti(x.id, r); }
+      salva(); return 1; },
     prossime: async () => { const io = mio(); if(!io) return [];
       return visibiliRicuciti(io).filter(p => p.prossima_qualifica).map(p => ({ partner_id:p.id, prossima_qualifica:p.prossima_qualifica })); },
     nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid); p.chiave = hex();

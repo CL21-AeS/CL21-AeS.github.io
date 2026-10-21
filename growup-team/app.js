@@ -59,6 +59,8 @@ function creaApi(){
     modificaPartenza: args => q(sb.rpc("modifica_partenza", args)),
     impostaProssima: chiave => q(sb.rpc("imposta_prossima_qualifica", { p_chiave:chiave })),
     prossime:     () => q(sb.rpc("prossime_qualifiche")),
+    mesiReport:   pid => q(sb.rpc("mesi_report", { p_partner:pid })),
+    salvaReportPassato: args => q(sb.rpc("salva_report_passato", args)),
     preferiti:    () => q(sb.from("preferiti").select("preferito_id")),
     copiaDati:    () => q(sb.rpc("copia_dati")),
     /* il primo obiettivo: il proprio per intero; del gruppo solo cifra e data (il perché resta personale) */
@@ -154,7 +156,9 @@ const st = {
   numeriLista: {},
   schedaPila: [],          // le schede aperte scendendo lungo le linee, per "Indietro"
   consigliAperti: new Set(),
-  prossime: new Map(),     // la prossima qualifica di chi vedo (da Platino in su)  // "Come arrivarci" aperto (per persona), così resta aperto quando la pagina si ridisegna
+  prossime: new Map(),     // la prossima qualifica di chi vedo (da Platino in su)
+  mesiReport: [],          // i miei numeri dei report degli ultimi 13 mesi (percentuale per i mesi da Argento)
+  mesiScheda: {},          // gli stessi, per le schede del gruppo  // "Come arrivarci" aperto (per persona), così resta aperto quando la pagina si ridisegna
   inviti: [], sezPersone: "lista", invitoId: null, archiviatiT: false,  // il Target (solo miei)
   ct: null,               // la pagina del contatto (le otto domande)
   listino: [],            // il listino Amway (dal database; una copia sul telefono)
@@ -227,6 +231,7 @@ const MESSAGGI_ERRORE = {
   profilo_esistente: "Questo telefono è già collegato a un profilo: ricarica la pagina.",
   data_futura: "La data di iscrizione non può essere nel futuro.",
   qualifica_non_valida: "Qualifica non riconosciuta.",
+  codice_mancante: "Prima importa il report del mese in corso: salva il tuo codice Amway nell'app.",
   percentuale_non_valida: "Percentuale non riconosciuta.",
   posizione_non_valida: "Puoi aggiungere persone solo nel tuo gruppo.",
   nome_mancante: "Scrivi il nome della persona.",
@@ -341,8 +346,27 @@ function mancanze(t, n){
   return out;
 }
 function ordineDi(chiave){ const t = st.stages.find(s => s.chiave === chiave); return t ? t.ordine : 0; }
-/* Oltre Argento le qualifiche sono annuali (mesi del Performance Year): si dichiarano, non si calcolano dal mese */
+/* Oltre Argento le qualifiche sono annuali (mesi del Performance Year). Oro e Platino sono tappe del percorso,
+   contate sui mesi da Argento (21% nel report mappe); da Platino in su si dichiarano. */
 function oltreArgento(s){ return !!s && ordineDi("argento") > 0 && s.ordine > ordineDi("argento"); }
+function oltrePlatino(s){ return !!s && ordineDi("platino") > 0 && s.ordine > ordineDi("platino"); }
+const MESI_ARGENTO = { oro:3, platino:6 };   // la prima volta: in 12 mesi consecutivi; Platino con 3 mesi di fila
+/* i mesi da Argento negli ultimi 12 mesi (compreso quello in corso): { mesi, fila, conReport } */
+function mesiArgento(righe){
+  const fine = meseDi(oggi()), inizio = spostaMese(fine, -11);
+  const per = new Map((righe || []).map(x => [meseDi(x.mese), Number(x.percentuale) || 0]));
+  let mesi = 0, fila = 0, run = 0, conReport = 0;
+  for(let m = inizio; m <= fine; m = spostaMese(m, 1)){
+    if(per.has(m)) conReport++;
+    if((per.get(m) || 0) >= 21){ mesi++; run++; fila = Math.max(fila, run); } else run = 0;
+  }
+  return { mesi, fila, conReport };
+}
+function spostaMese(m, n){ const [y, mm] = m.split("-").map(Number), t = y * 12 + mm - 1 + n; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, "0")}`; }
+function tappaAnnualeFatta(t, righe){
+  const x = mesiArgento(righe), min = MESI_ARGENTO[t.chiave];
+  return !!min && x.mesi >= min && (t.chiave !== "platino" || x.fila >= 3);
+}
 /* chi ha dichiarato Platino o più sceglie la prossima qualifica */
 function daPlatino(chiave){ return ordineDi("platino") > 0 && ordineDi(chiave) >= ordineDi("platino"); }
 const RUBINO_VP = 20000;   // Volume Rubino del mese: il VPG del report mappe (senza le linee al 21%)
@@ -358,7 +382,10 @@ function finestraPrimoOrdine(tappa){
 
 /* Una tappa è fatta se la qualifica dichiarata la comprende, oppure se i numeri lo dicono. */
 function tappaFatta(t){
-  if(oltreArgento(t)) return false;
+  if(oltrePlatino(t)) return false;
+  if(oltreArgento(t)) return tappaAnnualeFatta(t, st.mesiReport);
+  /* Argento: anche un mese al 21% in un report mappe importato (anche di un mese passato) */
+  if(t.chiave === "argento" && st.mesiReport.some(x => Number(x.percentuale) >= 21)) return true;
   if(t.chiave === "primo_ordine"){
     const f = finestraPrimoOrdine(t);
     if(f && f.vp >= t.vp_personali) return true;
@@ -379,12 +406,19 @@ function percorso(){
   /* un pin senza qualifica Bronze: primo ordine e primi clienti sono alle spalle */
   if(fatte < 0 && st.profilo && st.profilo.percentuale_iniziale) fatte = S.findIndex(s => s.chiave === "primi_clienti");
   while(fatte + 1 < S.length && tappaFatta(S[fatte + 1])) fatte++;
-  const attuale = S[fatte + 1] && !oltreArgento(S[fatte + 1]) ? S[fatte + 1] : null;
+  const attuale = S[fatte + 1] && !oltrePlatino(S[fatte + 1]) ? S[fatte + 1] : null;
   return { raggiunta: fatte >= 0 ? S[fatte] : null, attuale, indice: fatte + 1 };
 }
 
 function requisiti(t){
   const m = meseDi(oggi()), out = [];
+  if(oltreArgento(t)){
+    const x = mesiArgento(st.mesiReport), min = MESI_ARGENTO[t.chiave] || 0;
+    out.push({ ok: x.mesi >= min, txt: "Mesi da Argento (21%) negli ultimi 12 mesi", val: `${Math.min(x.mesi, min)} / ${min}` });
+    if(t.chiave === "platino") out.push({ ok: x.fila >= 3, txt: "Di cui 3 mesi di fila", val: `${Math.min(x.fila, 3)} / 3` });
+    out.push({ ok: x.conReport >= 12, attesa: x.conReport < 12, txt: "Report mappe importati negli ultimi 12 mesi", val: `${x.conReport} / 12` });
+    return out;
+  }
   if(t.chiave === "primo_ordine"){
     const f = finestraPrimoOrdine(t);
     const vp = f ? f.vp : vpMese(m);
@@ -511,7 +545,7 @@ function situazione(pid){
   const io = pid === st.profilo.id;
   if(io){
     const a = percorso().attuale;
-    if(!a) return null;
+    if(!a || oltreArgento(a)) return null;
     if(a.chiave === "primo_ordine"){
       const f = finestraPrimoOrdine(a), vp = f ? f.vp : vpMese(meseDi(oggi()));
       return { chiave:"primo_ordine", tappa:a, linee:[], dati:{ manca:num(Math.max(0, a.vp_personali - vp)), entro:f ? dataIt(f.fine) : "fine mese" },
@@ -633,6 +667,7 @@ async function caricaNumeri(){
     api.livelli().catch(() => [])
   ]);
   st.riep = riep || []; st.riepPrec = prec || []; st.storico = storico || []; st.livelli = livelli || [];
+  try{ st.mesiReport = await api.mesiReport(pid) || []; }catch(e){ st.mesiReport = []; }
   const dal = [inizio4(), mesePrecedente() + "-01"].sort()[0];  // 4 settimane e tutto il mese prima
   const [att, goals, mgoals] = await Promise.all([
     api.attivitaGruppo(dal).catch(() => []),
@@ -697,6 +732,7 @@ async function vaiHome(profilo){
   await caricaTutto();
   /* chi è stato aggiunto a mano, la prima volta che entra, legge e accetta la privacy */
   st.fase = profilo.privacy_accettata_il ? "home" : "privacy_primo";
+  if(st.fase === "home") setTimeout(riconosciPlatino, 0);
 }
 
 async function caricaStruttura(){
@@ -902,9 +938,11 @@ function campiQualifica(obbligoData, scelta){
         <label class="field"><span>Prossima qualifica che vuoi ottenere</span>
           <select name="prossima">${opzioniProssima(scelta.valore, scelta.prossima)}</select></label>
       </div>
-      <div data-mostra="pagamenti" ${tappa && tappa.pagamenti_max ? "" : "hidden"}>
-        <label class="field"><span>Mese della prima qualifica</span>
+      <div data-mostra="mese" ${tappa && (tappa.pagamenti_max || conMeseArgento(tappa.chiave)) ? "" : "hidden"}>
+        <label class="field"><span data-etichetta-mese>${etichettaMese(scelta.valore)}</span>
           <input type="month" name="mese" max="${meseDi(oggi())}" value="${esc(scelta.mese || "")}"></label>
+      </div>
+      <div data-mostra="pagamenti" ${tappa && tappa.pagamenti_max ? "" : "hidden"}>
         <label class="field"><span>Pagamenti già ricevuti (su 12)</span>
           <input type="number" name="pagamenti" min="0" max="12" inputmode="numeric" value="" placeholder="${Number(scelta.pagamenti) || 0}" data-vuoto></label>
       </div>
@@ -912,6 +950,9 @@ function campiQualifica(obbligoData, scelta){
         <input type="date" name="data" max="${oggi()}"></label>`}
       ${obbligoData ? `<p class="nota" style="margin-top:6px">Serve al conto alla rovescia dei 30 giorni per il primo ordine.</p>` : ""}`;
 }
+/* Argento e Oro: serve il mese della prima qualifica Argento, da cui si importano i report per contare i mesi */
+function conMeseArgento(chiave){ return chiave === "argento" || chiave === "oro"; }
+function etichettaMese(chiave){ return conMeseArgento(chiave) ? "Mese della prima qualifica Argento" : "Mese della prima qualifica"; }
 /* le qualifiche sopra quella dichiarata (da Platino in su) */
 function opzioniProssima(qualifica, scelta){
   const o = ordineDi(qualifica);
@@ -936,12 +977,12 @@ function leggiQualifica(f){
   const percentuale = v.startsWith("pin:") ? Number(v.slice(4)) : null;
   const qualifica = v && !percentuale ? v : null;
   const t = st.stages.find(s => s.chiave === qualifica);
-  const conPagamenti = !!(t && t.pagamenti_max);
+  const conPagamenti = !!(t && t.pagamenti_max), conMese = conPagamenti || conMeseArgento(qualifica);
   const prossima = daPlatino(qualifica) && f.prossima && f.prossima.value && ordineDi(f.prossima.value) > ordineDi(qualifica) ? f.prossima.value : null;
   return { qualifica, percentuale, tappa:t, prossima, data: f.data ? f.data.value || null : null,
-    mese: conPagamenti && f.mese.value ? f.mese.value + "-01" : null,
+    mese: conMese && f.mese.value ? f.mese.value + "-01" : null,
     pagamenti: conPagamenti ? Math.max(0, Math.min(12, Number(f.pagamenti.value) || 0)) : 0,
-    mancaMese: conPagamenti && !f.mese.value };
+    mancaMese: conMese && !f.mese.value };
 }
 
 function vIngresso(){
@@ -1230,7 +1271,7 @@ function vObiettivo(){
     <h2 style="margin-top:4px">Quanto vorresti guadagnare al mese?</h2>
     <p class="small">Scrivi la cifra e per quando: qui vedrai la tappa che la vale e il percorso per arrivarci.</p>
     <button class="btn primary wide" style="margin-top:8px" data-act="obiettivo-modifica">Scrivi il tuo obiettivo</button>
-  </div>${vProssimaQualifica()}${vComeArrivarci(st.profilo.id, "io")}${vVisione()}`;
+  </div>${vProssimaQualifica()}${vReportDaImportare()}${vComeArrivarci(st.profilo.id, "io")}${vVisione()}`;
   const t = tappaPerCifra(o.cifra_mese), S = st.stages, { indice } = percorso();
   const fino = t ? S.findIndex(s => s.chiave === t.tappa.chiave) : -1;
   const giaFatto = fino >= 0 && indice > fino;
@@ -1265,6 +1306,7 @@ function vObiettivo(){
             : stato === "dopo" ? `<p class="small" style="margin:2px 0 0">${esc(requisitiTesto(s))}</p>` : ""}</div></li>`; }).join("")}</ol>
   </div>` : ""}
   ${vProssimaQualifica()}
+  ${vReportDaImportare()}
   ${vComeArrivarci(st.profilo.id, "io")}
   ${vVisione()}`;
 }
@@ -1278,6 +1320,16 @@ function vRubino(pid){
     ? "importa il report mappe per vederlo" : "si vede quando importi il report mappe"}.</p>`;
   const v = Number(r.vp_gruppo) || 0;
   return `<p class="small rubino" style="margin:6px 0 0">Volume Rubino questo mese: <b class="num">${num(v)}</b> su ${num(RUBINO_VP)} VP${v >= RUBINO_VP ? " ✓" : ""}</p>`;
+}
+/* nella scheda partner, per chi è tra Argento e Platino: i mesi da Argento dai report che ho importato io */
+function vMesiArgentoScheda(p){
+  const righe = st.mesiScheda[p.id];
+  if(!righe || daPlatino(p.qualifica_iniziale)) return "";
+  const x = mesiArgento(righe);
+  if(!x.mesi && !conMeseArgento(p.qualifica_iniziale)) return "";
+  const prossima = x.mesi >= MESI_ARGENTO.oro ? "Platino" : "Oro", min = MESI_ARGENTO[prossima.toLowerCase()];
+  return `<p class="small mesi-argento" style="margin:6px 0 0">Mesi da Argento: <b>${x.mesi} su ${min}</b> per ${prossima}
+    <span class="faint">(ultimi 12 mesi, dai report che hai importato)</span></p>`;
 }
 /* la prossima qualifica (da Platino in su): nome, requisiti, Volume Rubino */
 function vProssimaQualifica(){
@@ -1341,9 +1393,11 @@ function vTappa(){
   if(!attuale){
     const pq = st.profilo.prossima_qualifica;
     return `<div class="card"><span class="eyebrow">Il tuo percorso</span><h2 style="margin-top:4px">${esc(raggiunta ? raggiunta.nome : "Argento")} raggiunto 🎉</h2>
-      ${pq ? `<p class="small" style="margin:4px 0 0">Prossima qualifica: <b>${esc(nomeQualifica(pq))}</b></p>` : ""}
+      ${pq ? `<p class="small" style="margin:4px 0 0">Prossima qualifica: <b>${esc(nomeQualifica(pq))}</b></p>`
+        : `<button class="btn" style="margin-top:10px;min-height:38px" data-act="scegli-prossima">Scegli la prossima qualifica</button>`}
       ${vRubino(st.profilo.id)}
-      <p class="muted">Hai completato il percorso fino ad Argento. Ora l'obiettivo è aiutare le tue linee a fare lo stesso.</p></div>`;
+      <p class="muted">Hai completato il percorso fino a Platino. Ora l'obiettivo è aiutare le tue linee a fare lo stesso.</p></div>
+      ${vReportDaImportare()}`;
   }
   const req = requisiti(attuale);
   let scadenza = "";
@@ -1354,7 +1408,7 @@ function vTappa(){
   }
   const nelMese = Number(attuale.vp_personali) > 0 && attuale.chiave !== "primo_ordine";
   const n = numeriMese(meseDi(oggi()));
-  const conLinee = attuale.ordine >= 3;
+  const conLinee = attuale.ordine >= 3 && !oltreArgento(attuale);
   /* percentuale e qualifica sono due cose distinte */
   const manca = conLinee ? mancanze(attuale, n) : [];
   const pinMax = Math.max(Number(st.profilo.percentuale_iniziale) || 0, ...st.storico.map(r => Number(r.percentuale) || 0));
@@ -1369,7 +1423,7 @@ function vTappa(){
         <span class="num ${l.vp >= soglia() ? "" : "faint"}">${num(l.vp)} VP</span></li>`).join("")}</ul>
        <p class="nota" style="margin-top:4px">Le tue linee frontali questo mese, con i VP di tutto il loro gruppo. Attiva da ${num(soglia())} VP.</p>` : "";
   return `<div class="card">
-    <div class="spread"><span class="eyebrow">Tappa ${indice + 1} di ${st.stages.length}</span>
+    <div class="spread"><span class="eyebrow">Tappa ${indice + 1} di ${(st.stages.findIndex(s => s.chiave === "platino") + 1) || st.stages.length}</span>
       <span class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end">
       ${n.percentuale ? `<span class="pill s">${n.percentuale}% questo mese</span>` : ""}
       ${n.daReport ? `<span class="pill">dal report Amway</span>` : ""}
@@ -1387,7 +1441,49 @@ function vTappa(){
     ${terza}
     ${pag ? `<p class="small" style="margin-top:8px">${esc(raggiunta.nome)}: ${esc(pag)}</p>` : ""}
     ${nelMese ? `<p class="nota">Tutti i requisiti valgono nello stesso mese di calendario (${nomeMese(meseDi(oggi()))}).</p>` : ""}
+    ${oltreArgento(attuale) ? `<p class="nota">Un mese da Argento è un mese in cui il report mappe importato ti dà al 21%.
+      La prima volta Oro e Platino si contano su 12 mesi consecutivi.</p>` : ""}
     ${attuale.guadagno_mese ? `<p class="nota">* ${notaGuadagni()}</p>` : ""}
+  </div>
+  ${vReportDaImportare()}`;
+}
+
+/* I report mappe da importare per contare i mesi: chi ha dichiarato Argento o Oro dal mese della prima qualifica
+   Argento (al massimo gli ultimi 12 mesi), chi ha dichiarato Platino o più da settembre (Performance Year).
+   Fino al mese scorso: il mese in corso si importa come sempre. */
+function mesiDaImportare(){
+  const p = st.profilo, q = p.qualifica_iniziale, ora = meseDi(oggi());
+  let da = null;
+  if(conMeseArgento(q) && p.qualifica_iniziale_mese) da = [meseDi(p.qualifica_iniziale_mese), spostaMese(ora, -11)].sort()[1];
+  else if(daPlatino(q)) da = `${Number(ora.slice(5)) >= 9 ? ora.slice(0, 4) : Number(ora.slice(0, 4)) - 1}-09`;
+  if(!da) return [];
+  const fatti = new Set(st.mesiReport.map(x => meseDi(x.mese)));
+  const out = [];
+  for(let m = da; m < ora; m = spostaMese(m, 1)) out.push({ mese:m, fatto:fatti.has(m) });
+  return out;
+}
+/* 6 mesi da Argento (3 di fila): l'app riconosce Platino, la qualifica dichiarata diventa Platino e chiede la prossima */
+async function riconosciPlatino(){
+  const p = st.profilo;
+  if(!p || !ordineDi("platino") || ordineDi(p.qualifica_iniziale) >= ordineDi("platino") || (percorso().raggiunta || {}).chiave !== "platino") return;
+  try{
+    st.profilo = await api.modificaPartenza({ p_qualifica:"platino", p_percentuale:null,
+      p_qualifica_mese:p.qualifica_iniziale_mese || null, p_pagamenti:Number(p.pagamenti_iniziali) || 0 });
+  }catch(e){ return; }
+  const k = `growup-team.festa.${p.id}.tappa.${percorso().indice}`;
+  if(!leggiLocale(k)){ salvaLocale(k, "1"); festeggia("grande", "Platino!", "6 mesi da Argento: il percorso è completo"); }
+  if(!st.profilo.prossima_qualifica){ st.platinoNuovo = true; st.sheet = "prossima"; }
+  render();
+}
+function vReportDaImportare(){
+  const elenco = mesiDaImportare();
+  if(!elenco.length || elenco.every(x => x.fatto)) return "";
+  return `<div class="card report-da-importare">
+    <span class="eyebrow">Report da importare</span>
+    <p class="small" style="margin:6px 0 0">Per contare i tuoi mesi da Argento importa il report mappe di ogni mese
+      (sul sito Amway scegli il mese, poi scarica il CSV come sempre).</p>
+    <ul class="mesi-report">${elenco.map(x => `<li class="${x.fatto ? "ok" : ""}"><span class="mark">${x.fatto ? "✓" : "○"}</span>${esc(nomeMese(x.mese))}</li>`).join("")}</ul>
+    <button class="btn wide" style="margin-top:10px" data-act="importa">Importa un report</button>
   </div>`;
 }
 
@@ -1824,6 +1920,7 @@ function vScheda(){
       : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</p>
     ${p.stato === "gestito" ? "" : `<p class="small" style="margin:6px 0 0">${rigaObiettivoDi(p.id)}</p>`}
     ${vRubino(p.id)}
+    ${vMesiArgentoScheda(p)}
     <p class="small" style="margin:6px 0 0">${p.codice_amway ? `Codice Amway <b>${esc(p.codice_amway)}</b>` : "Codice Amway non scritto"}
       ${st.profilo.is_admin && !gestito ? soloAdmin(`<button class="btn link small" data-act="codice" data-id="${esc(p.id)}" style="min-height:0;padding:0 4px">Correggi</button>`) : ""}</p>
     <div class="dati-scheda">
@@ -2026,15 +2123,20 @@ function leggiReport(testo){
    Nell'app: io, chi usa l'app nel mio gruppo, le persone che ho importato io. */
 function analizzaReport(rep){
   const io = st.profilo, m = rep.mese;
-  if(m !== meseDi(oggi()) && !(m === mesePrecedente() && precedenteAperto()))
-    return { errore: m > meseDi(oggi()) ? `Il report è di ${nomeMese(m)}, un mese che non è ancora iniziato.`
-      : `Il report è di ${nomeMese(m)}: nell'app quel mese è già chiuso (si chiude il giorno ${giornoChiusura()} del mese dopo). Scarica il report del mese in corso.` };
+  const passato = m < meseDi(oggi()) && !(m === mesePrecedente() && precedenteAperto());
+  if(m > meseDi(oggi())) return { errore:`Il report è di ${nomeMese(m)}, un mese che non è ancora iniziato.` };
+  if(passato && m < spostaMese(meseDi(oggi()), -24)) return { errore:`Il report è di ${nomeMese(m)}: troppo vecchio, servono solo gli ultimi 12 mesi.` };
   const prima = rep.righe.find(r => r.livello === 1) || rep.righe[0];
   if(io.codice_amway && io.codice_amway !== prima.codice)
     return { errore:`Questo report è di ${prima.nome} (${prima.codice}), ma il tuo codice nell'app è ${io.codice_amway}. `
       + `Ognuno importa il report scaricato dal proprio accesso al sito Amway. Se il report è tuo, il codice nell'app è sbagliato: `
       + (io.is_admin ? "correggilo in fondo alla pagina Io." : "chiedi a Stefano e Alessia di correggerlo.") };
   const perCodice = new Map(rep.righe.map(r => [r.codice, r]));
+  /* un mese chiuso: si salvano solo i numeri (21%, VPG, linee) per contare i mesi da Argento */
+  if(passato){
+    if(!io.codice_amway) return { errore:MESSAGGI_ERRORE.codice_mancante };
+    return { passato:true, mese:m, prima, perCodice, totale:rep.righe.length };
+  }
   const altri = alberoSotto(io.id, 0).map(x => x.p);
   const attivi = new Map(altri.filter(p => p.stato !== "gestito" && p.codice_amway).map(p => [p.codice_amway, p]));
   const mie = altri.filter(p => p.stato === "gestito");
@@ -2091,6 +2193,15 @@ function vImporta(){
       <input type="file" id="file-report" accept=".csv,text/csv,text/comma-separated-values" hidden></label>
     ${a && a.errore ? `<p class="errore">${esc(a.errore)}</p>` : ""}
     ${chiudi}`;
+  if(a.passato) return `<h2>Report di ${nomeMese(a.mese)}</h2>
+  <p class="small">È un mese chiuso: salvo solo i numeri (percentuale, VP di gruppo, linee) per contare i mesi da Argento.
+    La tua struttura e i VP non cambiano.</p>
+  <ul class="imp"><li><span class="grow">${esc(st.profilo.nome)} (tu)</span>
+    <b class="num">${a.prima.perc != null ? a.prima.perc + "%" : "–"} · ${num(a.prima.vpg)} VPG</b></li></ul>
+  <form data-form="importa" novalidate>
+    <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
+      <button class="btn primary grow"${st.occupato ? " disabled" : ""}>Salva i numeri</button></div>
+  </form>`;
   const riga = (p, extra) => `<span class="grow">${esc(p.nome)}${extra ? `<br><span class="small">${extra}</span>` : ""}</span>`;
   const sezione = (titolo, corpo, nota, cl) => `<div class="imp-sezione${cl ? " " + cl : ""}"><h3>${titolo}</h3>${nota ? `<p class="small">${nota}</p>` : ""}${corpo}</div>`;
   const sponsorDi = r => { const s = a.perCodice.get(r.sponsor); return s ? `sponsor ${esc(s.nome)}` : ""; };
@@ -2167,8 +2278,31 @@ async function leggiFileReport(file){
   st.imp = a; render();
 }
 
+/* i numeri ufficiali di ognuno: VPP, VPG, percentuale e i VPG delle sue linee frontali del report
+   (se il report non mostra il suo gruppo, come per i Platino, le linee sono "nascoste") */
+function numeriDelReport(perCodice){
+  const figliReport = new Map();
+  for(const r of perCodice.values()) if(r.sponsor) figliReport.set(r.sponsor, (figliReport.get(r.sponsor) || []).concat([r]));
+  return r => r.vpg == null ? {} : { vpg:r.vpg, percentuale:r.perc,
+    linee:(figliReport.get(r.codice) || []).map(x => ({ codice:x.codice, vpg:x.vpg || 0 })),
+    nascoste:!figliReport.has(r.codice) && r.dimensione > 1 };
+}
+async function salvaReportPassato(a, f){
+  const numeri = numeriDelReport(a.perCodice);
+  const altri = [...a.perCodice.values()].filter(r => r.codice !== a.prima.codice && r.vpg != null)
+    .map(r => Object.assign({ codice:r.codice, vpp:r.vpp }, numeri(r)));
+  st.occupato = true;
+  try{
+    await api.salvaReportPassato({ p_mese:a.mese + "-01", p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp }, numeri(a.prima)), p_altri:altri });
+    await caricaNumeri();
+    st.sheet = null; st.imp = null; st.occupato = false; render();
+    toast(`Numeri di ${nomeMese(a.mese)} salvati`);
+    riconosciPlatino();
+  }catch(e){ st.occupato = false; mostraErroreForm(f, messaggio(e)); }
+}
 async function eseguiImport(f){
   const a = st.imp, io = st.profilo;
+  if(a.passato) return salvaReportPassato(a, f);
   const scelti = nome => new Set([...f.querySelectorAll(`input[name=${nome}]:checked`)].map(i => i.value));
   const nascondi = scelti("nascondi");
   /* "Riapplica i filtri": chi c'è già si nasconde o si rimette secondo le caselle; "Lascia tutto com'è": nessun cambio */
@@ -2179,13 +2313,7 @@ async function eseguiImport(f){
   if(a.nuovi.length && !f.consenso.checked){ mostraErroreForm(f, "Conferma di avere il consenso delle persone della tua linea."); return; }
   /* l'import è completo: le mie persone sono quelle già importate più tutte le nuove */
   const mie = a.aggiorna.map(x => x.r).concat(a.nuovi);
-  /* i numeri ufficiali di ognuno: VPP, VPG, percentuale e i VPG delle sue linee frontali del report
-     (se il report non mostra il suo gruppo, come per i Platino, le linee sono "nascoste") */
-  const figliReport = new Map();
-  for(const r of a.perCodice.values()) if(r.sponsor) figliReport.set(r.sponsor, (figliReport.get(r.sponsor) || []).concat([r]));
-  const numeri = r => r.vpg == null ? {} : { vpg:r.vpg, percentuale:r.perc,
-    linee:(figliReport.get(r.codice) || []).map(x => ({ codice:x.codice, vpg:x.vpg || 0 })),
-    nascoste:!figliReport.has(r.codice) && r.dimensione > 1 };
+  const numeri = numeriDelReport(a.perCodice);
   const codiciMie = new Set(mie.map(r => r.codice));
   const attivi = new Set(a.usanoApp.map(x => x.r.codice));
   const profondita = r => { let n = 0; for(let c = r.sponsor; c && a.perCodice.has(c) && n < 200; c = a.perCodice.get(c).sponsor) n++; return n; };
@@ -2204,6 +2332,7 @@ async function eseguiImport(f){
     st.att = await api.activities(io.id, [settimana(), primoDelMese()].sort()[0]) || [];
     await caricaNumeri();
     st.sheet = null; st.imp = null; st.occupato = false; render();
+    riconosciPlatino();
     const n = k => Number(esito[k]) || 0;
     toast(`Import di ${nomeMese(a.mese).split(" ")[0]}: ${[n("aggiunte") ? plur(n("aggiunte"), "persona aggiunta", "persone aggiunte") : "",
       plur(n("aggiornati"), "VPP aggiornato", "VPP aggiornati"), n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
@@ -2364,6 +2493,18 @@ function vSheet(){
       <p class="nota">Su WhatsApp parte un messaggio già scritto, per esempio: "${esc(testoChiamata(x.nome, piuGiorni(oggi(), 1), "21:00"))}".
         Scegli tu a chi mandarlo.</p>
       <button type="button" class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>${err}
+    </form>`;
+  }
+  if(s === "prossima"){
+    const q = st.profilo.qualifica_iniziale;
+    return `<h2>${st.platinoNuovo ? "Platino! Qual è la tua prossima qualifica?" : "La tua prossima qualifica"}</h2>
+    ${st.platinoNuovo ? `<p class="small">Sei arrivato a 6 mesi da Argento: il percorso è completo. Scegli la prossima qualifica che vuoi ottenere:
+      la vedono anche il tuo sponsor e la tua upline.</p>` : ""}
+    <form data-form="prossima-qualifica" novalidate>
+      <label class="field"><span>Prossima qualifica che vuoi ottenere</span>
+        <select name="prossima">${opzioniProssima(q, st.profilo.prossima_qualifica)}</select></label>
+      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Dopo</button>
+        <button class="btn primary grow">Salva</button></div>
     </form>`;
   }
   if(s === "partenza"){
@@ -2529,8 +2670,10 @@ const AZIONI = {
     try{ st.attScheda = (await api.activities(p.id, primaDataAperta()) || []).filter(a => a.data >= primaDataAperta()); render(); }
     catch(e){ toast(messaggio(e)); }
     if(p.stato !== "gestito") api.numeriPersone(p.id).then(n => { st.numeriLista[p.id] = n; render(); }).catch(() => {});
+    api.mesiReport(p.id).then(m => { st.mesiScheda[p.id] = m || []; render(); }).catch(() => {});
   },
   partenza(){ st.sheet = "partenza"; render(); },
+  "scegli-prossima"(){ st.platinoNuovo = false; st.sheet = "prossima"; render(); },
   chiamata(el){ st.chiamataId = el.dataset.id; st.errore = ""; st.sheet = "chiamata"; render(); },
   "chiamata-ics"(el){
     const f = el.form, x = st.struttura.find(y => y.id === st.chiamataId);
@@ -2753,9 +2896,17 @@ const MODULI = {
     apriIcs(creaIcs(dati), x.nome);
     if(!suIos()) toast("Apri il file per aggiungere la chiamata al calendario");
   },
+  async "prossima-qualifica"(f){
+    if(!f.prossima.value){ mostraErroreForm(f, "Scegli una qualifica."); return; }
+    try{
+      st.profilo = await api.impostaProssima(f.prossima.value);
+      await caricaStruttura();
+      st.sheet = null; st.platinoNuovo = false; render(); toast("Prossima qualifica salvata");
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
   async partenza(f){
     const q = leggiQualifica(f);
-    if(q.mancaMese){ mostraErroreForm(f, "Indica il mese della prima qualifica."); return; }
+    if(q.mancaMese){ mostraErroreForm(f, `Indica il ${etichettaMese(q.qualifica).toLowerCase()}.`); return; }
     try{
       st.profilo = await api.modificaPartenza({ p_qualifica:q.qualifica, p_percentuale:q.percentuale,
                            p_qualifica_mese:q.mese, p_pagamenti:q.pagamenti });
@@ -2775,7 +2926,7 @@ const MODULI = {
     else if(!codiceValido(codice)) err = MESSAGGI_ERRORE.codice_amway_non_valido;
     else if(!qual && !q.percentuale && !data) err = "Se stai iniziando serve la data di iscrizione: fa partire il conto alla rovescia del primo ordine.";
     else if(data && data > oggi()) err = "La data di iscrizione non può essere nel futuro.";
-    else if(q.mancaMese) err = "Indica il mese della prima qualifica.";
+    else if(q.mancaMese) err = `Indica il ${etichettaMese(q.qualifica).toLowerCase()}.`;
     else if(!f.privacy.checked) err = "Per iniziare serve accettare l'informativa privacy.";
     if(err){ mostraErroreForm(f, err); return; }
     st.occupato = true; f.querySelector("button.primary").disabled = true;
@@ -4715,7 +4866,8 @@ function festeggia(tipo, titolo, sotto){
   anima(avviso, [{ opacity:0, transform:`translate(-50%, -50%) scale(${tipo === "grande" ? .8 : .9})` }, { opacity:1, transform:"translate(-50%, -50%) scale(1)" }],
     { dur:VIVACE.dur * 1.8, ease:VIVACE.ease });
   setTimeout(() => anima(avviso, [{ opacity:1 }, { opacity:0 }], { dur:220 }).then(() => avviso.remove()), f.tempo);
-  try{ if(navigator.vibrate) navigator.vibrate(tipo === "grande" ? [30, 40, 30] : 25); }catch(e){}
+  /* la vibrazione solo dopo un tocco (il Platino si può riconoscere all'apertura dell'app) */
+  try{ if(navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate(tipo === "grande" ? [30, 40, 30] : 25); }catch(e){}
   if(fermo()) return;
   const cv = document.createElement("canvas"), k = window.devicePixelRatio || 1;
   cv.className = "coriandoli"; cv.setAttribute("aria-hidden", "true"); document.body.appendChild(cv);
@@ -4775,6 +4927,8 @@ document.addEventListener("change", e => {
   const f = e.target.form;
   const t = st.stages.find(s => s.chiave === f.qualifica.value);
   f.querySelector("[data-mostra=pagamenti]").hidden = !(t && t.pagamenti_max);
+  f.querySelector("[data-mostra=mese]").hidden = !(t && (t.pagamenti_max || conMeseArgento(t.chiave)));
+  f.querySelector("[data-etichetta-mese]").textContent = etichettaMese(f.qualifica.value);
   const pr = f.querySelector("[data-mostra=prossima]");
   if(pr){ const prima = f.prossima.value; pr.hidden = !daPlatino(f.qualifica.value);
     f.prossima.innerHTML = opzioniProssima(f.qualifica.value, prima); }
