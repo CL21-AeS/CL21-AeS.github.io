@@ -6,8 +6,8 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 ## Ripartire da qui (fermi la sera del 20 ottobre 2026)
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
-dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **028** (027 incollata da
-Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#85**. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
+dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **030** (027 incollata da
+Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#87**. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
 **Fatto il 19-20 ottobre** (dettagli più sotto, in ordine di data): import da Amway degli ordini e dell'elenco clienti
 (telefono, ultimo ordine, "Mai comprato" in Lista); Modifica dell'ordine e dei dati del cliente; etichette Da consegnare /
@@ -32,6 +32,16 @@ Bronze in su non ancora chiusa (qualifica dichiarata o mese chiuso). In cima, da
 chi ha sotto), a 0, sotto 50, 50-99, 100-199, 200+, VP medio di chi fattura, quanto manca. **Mancano persone** se almeno
 1 persona su 4 è attiva (100 VP e oltre) nelle linee considerate, altrimenti **fatturato basso**, con le persone tra 50 e
 99 nominate a parte. I testi stanno in `CONSIGLI` (app.js): si cambiano lì. Nessun dato nuovo nel database.
+
+**21 ottobre — qualifiche oltre Argento** (dal documento Amway "Livelli di Qualifica" 12-2025, letto e non salvato
+nel repository): nel menu della qualifica più alta Oro, Platino, Platino Fondatore, Rubino, Rubino Fondatore, Zaffiro,
+Zaffiro Fondatore, Smeraldo, Smeraldo Fondatore, Diamante, Diamante Fondatore. Sono annuali (mesi del Performance
+Year, 1° settembre - 31 agosto): **si dichiarano** dal Punto di partenza, l'app non le calcola; il percorso si ferma
+ad Argento. Chi dichiara **Platino o più** sceglie la **prossima qualifica** (all'ingresso e in Modifica; in Obiettivo
+il riquadro con i requisiti); sponsor e upline la vedono nella scheda. **Volume Rubino** = VPG del report mappe (le linee
+al 21% non ci sono, confermato da Stefano): "Volume Rubino questo mese: X su 20.000 VP", solo con il report del mese.
+Per dopo: contare i mesi del Performance Year (Oro, Platino, Rubino Fondatore, Zaffiro) e le linee al 21% per mese
+(Smeraldo, Diamante); Volume Equivalente ignorato; nessuna cifra in euro oltre Argento.
 
 **Da fare / in sospeso per Stefano**:
 - **Importare subito il report mappe**: dalla 027 tutti (tranne gli admin) sono "Da confermare" e chi ha qualcuno sotto

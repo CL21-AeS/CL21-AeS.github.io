@@ -210,10 +210,10 @@ begin
 
   -- ---- Amministrazione ----
   perform growup_test.come(u5);  -- A
-  perform growup_test.ok((select count(*) from public.stage_requirements) = 8, 'tutti leggono le 8 tappe');
+  perform growup_test.ok((select count(*) from public.stage_requirements) = 19, 'tutti leggono le 19 tappe e qualifiche');
   perform growup_test.ok(growup_test.righe('update public.stage_requirements set vp_personali = 1') = 0, 'A non modifica i requisiti');
   perform growup_test.come(u6);  -- R admin
-  perform growup_test.ok(growup_test.righe('update public.stage_requirements set descrizione = descrizione') = 8, 'l''admin modifica i requisiti');
+  perform growup_test.ok(growup_test.righe('update public.stage_requirements set descrizione = descrizione') = 19, 'l''admin modifica i requisiti');
 
   -- ---- Prendere possesso di un profilo creato da altri, con la sua chiave ----
   execute 'reset role';
@@ -706,6 +706,25 @@ begin
   execute 'reset role';
   update public.partners set bloccato_il = null where id = b;
   delete from public.listino where codice = '900001';
+
+  -- ---- 030: le qualifiche oltre Argento e la prossima qualifica ----
+  perform growup_test.come(u3);  -- B
+  perform growup_test.deve_fallire($q$select public.imposta_prossima_qualifica('smeraldo')$q$, 'sotto Platino non si sceglie la prossima qualifica');
+  perform public.modifica_partenza('platino');
+  perform growup_test.deve_fallire($q$select public.imposta_prossima_qualifica('oro')$q$, 'la prossima qualifica deve stare sopra la propria');
+  perform growup_test.ok(public.imposta_prossima_qualifica('smeraldo')->>'prossima_qualifica' = 'smeraldo', 'B (Platino) sceglie Smeraldo');
+  perform growup_test.deve_fallire(format('update public.partners set prossima_qualifica = %L where id = %L', 'diamante', a),
+                         'la prossima qualifica non si scrive direttamente (solo dalla funzione, solo la propria)');
+  perform growup_test.come(u2);  -- A, sponsor di B
+  perform growup_test.ok((select prossima_qualifica from public.prossime_qualifiche() where partner_id = b) = 'smeraldo', 'lo sponsor vede la prossima qualifica di B');
+  perform growup_test.come(u1);  -- R, upline
+  perform growup_test.ok((select prossima_qualifica from public.prossime_qualifiche() where partner_id = b) = 'smeraldo', 'l''upline la vede');
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.ok(not exists (select 1 from public.prossime_qualifiche() where partner_id = b), 'chi è in un''altra linea non la vede');
+  perform growup_test.come(u3);  -- B scende a Oro: la prossima qualifica si toglie
+  perform growup_test.ok(public.modifica_partenza('oro')->>'prossima_qualifica' is null, 'scendendo sotto Platino la prossima qualifica si toglie');
+  perform public.modifica_partenza('path_to_bronze');
+  execute 'reset role';
 
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A

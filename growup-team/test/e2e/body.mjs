@@ -1682,6 +1682,59 @@ await ctx.close();
   await ctx.close();
 }
 
+// 32. Qualifiche oltre Argento: Platino all'ingresso, prossima qualifica, Volume Rubino dal report (dati inventati)
+({ ctx, page } = await apri({}, "#RRRR22"));
+await page.getByText("Benvenuto in Growup").waitFor();
+await page.fill("input[name=nome]", "Pia Prova"); await page.fill("input[name=codice_amway]", "7100001");
+check(await page.locator("select[name=qualifica] option").count() >= 1 + 7 + 6 + 11
+  && await page.locator("select[name=qualifica] option", { hasText:"Diamante Fondatore" }).count() === 1, "nel menu le 11 qualifiche oltre Argento");
+await page.selectOption("select[name=qualifica]", "oro");
+check(await page.locator("[data-mostra=prossima]").isHidden(), "con Oro non si chiede la prossima qualifica");
+await page.selectOption("select[name=qualifica]", "platino");
+check(await page.locator("[data-mostra=prossima]").isVisible()
+  && !(await page.locator("select[name=prossima] option", { hasText:/^Oro$/ }).count())
+  && await page.locator("select[name=prossima] option", { hasText:"Platino Fondatore" }).count() === 1, "con Platino: la prossima qualifica, solo quelle sopra");
+await page.selectOption("select[name=prossima]", "smeraldo");
+await page.check("input[name=privacy]"); await page.click("form button.primary");
+await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
+await page.getByText("Ciao Pia").waitFor();
+check(await page.getByText("Platino raggiunto 🎉").isVisible() && await page.getByText("Prossima qualifica: Smeraldo").isVisible(), "Io: Platino raggiunto e la prossima qualifica");
+check(await page.getByText("Volume Rubino questo mese: importa il report mappe per vederlo.").isVisible(), "senza report: il Volume Rubino si vede importando le mappe");
+await page.click("button[role=tab][data-act=vista-obiettivo]");
+const prossima = page.locator(".prossima-qualifica");
+check(await prossima.locator("h2").innerText() === "Smeraldo" && await prossima.getByText("3 linee frontali al 21%").isVisible(), "Obiettivo: la prossima qualifica con i requisiti");
+check(!(await page.locator(".consigli").count()), "oltre Argento «Come arrivarci» non compare");
+const sessPia = await page.evaluate(() => localStorage.getItem("mock.session"));
+await sync(page); await ctx.close();
+const pia = DB.partners.find(p => p.nome === "Pia Prova");
+check(pia.qualifica_iniziale === "platino" && pia.prossima_qualifica === "smeraldo", "salvati Platino e la prossima qualifica Smeraldo");
+// il report mappe del mese: VPG 21.000 = Volume Rubino
+DB.numeri = (DB.numeri || []).concat([{ visto_da:pia.id, partner_id:pia.id, mese:oggiStr.slice(0, 7), vpg:21000, percentuale:21, linee:[] }]);
+const telefonoPia = () => apri({ storageState:{ cookies:[], origins:[{ origin:"http://127.0.0.1:8765", localStorage:[{ name:"mock.session", value:sessPia }] }] } }, "");
+({ ctx, page } = await telefonoPia());
+await page.getByText("Ciao Pia").waitFor();
+check(await page.getByText("Volume Rubino questo mese: 21.000 su 20.000 VP ✓").isVisible(), "Volume Rubino dal report: 21.000 su 20.000 ✓");
+await ctx.close();
+// lo sponsor la vede nella scheda
+({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.click("button[data-act=vista-gruppo]");
+await page.locator(".albero.struttura li", { hasText:"Pia Prova" }).first().locator("button[data-act=apri-scheda]").first().click();
+await page.locator(".card h2", { hasText:"Pia Prova" }).waitFor();
+check(await page.getByText("Prossima qualifica: Smeraldo").isVisible(), "lo sponsor vede la prossima qualifica nella scheda");
+await ctx.close();
+// Pia corregge: era Oro, non Platino → la prossima qualifica si toglie
+({ ctx, page } = await telefonoPia());
+await page.getByText("Ciao Pia").waitFor();
+await page.click("button[role=tab][data-act=vista-obiettivo]");
+await page.click(".prossima-qualifica button[data-act=partenza]");
+check(await page.locator(".sheet select[name=prossima]").inputValue() === "smeraldo", "Modifica: la prossima qualifica già scelta");
+await page.selectOption(".sheet select[name=qualifica]", "oro");
+await page.click(".sheet button.primary");
+await page.getByText("Punto di partenza aggiornato").waitFor();
+await sync(page); await ctx.close();
+check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scendendo sotto Platino la prossima qualifica si toglie");
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

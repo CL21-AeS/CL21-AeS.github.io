@@ -76,7 +76,10 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 25. `supabase/028_listino.sql` — il listino Amway nel database (lo leggono gli utenti dell'app, lo scrive l'admin);
     prezzo Partner e VP anche sulle righe degli ordini
 26. `supabase/029_si_divisi.sql` — per sponsor e upline i "sì" del mese divisi in nuovi partner e nuovi clienti
-27. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+27. `supabase/030_qualifiche_annuali.sql` — le qualifiche oltre Argento (da Oro a Diamante Fondatore, si dichiarano),
+    la prossima qualifica scelta da chi è Platino o più (la vedono sponsor e upline); la qualifica del mese si calcola
+    solo fino ad Argento
+28. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 17. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 18. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
