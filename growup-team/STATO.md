@@ -3,11 +3,36 @@
 Ultimo aggiornamento: 21 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
-## Ripartire da qui (fermi la sera del 20 ottobre 2026)
+## Ripartire da qui (fermi la sera del 21 ottobre 2026)
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
 dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **031** (027 incollata da
-Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#89**. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
+Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#91**, nessuna aperta; il ramo di
+lavoro è ricreato da main. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
+
+**Il 21 ottobre in breve** (dettagli sotto): «Come arrivarci» (consigli a richiesta in Obiettivo e nella scheda partner,
+anche da Argento a Platino) · qualifiche oltre Argento fino a Diamante Fondatore, prossima qualifica da Platino in su,
+Volume Rubino · percorso Argento → Oro → Platino contato sui mesi al 21% dei report mappe, con l'import "solo numeri" dei
+report dei mesi chiusi e Platino riconosciuto dall'app.
+
+**Aperto, in attesa di Stefano**:
+- Confrontare nel report mappe la colonna **"VP Rubino"** con il VPG: se sono diversi, il Volume Rubino si prende da lì.
+- Controllare sul sito Amway che la **%** delle linee frontali nei report importati sia quella giusta (serve a «Come arrivarci»
+  da Argento a Platino).
+- Indicare il proprio mese della prima qualifica Argento e importare i report dei mesi passati (riquadro «Report da importare»).
+- **Copie di sicurezza**: vedi la voce del 21 ottobre più sotto (la copia dall'app non contiene Liste e Clienti).
+
+**21 ottobre — avviso di Supabase (email "Final notice", grants dal 30 ottobre)**: dal 30 ottobre 2026 Supabase non dà
+più in automatico i permessi delle API alle **tabelle nuove** dello schema public (le esistenti non cambiano). Per Growup
+non cambia niente: ogni tabella è sempre stata creata con `revoke all` e i `grant` espliciti (anche per colonna) nella
+stessa migrazione, più la RLS; controllate tutte le 24 tabelle. Regola che resta: **ogni tabella nuova con i suoi grant
+nella stessa migrazione** (vale anche per `installa_tutto.sql` su un progetto nuovo).
+
+**21 ottobre — copie di sicurezza, il punto**: il **codice** è su GitHub e `installa_tutto.sql` ricrea tutto il database
+vuoto. I **dati**: Supabase gratuito non fa copie automatiche; la copia dall'app («Scarica la copia dei dati», solo admin,
+`copia_dati()`) contiene partner, attività, obiettivi, storico, numeri dei report, impostazioni, ma **non** le Liste, i
+passi, il Target, i Clienti e gli ordini (per scelta: gli admin non li vedono) né il listino e i codici tolti. Da
+decidere con Stefano (vedi la risposta del 21 ottobre).
 
 **Fatto il 19-20 ottobre** (dettagli più sotto, in ordine di data): import da Amway degli ordini e dell'elenco clienti
 (telefono, ultimo ordine, "Mai comprato" in Lista); Modifica dell'ordine e dei dati del cliente; etichette Da consegnare /
@@ -36,8 +61,8 @@ chi ha sotto), a 0, sotto 50, 50-99, 100-199, 200+, VP medio di chi fattura, qua
 **21 ottobre — qualifiche oltre Argento** (dal documento Amway "Livelli di Qualifica" 12-2025, letto e non salvato
 nel repository): nel menu della qualifica più alta Oro, Platino, Platino Fondatore, Rubino, Rubino Fondatore, Zaffiro,
 Zaffiro Fondatore, Smeraldo, Smeraldo Fondatore, Diamante, Diamante Fondatore. Sono annuali (mesi del Performance
-Year, 1° settembre - 31 agosto): **si dichiarano** dal Punto di partenza, l'app non le calcola; il percorso si ferma
-ad Argento. Chi dichiara **Platino o più** sceglie la **prossima qualifica** (all'ingresso e in Modifica; in Obiettivo
+Year, 1° settembre - 31 agosto): **si dichiarano** dal Punto di partenza (Oro e Platino poi sono diventati tappe del
+percorso: vedi sotto). Chi dichiara **Platino o più** sceglie la **prossima qualifica** (all'ingresso e in Modifica; in Obiettivo
 il riquadro con i requisiti); sponsor e upline la vedono nella scheda. **Volume Rubino** = VPG del report mappe (le linee
 al 21% non ci sono, confermato da Stefano): "Volume Rubino questo mese: X su 20.000 VP", solo con il report del mese.
 Per dopo: contare i mesi del Performance Year (Oro, Platino, Rubino Fondatore, Zaffiro) e le linee al 21% per mese
@@ -56,7 +81,7 @@ da verificare con Stefano se usarla al posto del VPG.
 
 **21 ottobre — «Come arrivarci» da Argento a Platino** (tavola "Da Argento a Platino" v2, corretta da Stefano): per le
 tappe Oro e Platino, in ordine: report mancanti (solo per sé) · questo mese al 21% · 6 mesi ma non 3 di fila (con la fila
-in corso: «il prossimo è il secondo dei 3») · una linea al 21% e meno di 4.000 VP · vicino al 21% (da **8.000** VPG) ·
+in corso, sul mese in corso: «il mese scorso eri al 21%: questo mese è il secondo dei 3», PR #91) · una linea al 21% e meno di 4.000 VP · vicino al 21% (da **8.000** VPG) ·
 una linea vicina al 21% (da 8.000) · lontano dal 21% (mancano persone / fatturato basso, regola di 1 su 4). Riga fissa
 «Mesi da Argento negli ultimi 12 mesi: N su 3/6», tabellina con la **%** di ogni linea. Lo sponsor lo vede nella scheda
 di chi è tra Argento e Platino (mesi dai report importati da lui).

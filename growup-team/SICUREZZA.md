@@ -20,6 +20,7 @@ al database e prima del lancio a tutto il gruppo.
 | **Listino (028)** | Tabella `listino` con RLS: lettura solo con `my_partner_id()` (utenti dell'app non bloccati), scrittura solo `sono_admin()`, nessuna cancellazione (i prodotti usciti diventano non attivi). Il PDF Amway si legge sul telefono dell'admin con pdf.js (da jsDelivr, versione fissa 3.11.174 con controllo d'integrità SRI, senza eval né worker esterni) e non si salva. `catalogo.js` tolto dal repository pubblico (resta nella storia di GitHub finché non si chiede la pulizia). |
 | **Niente cancellazioni** | Dall'app nessuno può cancellare persone (neanche gli admin): si possono solo nascondere. La cancellazione per diritto all'oblio si fa dall'SQL Editor (`ADMIN.md`). |
 | **GitHub, storia** | 17 ottobre 2026: la storia del repository è stata riscritta per togliere ogni dato reale (nomi, codici Amway, numeri, codice d'invito, email dell'autore dei commit). |
+| **Tabelle nuove** | Da ottobre 2026 Supabase non dà più permessi automatici alle tabelle nuove: in Growup ogni tabella nasce con `revoke all` e i `grant` espliciti nella stessa migrazione, più la RLS. |
 | **Copia di sicurezza** | La scarica solo un admin; contiene tutti i dati: va tenuta in una cartella privata di Google Drive. |
 
 ## Controlli fatti
