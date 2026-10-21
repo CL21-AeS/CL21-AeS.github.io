@@ -1597,9 +1597,12 @@ function vScheda(){
     </div>
     ${r.da_report ? `<p class="nota" style="margin:6px 0 0">VP di gruppo, linee e percentuale dal report Amway${r.linee_nascoste
       ? ". Linee non visibili nel report (il suo gruppo Amway non lo mostra): la qualifica non può contarle" : ""}.</p>` : ""}
-    ${(() => { const l = r.da_report ? lineeReport(r) : frontali.map(x => ({ nome:nomeDi(x.partner_id), vp:Number(x.vp_gruppo) }));
-      return l.length ? `<ul class="linee">${l.map(x => `<li><span class="grow">${esc(x.nome)}</span>
-      <span class="num ${x.vp >= soglia() ? "" : "faint"}">${num(x.vp)} VP</span></li>`).join("")}</ul>` : ""; })()}
+    ${(() => { const l = r.da_report ? lineeReport(r) : frontali.map(x => ({ id:x.partner_id, nome:nomeDi(x.partner_id), vp:Number(x.vp_gruppo) }));
+      /* le linee frontali: chi è nella mia struttura si apre toccando il nome */
+      return l.length ? `<p class="small" style="margin:12px 0 0"><b>Le sue linee frontali</b> · VP di gruppo di ogni linea${r.da_report ? ", dal report Amway" : ""}</p>
+      <ul class="linee">${l.map(x => { const apri = x.id && x.id !== p.id && st.struttura.some(y => y.id === x.id);
+        return `<li>${apri ? `<button class="grow nome-linea" data-act="apri-scheda" data-id="${esc(x.id)}">${esc(x.nome)} ›</button>` : `<span class="grow">${esc(x.nome)}</span>`}
+      <span class="num ${x.vp >= soglia() ? "" : "faint"}">${num(x.vp)} VP</span></li>`; }).join("")}</ul>` : ""; })()}
     <p class="small" style="margin:10px 0 0">Punto di partenza dichiarato: <b>${esc(testoPartenza(p))}</b></p>
     ${gestito ? "" : vNumeriLista(p.id)}
     <button class="btn wide" style="margin-top:12px" data-act="chiamata" data-id="${esc(p.id)}">Fissa una chiamata</button>

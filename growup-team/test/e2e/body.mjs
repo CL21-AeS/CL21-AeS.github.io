@@ -424,6 +424,13 @@ check(await page.locator(".linee li", { hasText:"Linea Uno" }).getByText("250 VP
 check(await page.getByText("3% questo mese").isVisible(), "percentuale del mese: 570 VP = 3%");
 check(await page.locator(".card", { hasText:"Il mio mese" }).getByText("570").isVisible(), "VP di gruppo nel mio mese");
 await page.screenshot({ path: S + "/e2e/8-gruppo-ptb.png", fullPage:true });
+// la scheda di un partner: le sue linee frontali con il titolo; chi è nella struttura si apre toccando il nome
+await page.click("button[data-act=vista-gruppo]");
+await page.locator(".albero.struttura li", { hasText:"Linea Uno" }).first().locator("button[data-act=apri-scheda]").first().click();
+check(await page.getByText("Le sue linee frontali").isVisible(), "scheda partner: il titolo sopra le linee frontali");
+await page.locator(".linee button[data-act=apri-scheda]", { hasText:"Sotto Uno" }).click();
+await page.locator(".card h2", { hasText:"Sotto Uno" }).waitFor();
+check(true, "toccando il nome di una linea si apre la sua scheda");
 await sync(page); await ctx.close();
 // la terza linea arriva a 120: Path to Bronze fatto; poi tanti VP su una sola linea: 9% ma non Foundation
 O("l3", 40, "rettifica"); O("l1b", 700);
