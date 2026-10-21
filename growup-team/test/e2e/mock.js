@@ -131,8 +131,17 @@
     storico: async pid => (db.storico || []).filter(r => r.partner_id === pid),
     livelli: async () => [[3,200],[6,600],[9,1200],[12,2400],[15,4000],[18,7000],[21,10000]].map(([percentuale, vp_gruppo]) => ({ percentuale, vp_gruppo })),
     modificaPartenza: async a => { const p = mio(); if(!p) throw new Error("non_autenticato");
+      const ord = k => (db.stages.find(x => x.chiave === k) || {}).ordine || 0;
       Object.assign(p, { qualifica_iniziale:a.p_qualifica, percentuale_iniziale:a.p_percentuale, qualifica_iniziale_mese:a.p_qualifica_mese,
-        pagamenti_iniziali:a.p_pagamenti }); salva(); return pub(p); },
+        pagamenti_iniziali:a.p_pagamenti });
+      if(!(ord(p.qualifica_iniziale) >= ord("platino") && ord(p.prossima_qualifica) > ord(p.qualifica_iniziale))) p.prossima_qualifica = null;
+      salva(); return pub(p); },
+    /* come nel database: solo per sé, da Platino in su, solo una qualifica sopra la propria */
+    impostaProssima: async k => { const p = mio(); const ord = c => (db.stages.find(x => x.chiave === c) || {}).ordine || 0;
+      if(k && (ord(p.qualifica_iniziale) < ord("platino") || ord(k) <= ord(p.qualifica_iniziale))) throw new Error("qualifica_non_valida");
+      p.prossima_qualifica = k || null; salva(); return pub(p); },
+    prossime: async () => { const io = mio(); if(!io) return [];
+      return visibiliRicuciti(io).filter(p => p.prossima_qualifica).map(p => ({ partner_id:p.id, prossima_qualifica:p.prossima_qualifica })); },
     nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid); p.chiave = hex();
       db.accessi = db.accessi.filter(a => a.partner_id !== pid); salva(); return p.chiave; },
     /* come nel database: il mio codice o quello di una persona che ho importato; unico tra chi usa l'app, e tra le mie importate */

@@ -57,6 +57,8 @@ function creaApi(){
     sbloccaCodice: codice => q(sb.rpc("sblocca_codice", { p_codice:codice })),
     creaInvitoSopra: (pid, altri) => q(sb.rpc("crea_invito_sopra", { p_partner:pid, p_altri:altri })),
     modificaPartenza: args => q(sb.rpc("modifica_partenza", args)),
+    impostaProssima: chiave => q(sb.rpc("imposta_prossima_qualifica", { p_chiave:chiave })),
+    prossime:     () => q(sb.rpc("prossime_qualifiche")),
     preferiti:    () => q(sb.from("preferiti").select("preferito_id")),
     copiaDati:    () => q(sb.rpc("copia_dati")),
     /* il primo obiettivo: il proprio per intero; del gruppo solo cifra e data (il perché resta personale) */
@@ -151,7 +153,8 @@ const st = {
   personaId: null, filtroLista: "aperti", cercaLista: "", passoTipo: null,
   numeriLista: {},
   schedaPila: [],          // le schede aperte scendendo lungo le linee, per "Indietro"
-  consigliAperti: new Set(),  // "Come arrivarci" aperto (per persona), così resta aperto quando la pagina si ridisegna
+  consigliAperti: new Set(),
+  prossime: new Map(),     // la prossima qualifica di chi vedo (da Platino in su)  // "Come arrivarci" aperto (per persona), così resta aperto quando la pagina si ridisegna
   inviti: [], sezPersone: "lista", invitoId: null, archiviatiT: false,  // il Target (solo miei)
   ct: null,               // la pagina del contatto (le otto domande)
   listino: [],            // il listino Amway (dal database; una copia sul telefono)
@@ -338,6 +341,12 @@ function mancanze(t, n){
   return out;
 }
 function ordineDi(chiave){ const t = st.stages.find(s => s.chiave === chiave); return t ? t.ordine : 0; }
+/* Oltre Argento le qualifiche sono annuali (mesi del Performance Year): si dichiarano, non si calcolano dal mese */
+function oltreArgento(s){ return !!s && ordineDi("argento") > 0 && s.ordine > ordineDi("argento"); }
+/* chi ha dichiarato Platino o più sceglie la prossima qualifica */
+function daPlatino(chiave){ return ordineDi("platino") > 0 && ordineDi(chiave) >= ordineDi("platino"); }
+const RUBINO_VP = 20000;   // Volume Rubino del mese: il VPG del report mappe (senza le linee al 21%)
+function nomeQualifica(chiave){ const t = st.stages.find(s => s.chiave === chiave); return t ? t.nome : ""; }
 
 function finestraPrimoOrdine(tappa){
   const p = st.profilo;
@@ -349,6 +358,7 @@ function finestraPrimoOrdine(tappa){
 
 /* Una tappa è fatta se la qualifica dichiarata la comprende, oppure se i numeri lo dicono. */
 function tappaFatta(t){
+  if(oltreArgento(t)) return false;
   if(t.chiave === "primo_ordine"){
     const f = finestraPrimoOrdine(t);
     if(f && f.vp >= t.vp_personali) return true;
@@ -369,7 +379,8 @@ function percorso(){
   /* un pin senza qualifica Bronze: primo ordine e primi clienti sono alle spalle */
   if(fatte < 0 && st.profilo && st.profilo.percentuale_iniziale) fatte = S.findIndex(s => s.chiave === "primi_clienti");
   while(fatte + 1 < S.length && tappaFatta(S[fatte + 1])) fatte++;
-  return { raggiunta: fatte >= 0 ? S[fatte] : null, attuale: S[fatte + 1] || null, indice: fatte + 1 };
+  const attuale = S[fatte + 1] && !oltreArgento(S[fatte + 1]) ? S[fatte + 1] : null;
+  return { raggiunta: fatte >= 0 ? S[fatte] : null, attuale, indice: fatte + 1 };
 }
 
 function requisiti(t){
@@ -493,7 +504,7 @@ function tappaDaGuardare(pid){
   const S = st.stages, p = st.struttura.find(x => x.id === pid) || (pid === st.profilo.id ? st.profilo : {});
   let chiusa = ordineDi(p.qualifica_iniziale);
   if(pid === st.profilo.id) for(const r of st.storico) chiusa = Math.max(chiusa, ordineDi(r.qualifica));
-  return S.find(s => !TAPPE_DI_PERCORSO.includes(s.chiave) && s.ordine > chiusa) || null;
+  return S.find(s => !TAPPE_DI_PERCORSO.includes(s.chiave) && !oltreArgento(s) && s.ordine > chiusa) || null;
 }
 /* { chiave, tappa, dati, sintesi, linee, vpLinea } oppure null (percorso finito o numeri non disponibili) */
 function situazione(pid){
@@ -693,6 +704,7 @@ async function caricaStruttura(){
   try{ st.accessi = new Map((await api.accessiStruttura() || []).map(r => [r.id, r])); }catch(e){ st.accessi = new Map(); }
   try{ st.preferiti = new Set((await api.preferiti() || []).map(r => r.preferito_id)); }catch(e){}
   try{ st.nascosti = new Set((await api.nascosti() || []).map(r => r.nascosto_id)); }catch(e){}
+  try{ st.prossime = new Map((await api.prossime() || []).map(r => [r.partner_id, r.prossima_qualifica])); }catch(e){ st.prossime = new Map(); }
 }
 
 async function entraConChiave(k){
@@ -886,6 +898,10 @@ function campiQualifica(obbligoData, scelta){
         <select name="qualifica"><option value=""${sel("")}>Inizio (nessuna qualifica)</option>
           <optgroup label="Percentuale raggiunta">${pin}</optgroup>
           <optgroup label="Qualifiche">${qual}</optgroup></select></label>
+      <div data-mostra="prossima" ${daPlatino(scelta.valore) ? "" : "hidden"}>
+        <label class="field"><span>Prossima qualifica che vuoi ottenere</span>
+          <select name="prossima">${opzioniProssima(scelta.valore, scelta.prossima)}</select></label>
+      </div>
       <div data-mostra="pagamenti" ${tappa && tappa.pagamenti_max ? "" : "hidden"}>
         <label class="field"><span>Mese della prima qualifica</span>
           <input type="month" name="mese" max="${meseDi(oggi())}" value="${esc(scelta.mese || "")}"></label>
@@ -895,6 +911,12 @@ function campiQualifica(obbligoData, scelta){
       ${scelta.senzaData ? "" : `<label class="field"><span>Data di iscrizione ad Amway <i data-obbl>${obbligoData ? "(obbligatoria per chi inizia)" : "(facoltativa)"}</i></span>
         <input type="date" name="data" max="${oggi()}"></label>`}
       ${obbligoData ? `<p class="nota" style="margin-top:6px">Serve al conto alla rovescia dei 30 giorni per il primo ordine.</p>` : ""}`;
+}
+/* le qualifiche sopra quella dichiarata (da Platino in su) */
+function opzioniProssima(qualifica, scelta){
+  const o = ordineDi(qualifica);
+  return `<option value="">Non ancora scelta</option>` + st.stages.filter(s => o && s.ordine > o)
+    .map(s => `<option value="${esc(s.chiave)}"${s.chiave === scelta ? " selected" : ""}>${esc(s.nome)}</option>`).join("");
 }
 /* Codice Amway Partner (il numero IBO): solo cifre. Serve ad abbinare le persone del report Amway. */
 function campoCodice(obbligatorio, valore){
@@ -915,7 +937,8 @@ function leggiQualifica(f){
   const qualifica = v && !percentuale ? v : null;
   const t = st.stages.find(s => s.chiave === qualifica);
   const conPagamenti = !!(t && t.pagamenti_max);
-  return { qualifica, percentuale, tappa:t, data: f.data ? f.data.value || null : null,
+  const prossima = daPlatino(qualifica) && f.prossima && f.prossima.value && ordineDi(f.prossima.value) > ordineDi(qualifica) ? f.prossima.value : null;
+  return { qualifica, percentuale, tappa:t, prossima, data: f.data ? f.data.value || null : null,
     mese: conPagamenti && f.mese.value ? f.mese.value + "-01" : null,
     pagamenti: conPagamenti ? Math.max(0, Math.min(12, Number(f.pagamenti.value) || 0)) : 0,
     mancaMese: conPagamenti && !f.mese.value };
@@ -1133,7 +1156,7 @@ function vSalvaChiave(){
 /* ---- Il primo obiettivo: cifra al mese, entro quando, perché ---- */
 /* la prima tappa dal Path to Bronze in su che vale almeno la cifra (oltre Argento: Argento) */
 function tappaPerCifra(cifra){
-  const t = st.stages.filter(s => s.ordine >= 3 && Number(s.guadagno_mese) > 0).sort((a, b) => a.ordine - b.ordine);
+  const t = st.stages.filter(s => s.ordine >= 3 && !oltreArgento(s) && Number(s.guadagno_mese) > 0).sort((a, b) => a.ordine - b.ordine);
   if(!t.length) return null;
   const c = t.find(s => Number(s.guadagno_mese) >= Number(cifra));
   return c ? { tappa:c, oltre:false } : { tappa:t[t.length - 1], oltre:true };
@@ -1145,10 +1168,12 @@ function testoTraguardo(entro){
 }
 /* la riga "Obiettivo: …" di una persona del gruppo (cifra e data, mai il perché) */
 function rigaObiettivoDi(pid){
+  const pq = st.prossime.get(pid);
+  const prossima = pq ? `Prossima qualifica: <b>${esc(nomeQualifica(pq))}</b>` : "";
   const o = st.obiettiviGruppo.get(pid);
-  if(!o) return "Obiettivo: non ancora scritto";
+  if(!o) return prossima || "Obiettivo: non ancora scritto";
   const t = tappaPerCifra(o.cifra_mese);
-  return `Obiettivo: <b>${euro(o.cifra_mese)}/mese</b> ${esc(testoTraguardo(o.entro))}${t ? ` · ${esc(t.tappa.nome)}` : ""}`;
+  return `Obiettivo: <b>${euro(o.cifra_mese)}/mese</b> ${esc(testoTraguardo(o.entro))}${t && !prossima ? ` · ${esc(t.tappa.nome)}` : ""}${prossima ? "<br>" + prossima : ""}`;
 }
 function vObiettivoBreve(){
   const o = st.obiettivo;
@@ -1205,7 +1230,7 @@ function vObiettivo(){
     <h2 style="margin-top:4px">Quanto vorresti guadagnare al mese?</h2>
     <p class="small">Scrivi la cifra e per quando: qui vedrai la tappa che la vale e il percorso per arrivarci.</p>
     <button class="btn primary wide" style="margin-top:8px" data-act="obiettivo-modifica">Scrivi il tuo obiettivo</button>
-  </div>${vComeArrivarci(st.profilo.id, "io")}${vVisione()}`;
+  </div>${vProssimaQualifica()}${vComeArrivarci(st.profilo.id, "io")}${vVisione()}`;
   const t = tappaPerCifra(o.cifra_mese), S = st.stages, { indice } = percorso();
   const fino = t ? S.findIndex(s => s.chiave === t.tappa.chiave) : -1;
   const giaFatto = fino >= 0 && indice > fino;
@@ -1239,8 +1264,34 @@ function vObiettivo(){
               <span class="grow">${esc(r.txt)}</span>${r.val ? `<span class="num">${esc(r.val)}</span>` : ""}</li>`).join("")}</ul>`
             : stato === "dopo" ? `<p class="small" style="margin:2px 0 0">${esc(requisitiTesto(s))}</p>` : ""}</div></li>`; }).join("")}</ol>
   </div>` : ""}
+  ${vProssimaQualifica()}
   ${vComeArrivarci(st.profilo.id, "io")}
   ${vVisione()}`;
+}
+
+/* Volume Rubino del mese (da Platino in su): il VPG del report mappe importato, che non conta le linee al 21% */
+function vRubino(pid){
+  const p = pid === st.profilo.id ? st.profilo : st.struttura.find(x => x.id === pid);
+  if(!p || !daPlatino(p.qualifica_iniziale)) return "";
+  const r = rigaDi(st.riep, pid);
+  if(!r || !r.da_report) return `<p class="small rubino" style="margin:6px 0 0">Volume Rubino questo mese: ${pid === st.profilo.id
+    ? "importa il report mappe per vederlo" : "si vede quando importi il report mappe"}.</p>`;
+  const v = Number(r.vp_gruppo) || 0;
+  return `<p class="small rubino" style="margin:6px 0 0">Volume Rubino questo mese: <b class="num">${num(v)}</b> su ${num(RUBINO_VP)} VP${v >= RUBINO_VP ? " ✓" : ""}</p>`;
+}
+/* la prossima qualifica (da Platino in su): nome, requisiti, Volume Rubino */
+function vProssimaQualifica(){
+  const p = st.profilo;
+  if(!daPlatino(p.qualifica_iniziale)) return "";
+  const t = st.stages.find(s => s.chiave === p.prossima_qualifica);
+  return `<div class="card prossima-qualifica">
+    <span class="eyebrow">La prossima qualifica</span>
+    ${t ? `<h2 style="margin-top:4px">${esc(t.nome)}</h2>${t.descrizione ? `<p class="small" style="margin:4px 0 0">${esc(t.descrizione)}</p>` : ""}`
+      : `<p class="small" style="margin:6px 0 0">Non l'hai ancora scelta.</p>`}
+    ${vRubino(p.id)}
+    <p class="nota">Hai dichiarato: ${esc(testoPartenza(p))}. Le qualifiche oltre Argento si aggiornano da qui quando le raggiungi.</p>
+    <button class="btn" style="margin-top:10px;min-height:38px" data-act="partenza">${t ? "Modifica" : "Scegli la prossima qualifica"}</button>
+  </div>`;
 }
 
 /* "Come arrivarci": chiuso finché non lo si tocca. chi: "io" (per me, in Obiettivo) o "lui" (per lo sponsor, nella scheda) */
@@ -1288,8 +1339,11 @@ function vTappa(){
   const { raggiunta, attuale, indice } = percorso();
   const pag = pagamenti(raggiunta);
   if(!attuale){
-    return `<div class="card"><span class="eyebrow">Il tuo percorso</span><h2 style="margin-top:4px">Argento raggiunto 🎉</h2>
-      <p class="muted">Hai completato il percorso. Ora l'obiettivo è aiutare le tue linee a fare lo stesso.</p></div>`;
+    const pq = st.profilo.prossima_qualifica;
+    return `<div class="card"><span class="eyebrow">Il tuo percorso</span><h2 style="margin-top:4px">${esc(raggiunta ? raggiunta.nome : "Argento")} raggiunto 🎉</h2>
+      ${pq ? `<p class="small" style="margin:4px 0 0">Prossima qualifica: <b>${esc(nomeQualifica(pq))}</b></p>` : ""}
+      ${vRubino(st.profilo.id)}
+      <p class="muted">Hai completato il percorso fino ad Argento. Ora l'obiettivo è aiutare le tue linee a fare lo stesso.</p></div>`;
   }
   const req = requisiti(attuale);
   let scadenza = "";
@@ -1769,6 +1823,7 @@ function vScheda(){
     <p class="small" style="margin:2px 0 0">${gestito ? "importata da te dal report Amway: la vedi solo tu, i suoi numeri li aggiorni tu"
       : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</p>
     ${p.stato === "gestito" ? "" : `<p class="small" style="margin:6px 0 0">${rigaObiettivoDi(p.id)}</p>`}
+    ${vRubino(p.id)}
     <p class="small" style="margin:6px 0 0">${p.codice_amway ? `Codice Amway <b>${esc(p.codice_amway)}</b>` : "Codice Amway non scritto"}
       ${st.profilo.is_admin && !gestito ? soloAdmin(`<button class="btn link small" data-act="codice" data-id="${esc(p.id)}" style="min-height:0;padding:0 4px">Correggi</button>`) : ""}</p>
     <div class="dati-scheda">
@@ -2318,7 +2373,7 @@ function vSheet(){
       e nessuno lo conferma al posto tuo. I numeri del mese arrivano dal report Amway.</p>
     <form data-form="partenza" novalidate>
       ${campiQualifica(false, { valore:valoreQualifica(p), mese:p.qualifica_iniziale_mese ? meseDi(p.qualifica_iniziale_mese) : "",
-                               pagamenti:p.pagamenti_iniziali, senzaData:true })}
+                               pagamenti:p.pagamenti_iniziali, senzaData:true, prossima:p.prossima_qualifica })}
       <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
         <button class="btn primary grow">Salva</button></div>
     </form>`;
@@ -2704,6 +2759,7 @@ const MODULI = {
     try{
       st.profilo = await api.modificaPartenza({ p_qualifica:q.qualifica, p_percentuale:q.percentuale,
                            p_qualifica_mese:q.mese, p_pagamenti:q.pagamenti });
+      if((q.prossima || null) !== (st.profilo.prossima_qualifica || null)) st.profilo = await api.impostaProssima(q.prossima);
       await caricaStruttura();
       st.sheet = null; render(); toast("Punto di partenza aggiornato");
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
@@ -2731,6 +2787,7 @@ const MODULI = {
       });
       ricordaChiave(r.chiave);
       salvaLocale(CHIAVE_SALVATA, null);
+      if(q.prossima){ try{ r.profilo = await api.impostaProssima(q.prossima); }catch(e){} }
       await vaiHome(r.profilo);
       if(st.fase === "home" && !st.obiettivo) st.fase = "obiettivo_primo";
       st.occupato = false; render();
@@ -4718,6 +4775,9 @@ document.addEventListener("change", e => {
   const f = e.target.form;
   const t = st.stages.find(s => s.chiave === f.qualifica.value);
   f.querySelector("[data-mostra=pagamenti]").hidden = !(t && t.pagamenti_max);
+  const pr = f.querySelector("[data-mostra=prossima]");
+  if(pr){ const prima = f.prossima.value; pr.hidden = !daPlatino(f.qualifica.value);
+    f.prossima.innerHTML = opzioniProssima(f.qualifica.value, prima); }
   const obbl = f.querySelector("[data-obbl]");
   if(obbl && f.dataset.form === "ingresso") obbl.textContent = f.qualifica.value ? "(facoltativa)" : "(obbligatoria per chi inizia)";
 });
