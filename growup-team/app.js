@@ -1291,12 +1291,17 @@ function vMeseGruppo(){
 
 const ETICHETTE = { contatto:"Contatto", piano:"Piano mostrato", ordine:"Ordine", cliente:"Nuovo cliente", rettifica:"Totale del mese aggiornato" };
 function vpFirmati(v){ return (v > 0 ? "+" : "") + num(v); }
+/* l'attività contata da un passo della lista: il nome della persona (solo nella mia pagina Io) */
+function nomeDiAttivita(a){
+  const s = (st.passi || []).find(x => x.attivita_id && x.attivita_id === a.id), p = s && (st.persone || []).find(x => x.id === s.persona_id);
+  return p ? p.nome : "";
+}
 function vOggi(){
   const l = st.att.filter(a => a.data === oggi()).slice().reverse();
   return `<div class="card">
     <div class="spread"><span class="eyebrow">Oggi</span><span class="small">${dataIt(oggi())}</span></div>
     ${l.length ? `<ul class="oggi">${l.map(a => `<li>
-      <span class="grow">${ETICHETTE[a.tipo]}${a.tipo === "ordine" ? ` · <b>${num(a.vp)} VP</b>` : a.tipo === "rettifica" ? ` · <b>${vpFirmati(a.vp)} VP</b>` : a.quantita > 1 ? ` × ${a.quantita}` : ""}</span>
+      <span class="grow">${ETICHETTE[a.tipo]}${nomeDiAttivita(a) ? `: <b>${esc(nomeDiAttivita(a))}</b>` : ""}${a.tipo === "ordine" ? ` · <b>${num(a.vp)} VP</b>` : a.tipo === "rettifica" ? ` · <b>${vpFirmati(a.vp)} VP</b>` : a.quantita > 1 ? ` × ${a.quantita}` : ""}</span>
       <span class="small">${a.inserito_il ? fmtOra.format(new Date(a.inserito_il)) : ""}</span>
       ${String(a.id).startsWith("tmp") ? "" : `<button class="x" data-act="elimina" data-id="${esc(a.id)}" aria-label="Elimina">×</button>`}</li>`).join("")}</ul>`
       : `<p class="muted" style="margin:8px 0 0">Ancora niente oggi. Un contatto, un piano, un ordine: si registra con un tocco qui sotto.</p>`}
