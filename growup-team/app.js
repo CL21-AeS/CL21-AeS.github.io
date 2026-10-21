@@ -843,12 +843,14 @@ function vSelettore(){
   </div>`;
 }
 
+/* I pulsanti che vedono solo gli admin: sotto, in piccolo, "Solo Admin" (largo: per i pulsanti a tutta larghezza) */
+function soloAdmin(html, largo){ return `<span class="solo-admin-box${largo ? " largo" : ""}">${html}<span class="solo-admin">Solo Admin</span></span>`; }
 /* In fondo a ogni pagina: link personale, privacy, uscita (prima stavano nel menu ⋯). */
 /* Copia di sicurezza (solo admin): un file con tutti i dati, da scaricare una volta al mese e tenere su Google Drive */
 function vCopiaDati(){
   const ultima = leggiLocale(CHIAVE_ULTIMA_COPIA), giorni = ultima ? giorniTra(ultima, oggi()) : null;
   return `<div class="copia-dati">
-    <button class="btn small" data-act="copia-dati">Scarica la copia dei dati</button>
+    ${soloAdmin(`<button class="btn small" data-act="copia-dati">Scarica la copia dei dati</button>`)}
     <p class="nota" style="margin:6px 0 0">${ultima ? `Ultima copia da questo telefono: ${dataIt(ultima)}${giorni > 35 ? " · è passato più di un mese" : ""}.`
       : "Nessuna copia scaricata da questo telefono."} Una volta al mese, dopo la chiusura del giorno 5.</p>
   </div>`;
@@ -862,11 +864,11 @@ function vFondo(){
       <button class="btn small ghost" data-act="esci">Esci</button>
     </div>
     ${st.profilo.is_admin ? vCopiaDati() : ""}
-    ${st.profilo.is_admin ? `<div class="row" style="justify-content:center;margin-top:6px;gap:6px"><button class="btn small ghost" data-act="listino">Listino</button>
-      <button class="btn small ghost" data-act="codici-tolti">Codici Amway tolti</button></div>` : ""}
+    ${st.profilo.is_admin ? `<div class="row" style="justify-content:center;margin-top:6px;gap:6px">${soloAdmin(`<button class="btn small ghost" data-act="listino">Listino</button>`)}
+      ${soloAdmin(`<button class="btn small ghost" data-act="codici-tolti">Codici Amway tolti</button>`)}</div>` : ""}
     <p class="nota" style="text-align:center">${esc(st.profilo.nome)} · codice d'invito <b>${esc(st.profilo.codice_invito)}</b><br>
       ${st.profilo.codice_amway ? `Codice Amway Partner <b>${esc(st.profilo.codice_amway)}</b>` : "Codice Amway Partner non ancora scritto"}
-      ${st.profilo.is_admin ? `<button class="btn link small" data-act="codice" data-id="${esc(st.profilo.id)}" style="min-height:0;padding:0 4px">Correggi</button>` : ""}<br>
+      ${st.profilo.is_admin ? soloAdmin(`<button class="btn link small" data-act="codice" data-id="${esc(st.profilo.id)}" style="min-height:0;padding:0 4px">Correggi</button>`) : ""}<br>
       Punto di partenza <b>${esc(testoPartenza(st.profilo))}</b>
       <button class="btn link small" data-act="partenza" style="min-height:0;padding:0 4px">Modifica</button><br>
       Per cancellare il profilo e i tuoi dati scrivi a Stefano e Alessia.</p>
@@ -1593,7 +1595,7 @@ function vScheda(){
       : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</p>
     ${p.stato === "gestito" ? "" : `<p class="small" style="margin:6px 0 0">${rigaObiettivoDi(p.id)}</p>`}
     <p class="small" style="margin:6px 0 0">${p.codice_amway ? `Codice Amway <b>${esc(p.codice_amway)}</b>` : "Codice Amway non scritto"}
-      ${st.profilo.is_admin && !gestito ? `<button class="btn link small" data-act="codice" data-id="${esc(p.id)}" style="min-height:0;padding:0 4px">Correggi</button>` : ""}</p>
+      ${st.profilo.is_admin && !gestito ? soloAdmin(`<button class="btn link small" data-act="codice" data-id="${esc(p.id)}" style="min-height:0;padding:0 4px">Correggi</button>`) : ""}</p>
     <div class="dati-scheda">
       <div><span class="small">VP personali</span><b class="num">${num(r.vp_personali)}</b></div>
       <div><span class="small">VP di gruppo</span><b class="num">${num(r.vp_gruppo)}</b></div>
@@ -1631,7 +1633,7 @@ function vScheda(){
       e da lì i suoi numeri li aggiorna lei.</p>
   </div>` : `<div class="card">
     <p class="small" style="margin:0">Usa l'app: i suoi numeri li aggiorna lui.</p>
-    ${st.profilo.is_admin ? `<button class="btn wide" style="margin-top:12px" data-act="nuovo-link" data-id="${esc(p.id)}">Nuovo link personale</button>
+    ${st.profilo.is_admin ? `<div style="margin-top:12px">${soloAdmin(`<button class="btn wide" data-act="nuovo-link" data-id="${esc(p.id)}">Nuovo link personale</button>`, true)}</div>
       <p class="nota">Solo per chi ha perso il suo link: quello vecchio smette di funzionare e i suoi telefoni vanno ricollegati.</p>` : ""}
   </div>`}
   ${st.profilo.is_admin ? vInvitiAdmin(p) : ""}
@@ -1662,8 +1664,8 @@ function vAccessoScheda(p){
       <p class="nota">Si cancellano il suo profilo e tutti i suoi dati, l'app sul suo telefono si blocca e con lo stesso codice Amway non può
         rientrare finché un admin non lo sblocca. Chi ha invitato passa sotto ${p.sponsor_id === st.profilo.id ? "di te" : "il suo sponsor"}.</p>` : ""}
     ${a.bloccato_il ? `<p class="small" style="margin:8px 0 0"><span class="pill r">Bloccato</span> l'app è bloccata dal ${dataIt(String(a.bloccato_il).slice(0, 10))}.</p>` : ""}
-    ${blocca ? `<button class="btn wide${a.bloccato_il ? "" : " ghost"}" style="margin-top:10px" data-act="blocca-app" data-id="${esc(p.id)}" data-blocca="${a.bloccato_il ? "" : "1"}">${a.bloccato_il ? "Sblocca l'app" : "Blocca l'app"}</button>
-      <p class="nota">Solo admin. Chi è bloccato non vede più niente; i suoi dati restano e i suoi VP contano. Sponsor e upline vedono "Bloccato".</p>` : ""}
+    ${blocca ? `<div style="margin-top:10px">${soloAdmin(`<button class="btn wide${a.bloccato_il ? "" : " ghost"}" data-act="blocca-app" data-id="${esc(p.id)}" data-blocca="${a.bloccato_il ? "" : "1"}">${a.bloccato_il ? "Sblocca l'app" : "Blocca l'app"}</button>`, true)}</div>
+      <p class="nota">Chi è bloccato non vede più niente; i suoi dati restano e i suoi VP contano. Sponsor e upline vedono "Bloccato".</p>` : ""}
   </div>`;
 }
 
@@ -1681,8 +1683,8 @@ function vInvitiAdmin(p){
   return `<div class="card">
     <span class="eyebrow">Inviti · solo admin</span>
     <p class="small" style="margin:4px 0 0"><b>Invita sotto ${esc(nomeSaluto(p.nome))}</b>: chi entra con questo link va nel suo gruppo, sotto di lei.</p>
-    ${p.codice_invito ? bottoniLink(base() + "#" + p.codice_invito) : ""}
-    <button class="btn wide" style="margin-top:12px" data-act="invito-sopra" data-id="${esc(p.id)}">Invita chi manca sopra di ${esc(nomeSaluto(p.nome))}</button>
+    ${p.codice_invito ? soloAdmin(bottoniLink(base() + "#" + p.codice_invito), true) : ""}
+    <div style="margin-top:12px">${soloAdmin(`<button class="btn wide" data-act="invito-sopra" data-id="${esc(p.id)}">Invita chi manca sopra di ${esc(nomeSaluto(p.nome))}</button>`, true)}</div>
     <p class="nota">Un link valido una volta sola: chi lo apre entra tra ${esc(p.sponsor_id === st.profilo.id ? "voi" : nomeDi(p.sponsor_id) || "il suo sponsor")}
       e ${esc(nomeSaluto(p.nome))}, che passa sotto di lui con il suo gruppo.</p>
   </div>`;

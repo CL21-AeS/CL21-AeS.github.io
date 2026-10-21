@@ -7,6 +7,8 @@ funzione da admin.
 
 ## Nell'app (pulsanti che vedono solo gli admin)
 
+Nell'app ognuno di questi pulsanti ha sotto la scritta piccola **Solo Admin**.
+
 | Dove | Cosa | A cosa serve |
 |---|---|---|
 | Scheda di un partner → **Invita sotto questa persona** | link d'invito di quella persona (WhatsApp, Telegram, Copia) | far entrare qualcuno sotto una persona precisa, anche nei gruppi dei Platino che il report Amway non mostra |

@@ -73,6 +73,10 @@ aggiunti con "+ Un cliente" e quelli importati dal sito Amway restano contati tr
 stesso carattere dei nomi. Aprendo una linea da un'altra scheda, in alto ci sono **‹ Indietro** (la scheda di prima) e
 **Il mio gruppo** (l'elenco); anche il dito verso destra torna alla scheda di prima, con il passaggio all'indietro.
 
+**21 ottobre — "Solo Admin"**: sotto ogni pulsante che vedono solo gli admin c'è la scritta piccola **Solo Admin** (Scarica la
+copia dei dati, Listino, Codici Amway tolti, Correggi il codice Amway, Nuovo link personale, Invita sotto / chi manca sopra,
+Blocca/Sblocca l'app). "Togli dalla struttura" no: lo usano anche sponsor e upline.
+
 **Nota tecnica per Claude**: il connettore Supabase non applica le istruzioni con cancellazioni (`drop`, `delete`):
 va in timeout. Si applicano a pezzi senza `drop` (oggetti nuovi) e il resto lo incolla Stefano nell'SQL Editor.
 

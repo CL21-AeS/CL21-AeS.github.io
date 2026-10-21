@@ -51,6 +51,7 @@ await page.getByText("Ciao Anna").waitFor();
 check(await page.locator(".obiettivo-breve").getByText("300 €").isVisible(), "su Io: il riquadro del mio obiettivo");
 check(await page.locator("button[data-act=copia-dati]").count() === 0, "chi non è admin non vede la copia dei dati");
 check(await page.locator("button[data-act=listino]").count() === 0, "chi non è admin non vede il listino");
+check(await page.getByText("Solo Admin", { exact:true }).count() === 0, "chi non è admin non vede le scritte Solo Admin");
 await sync(page);
 const anna = DB.partners.find(p => p.nome === "Anna Bianchi");
 check(anna.sponsor_id === "R", "Anna sotto Stefano e Alessia");
@@ -1559,6 +1560,8 @@ const pdfFinto = n => { const pagina = []; let y = 560;
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.evaluate(items => { window.pdfjsWorker = {}; window.pdfjsLib = { GlobalWorkerOptions:{},
   getDocument: () => ({ promise:Promise.resolve({ numPages:1, getPage: async () => ({ getTextContent: async () => ({ items }) }) }) }) }; }, pdfFinto(60));
+check(await page.locator(".solo-admin-box", { has:page.locator("button[data-act=listino]") }).getByText("Solo Admin").isVisible()
+  && await page.locator(".solo-admin-box", { has:page.locator("button[data-act=copia-dati]") }).getByText("Solo Admin").isVisible(), "admin: Solo Admin sotto i suoi pulsanti");
 await page.click("button[data-act=listino]");
 await page.fill("#cerca-listino", "shampoo");
 await page.locator("#risultati-listino button[data-act=prodotto-apri]").first().click();
