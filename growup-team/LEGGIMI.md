@@ -158,10 +158,15 @@ gratuito **non fa copie automatiche**. Per questo, una volta al mese:
    Sotto il pulsante l'app ricorda la data dell'ultima copia e avvisa se è passato più di un mese.
 3. **Dove tenerla**: carica il file su **Google Drive**, in una cartella "Growup – copie". Tenete almeno le ultime 6.
    Il file contiene dati personali del gruppo: non inoltratelo e non mettetelo in cartelle condivise.
+4. **Anche il codice**, nello stesso momento: sulla pagina GitHub del repository `CL21-AeS/CL21-AeS.github.io`, pulsante
+   verde **Code → Download ZIP**. Carica lo ZIP nella stessa cartella "Growup – copie" (nome con la data, per esempio
+   `growup-codice-AAAA-MM-GG.zip`). Contiene tutta l'app (pagine, grafica, database da ricreare con
+   `supabase/installa_tutto.sql`, documenti): se GitHub non fosse più raggiungibile, codice e dati sono tutti lì.
 
 **Riserva**: Supabase → *Table editor* → per ogni tabella, menu ⋯ → *Export to CSV*.
 
-**Se un giorno servisse ripristinare**: aprite una sessione con Claude, allegate il file della copia e chiedete di
+**Se un giorno servisse ripristinare**: aprite una sessione con Claude, allegate il file della copia (e, se GitHub non
+c'è più, lo ZIP del codice) e chiedete di
 ripristinare i dati in Supabase. Ogni tabella del file corrisponde a una tabella del database (le migrazioni in
 `supabase/` ricreano la struttura vuota). I telefoni si ricollegano aprendo i link personali, che restano validi
 perché nella copia c'è l'impronta delle chiavi.

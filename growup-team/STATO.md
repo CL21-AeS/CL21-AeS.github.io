@@ -31,8 +31,10 @@ nella stessa migrazione** (vale anche per `installa_tutto.sql` su un progetto nu
 **21 ottobre — copie di sicurezza, il punto**: il **codice** è su GitHub e `installa_tutto.sql` ricrea tutto il database
 vuoto. I **dati**: Supabase gratuito non fa copie automatiche; la copia dall'app («Scarica la copia dei dati», solo admin,
 `copia_dati()`) contiene partner, attività, obiettivi, storico, numeri dei report, impostazioni, ma **non** le Liste, i
-passi, il Target, i Clienti e gli ordini (per scelta: gli admin non li vedono) né il listino e i codici tolti. Da
-decidere con Stefano (vedi la risposta del 21 ottobre).
+passi, il Target, i Clienti e gli ordini (per scelta: gli admin non li vedono) né il listino e i codici tolti. Decisioni
+di Stefano: una copia l'ha già scaricata; il **piano Pro** di Supabase (copie automatiche giornaliere, comprese Liste e
+Clienti) si attiva **al lancio ai Partner**. Ogni mese, insieme alla copia dei dati, si scarica lo **ZIP del codice** da
+GitHub (procedura in `LEGGIMI.md`). Da fare: verifica in due passaggi sull'account GitHub.
 
 **Fatto il 19-20 ottobre** (dettagli più sotto, in ordine di data): import da Amway degli ordini e dell'elenco clienti
 (telefono, ultimo ordine, "Mai comprato" in Lista); Modifica dell'ordine e dei dati del cliente; etichette Da consegnare /
