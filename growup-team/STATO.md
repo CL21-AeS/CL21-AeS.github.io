@@ -7,7 +7,7 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
 dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **031** (027 incollata da
-Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#88**. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
+Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#89**. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
 **Fatto il 19-20 ottobre** (dettagli più sotto, in ordine di data): import da Amway degli ordini e dell'elenco clienti
 (telefono, ultimo ordine, "Mai comprato" in Lista); Modifica dell'ordine e dei dati del cliente; etichette Da consegnare /
@@ -53,6 +53,13 @@ importa **da settembre**. In Io e Obiettivo il riquadro «Report da importare» 
 dei **mesi chiusi** si importano "solo numeri" (21%, VPG, linee): la struttura e i VP non cambiano. Lo sponsor vede nella
 scheda «Mesi da Argento: N su 3/6» (dai report che ha importato lui). Nota: il report ha anche una colonna "VP Rubino":
 da verificare con Stefano se usarla al posto del VPG.
+
+**21 ottobre — «Come arrivarci» da Argento a Platino** (tavola "Da Argento a Platino" v2, corretta da Stefano): per le
+tappe Oro e Platino, in ordine: report mancanti (solo per sé) · questo mese al 21% · 6 mesi ma non 3 di fila (con la fila
+in corso: «il prossimo è il secondo dei 3») · una linea al 21% e meno di 4.000 VP · vicino al 21% (da **8.000** VPG) ·
+una linea vicina al 21% (da 8.000) · lontano dal 21% (mancano persone / fatturato basso, regola di 1 su 4). Riga fissa
+«Mesi da Argento negli ultimi 12 mesi: N su 3/6», tabellina con la **%** di ogni linea. Lo sponsor lo vede nella scheda
+di chi è tra Argento e Platino (mesi dai report importati da lui).
 
 **Da fare / in sospeso per Stefano**:
 - **Importare subito il report mappe**: dalla 027 tutti (tranne gli admin) sono "Da confermare" e chi ha qualcuno sotto
