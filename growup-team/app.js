@@ -1423,10 +1423,11 @@ function situazioneArgento(pid, t, righe){
     s.chiave = "mese_ok"; dati.mesi = Math.min(x.mesi + (giaContato ? 0 : 1), servono);
   }
   else if(t.chiave === "platino" && x.mesi >= servono && x.fila < 3){
-    const f = Math.min(filaInCorso(righe), 2), tu = io ? "Hai" : "Ha";
+    /* conta il mese in corso (ancora aperto): è il primo, il secondo o il terzo della fila */
+    const f = Math.min(filaInCorso(righe), 2), eri = io ? "eri" : "era", arrivi = io ? "arrivi" : "arriva";
     s.chiave = "fila";
-    dati.fila_testo = f === 0 ? "Il prossimo mese al 21% è il primo dei 3."
-      : f === 1 ? `${tu} già 1 mese di fila: il prossimo è il secondo dei 3.` : `${tu} già 2 mesi di fila: il prossimo è il terzo, quello che fa Platino.`;
+    dati.fila_testo = f === 0 ? `Il mese scorso non ${eri} al 21%: questo mese, se ${arrivi} al 21%, è il primo dei 3.`
+      : f === 1 ? `Il mese scorso ${eri} al 21%: questo mese è il secondo dei 3.` : `Gli ultimi 2 mesi ${eri} al 21%: questo mese è il terzo, quello che fa Platino.`;
   }
   else if(l21 && n.gruppo < ARGENTO_VPG_CON_LINEA){
     s.chiave = "linea_21"; Object.assign(dati, { nome_linea:l21.nome, manca:num(ARGENTO_VPG_CON_LINEA - n.gruppo) });

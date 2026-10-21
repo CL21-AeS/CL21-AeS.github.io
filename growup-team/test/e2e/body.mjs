@@ -1864,7 +1864,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   numeriLea("lea", mm(0), 5000, 15, []);
   c = await consigliLea();
   check(await c.getAttribute("data-chiave") === "fila" && await c.getByText("Hai 6 mesi da Argento, ma non ancora 3 di fila").isVisible()
-    && await c.getByText("Hai già 1 mese di fila: il prossimo è il secondo dei 3.").isVisible(), "6 mesi senza 3 di fila: il prossimo è il secondo dei 3");
+    && await c.getByText("Il mese scorso eri al 21%: questo mese è il secondo dei 3.").isVisible(), "6 mesi senza 3 di fila: questo mese è il secondo dei 3");
   check(await c.getByText("· 3 di fila ○ (1 su 3)").isVisible(), "riga fissa: 3 di fila non ancora");
   await ctx.close();
 }

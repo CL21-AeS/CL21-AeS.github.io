@@ -2,7 +2,7 @@
    Tiene in cache solo la "scatola" dell'app, per aprirla in fretta e installarla sulla Home.
    I dati vengono sempre da Supabase, mai dalla cache. Prima la rete, così gli aggiornamenti
    arrivano subito; la cache serve solo quando la rete manca. */
-const CACHE = "growup-team-v26";
+const CACHE = "growup-team-v27";
 const SCATOLA = ["./", "index.html", "app.js", "config.js", "listino.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "favicon-32.png", "icon.svg", "invito-quadrato.png", "invito-stato.png"];
 
 self.addEventListener("install", e => {
