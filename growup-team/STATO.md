@@ -6,8 +6,8 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 ## Ripartire da qui (fermi la sera del 20 ottobre 2026)
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
-dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **030** (027 incollata da
-Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#87**. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
+dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **031** (027 incollata da
+Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#88**. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
 **Fatto il 19-20 ottobre** (dettagli più sotto, in ordine di data): import da Amway degli ordini e dell'elenco clienti
 (telefono, ultimo ordine, "Mai comprato" in Lista); Modifica dell'ordine e dei dati del cliente; etichette Da consegnare /
@@ -42,6 +42,17 @@ il riquadro con i requisiti); sponsor e upline la vedono nella scheda. **Volume 
 al 21% non ci sono, confermato da Stefano): "Volume Rubino questo mese: X su 20.000 VP", solo con il report del mese.
 Per dopo: contare i mesi del Performance Year (Oro, Platino, Rubino Fondatore, Zaffiro) e le linee al 21% per mese
 (Smeraldo, Diamante); Volume Equivalente ignorato; nessuna cifra in euro oltre Argento.
+
+**21 ottobre — il percorso oltre Argento** (decisione di Stefano: "il percorso non si deve fermare ad Argento"):
+… Builder 18% → **Argento → Oro → Platino**. Un **mese da Argento** è un mese in cui il report mappe importato dà la
+persona al **21%**. Prima volta (regola Amway): si contano gli **ultimi 12 mesi**; Oro = 3 mesi, Platino = 6 mesi di cui 3
+di fila. A Platino l'app lo **riconosce da sola** (la qualifica dichiarata diventa Platino, festa) e chiede la
+**prossima qualifica**. Da Platino in su le qualifiche si dichiarano. Chi entra come **Argento o Oro** indica il mese
+della prima qualifica Argento e importa i report **da quel mese** (al massimo 12); chi entra come **Platino o più** li
+importa **da settembre**. In Io e Obiettivo il riquadro «Report da importare» (✓/○ per mese) finché ne manca uno. I report
+dei **mesi chiusi** si importano "solo numeri" (21%, VPG, linee): la struttura e i VP non cambiano. Lo sponsor vede nella
+scheda «Mesi da Argento: N su 3/6» (dai report che ha importato lui). Nota: il report ha anche una colonna "VP Rubino":
+da verificare con Stefano se usarla al posto del VPG.
 
 **Da fare / in sospeso per Stefano**:
 - **Importare subito il report mappe**: dalla 027 tutti (tranne gli admin) sono "Da confermare" e chi ha qualcuno sotto
