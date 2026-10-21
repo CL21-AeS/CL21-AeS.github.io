@@ -1656,6 +1656,8 @@ await ctx.close();
   await lui.locator("summary").click();
   check(await lui.getAttribute("data-chiave") === "linee_zero" && await lui.getByText("Non ha ancora linee attive: gli servono i primi 3 frontali.").isVisible()
     && await lui.getByText("Ricorda: per Path to Bronze servono anche 100 VP personali nel mese · ne ha 150 ✓").isVisible(), "scheda partner: i consigli in terza persona");
+  check(!(await page.getByText("VP medio: di chi ha fatturato").count()) && await lui.locator(".nota").count() === 1
+    && await lui.getByText("Calcolato sui numeri del mese fino a oggi. Sono spunti: la strada la decidete voi.").isVisible(), "sotto la tabellina solo la nota finale");
   await page.click("button[data-act=vista-gruppo]");
   check(!(await page.locator(".consigli").count()), "nessun consiglio nell'elenco del gruppo");
   await page.locator(".albero.struttura li", { hasText:"Linea Beta" }).first().locator("button[data-act=apri-scheda]").first().click();

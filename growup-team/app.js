@@ -1258,10 +1258,7 @@ function vComeArrivarci(pid, chi){
       <tbody>${s.linee.map(l => { const f = l.fasce || [];
         return `<tr><td>${esc(l.nome)}</td>${cella(l.vp)}${cella(l.persone)}${cella(l.zero)}${cella(f[0])}${cella(f[1])}${cella(f[2])}${cella(f[3])}${cella(l.media)}
         <td class="num${l.manca ? " sotto" : ""}">${l.manca ? num(l.manca) + " VP" : "✓"}</td></tr>`; }).join("")}</tbody>
-    </table></div>
-    <p class="nota">VP di gruppo di ogni linea; persone: chi apre la linea e chi ha sotto, con i VP personali del mese.
-      VP medio: di chi ha fatturato. Da attivare: 0 o sotto 50 · vicine ai 100: 50-99 · attive: 100 e oltre.
-      «Manca»: VP che servono alla linea per ${esc(t.nome)} (${num(s.vpLinea)}).</p>` : "";
+    </table></div>` : "";
   const aperto = st.consigliAperti.has(pid);
   return `<details class="card metodo consigli" data-chiave="${esc(s.chiave)}" data-id="${esc(pid)}"${aperto ? " open" : ""}>
     <summary><span class="eyebrow">Come arrivarci</span></summary>
