@@ -7,4 +7,5 @@
 - Sicurezza: RLS su ogni tabella, nel codice solo la chiave publishable, ogni regola nuova in `supabase/tests_rls.sql`.
 - Il repository è pubblico: mai dati reali (nomi, codici Amway, numeri, codici d'invito) in file, test, commit o PR.
   Controlli di sicurezza in `SICUREZZA.md`.
-- L'app non dà suggerimenti: mostra dati, percorso e mancanze.
+- L'app non dà suggerimenti nelle schermate di tutti i giorni: mostra dati, percorso e mancanze. Unica eccezione:
+  il riquadro «Come arrivarci» (pagina Obiettivo e scheda partner), chiuso finché non lo si apre.
