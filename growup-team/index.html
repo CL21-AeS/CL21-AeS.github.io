@@ -378,6 +378,10 @@ html,body{overflow-x:clip}
 .pagina-prima.sopra{z-index:20;box-shadow:-14px 0 28px rgba(0,0,0,.18)}
 #app.in-cima{position:relative;z-index:2;background:var(--bg);min-height:100vh;box-shadow:-14px 0 28px rgba(0,0,0,.18)}
 #app.sotto{position:relative;z-index:0;min-height:100vh}
+/* I pulsanti che vedono solo gli admin, con la scritta piccola sotto */
+.solo-admin-box{display:inline-flex;flex-direction:column;align-items:center;gap:2px;vertical-align:top}
+.solo-admin-box.largo{display:flex;align-items:stretch}
+.solo-admin{font-size:11px;font-weight:700;color:var(--rame);text-align:center;line-height:1.2}
 /* I traguardi: coriandoli su tutto lo schermo e l'annuncio al centro */
 .coriandoli{position:fixed;inset:0;width:100%;height:100%;z-index:80;pointer-events:none}
 .annuncio-festa{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:81;pointer-events:none;width:min(330px,calc(100% - 32px));
