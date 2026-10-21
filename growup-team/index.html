@@ -168,9 +168,10 @@ ul.imp li:first-child{border-top:0}
 .spinta{margin-top:12px;padding:12px;border-radius:12px;font-size:14px;color:var(--ink2);background:var(--traccia)}
 .spinta b{color:var(--ink)}
 .linee{list-style:none;margin:10px 0 0;padding:0}
-.linee li{display:flex;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:14px}
+.linee li{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:14px}
+.linee li .num{margin-left:auto;text-align:right;white-space:nowrap;font:700 14px/1.2 var(--f-testo);font-variant-numeric:tabular-nums}
 .linee li:first-child{border-top:0}
-.nome-linea{all:unset;cursor:pointer;color:var(--accent);font-weight:600;min-height:28px}
+.nome-linea{all:unset;flex:1;min-width:0;cursor:pointer;color:var(--accent);font-weight:600;min-height:28px}
 .nome-linea:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:4px}
 .storico{list-style:none;margin:10px 0 0;padding:0}
 .storico li{padding:12px 0;border-top:1px solid var(--line)}

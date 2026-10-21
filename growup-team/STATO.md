@@ -69,6 +69,10 @@ partner (in lista, in corso, piani e sì del mese, clienti), solo numeri.
 Preferiti) al posto di "N piani e N sì" ci sono "N piani, N partner e N clienti nuovi · N clienti in tutto". I clienti
 aggiunti con "+ Un cliente" e quelli importati dal sito Amway restano contati tra i clienti nuovi (decisione di Stefano).
 
+**21 ottobre — scendere lungo le linee**: nella scheda partner i VP delle linee frontali sono allineati a destra, con lo
+stesso carattere dei nomi. Aprendo una linea da un'altra scheda, in alto ci sono **‹ Indietro** (la scheda di prima) e
+**Il mio gruppo** (l'elenco); anche il dito verso destra torna alla scheda di prima, con il passaggio all'indietro.
+
 **Nota tecnica per Claude**: il connettore Supabase non applica le istruzioni con cancellazioni (`drop`, `delete`):
 va in timeout. Si applicano a pezzi senza `drop` (oggetti nuovi) e il resto lo incolla Stefano nell'SQL Editor.
 

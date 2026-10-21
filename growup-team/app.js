@@ -150,6 +150,7 @@ const st = {
   persone: [], passi: [], // la mia lista (solo mia) e i suoi passi
   personaId: null, filtroLista: "aperti", cercaLista: "", passoTipo: null,
   numeriLista: {},
+  schedaPila: [],          // le schede aperte scendendo lungo le linee, per "Indietro"
   inviti: [], sezPersone: "lista", invitoId: null, archiviatiT: false,  // il Target (solo miei)
   ct: null,               // la pagina del contatto (le otto domande)
   listino: [],            // il listino Amway (dal database; una copia sul telefono)
@@ -1579,7 +1580,10 @@ function vScheda(){
   const m = meseDi(oggi());
   const recenti = st.attScheda.slice().sort((a, b) => a.inserito_il < b.inserito_il ? 1 : -1).slice(0, 12);
   const frontali = st.riep.filter(x => x.sponsor_id === p.id);
-  return `<button class="btn link" data-act="vista-gruppo" style="padding:0">‹ Il mio gruppo</button>
+  /* scendendo lungo le linee: "‹ Indietro" torna alla scheda di prima, "Il mio gruppo" all'elenco */
+  return `${st.schedaPila.length ? `<div class="spread"><button class="btn link" data-act="scheda-indietro" style="padding:0">‹ Indietro</button>
+    <button class="btn link" data-act="vista-gruppo" style="padding:0">Il mio gruppo</button></div>`
+    : `<button class="btn link" data-act="vista-gruppo" style="padding:0">‹ Il mio gruppo</button>`}
   <div class="card">
     <div class="spread"><h2>${esc(p.nome)}</h2><span class="row" style="gap:8px">
       <button class="stella${st.preferiti.has(p.id) ? " on" : ""}" data-act="preferito" data-id="${esc(p.id)}" aria-pressed="${st.preferiti.has(p.id)}"
@@ -2241,7 +2245,13 @@ const AZIONI = {
     }catch(e){ if(st.meseGruppo && st.meseGruppo.mese === mese){ st.meseGruppo.errore = messaggio(e); render(); } }
   },
   "vista-io"(){ st.vista = "io"; st.target = null; render(); window.scrollTo(0, 0); },
-  "vista-gruppo"(){ st.vista = "gruppo"; st.target = null; st.schedaId = null; render(); window.scrollTo(0, 0); },
+  "vista-gruppo"(){ st.vista = "gruppo"; st.target = null; st.schedaId = null; st.schedaPila = []; render(); window.scrollTo(0, 0); },
+  "scheda-indietro"(){
+    const id = st.schedaPila.pop();
+    if(!id){ AZIONI["vista-gruppo"](); return; }
+    st.versoNav = -1;
+    AZIONI["apri-scheda"]({ dataset:{ id, indietro:"1" } });
+  },
   "vista-obiettivo"(){ st.vista = "obiettivo"; st.target = null; render(); window.scrollTo(0, 0); },
   "obiettivo-modifica"(){ st.errore = ""; st.sheet = "obiettivo"; render(); },
   "obiettivo-dopo"(){ st.fase = "home"; render(); },
@@ -2277,6 +2287,10 @@ const AZIONI = {
   async "apri-scheda"(el){
     const p = st.struttura.find(x => x.id === el.dataset.id);
     if(!p) return;
+    /* da una scheda a un'altra (le linee frontali): si ricorda la strada per tornare indietro */
+    if(el.dataset.indietro){}
+    else if(st.vista === "scheda" && st.schedaId && st.schedaId !== p.id) st.schedaPila.push(st.schedaId);
+    else st.schedaPila = [];
     st.schedaId = p.id; st.target = p.stato === "gestito" ? p.id : null; st.attScheda = [];
     st.vista = "scheda"; render(); window.scrollTo(0, 0);
     try{ st.attScheda = (await api.activities(p.id, primaDataAperta()) || []).filter(a => a.data >= primaDataAperta()); render(); }
@@ -4358,7 +4372,7 @@ function muoviDopo(prima){
     /* la direzione: verso destra si va avanti (pagina dopo, una scheda che si apre), verso sinistra si torna */
     let verso = ORDINE_PAGINE.indexOf(st.vista) - ORDINE_PAGINE.indexOf(v.pagina);
     if(!verso && st.vista === "persone") verso = dettaglio !== v.dettaglio ? (dettaglio ? 1 : -1) : ORDINE_SEZIONI.indexOf(st.sezPersone) - ORDINE_SEZIONI.indexOf(v.sez);
-    if(prima.pagina) unaSopraLAltra(app, prima.pagina, Math.sign(verso) || 1);
+    if(prima.pagina) unaSopraLAltra(app, prima.pagina, Math.sign(verso) || st.versoNav || 1);
   }
   /* le barre si riempiono scorrendo (anche quando si apre la pagina), i numeri cambiati fanno un salto */
   document.querySelectorAll("#app .bar[aria-label]").forEach(b => {
@@ -4377,6 +4391,7 @@ function muoviDopo(prima){
     anima(box, [{ transform:"translateY(100%)" }, { transform:"none" }], { dur:VIVACE.dur * 1.5, ease:"cubic-bezier(.34,1.25,.64,1)" });
   }
   st.foglioPrima = st.sheet || null;
+  st.versoNav = null;
   vistaPrima = ora;
   controllaTraguardi();
 }
@@ -4567,7 +4582,7 @@ document.addEventListener("touchend", e => {
   else if(dx > 0 && st.vista === "persone") scorri("vista-io");
   else if(dx > 0 && st.vista === "io") scorri("vista-obiettivo");
   else if(dx > 0 && st.vista === "gruppo") scorri("vista-persone");
-  else if(dx > 0 && st.vista === "scheda") scorri("vista-gruppo");
+  else if(dx > 0 && st.vista === "scheda") scorri("scheda-indietro");   // alla scheda di prima, o al gruppo
 }, { passive:true });
 function scorri(azione){ AZIONI[azione](); }   // il movimento della pagina lo fa render (muoviDopo)
 
