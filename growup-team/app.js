@@ -2347,9 +2347,21 @@ function vImporta(){
       L'app aggiorna i VPP del mese tuoi e delle persone importate; chi usa l'app non viene toccato, i suoi numeri li aggiorna lui.
       Il file resta sul telefono: si salvano solo nome, codice e numeri.</p>
     <label class="btn primary wide" style="margin-top:12px">Scegli il file CSV
-      <input type="file" id="file-report" accept=".csv,text/csv,text/comma-separated-values" hidden></label>
+      <input type="file" id="file-report" accept=".csv,text/csv,text/comma-separated-values" multiple hidden></label>
+    <p class="nota">Puoi scegliere più file insieme (per esempio i mesi passati): dei mesi chiusi si salvano solo i numeri.</p>
     ${a && a.errore ? `<p class="errore">${esc(a.errore)}</p>` : ""}
     ${chiudi}`;
+  if(a.multi) return `<h2>Report di più mesi</h2>
+  ${a.passati.length ? `<p class="small">Mesi chiusi: salvo solo i numeri (percentuale, VP di gruppo, linee). La tua struttura e i VP non cambiano.</p>
+  <ul class="imp">${a.passati.map(x => `<li><span class="grow">${esc(nomeMese(x.mese))}</span>
+    <b class="num">${x.prima.perc != null ? x.prima.perc + "%" : "–"} · ${num(x.prima.vpg)} VPG</b></li>`).join("")}</ul>` : ""}
+  ${a.corrente ? `<p class="small">${a.passati.length ? "Poi" : "Ora"} il report di <b>${esc(nomeMese(a.corrente.mese))}</b> (mese in corso): l'import completo, con la sua anteprima.</p>` : ""}
+  ${a.errori.length ? `<div class="avviso">${a.errori.map(e => `<p style="margin:2px 0">${esc(e)}</p>`).join("")}</div>` : ""}
+  <form data-form="importa" novalidate>
+    <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">${a.passati.length || a.corrente ? "Annulla" : "Chiudi"}</button>
+      ${a.passati.length ? `<button class="btn primary grow"${st.occupato ? " disabled" : ""}>Salva i numeri</button>`
+        : a.corrente ? `<button class="btn primary grow">Continua</button>` : ""}</div>
+  </form>`;
   if(a.passato) return `<h2>Report di ${nomeMese(a.mese)}</h2>
   <p class="small">È un mese chiuso: salvo solo i numeri (percentuale, VP di gruppo, linee) per contare i mesi da Argento.
     La tua struttura e i VP non cambiano.</p>
@@ -2421,7 +2433,45 @@ function sceltaRapida(el, spunta){
   accendiRapida(el);
 }
 
-async function leggiFileReport(file){
+/* Più file insieme: i mesi chiusi si salvano solo come numeri, uno dopo l'altro; il mese in corso (al massimo uno)
+   resta l'import completo, con la sua anteprima, dopo i mesi chiusi. */
+async function leggiFileReport(files){
+  if(!files || !files.length) return;
+  if(files.length === 1) return leggiUnReport(files[0]);
+  const m = { multi:true, passati:[], corrente:null, errori:[] };
+  try{ st.esclusi = new Set((await api.esclusi() || []).map(x => x.codice)); }catch(e){}
+  for(const file of files){
+    let a;
+    if(/\.xlsx?$/i.test(file.name)) a = { errore:"è il file Excel: sul sito Amway scegli il formato CSV." };
+    else try{ const rep = leggiReport(await file.text()); a = rep.errore ? rep : analizzaReport(rep); }
+    catch(e){ a = { errore:"non riesco a leggerlo: scaricalo di nuovo dal sito Amway." }; }
+    if(a.errore) m.errori.push(`${file.name}: ${a.errore}`);
+    else if(a.passato){ if(!m.passati.some(x => x.mese === a.mese)) m.passati.push(a); }
+    else if(m.corrente) m.errori.push(`${file.name}: c'è già un report del mese in corso, si importa uno alla volta.`);
+    else m.corrente = a;
+  }
+  m.passati.sort((x, y) => x.mese < y.mese ? -1 : 1);
+  if(!m.passati.length && !m.errori.length) st.imp = m.corrente;
+  else st.imp = m;
+  render();
+}
+async function salvaReportPassati(m, f){
+  st.occupato = true; render();
+  const fatti = [];
+  for(const a of m.passati){
+    try{ await api.salvaReportPassato(argomentiPassato(a)); fatti.push(nomeMese(a.mese)); }
+    catch(e){ m.errori.push(`${nomeMese(a.mese)}: ${messaggio(e)}`); }
+  }
+  await caricaNumeri();
+  st.occupato = false;
+  if(fatti.length) toast(`Numeri salvati: ${fatti.join(", ")}`);
+  /* il mese in corso, se c'era, si importa adesso con la sua anteprima */
+  if(m.corrente && !m.errori.length){ st.imp = m.corrente; render(); }
+  else if(m.errori.length){ st.imp = { multi:true, passati:[], corrente:m.corrente, errori:m.errori }; render(); }
+  else { st.sheet = null; st.imp = null; render(); }
+  riconosciPlatino();
+}
+async function leggiUnReport(file){
   if(!file) return;
   let a;
   if(/\.xlsx?$/i.test(file.name)) a = { errore:"Questo è il file Excel: sul sito Amway scegli il formato CSV." };
@@ -2444,13 +2494,16 @@ function numeriDelReport(perCodice){
     linee:(figliReport.get(r.codice) || []).map(x => ({ codice:x.codice, vpg:x.vpg || 0 })),
     nascoste:!figliReport.has(r.codice) && r.dimensione > 1 };
 }
-async function salvaReportPassato(a, f){
+function argomentiPassato(a){
   const numeri = numeriDelReport(a.perCodice);
   const altri = [...a.perCodice.values()].filter(r => r.codice !== a.prima.codice && r.vpg != null)
     .map(r => Object.assign({ codice:r.codice, vpp:r.vpp }, numeri(r)));
+  return { p_mese:a.mese + "-01", p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp }, numeri(a.prima)), p_altri:altri };
+}
+async function salvaReportPassato(a, f){
   st.occupato = true;
   try{
-    await api.salvaReportPassato({ p_mese:a.mese + "-01", p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp }, numeri(a.prima)), p_altri:altri });
+    await api.salvaReportPassato(argomentiPassato(a));
     await caricaNumeri();
     st.sheet = null; st.imp = null; st.occupato = false; render();
     toast(`Numeri di ${nomeMese(a.mese)} salvati`);
@@ -2459,6 +2512,11 @@ async function salvaReportPassato(a, f){
 }
 async function eseguiImport(f){
   const a = st.imp, io = st.profilo;
+  if(a.multi){
+    if(a.passati.length) return salvaReportPassati(a, f);
+    if(a.corrente){ st.imp = a.corrente; render(); return; }
+    st.sheet = null; st.imp = null; render(); return;
+  }
   if(a.passato) return salvaReportPassato(a, f);
   const scelti = nome => new Set([...f.querySelectorAll(`input[name=${nome}]:checked`)].map(i => i.value));
   const nascondi = scelti("nascondi");
@@ -5079,7 +5137,7 @@ document.addEventListener("submit", e => {
 /* Qualifica scelta: mostra mese e pagamenti per Foundation e Builder; la data di iscrizione
    è obbligatoria solo per chi inizia (nel modulo d'ingresso). */
 document.addEventListener("change", e => {
-  if(e.target.id === "file-report"){ leggiFileReport(e.target.files && e.target.files[0]); return; }
+  if(e.target.id === "file-report"){ leggiFileReport(e.target.files ? [...e.target.files] : []); return; }
   if(e.target.name === "nascondi" && e.target.closest(".imp-da-scegliere")){ accendiRapida(null); return; }
   if(e.target.name !== "qualifica") return;
   const f = e.target.form;

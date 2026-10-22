@@ -23,6 +23,10 @@ Platino Fondatore (mesi da Argento su 12), Rubino Fondatore (mesi Rubino su 12),
 «Report importati da settembre» e la tabellina «Le tue linee nel Performance Year» (mesi al 21% per frontale). In Io una
 riga breve. «Come arrivarci» da Platino in su: non ancora (servono testi).
 
+**22 ottobre — più report insieme**: nella scelta del file del report mappe si possono selezionare più file. I mesi chiusi
+si salvano "solo numeri" uno dopo l'altro (anteprima con % e VPG di ogni mese); se c'è anche il mese in corso, dopo si
+apre il suo import completo con l'anteprima di sempre; i file sbagliati sono elencati e non fermano gli altri.
+
 **Aperto, in attesa di Stefano**:
 - Confrontare nel report mappe la colonna **"VP Rubino"** con il VPG: se sono diversi, il Volume Rubino si prende da lì.
 - Controllare sul sito Amway che la **%** delle linee frontali nei report importati sia quella giusta (serve a «Come arrivarci»

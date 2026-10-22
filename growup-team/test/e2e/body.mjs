@@ -1909,6 +1909,36 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
 }
 
+// 36. Più report insieme: due mesi chiusi (solo numeri) e il mese in corso dopo, con la sua anteprima
+{
+  const mm = n => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7); };
+  DB.numeri = DB.numeri.filter(x => x.visto_da !== "lea");
+  const riga = perc => { const r = persona(1, "1000000", "7300001", "PROVA, LEA", "120"); r[10] = "'10.500,00"; r[13] = `'${perc}%`; return r; };
+  ({ ctx, page } = await apri({}, "#chiave=" + "c0".repeat(16)));
+  await page.getByText("Ciao Lea").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.locator("button[data-act=importa]").first().click();
+  await page.locator(".sheet").getByText("Intera Linea di Sponsorizzazione con tutti i KPI disponibili").waitFor();
+  check(await page.locator("#file-report").getAttribute("multiple") !== null, "si possono scegliere più file");
+  await page.setInputFiles("#file-report", [
+    { name:"mese-a.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(mm(-3).replace("-", ""), [riga(21)])) },
+    { name:"mese-b.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(mm(-2).replace("-", ""), [riga(18)])) },
+    { name:"ora.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(mm(0).replace("-", ""), [riga(15)])) },
+    { name:"sbagliato.csv", mimeType:"text/csv", buffer:Buffer.from("niente") }]);
+  await page.locator(".sheet h2", { hasText:"Report di più mesi" }).waitFor();
+  check(await page.locator(".sheet ul.imp li").count() === 2 && await page.getByText("sbagliato.csv:").isVisible()
+    && await page.getByText("(mese in corso): l'import completo").isVisible(), "anteprima: 2 mesi chiusi, il mese in corso dopo, il file sbagliato segnalato");
+  await page.click(".sheet button:has-text('Salva i numeri')");
+  await page.getByText(/Numeri salvati: .*, /).waitFor();
+  await sync(page);
+  check(DB.numeri.filter(x => x.visto_da === "lea" && x.partner_id === "lea" && [mm(-3), mm(-2)].includes(x.mese)).length === 2, "salvati i numeri dei due mesi chiusi");
+  check(await page.locator(".sheet button:has-text('Continua')").isVisible(), "resta il file sbagliato da leggere, poi si continua con il mese in corso");
+  await page.click(".sheet button:has-text('Continua')");
+  await page.locator(".sheet h2", { hasText:`Report di ` }).filter({ hasNotText:"più mesi" }).waitFor();
+  check(await page.locator(".sheet button.primary", { hasText:"Importa" }).isVisible(), "poi l'import completo del mese in corso");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
