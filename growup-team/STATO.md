@@ -6,7 +6,7 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 ## Ripartire da qui (fermi la sera del 21 ottobre 2026)
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
-dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **031** (027 incollata da
+dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **032** (027 incollata da
 Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#91**, nessuna aperta; il ramo di
 lavoro è ricreato da main. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
@@ -26,6 +26,14 @@ riga breve. «Come arrivarci» da Platino in su: non ancora (servono testi).
 **22 ottobre — più report insieme**: nella scelta del file del report mappe si possono selezionare più file. I mesi chiusi
 si salvano "solo numeri" uno dopo l'altro (anteprima con % e VPG di ogni mese); se c'è anche il mese in corso, dopo si
 apre il suo import completo con l'anteprima di sempre; i file sbagliati sono elencati e non fermano gli altri.
+
+**22 ottobre — la cifra porta oltre Argento** (cifre di Stefano dal calcolatore dei guadagni Amway, migrazione 032):
+Argento **2.500 €** al mese senza incentivi Bronze (circa 3.750 € se ci si arriva mentre si ricevono ancora) · Platino
+3.000 · Rubino 4.000 · Zaffiro 5.000 · Smeraldo 8.000 · Diamante 18.000; i Fondatori hanno la stessa cifra della loro
+qualifica e **come obiettivo si propone sempre la qualifica senza "Fondatore"**; Oro si salta. Strutture: linee
+qualificate della qualifica più altre linee aperte (ideale 10.000 VP, almeno 4.000 VP). Esempio: 9% e 8.000 € → Smeraldo.
+Arrivati a Platino, nella domanda della prossima qualifica è già scelta quella dell'obiettivo. La guida «Guadagnare
+con Amway» PY25 è stata letta e scartata (vecchia, solo esempi Fondatori, non coerente).
 
 **Aperto, in attesa di Stefano**:
 - Confrontare nel report mappe la colonna **"VP Rubino"** con il VPG: se sono diversi, il Volume Rubino si prende da lì.

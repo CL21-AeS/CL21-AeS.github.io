@@ -1939,6 +1939,23 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
 }
 
+// 37. La cifra porta anche oltre Argento: sempre la qualifica senza "Fondatore", Oro mai
+{
+  const obiettivoDi = async cifra => {
+    DB.obiettivi = (DB.obiettivi || []).filter(o => o.partner_id !== "R").concat([{ partner_id:"R", cifra_mese:cifra, entro:"2027-12-01", perche:null }]);
+    ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    await page.click("button[role=tab][data-act=vista-obiettivo]");
+    const h = (await page.locator(".card", { hasText:"La tappa che vale la tua cifra" }).locator("h2").innerText()).trim();
+    await ctx.close(); return h;
+  };
+  check(await obiettivoDi(8000) === "Smeraldo", "8.000 € al mese → Smeraldo (non Smeraldo Fondatore)");
+  check(await obiettivoDi(2800) === "Platino", "2.800 € → Platino (Argento vale 2.500 senza incentivi Bronze)");
+  check(await obiettivoDi(2400) === "Argento 21%", "2.400 € → Argento");
+  check(await obiettivoDi(4500) === "Zaffiro", "4.500 € → Zaffiro (oltre Rubino 4.000)");
+  check(await obiettivoDi(30000) === "Diamante", "oltre l'ultima cifra → Diamante, e oltre");
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

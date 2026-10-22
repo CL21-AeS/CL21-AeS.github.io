@@ -81,7 +81,9 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     solo fino ad Argento
 28. `supabase/031_mesi_argento.sql` — i mesi da Argento: i numeri dei report degli ultimi 13 mesi (per sé e per chi si
     vede) e l'import "solo numeri" dei report dei mesi chiusi (non sposta persone, non tocca i VPP)
-29. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+29. `supabase/032_guadagni_oltre_argento.sql` — le cifre al mese da Platino in su (Fondatori uguali alla qualifica) e
+    Argento senza incentivi Bronze (2.500 €)
+30. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 17. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 18. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
