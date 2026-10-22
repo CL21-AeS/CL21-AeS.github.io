@@ -158,7 +158,8 @@ const st = {
   consigliAperti: new Set(),
   prossime: new Map(),     // la prossima qualifica di chi vedo (da Platino in su)
   mesiReport: [],          // i miei numeri dei report degli ultimi 13 mesi (percentuale per i mesi da Argento)
-  mesiScheda: {},          // gli stessi, per le schede del gruppo  // "Come arrivarci" aperto (per persona), così resta aperto quando la pagina si ridisegna
+  mesiScheda: {},          // gli stessi, per le schede del gruppo
+  mesiLinee: new Map(),    // da Platino in su: i mesi dei report delle mie linee frontali (per Smeraldo, Diamante, Zaffiro)  // "Come arrivarci" aperto (per persona), così resta aperto quando la pagina si ridisegna
   inviti: [], sezPersone: "lista", invitoId: null, archiviatiT: false,  // il Target (solo miei)
   ct: null,               // la pagina del contatto (le otto domande)
   listino: [],            // il listino Amway (dal database; una copia sul telefono)
@@ -711,6 +712,12 @@ async function caricaNumeri(){
   ]);
   st.riep = riep || []; st.riepPrec = prec || []; st.storico = storico || []; st.livelli = livelli || [];
   try{ st.mesiReport = await api.mesiReport(pid) || []; }catch(e){ st.mesiReport = []; }
+  st.mesiLinee = new Map();
+  if(daPlatino(st.profilo.qualifica_iniziale)){
+    const frontali = lineeDi(pid, rigaDi(st.riep, pid)).filter(l => l.id && l.id !== pid && st.struttura.some(p => p.id === l.id));
+    st.mesiLinee = new Map(await Promise.all(frontali.map(l => api.mesiReport(l.id)
+      .then(righe => [l.id, { nome:l.nome, righe:righe || [] }]).catch(() => [l.id, { nome:l.nome, righe:[] }]))));
+  }
   const dal = [inizio4(), mesePrecedente() + "-01"].sort()[0];  // 4 settimane e tutto il mese prima
   const [att, goals, mgoals] = await Promise.all([
     api.attivitaGruppo(dal).catch(() => []),
@@ -963,7 +970,7 @@ function vChiaveErrata(){
   </div>`;
 }
 
-/* "Qualifica più alta raggiunta": Inizio, i pin (3%…21%) e le qualifiche Bronze/Argento.
+/* "La tua qualifica oggi": Inizio, i pin (3%…21%) e le qualifiche Bronze/Argento.
    Primo ordine e primi clienti sono tappe del percorso, non qualifiche: non si dichiarano. */
 function campiQualifica(obbligoData, scelta){
   scelta = scelta || {};
@@ -973,7 +980,7 @@ function campiQualifica(obbligoData, scelta){
   const pin = PIN.map(n => `<option value="pin:${n}"${sel("pin:" + n)}>${n}%</option>`).join("");
   const tappa = st.stages.find(s => s.chiave === scelta.valore);
   return `
-      <label class="field"><span>Qualifica più alta raggiunta</span>
+      <label class="field"><span>La tua qualifica oggi</span>
         <select name="qualifica"><option value=""${sel("")}>Inizio (nessuna qualifica)</option>
           <optgroup label="Percentuale raggiunta">${pin}</optgroup>
           <optgroup label="Qualifiche">${qual}</optgroup></select></label>
@@ -1374,6 +1381,55 @@ function vMesiArgentoScheda(p){
   return `<p class="small mesi-argento" style="margin:6px 0 0">Mesi da Argento: <b>${x.mesi} su ${min}</b> per ${prossima}
     <span class="faint">(ultimi 12 mesi, dai report che hai importato)</span></p>`;
 }
+/* Il Performance Year in corso: da settembre al mese in corso */
+function annoPY(){
+  const ora = meseDi(oggi()), out = [];
+  for(let m = `${Number(ora.slice(5)) >= 9 ? ora.slice(0, 4) : Number(ora.slice(0, 4)) - 1}-09`; m <= ora; m = spostaMese(m, 1)) out.push(m);
+  return out;
+}
+/* I mesi del Performance Year dai report importati: mesi da Argento (21%), Rubino (VPG ≥ 20.000), Zaffiro (VPG ≥ 4.000
+   e 2 linee al 21%, oppure 3 linee al 21%) e, per ogni linea frontale, i mesi al 21% */
+function contaPY(){
+  const mesi = annoPY(), mio = new Map(st.mesiReport.map(x => [meseDi(x.mese), x]));
+  const linee = [...st.mesiLinee.values()].map(l => {
+    const per = new Map(l.righe.map(x => [meseDi(x.mese), Number(x.percentuale) || 0]));
+    return { nome:l.nome, per, mesi21:mesi.filter(m => (per.get(m) || 0) >= 21).length, ora:per.get(meseDi(oggi())) };
+  }).sort((a, b) => b.mesi21 - a.mesi21);
+  let argento = 0, rubino = 0, zaffiro = 0;
+  for(const m of mesi){
+    const x = mio.get(m); if(!x) continue;
+    const vpg = Number(x.vpg) || 0, l21 = linee.filter(l => (l.per.get(m) || 0) >= 21).length;
+    if(Number(x.percentuale) >= 21) argento++;
+    if(vpg >= RUBINO_VP) rubino++;
+    if((vpg >= 4000 && l21 >= 2) || l21 >= 3) zaffiro++;
+  }
+  return { mesi:mesi.length, report:mesi.filter(m => mio.has(m)).length, argento, rubino, zaffiro, linee };
+}
+/* l'avanzamento verso la prossima qualifica: righe { ok, txt, val } */
+function avanzamentoPY(chiave){
+  const c = contaPY(), out = [];
+  const lineeDa = min => c.linee.filter(l => l.mesi21 >= min).length;
+  const riga = (n, su, txt) => out.push({ ok:n >= su, txt, val:`${Math.min(n, su)} / ${su}` });
+  if(chiave === "platino_fondatore") riga(c.argento, 12, "Mesi da Argento nel Performance Year");
+  if(chiave === "rubino_fondatore") riga(c.rubino, 12, "Mesi Rubino (20.000 VP di Volume Rubino)");
+  if(chiave === "zaffiro") riga(c.zaffiro, 6, "Mesi Zaffiro nel Performance Year");
+  if(chiave === "zaffiro_fondatore") riga(c.zaffiro, 12, "Mesi Zaffiro nel Performance Year");
+  if(chiave === "smeraldo") riga(lineeDa(6), 3, "Linee al 21% per almeno 6 mesi");
+  if(chiave === "smeraldo_fondatore") riga(lineeDa(12), 3, "Linee al 21% per 12 mesi");
+  if(chiave === "diamante") riga(lineeDa(6), 6, "Linee al 21% per almeno 6 mesi");
+  if(chiave === "diamante_fondatore") riga(lineeDa(12), 6, "Linee al 21% per 12 mesi");
+  if(out.length) out.push({ ok:c.report >= c.mesi, attesa:c.report < c.mesi, txt:"Report mappe importati da settembre", val:`${c.report} / ${c.mesi}` });
+  return { righe:out, c };
+}
+function vAvanzamentoPY(chiave){
+  const { righe, c } = avanzamentoPY(chiave);
+  const lista = righe.length ? `<ul class="req">${righe.map(r => `<li class="${r.ok ? "ok" : ""} ${r.attesa ? "attesa" : ""}">
+      <span class="mark">${r.ok ? "✓" : r.attesa ? "·" : "○"}</span><span class="grow">${esc(r.txt)}</span><span class="num">${esc(r.val)}</span></li>`).join("")}</ul>` : "";
+  const tabella = c.linee.length ? `<p class="small" style="margin:12px 0 0"><b>Le tue linee nel Performance Year</b> · mesi al 21% da settembre</p>
+    <div class="tab-consigli linee-py"><table><thead><tr><th>Linea</th><th>mesi al 21%</th><th>questo mese</th></tr></thead>
+      <tbody>${c.linee.map(l => `<tr><td>${esc(l.nome)}</td><td class="num">${l.mesi21}</td><td class="num">${l.ora != null ? l.ora + "%" : "–"}</td></tr>`).join("")}</tbody></table></div>` : "";
+  return lista + tabella + (righe.length || c.linee.length ? `<p class="nota">Dai report mappe che hai importato: un mese senza report non si conta.</p>` : "");
+}
 /* la prossima qualifica (da Platino in su): nome, requisiti, Volume Rubino */
 function vProssimaQualifica(){
   const p = st.profilo;
@@ -1384,6 +1440,7 @@ function vProssimaQualifica(){
     ${t ? `<h2 style="margin-top:4px">${esc(t.nome)}</h2>${t.descrizione ? `<p class="small" style="margin:4px 0 0">${esc(t.descrizione)}</p>` : ""}`
       : `<p class="small" style="margin:6px 0 0">Non l'hai ancora scelta.</p>`}
     ${vRubino(p.id)}
+    ${t ? vAvanzamentoPY(t.chiave) : ""}
     <p class="nota">Hai dichiarato: ${esc(testoPartenza(p))}. Le qualifiche oltre Argento si aggiornano da qui quando le raggiungi.</p>
     <button class="btn" style="margin-top:10px;min-height:38px" data-act="partenza">${t ? "Modifica" : "Scegli la prossima qualifica"}</button>
   </div>`;
@@ -1492,7 +1549,8 @@ function vTappa(){
   if(!attuale){
     const pq = st.profilo.prossima_qualifica;
     return `<div class="card"><span class="eyebrow">Il tuo percorso</span><h2 style="margin-top:4px">${esc(raggiunta ? raggiunta.nome : "Argento")} raggiunto 🎉</h2>
-      ${pq ? `<p class="small" style="margin:4px 0 0">Prossima qualifica: <b>${esc(nomeQualifica(pq))}</b></p>`
+      ${pq ? `<p class="small" style="margin:4px 0 0">Prossima qualifica: <b>${esc(nomeQualifica(pq))}</b>${(() => {
+          const x = avanzamentoPY(pq).righe[0]; return x && !x.attesa ? ` · ${esc(x.txt.toLowerCase())}: ${esc(x.val)}` : ""; })()}</p>`
         : `<button class="btn" style="margin-top:10px;min-height:38px" data-act="scegli-prossima">Scegli la prossima qualifica</button>`}
       ${vRubino(st.profilo.id)}
       <p class="muted">Hai completato il percorso fino a Platino. Ora l'obiettivo è aiutare le tue linee a fare lo stesso.</p></div>
@@ -3011,6 +3069,7 @@ const MODULI = {
                            p_qualifica_mese:q.mese, p_pagamenti:q.pagamenti });
       if((q.prossima || null) !== (st.profilo.prossima_qualifica || null)) st.profilo = await api.impostaProssima(q.prossima);
       await caricaStruttura();
+      await caricaNumeri();
       st.sheet = null; render(); toast("Punto di partenza aggiornato");
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
