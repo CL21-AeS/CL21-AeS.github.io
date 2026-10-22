@@ -1246,8 +1246,14 @@ function vSalvaChiave(){
 
 /* ---- Il primo obiettivo: cifra al mese, entro quando, perché ---- */
 /* la prima tappa dal Path to Bronze in su che vale almeno la cifra (oltre Argento: Argento) */
+/* la qualifica che vale la cifra del mio obiettivo, se è oltre Platino (per proporla come prossima) */
+function qualificaObiettivo(){
+  const t = st.obiettivo ? tappaPerCifra(st.obiettivo.cifra_mese) : null;
+  return t && oltrePlatino(t.tappa) ? t.tappa.chiave : null;
+}
 function tappaPerCifra(cifra){
-  const t = st.stages.filter(s => s.ordine >= 3 && !oltreArgento(s) && Number(s.guadagno_mese) > 0).sort((a, b) => a.ordine - b.ordine);
+  /* Oro si salta: ha gli stessi riconoscimenti di Argento (decisione di Stefano) */
+  const t = st.stages.filter(s => s.ordine >= 3 && s.chiave !== "oro" && Number(s.guadagno_mese) > 0).sort((a, b) => a.ordine - b.ordine);
   if(!t.length) return null;
   const c = t.find(s => Number(s.guadagno_mese) >= Number(cifra));
   return c ? { tappa:c, oltre:false } : { tappa:t[t.length - 1], oltre:true };
@@ -1322,7 +1328,7 @@ function vObiettivo(){
     <p class="small">Scrivi la cifra e per quando: qui vedrai la tappa che la vale e il percorso per arrivarci.</p>
     <button class="btn primary wide" style="margin-top:8px" data-act="obiettivo-modifica">Scrivi il tuo obiettivo</button>
   </div>${vProssimaQualifica()}${vReportDaImportare()}${vComeArrivarci(st.profilo.id, "io")}${vVisione()}`;
-  const t = tappaPerCifra(o.cifra_mese), S = st.stages, { indice } = percorso();
+  const t = tappaPerCifra(o.cifra_mese), S = st.stages, { indice, attuale } = percorso();
   const fino = t ? S.findIndex(s => s.chiave === t.tappa.chiave) : -1;
   const giaFatto = fino >= 0 && indice > fino;
   const mancano = fino >= indice ? fino - indice + 1 : 0;
@@ -1336,15 +1342,17 @@ function vObiettivo(){
   ${t ? `<div class="card">
     <span class="eyebrow">La tappa che vale la tua cifra</span>
     <div class="spread" style="margin-top:4px"><h2>${esc(t.tappa.nome)}</h2><span class="num">${euro(t.tappa.guadagno_mese)}<span class="small"> /mese*</span></span></div>
-    ${t.oltre ? `<p class="small" style="margin:4px 0 0">La tua cifra è oltre Argento: Argento vale circa ${euro(t.tappa.guadagno_mese)} al mese.</p>` : ""}
+    ${t.oltre ? `<p class="small" style="margin:4px 0 0">La tua cifra è oltre ${esc(t.tappa.nome)}: ${esc(t.tappa.nome)} vale circa ${euro(t.tappa.guadagno_mese)} al mese.</p>` : ""}
     ${t.tappa.struttura_calcolo ? `<p class="small" style="margin:4px 0 0">Calcolato su: ${esc(t.tappa.struttura_calcolo)}</p>` : ""}
-    <p class="small" style="margin:8px 0 0">${giaFatto ? "Hai già raggiunto questa tappa." : mancano === 1 ? "È la tua tappa attuale." : `Da qui: ${mancano} tappe, compresa quella attuale.`}</p>
+    <p class="small" style="margin:8px 0 0">${giaFatto ? "Hai già raggiunto questa tappa." : !attuale ? `Da qui: ${plur(mancano, "qualifica", "qualifiche")} da raggiungere.`
+      : mancano === 1 ? "È la tua tappa attuale." : `Da qui: ${mancano} tappe, compresa quella attuale.`}</p>
     <p class="nota">* ${notaGuadagni()}</p>
   </div>
   <div class="card">
     <span class="eyebrow">Il percorso fino all'obiettivo</span>
     <ol class="percorso">${S.slice(0, Math.max(fino, indice - 1) + 1).map((s, i) => {
-      const stato = i < indice ? "fatta" : i === indice ? "attuale" : "dopo";
+      /* oltre Platino non c'è una tappa "attuale": le qualifiche si dichiarano */
+      const stato = i < indice ? "fatta" : i === indice && attuale ? "attuale" : "dopo";
       const req = stato === "attuale" ? requisiti(s) : [];
       return `<li class="${stato}${i === fino ? " meta" : ""}">
         <span class="mark">${stato === "fatta" ? "✓" : i + 1}</span>
@@ -1353,7 +1361,7 @@ function vObiettivo(){
           ${s.guadagno_mese ? `<span class="small"> · ${euro(s.guadagno_mese)}/mese*</span>` : ""}
           ${stato === "attuale" ? `<ul class="req">${req.map(r => `<li class="${r.ok ? "ok" : ""}"><span class="mark">${r.ok ? "✓" : "○"}</span>
               <span class="grow">${esc(r.txt)}</span>${r.val ? `<span class="num">${esc(r.val)}</span>` : ""}</li>`).join("")}</ul>`
-            : stato === "dopo" ? `<p class="small" style="margin:2px 0 0">${esc(requisitiTesto(s))}</p>` : ""}</div></li>`; }).join("")}</ol>
+            : stato === "dopo" ? `<p class="small" style="margin:2px 0 0">${esc(requisitiTesto(s) || s.descrizione || "")}</p>` : ""}</div></li>`; }).join("")}</ol>
   </div>` : ""}
   ${vProssimaQualifica()}
   ${vReportDaImportare()}
@@ -2717,7 +2725,7 @@ function vSheet(){
       la vedono anche il tuo sponsor e la tua upline.</p>` : ""}
     <form data-form="prossima-qualifica" novalidate>
       <label class="field"><span>Prossima qualifica che vuoi ottenere</span>
-        <select name="prossima">${opzioniProssima(q, st.profilo.prossima_qualifica)}</select></label>
+        <select name="prossima">${opzioniProssima(q, st.profilo.prossima_qualifica || qualificaObiettivo())}</select></label>
       <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Dopo</button>
         <button class="btn primary grow">Salva</button></div>
     </form>`;
