@@ -1245,15 +1245,17 @@ function vSalvaChiave(){
 }
 
 /* ---- Il primo obiettivo: cifra al mese, entro quando, perché ---- */
-/* la prima tappa dal Path to Bronze in su che vale almeno la cifra (oltre Argento: Argento) */
+/* la prima tappa dal Path to Bronze in su che vale almeno la cifra (oltre l'ultima con una cifra: l'ultima) */
 /* la qualifica che vale la cifra del mio obiettivo, se è oltre Platino (per proporla come prossima) */
 function qualificaObiettivo(){
   const t = st.obiettivo ? tappaPerCifra(st.obiettivo.cifra_mese) : null;
   return t && oltrePlatino(t.tappa) ? t.tappa.chiave : null;
 }
 function tappaPerCifra(cifra){
-  /* Oro si salta: ha gli stessi riconoscimenti di Argento (decisione di Stefano) */
-  const t = st.stages.filter(s => s.ordine >= 3 && s.chiave !== "oro" && Number(s.guadagno_mese) > 0).sort((a, b) => a.ordine - b.ordine);
+  /* Oro si salta (stessi riconoscimenti di Argento) e i Fondatori pure: hanno la cifra della loro qualifica, che è
+     sempre l'obiettivo proposto (decisioni di Stefano) */
+  const t = st.stages.filter(s => s.ordine >= 3 && s.chiave !== "oro" && !s.chiave.endsWith("_fondatore") && Number(s.guadagno_mese) > 0)
+    .sort((a, b) => a.ordine - b.ordine);
   if(!t.length) return null;
   const c = t.find(s => Number(s.guadagno_mese) >= Number(cifra));
   return c ? { tappa:c, oltre:false } : { tappa:t[t.length - 1], oltre:true };

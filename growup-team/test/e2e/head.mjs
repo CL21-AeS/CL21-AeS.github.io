@@ -10,11 +10,11 @@ const stages = [
  {ordine:5,chiave:"foundation_12",nome:"Bronze Foundation 12%",percentuale:12,vp_personali:100,vp_gruppo:2400,linee:3,vp_linea:200,pagamenti_max:12,mesi_finestra:18,guadagno_mese:580,struttura_calcolo:"100 VP personali + 3 linee da 800 VP"},
  {ordine:6,chiave:"builder_15",nome:"Bronze Builder 15%",vp_personali:200,vp_gruppo:4000,linee:3,vp_linea:600,pagamenti_max:12,mesi_finestra:18,guadagno_mese:1050,struttura_calcolo:"x"},
  {ordine:7,chiave:"builder_18",nome:"Bronze Builder 18%",vp_personali:200,vp_gruppo:7000,linee:3,vp_linea:600,pagamenti_max:12,mesi_finestra:18,guadagno_mese:1980,struttura_calcolo:"x"},
- {ordine:8,chiave:"argento",nome:"Argento 21%",vp_personali:0,vp_gruppo:10000,linee:2,linee_obiettivo:3,guadagno_mese:3750,struttura_calcolo:"200 VP personali + 3 linee da 4.100 VP"},
+ {ordine:8,chiave:"argento",nome:"Argento 21%",vp_personali:0,vp_gruppo:10000,linee:2,linee_obiettivo:3,guadagno_mese:2500,struttura_calcolo:"200 VP personali + 3 linee da 4.100 VP"},
  ...[["oro","Oro"],["platino","Platino"],["platino_fondatore","Platino Fondatore"],["rubino","Rubino"],["rubino_fondatore","Rubino Fondatore"],
    ["zaffiro","Zaffiro"],["zaffiro_fondatore","Zaffiro Fondatore"],["smeraldo","Smeraldo"],["smeraldo_fondatore","Smeraldo Fondatore"],
    ["diamante","Diamante"],["diamante_fondatore","Diamante Fondatore"]].map(([chiave, nome], i) =>
-   ({ ordine:9 + i, chiave, nome, vp_personali:0, descrizione:chiave === "smeraldo" ? "Da Platino: 3 linee frontali al 21% per almeno 6 mesi del Performance Year" : "Requisiti di prova" }))];
+   ({ ordine:9 + i, chiave, nome, vp_personali:0, guadagno_mese:{ platino:3000, rubino:4000, zaffiro:5000, smeraldo:8000, diamante:18000 }[chiave.replace("_fondatore", "")] || null, descrizione:chiave === "smeraldo" ? "Da Platino: 3 linee frontali al 21% per almeno 6 mesi del Performance Year" : "Requisiti di prova" }))];
 const DB = { partners:[{id:"R",nome:"Stefano e Alessia",codice_invito:"RRRR22",chiave:"a".repeat(32),stato:"gestito",is_admin:true}],
   /* il listino (prodotti inventati) */
   listino:[{codice:"900001",nome:"Double Prova (31 giorni)",formato:"140 g",categoria:"Integratori",prezzo_cliente:80,prezzo_partner:66.5,vp:26.5,attivo:true},
