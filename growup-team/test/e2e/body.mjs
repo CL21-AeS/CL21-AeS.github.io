@@ -1869,6 +1869,46 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
 }
 
+// 35. Da Platino in su: i mesi del Performance Year dai report (Smeraldo: linee al 21%; Zaffiro: mesi Zaffiro)
+{
+  const mm = n => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7); };
+  const ora = oggiStr.slice(0, 7), set = `${Number(ora.slice(5)) >= 9 ? ora.slice(0, 4) : Number(ora.slice(0, 4)) - 1}-09`;
+  const mesiPY = []; for(let k = 0; mm(-k) >= set; k++) mesiPY.unshift(mm(-k));
+  const chiavePf = "d0".repeat(16);
+  DB.partners.push({ id:"pf", nome:"Pino Fondatore", sponsor_id:"R", stato:"attivo", chiave:chiavePf, codice_invito:"PFPFPF", codice_amway:"7400001",
+    qualifica_iniziale:"platino_fondatore", prossima_qualifica:"smeraldo", privacy_accettata_il:"2026-10-01T00:00:00Z",
+    partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() });
+  for(const [id, nome, cod] of [["pf1", "Linea Prima", "7400002"], ["pf2", "Linea Seconda", "7400003"], ["pf3", "Linea Terza", "7400004"]])
+    DB.partners.push({ id, nome, sponsor_id:"pf", stato:"gestito", gestore_id:"pf", codice_amway:cod, codice_invito:id.toUpperCase() + "XX", creato_il:new Date().toISOString() });
+  const nPf = (chi, m, vpg, perc) => { DB.numeri = DB.numeri.filter(x => !(x.visto_da === "pf" && x.partner_id === chi && x.mese === m))
+    .concat([{ visto_da:"pf", partner_id:chi, mese:m, vpg, percentuale:perc, linee:[] }]); };
+  /* ogni mese del PY: io a 5.000 VPG; Prima sempre al 21%, Seconda al 21% solo nel primo mese, Terza mai */
+  mesiPY.forEach((m, i) => { nPf("pf", m, 5000, 21); nPf("pf1", m, 10500, 21); nPf("pf2", m, i === 0 ? 10200 : 7000, i === 0 ? 21 : 18); nPf("pf3", m, 900, 9); });
+  DB.numeri = DB.numeri.filter(x => !(x.visto_da === "pf" && x.partner_id === "pf" && x.mese === ora))
+    .concat([{ visto_da:"pf", partner_id:"pf", mese:ora, vpg:5000, percentuale:21,
+      linee:[{ codice:"7400002", vpg:10500 }, { codice:"7400003", vpg:7000 }, { codice:"7400004", vpg:900 }] }]);
+  const apriPf = async () => { ({ ctx, page } = await apri({}, "#chiave=" + chiavePf)); await page.getByText("Ciao Pino").waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]"); };
+  await apriPf();
+  check(await page.getByText(`Prossima qualifica: Smeraldo · linee al 21% per almeno 6 mesi: 0 / 3`).isVisible(), "Io: Smeraldo, linee al 21% da 6 mesi");
+  await page.click("button[role=tab][data-act=vista-obiettivo]");
+  const pq = page.locator(".prossima-qualifica");
+  check((await pq.locator(".req li", { hasText:"Linee al 21% per almeno 6 mesi" }).locator(".num").innerText()) === "0 / 3"
+    && (await pq.locator(".req li", { hasText:"Report mappe importati da settembre" }).locator(".num").innerText()) === `${mesiPY.length} / ${mesiPY.length}`,
+    "Obiettivo: Smeraldo 0 su 3 e i report del Performance Year");
+  const riga = n => pq.locator(".linee-py tr", { hasText:n }).locator("td");
+  check((await riga("Linea Prima").nth(1).innerText()) === String(mesiPY.length) && (await riga("Linea Prima").nth(2).innerText()) === "21%"
+    && (await riga("Linea Seconda").nth(1).innerText()) === "1" && (await riga("Linea Terza").nth(1).innerText()) === "0", "le linee nel Performance Year: mesi al 21%");
+  await page.click(".prossima-qualifica button[data-act=partenza]");
+  check(await page.locator(".sheet .field span", { hasText:"La tua qualifica oggi" }).isVisible(), "l'etichetta: La tua qualifica oggi");
+  await page.selectOption(".sheet select[name=prossima]", "zaffiro");
+  await page.click(".sheet button.primary");
+  await page.getByText("Punto di partenza aggiornato").waitFor();
+  check((await page.locator(".prossima-qualifica .req li", { hasText:"Mesi Zaffiro" }).locator(".num").innerText()) === "1 / 6",
+    "Zaffiro: solo il primo mese ha 2 linee al 21% (e 4.000 VP)");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

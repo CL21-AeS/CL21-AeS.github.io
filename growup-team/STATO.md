@@ -15,6 +15,14 @@ anche da Argento a Platino) · qualifiche oltre Argento fino a Diamante Fondator
 Volume Rubino · percorso Argento → Oro → Platino contato sui mesi al 21% dei report mappe, con l'import "solo numeri" dei
 report dei mesi chiusi e Platino riconosciuto dall'app.
 
+**22 ottobre — «La tua qualifica oggi» e i mesi del Performance Year**: l'etichetta del menu della qualifica è ora «La tua
+qualifica oggi» (Stefano e Alessia: stati Smeraldo, oggi Platino Fondatore → dichiarano Platino Fondatore). Da Platino in su,
+in Obiettivo sotto la prossima qualifica: righe con i mesi del Performance Year (da settembre) dai report importati —
+Platino Fondatore (mesi da Argento su 12), Rubino Fondatore (mesi Rubino su 12), Zaffiro (mesi Zaffiro su 6/12:
+4.000 VPG e 2 linee al 21%, o 3 linee al 21%), Smeraldo (linee al 21% da almeno 6/12 mesi su 3), Diamante (su 6) — più
+«Report importati da settembre» e la tabellina «Le tue linee nel Performance Year» (mesi al 21% per frontale). In Io una
+riga breve. «Come arrivarci» da Platino in su: non ancora (servono testi).
+
 **Aperto, in attesa di Stefano**:
 - Confrontare nel report mappe la colonna **"VP Rubino"** con il VPG: se sono diversi, il Volume Rubino si prende da lì.
 - Controllare sul sito Amway che la **%** delle linee frontali nei report importati sia quella giusta (serve a «Come arrivarci»
