@@ -224,6 +224,9 @@ function nomeMese(m){ const [y,mm] = m.split("-").map(Number); return `${MESI[mm
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 function num(n){ const x = Math.round((Number(n) || 0) * 100) / 100; const [i, d] = String(x).split("."); return i.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + (d ? "," + d : ""); }
 function euro(n){ return num(n) + " €"; }
+/* prezzi e VP di prodotti e ordini: sempre con due decimali, come nel listino Amway (96,30 € · 18,20 VP) */
+function num2(n){ const [i, d] = (Math.round((Number(n) || 0) * 100) / 100).toFixed(2).split("."); return i.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + "," + d; }
+function prezzo(n){ return num2(n) + " €"; }
 function plur(n, uno, molti){ return n === 1 ? `${n} ${uno}` : `${num(n)} ${molti}`; }
 function numIt(v){ return Number(String(v).trim().replace(/\./g, "").replace(",", ".")); }
 function salvaLocale(k, v){ try{ v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); }catch(e){} }
@@ -4302,7 +4305,7 @@ function totaliRighe(righe){
     if(numOrNull(r.vp) != null){ t.vp += Number(r.vp) * q; t.conVp = true; } }
   return t;
 }
-function testoTotali(t){ return [`Cliente <b>${euro(t.cliente)}</b>`, t.conPartner ? `Partner <b>${euro(t.partner)}</b>` : "", t.conVp ? `<b>${num(t.vp)}</b> VP` : ""].filter(Boolean).join(" · "); }
+function testoTotali(t){ return [`Cliente <b>${prezzo(t.cliente)}</b>`, t.conPartner ? `Partner <b>${prezzo(t.partner)}</b>` : "", t.conVp ? `<b>${num2(t.vp)}</b> VP` : ""].filter(Boolean).join(" · "); }
 /* i prodotti che segue: per ognuno l'ultimo acquisto, e quando finisce (giorni × quantità) */
 function scaffale(p){
   const ultimo = new Map();
@@ -4458,8 +4461,8 @@ function vCliente(){
     <span class="eyebrow">Ordini</span>
     <ul class="oggi">${ord.map(o => { const rr = righeDi(o.id), tr = totaliRighe(rr);
       /* con i prodotti: i totali dalle righe (i VP dell'ordine importato restano quelli di Amway); senza: valore e VP del sito */
-      const totali = rr.length ? ` · ${euro(tr.cliente)}${tr.conPartner ? ` · Partner ${euro(tr.partner)}` : ""}${o.vp ? ` · ${num(o.vp)} VP` : tr.conVp ? ` · ${num(tr.vp)} VP` : ""}`
-        : `${Number(o.importo) ? ` · ${euro(o.importo)}` : ""}${o.vp ? ` · ${num(o.vp)} VP` : ""}`;
+      const totali = rr.length ? ` · ${prezzo(tr.cliente)}${tr.conPartner ? ` · Partner ${prezzo(tr.partner)}` : ""}${o.vp ? ` · ${num2(o.vp)} VP` : tr.conVp ? ` · ${num2(tr.vp)} VP` : ""}`
+        : `${Number(o.importo) ? ` · ${prezzo(o.importo)}` : ""}${o.vp ? ` · ${num2(o.vp)} VP` : ""}`;
       return `<li><span class="grow"><b>${dataIt(o.data)}</b> · ${o.modo === "io" ? "fatto da me" : "dal sito"}${totali}<br>
         <span class="small">${rr.length ? rr.map(r => esc(r.nome) + (r.quantita > 1 ? ` × ${r.quantita}` : "")).join(", ")
           : `<button class="btn link small" data-act="ordine-modifica" data-id="${esc(o.id)}" style="min-height:0;padding:0">+ Aggiungi i prodotti</button>`}
@@ -4529,8 +4532,8 @@ function vSheetClienti(s){
           `<label class="chip"><input type="radio" name="modo" value="${v}" data-bozza="modo"${b.modo === v ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>
       <fieldset class="field"><legend>Prodotti</legend>
         ${b.righe.length ? `<ul class="righe-ordine">${b.righe.map((r, i) => `<li>
-          <span class="grow"><b>${esc(r.nome)}</b>${r.prezzo_partner != null || r.vp != null ? `<br><span class="small">${[r.prezzo_partner != null ? "Partner " + euro(r.prezzo_partner) : "",
-            r.vp != null ? num(r.vp) + " VP" : ""].filter(Boolean).join(" · ")}</span>` : ""}<br><span class="small">dura <input class="mini" type="number" min="1" max="3650" inputmode="numeric" value="${r.giorni}" data-riga="${i}" data-campo="giorni" aria-label="Giorni che dura"> giorni</span></span>
+          <span class="grow"><b>${esc(r.nome)}</b>${r.prezzo_partner != null || r.vp != null ? `<br><span class="small">${[r.prezzo_partner != null ? "Partner " + prezzo(r.prezzo_partner) : "",
+            r.vp != null ? num2(r.vp) + " VP" : ""].filter(Boolean).join(" · ")}</span>` : ""}<br><span class="small">dura <input class="mini" type="number" min="1" max="3650" inputmode="numeric" value="${r.giorni}" data-riga="${i}" data-campo="giorni" aria-label="Giorni che dura"> giorni</span></span>
           <span class="qta"><button type="button" class="btn small ghost" data-act="riga-meno" data-i="${i}" aria-label="Uno in meno">−</button><b>${r.quantita}</b>
             <button type="button" class="btn small ghost" data-act="riga-piu" data-i="${i}" aria-label="Uno in più">+</button></span>
           <input class="mini prezzo" type="text" inputmode="decimal" value="${r.prezzo != null ? String(r.prezzo).replace(".", ",") : ""}" placeholder="€" data-riga="${i}" data-campo="prezzo" aria-label="Prezzo"></li>`).join("")}</ul>
@@ -4588,8 +4591,8 @@ function risultatiProdotto(q){
   if(t.length < 2) return "";
   const cat = st.listino.filter(r => r.attivo !== false && senzaAccenti(r.codice + " " + r.nome).includes(t)).slice(0, 8);
   return cat.map(r => `<li><button type="button" class="persona" data-act="aggiungi-prodotto" data-codice="${esc(r.codice)}">
-      <span class="grow">${esc(r.nome)}<br><span class="small">${esc([r.codice, r.formato, r.prezzo_cliente != null ? euro(r.prezzo_cliente) : "",
-        r.prezzo_partner != null ? "Partner " + euro(r.prezzo_partner) : "", r.vp != null ? num(r.vp) + " VP" : ""].filter(Boolean).join(" · "))}</span></span><b>+</b></button></li>`).join("")
+      <span class="grow">${esc(r.nome)}<br><span class="small">${esc([r.codice, r.formato, r.prezzo_cliente != null ? prezzo(r.prezzo_cliente) : "",
+        r.prezzo_partner != null ? "Partner " + prezzo(r.prezzo_partner) : "", r.vp != null ? num2(r.vp) + " VP" : ""].filter(Boolean).join(" · "))}</span></span><b>+</b></button></li>`).join("")
     + `<li><button type="button" class="persona" data-act="aggiungi-libero"><span class="grow"><i>Non c'è: aggiungi "${esc(q.trim())}"</i></span><b>+</b></button></li>`;
 }
 function nuovaBozza(righe){
@@ -4982,8 +4985,8 @@ async function leggiPdfListino(file){
 function rigaProdotto(x){
   return `<li><button type="button" class="persona" data-act="prodotto-apri" data-codice="${esc(x.codice)}">
     <span class="grow"><b>${esc(x.nome)}</b>${x.attivo === false ? ` <span class="pill mini">non nel listino</span>` : ""}<br>
-      <span class="small">${esc([x.codice, x.formato, x.prezzo_cliente != null ? euro(x.prezzo_cliente) : "", x.prezzo_partner != null ? "Partner " + euro(x.prezzo_partner) : "",
-        x.vp != null ? num(x.vp) + " VP" : ""].filter(Boolean).join(" · "))}</span></span><b>›</b></button></li>`;
+      <span class="small">${esc([x.codice, x.formato, x.prezzo_cliente != null ? prezzo(x.prezzo_cliente) : "", x.prezzo_partner != null ? "Partner " + prezzo(x.prezzo_partner) : "",
+        x.vp != null ? num2(x.vp) + " VP" : ""].filter(Boolean).join(" · "))}</span></span><b>›</b></button></li>`;
 }
 function risultatiListino(q){
   const t = senzaAccenti(q || "");
@@ -5029,7 +5032,7 @@ function vSheetListino(s){
       <div class="imp-sezione"><h3>Nuovi · ${a.nuovi.length}</h3>${a.nuovi.length ? `<p class="small">${quanti(a.nuovi, 12)}</p>` : ""}</div>
       <div class="imp-sezione"><h3>Prezzi cambiati · ${a.cambiati.length}</h3>${a.cambiati.length ? `<ul class="oggi">${a.cambiati.slice(0, 8).map(p => { const x = prima.get(p.codice);
         return `<li><span class="grow">${esc(p.nome)}<br><span class="small">${PREZZI_LISTINO.filter(k => numOrNull(x[k]) !== numOrNull(p[k])).map(k =>
-          `${{ prezzo_cliente:"cliente", prezzo_partner:"Partner", vp:"VP" }[k]} ${x[k] != null ? (k === "vp" ? num(x[k]) : euro(x[k])) : "–"} → ${p[k] != null ? (k === "vp" ? num(p[k]) : euro(p[k])) : "–"}`).join(" · ")}</span></span></li>`; }).join("")}</ul>
+          `${{ prezzo_cliente:"cliente", prezzo_partner:"Partner", vp:"VP" }[k]} ${x[k] != null ? (k === "vp" ? num2(x[k]) : prezzo(x[k])) : "–"} → ${p[k] != null ? (k === "vp" ? num2(p[k]) : prezzo(p[k])) : "–"}`).join(" · ")}</span></span></li>`; }).join("")}</ul>
         ${a.cambiati.length > 8 ? `<p class="small">e altri ${a.cambiati.length - 8}</p>` : ""}` : ""}</div>
       ${a.usciti.length ? `<div class="imp-sezione"><h3>Non più nel listino · ${a.usciti.length}</h3>
         <p class="small">Spariscono dalla ricerca dei nuovi ordini (restano negli ordini già fatti). Togli la spunta a chi vuoi tenere.</p>
@@ -5097,8 +5100,8 @@ function totaliMiei(righe){
     t.vp += (Number(r.vp) || 0) * q; t.partner += (Number(r.prezzo_partner) || 0) * q; t.pubblico += (Number(r.prezzo_cliente) || 0) * q; }
   return t;
 }
-function testoPrezzi(x){ return `${num(x.vp)} VP · Partner ${euro(x.partner)} · Pubblico ${euro(x.pubblico)}`; }
-function testoTotaliMiei(t){ return `<b>${num(t.vp)}</b> VP · Partner <b>${euro(t.partner)}</b> · Pubblico <b>${euro(t.pubblico)}</b>`; }
+function testoPrezzi(x){ return `${num2(x.vp)} VP · Partner ${prezzo(x.partner)} · Pubblico ${prezzo(x.pubblico)}`; }
+function testoTotaliMiei(t){ return `<b>${num2(t.vp)}</b> VP · Partner <b>${prezzo(t.partner)}</b> · Pubblico <b>${prezzo(t.pubblico)}</b>`; }
 function prezziRiga(r){ return { vp:Number(r.vp) || 0, partner:Number(r.prezzo_partner) || 0, pubblico:Number(r.prezzo_cliente) || 0 }; }
 function prodotti(n){ return plur(n, "prodotto", "prodotti"); }
 
@@ -5138,8 +5141,8 @@ function vMieiOrdini(){
     <ul class="righe-ordine" style="margin-top:6px">${vedi.map(o => { const righe = righeMie(o.id), t = totaliMiei(righe), aperto = st.mioAperto === o.id;
       return `<li style="flex-wrap:wrap">
       <button type="button" class="apri-mio" data-act="mio-apri" data-id="${esc(o.id)}" aria-expanded="${aperto}">
-        <b>${esc(dataIt(o.data))}</b> · <b class="num">${num(o.vp != null ? o.vp : t.vp)} VP</b><br>
-        <span class="small">${prodotti(righe.length)} · Partner ${euro(t.partner)} · Pubblico ${euro(t.pubblico)}</span></button>
+        <b>${esc(dataIt(o.data))}</b> · <b class="num">${num2(o.vp != null ? o.vp : t.vp)} VP</b><br>
+        <span class="small">${prodotti(righe.length)} · Partner ${prezzo(t.partner)} · Pubblico ${prezzo(t.pubblico)}</span></button>
       <button type="button" class="btn small ghost" data-act="mio-rifai" data-id="${esc(o.id)}">Rifai</button>
       <button type="button" class="btn small ghost" data-act="mio-togli" data-id="${esc(o.id)}" aria-label="Togli l'ordine del ${esc(dataIt(o.data))}">×</button>
       ${aperto ? `<ul class="small" style="flex-basis:100%;margin:4px 0 0;padding-left:18px">${righe.map(r =>
@@ -5156,7 +5159,7 @@ function vSheetMiei(s){
     <p class="small">${prodotti(righe.length)} · ${testoTotaliMiei(t)}</p>
     <form data-form="conferma-mio" novalidate>
       <label class="field"><span>Data dell'ordine</span><input type="date" name="data" min="${primaDataAperta()}" max="${oggi()}" value="${esc(st.dataMio || oggi())}"></label>
-      <p class="small" id="testo-conferma-mio">I ${num(t.vp)} VP vanno nel tuo mese di ${nomeMese(m).split(" ")[0]}. Li vedi solo tu finché non arriva il report Amway.</p>
+      <p class="small" id="testo-conferma-mio">I ${num2(t.vp)} VP vanno nel tuo mese di ${nomeMese(m).split(" ")[0]}. Li vedi solo tu finché non arriva il report Amway.</p>
       ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
       <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Indietro</button><button class="btn primary grow">Conferma</button></div>
     </form>`;
@@ -5165,7 +5168,7 @@ function vSheetMiei(s){
     const o = (st.mieiOrdini || []).find(x => x.id === st.mioDaTogliere); if(!o) return "";
     const righe = righeMie(o.id), vp = o.vp != null ? Number(o.vp) : totaliMiei(righe).vp;
     return `<h2>Togli l'ordine del ${esc(dataIt(o.data))}?</h2>
-    <p class="small">${prodotti(righe.length)} · ${num(vp)} VP.${o.attivita_id ? ` I ${num(vp)} VP escono dal tuo mese di ${nomeMese(meseDi(o.data)).split(" ")[0]}.` : ""}</p>
+    <p class="small">${prodotti(righe.length)} · ${num2(vp)} VP.${o.attivita_id ? ` I ${num2(vp)} VP escono dal tuo mese di ${nomeMese(meseDi(o.data)).split(" ")[0]}.` : ""}</p>
     ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
     <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Indietro</button>
       <button class="btn primary grow" data-act="mio-togli-ok">Togli</button></div>`;
@@ -5231,7 +5234,7 @@ Object.assign(MODULI, {
       const o = await api.confermaOrdine(b.id, data);
       Object.assign(b, o);
       st.att = await api.activities(st.profilo.id, [settimana(), primoDelMese()].sort()[0]) || st.att;
-      st.sheet = null; render(); toast(`Ordine confermato: ${num(o.vp)} VP nel mese`);
+      st.sheet = null; render(); toast(`Ordine confermato: ${num2(o.vp)} VP nel mese`);
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   }
 });
@@ -5240,7 +5243,7 @@ document.addEventListener("input", e => {
   if(t && t.id === "cerca-mio"){ st.cercaMio = t.value; const u = document.getElementById("risultati-mio"); if(u) u.innerHTML = risultatiMio(t.value); }
   if(t && t.name === "data" && t.closest && t.closest('[data-form="conferma-mio"]')){
     st.dataMio = t.value; const b = bozzaMia(), p = document.getElementById("testo-conferma-mio");
-    if(b && p && t.value) p.textContent = `I ${num(totaliMiei(righeMie(b.id)).vp)} VP vanno nel tuo mese di ${nomeMese(meseDi(t.value)).split(" ")[0]}. Li vedi solo tu finché non arriva il report Amway.`;
+    if(b && p && t.value) p.textContent = `I ${num2(totaliMiei(righeMie(b.id)).vp)} VP vanno nel tuo mese di ${nomeMese(meseDi(t.value)).split(" ")[0]}. Li vedi solo tu finché non arriva il report Amway.`;
   }
 });
 
