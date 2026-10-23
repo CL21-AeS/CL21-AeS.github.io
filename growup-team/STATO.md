@@ -6,7 +6,7 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 ## Ripartire da qui (fermi la sera del 21 ottobre 2026)
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
-dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **033** (027 e la parte 2 della 033 — `togli_dalla_struttura` e `importa_mappa` —
+dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **034** (027 e la parte 2 della 033 — `togli_dalla_struttura` e `importa_mappa` —
 incollate da Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#97**, nessuna aperta; il ramo di
 lavoro è ricreato da main. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
@@ -44,6 +44,19 @@ Platino in downline). Persone senza app: una sola copia, visibile a tutta la upl
 scritti a mano ovunque (Io, Obiettivo, gruppo); prima del report contano gli ordini. Chi non è ancora nella mappa è **in attesa**:
 usa l'app ma i suoi dati restano suoi, l'upline lo vede solo per nome in «In attesa della mappa»; lo toglie **solo lo sponsor
 diretto** (o l'admin); non può importare. Le parti che il report non mostra (gruppo sotto un Platino) non si toccano.
+
+**23 ottobre — i miei ordini restano miei, e la bozza d'ordine** (migrazione 034; decisioni di Stefano dalla tavola «Bozza
+ordine e VP»): il partner può sempre scrivere i suoi ordini e correggere il totale, ma **lo vede solo lui**. Sponsor e upline
+vedono **solo i numeri del report** Amway, anche nei mesi senza report (lì vedono zero); la RLS non fa leggere a nessun altro gli
+ordini e le correzioni di chi ha l'app. Chi non ha l'app resta com'è (valgono i VP scritti da chi lo segue finché non c'è un
+report). Per me: **VPP del report + gli ordini scritti da me dopo la data e ora del file**; con un report nuovo il totale torna
+al dato ufficiale. Su Io la barra mostra in verde il report e in rame gli ordini scritti dopo, con la riga che lo spiega. Nel
+Gruppo i VP di chi ha l'app vengono dal report (preferiti, etichette, confronto col mese prima senza la riga «Ordini»).
+Nuove sezioni su Io: **Bozza ordine** (prodotti dal listino; per ogni prodotto e nel totale VP, prezzo Partner e prezzo al
+pubblico; una sola bozza, salvata nel database, solo mia) e **I miei ordini** (storico; «Rifai» copia i prodotti in una nuova
+bozza; «×» toglie l'ordine dopo la conferma e i suoi VP escono dal mese). Bozza e storico non entrano nella copia dei dati
+(come Liste e Clienti, gli admin non li vedono). Idea per il team (fuori dall'app): ogni Platino importa il report una volta a
+settimana, così il Gruppo è aggiornato.
 
 **Aperto, in attesa di Stefano**:
 - Confrontare nel report mappe la colonna **"VP Rubino"** con il VPG: se sono diversi, il Volume Rubino si prende da lì.

@@ -130,6 +130,10 @@ label.check input{width:22px;min-height:22px;height:22px;margin:1px 0 0;flex:non
 .bar{height:10px;border-radius:99px;background:var(--traccia);overflow:hidden}
 .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--rame),var(--rame2));border-radius:99px;transition:width .25s}
 .bar.fatto>i{background:var(--verde)}
+.bar.doppia{display:flex}
+.bar.doppia>i{border-radius:0}
+.bar.doppia>i.rep{background:var(--verde)}
+.bar.doppia>i:not(.rep){background:linear-gradient(90deg,var(--rame),var(--rame2))}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
   padding:3px 9px;border-radius:99px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
 .pill.v{color:var(--verde);border-color:color-mix(in srgb,var(--verde) 35%,transparent)}
@@ -291,6 +295,8 @@ ul.imp li:first-child{border-top:0}
 .righe-ordine li:first-child{border-top:0}
 .qta{display:flex;align-items:center;gap:4px}
 .qta .btn{min-width:32px;padding:0 8px}
+.apri-mio{flex:1;min-width:0;border:0;background:none;color:inherit;font:inherit;text-align:left;padding:4px 0;cursor:pointer}
+.tot-mio{background:var(--traccia);border-radius:12px;padding:9px 12px;font-size:14px;font-variant-numeric:tabular-nums}
 input.mini{width:56px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;background:var(--card);color:var(--ink)}
 input.mini.prezzo{width:68px;text-align:right}
 .risultati-prodotto{list-style:none;margin:6px 0 0;padding:0;max-height:280px;overflow:auto}
