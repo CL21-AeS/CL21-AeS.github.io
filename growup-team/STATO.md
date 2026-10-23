@@ -7,7 +7,7 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
 dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **034** (027 e la parte 2 della 033 — `togli_dalla_struttura` e `importa_mappa` —
-incollate da Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#97**, nessuna aperta; il ramo di
+incollate da Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#98**, nessuna aperta; il ramo di
 lavoro è ricreato da main. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
 **Il 21 ottobre in breve** (dettagli sotto): «Come arrivarci» (consigli a richiesta in Obiettivo e nella scheda partner,
@@ -56,7 +56,9 @@ Nuove sezioni su Io: **Bozza ordine** (prodotti dal listino; per ogni prodotto e
 pubblico; una sola bozza, salvata nel database, solo mia) e **I miei ordini** (storico; «Rifai» copia i prodotti in una nuova
 bozza; «×» toglie l'ordine dopo la conferma e i suoi VP escono dal mese). Bozza e storico non entrano nella copia dei dati
 (come Liste e Clienti, gli admin non li vedono). Idea per il team (fuori dall'app): ogni Platino importa il report una volta a
-settimana, così il Gruppo è aggiornato.
+settimana, così il Gruppo è aggiornato. Stefano conferma: dopo un report contano solo gli ordini scritti dal partner stesso
+(quelli scritti da chi lo seguiva prima che entrasse nell'app restano al report). **Prezzi e VP di prodotti e ordini con due
+decimali** (96,30 € · 18,20 VP) in bozza, storico, clienti e listino; cifre degli obiettivi e totali del mese come prima.
 
 **Aperto, in attesa di Stefano**:
 - Confrontare nel report mappe la colonna **"VP Rubino"** con il VPG: se sono diversi, il Volume Rubino si prende da lì.

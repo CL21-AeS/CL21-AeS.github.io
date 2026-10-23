@@ -1310,7 +1310,7 @@ await page.click(".sheet button[data-act=riga-piu]");
 await page.fill(".sheet input[data-campo=giorni]", "31");
 await page.click('.sheet label.chip:has-text("L\'ho fatto io")');
 const totOrdine = await page.locator("#totale-ordine").innerText();
-check(/Cliente 160 €/.test(totOrdine) && /Partner 133 €/.test(totOrdine) && /53 VP/.test(totOrdine), "ordine: totali al cliente, Partner e VP");
+check(/Cliente 160,00 €/.test(totOrdine) && /Partner 133,00 €/.test(totOrdine) && /53,00 VP/.test(totOrdine), "ordine: totali al cliente, Partner e VP");
 await page.fill("#cerca-prodotto", "vecchio");
 check(!(await page.locator("#risultati-prodotto button[data-act=aggiungi-prodotto]").count()), "i prodotti non più nel listino non si trovano");
 await page.fill("#cerca-prodotto", "");
@@ -2049,11 +2049,11 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await bozza.getByText("1 prodotto").waitFor();
   await bozza.locator("button[data-act=mio-piu]").click();
   await page.fill("#cerca-mio", "deters");
-  check((await bozza.locator("#risultati-mio").innerText()).includes("6,1 VP · Partner 13,7 € · Pubblico 17,6 €"), "nei risultati: VP, prezzo Partner e prezzo al pubblico");
+  check((await bozza.locator("#risultati-mio").innerText()).includes("6,10 VP · Partner 13,70 € · Pubblico 17,60 €"), "nei risultati: VP, prezzo Partner e prezzo al pubblico");
   await bozza.locator("button[data-act=mio-aggiungi]").first().click();
   await bozza.getByText("2 prodotti").waitFor();
-  check((await bozza.locator(".righe-ordine li", { hasText:"Crema Prova" }).innerText()).includes("18,2 VP · Partner 41,3 € · Pubblico 52,9 €"), "per ogni prodotto VP, Partner e Pubblico");
-  check((await bozza.locator(".tot-mio").innerText()).replace(/\s+/g, " ") === "42,5 VP · Partner 96,3 € · Pubblico 123,4 €", "il totale: VP, Partner e Pubblico");
+  check((await bozza.locator(".righe-ordine li", { hasText:"Crema Prova" }).innerText()).includes("18,20 VP · Partner 41,30 € · Pubblico 52,90 €"), "per ogni prodotto VP, Partner e Pubblico");
+  check((await bozza.locator(".tot-mio").innerText()).replace(/\s+/g, " ") === "42,50 VP · Partner 96,30 € · Pubblico 123,40 €", "il totale: VP, Partner e Pubblico");
   await bozza.screenshot({ path: S + "/e2e/39-bozza-ordine.png" });
   await sync(page);
   check(DB.ordiniMiei.length === 1 && DB.ordiniMiei[0].stato === "bozza" && DB.righeMie.length === 2, "la bozza è salvata nel database");
@@ -2066,7 +2066,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.locator(".sheet").getByText("Confermi l'ordine?").waitFor();
   check((await page.locator("#testo-conferma-mio").innerText()).includes("Li vedi solo tu finché non arriva il report Amway"), "conferma: i VP li vedo solo io");
   await page.click(".sheet button.primary");
-  await page.getByText("Ordine confermato: 42,5 VP nel mese").waitFor();
+  await page.getByText("Ordine confermato: 42,50 VP nel mese").waitFor();
   const mese2 = page.locator(".card", { hasText:"Il mio mese" });
   check((await mese2.locator(".obiettivo .num").first().innerText()).startsWith("342,5"), "034: report + il mio ordine dopo il report (342,5 VP)");
   check((await mese2.locator(".vp-report").innerText()).includes("+ 42,5 VP dei tuoi ordini scritti dopo: li vedi solo tu"), "034: la parte scritta da me si vede a parte");
@@ -2074,7 +2074,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(await page.locator("#bozza-ordine").getByText("Vuota").isVisible(), "dopo la conferma la bozza è vuota");
   const storico = page.locator("#miei-ordini");
   await mese2.screenshot({ path: S + "/e2e/39-mio-mese.png" });
-  check((await storico.innerText()).includes("2 prodotti") && (await storico.innerText()).includes("42,5 VP"), "l'ordine è nello storico");
+  check((await storico.innerText()).includes("2 prodotti") && (await storico.innerText()).includes("42,50 VP"), "l'ordine è nello storico");
   await storico.locator("button[data-act=mio-apri]").click();
   check((await storico.innerText()).includes("2 × Crema Prova"), "toccando l'ordine si vedono i prodotti");
   await storico.screenshot({ path: S + "/e2e/39-miei-ordini.png" });
@@ -2082,13 +2082,13 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await storico.locator("button[data-act=mio-rifai]").click();
   await page.getByText("Prodotti copiati nella bozza ordine").waitFor();
   check(await page.locator("#bozza-ordine").getByText("2 prodotti").isVisible()
-    && (await page.locator("#bozza-ordine .tot-mio").innerText()).startsWith("42,5"), "Rifai: stessi prodotti e quantità nella bozza");
+    && (await page.locator("#bozza-ordine .tot-mio").innerText()).startsWith("42,50"), "Rifai: stessi prodotti e quantità nella bozza");
   await page.click("#bozza-ordine button[data-act=mio-svuota]");
   await page.getByText("Bozza svuotata").waitFor();
   // togli l'ordine: chiede conferma, poi i VP escono dal mese
   await storico.locator("button[data-act=mio-togli]").click();
   await page.locator(".sheet h2", { hasText:"Togli l'ordine del" }).waitFor();
-  check((await page.locator(".sheet").innerText()).includes("I 42,5 VP escono dal tuo mese di"), "togli: la conferma dice quanti VP escono dal mese");
+  check((await page.locator(".sheet").innerText()).includes("I 42,50 VP escono dal tuo mese di"), "togli: la conferma dice quanti VP escono dal mese");
   await page.click(".sheet [data-act=chiudi]");
   check(await page.locator("#miei-ordini").count() === 1, "Indietro: l'ordine resta");
   await page.locator("#miei-ordini button[data-act=mio-togli]").click();
