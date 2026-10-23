@@ -83,6 +83,17 @@ function creaApi(){
     salvaMesePassato: a => q(sb.rpc("salva_mese_passato", a)),
     inAttesa:     () => q(sb.rpc("in_attesa")),
     datiAl:       (pid, mese) => q(sb.from("numeri_mese").select("dati_al").eq("partner_id", pid).eq("mese", mese)),
+    /* 034: i miei numeri ufficiali (per sommare i miei ordini scritti dopo il report) */
+    mioReport:    (pid, dal) => q(sb.from("numeri_mese").select("mese,vpp,vpg,percentuale,dati_al").eq("partner_id", pid).gte("mese", dal)),
+    /* 034: la bozza d'ordine e lo storico dei miei ordini (solo miei, RLS) */
+    ordiniMiei:   () => q(sb.from("ordini_personali").select("*").order("creato_il")),
+    righeMie:     () => q(sb.from("righe_ordine_personale").select("*")),
+    nuovaBozzaMia: id => q(sb.from("ordini_personali").insert({ id })),
+    nuovaRigaMia: riga => q(sb.from("righe_ordine_personale").insert(riga)),
+    quantitaMia:  (id, quantita) => q(sb.from("righe_ordine_personale").update({ quantita }).eq("id", id)),
+    togliRigaMia: id => q(sb.from("righe_ordine_personale").delete().eq("id", id)),
+    togliOrdineMio: id => q(sb.from("ordini_personali").delete().eq("id", id)),
+    confermaOrdine: (id, data) => q(sb.rpc("conferma_ordine", { p_ordine:id, p_data:data })),
     esclusi:      () => q(sb.from("esclusi_import").select("codice")),
     /* persone nascoste dalla mia struttura (i loro VP contano lo stesso) */
     nascosti:     () => q(sb.from("nascosti").select("nascosto_id")),
@@ -238,6 +249,8 @@ const MESSAGGI_ERRORE = {
   profilo_esistente: "Questo telefono è già collegato a un profilo: ricarica la pagina.",
   data_futura: "La data di iscrizione non può essere nel futuro.",
   qualifica_non_valida: "Qualifica non riconosciuta.",
+  ordine_vuoto: "La bozza è vuota: aggiungi almeno un prodotto.",
+  data_non_valida: "La data dell'ordine non può essere nel futuro.",
   in_attesa: "Sei ancora in attesa della mappa: potrai importare dopo che un report della tua upline ti avrà inserito nella struttura.",
   codice_mancante: "Prima importa il report del mese in corso: salva il tuo codice Amway nell'app.",
   percentuale_non_valida: "Percentuale non riconosciuta.",
@@ -295,17 +308,22 @@ function perMese(lista, campo){
 }
 /* I VP: ordini più le correzioni fatte con "Aggiorna il totale del mese" (anche negative). */
 function movimentiVp(){ return st.att.filter(a => a.tipo === "ordine" || a.tipo === "rettifica"); }
-/* I miei VP del mese: quelli del report Amway quando il mese ne ha uno (anche importato dalla upline), altrimenti gli
-   ordini registrati nell'app. Con una lista esplicita (correzioni del totale) contano sempre gli ordini. */
-function vpReport(m){
-  const righe = m === meseDi(oggi()) ? st.riep : m === mesePrecedente() ? st.riepPrec : [];
-  const r = st.profilo ? rigaDi(righe || [], st.profilo.id) : null;
-  return r && r.da_report ? Number(r.vp_personali) || 0 : null;
+/* I miei VP del mese (034): il VPP del report Amway quando il mese ne ha uno (anche importato dalla upline) più i miei
+   ordini scritti dopo la data e ora del file; senza report, gli ordini registrati nell'app. Gli ordini a mano li vedo
+   solo io: sponsor e upline vedono solo il report. Con una lista esplicita (un partner senza app) contano gli ordini. */
+function reportMio(m){ return (st.mioReport && st.mioReport.get(m)) || null; }
+function vpReport(m){ const r = reportMio(m); return r ? Number(r.vpp) || 0 : null; }
+function dopoReport(a, r){ return !r || (new Date(a.inserito_il || 0) > new Date(r.dati_al) && a.inserito_da === st.profilo.id); }
+function vpDopoReport(m){
+  const r = reportMio(m);
+  return somma(movimentiVp().filter(a => meseDi(a.data) === m && dopoReport(a, r)), "vp");
 }
 function vpMese(m, lista){
-  if(!lista){ const v = vpReport(m); if(v != null) return v; }
+  if(!lista){ const v = vpReport(m); if(v != null) return v + vpDopoReport(m); }
   return somma((lista || st.att).filter(a => (a.tipo === "ordine" || a.tipo === "rettifica") && meseDi(a.data) === m), "vp");
 }
+/* il totale che vedo e correggo: il mio (report + dopo) o quello del partner senza app aperto nella scheda */
+function vpAttuale(m){ return st.target ? vpMese(m, lista()) : vpMese(m); }
 /* Le attività su cui sto lavorando: le mie, o quelle del partner senza app aperto nella scheda */
 function lista(){ return st.target ? st.attScheda : st.att; }
 function clientiMese(m){ return somma(attivita("cliente").filter(a => meseDi(a.data) === m), "quantita"); }
@@ -334,9 +352,12 @@ function numeriMese(m){
   const personali = vpMese(m);
   /* con un import del report: VP di gruppo, linee e percentuale ufficiali di Amway */
   if(r && r.da_report){
-    const linee = lineeReport(r);
-    return { personali, gruppo:Number(r.vp_gruppo), linee, attive:linee.filter(l => l.vp >= soglia()).length,
-             percentuale:r.percentuale != null ? Number(r.percentuale) : percentualeDa(Number(r.vp_gruppo)), daReport:true };
+    const linee = lineeReport(r), rep = reportMio(m);
+    /* il gruppo del report più i miei ordini scritti dopo il report (solo nella mia app) */
+    const extra = rep ? personali - (Number(rep.vpp) || 0) : 0;
+    const gruppo = rep ? (Number(rep.vpg) || 0) + extra : Number(r.vp_gruppo);
+    return { personali, gruppo, linee, attive:linee.filter(l => l.vp >= soglia()).length,
+             percentuale:extra || r.percentuale == null ? percentualeDa(gruppo) : Number(r.percentuale), daReport:true };
   }
   const gruppo = (r ? Number(r.vp_gruppo) - Number(r.vp_personali) : 0) + personali;
   const linee = righe.filter(x => x.sponsor_id === me)
@@ -696,6 +717,7 @@ async function caricaTutto(){
   await caricaInviti();
   await caricaClienti();
   await caricaListino();
+  await caricaOrdiniMiei();
 
   /* nuova settimana / nuovo mese: si riparte dall'ultimo obiettivo scelto */
   const g = (goals || [])[0];
@@ -727,6 +749,8 @@ async function caricaNumeri(){
   ]);
   st.riep = riep || []; st.riepPrec = prec || []; st.storico = storico || []; st.livelli = livelli || [];
   try{ st.mesiReport = await api.mesiReport(pid) || []; }catch(e){ st.mesiReport = []; }
+  try{ st.mioReport = new Map((await api.mioReport(pid, mesePrecedente() + "-01") || []).map(r => [meseDi(r.mese), r])); }
+  catch(e){ st.mioReport = new Map(); }
   st.mesiLinee = new Map();
   if(daPlatino(st.profilo.qualifica_iniziale)){
     const frontali = lineeDi(pid, rigaDi(st.riep, pid)).filter(l => l.id && l.id !== pid && st.struttura.some(p => p.id === l.id));
@@ -1187,6 +1211,8 @@ function vHome(){
   ${vTappa()}
   ${vSettimana()}
   ${vMese()}
+  ${vBozzaOrdine()}
+  ${vMieiOrdini()}
   ${vOggi()}`}
   ${vFondo()}`;
 }
@@ -1680,6 +1706,24 @@ function barra(nome, fatto, obj){
     <div class="bar ${obj && fatto >= obj ? "fatto" : ""}" role="progressbar" aria-label="${nome}" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div></div>`;
 }
 
+/* VP del mese (034): in verde la parte del report Amway, in rame i miei ordini scritti dopo (li vedo solo io) */
+function barraVp(m){
+  const rep = vpReport(m);
+  if(rep == null) return barra("VP fatturati", vpMese(m), st.goalMese.obiettivo_vp);
+  const fatto = vpMese(m), obj = Number(st.goalMese.obiettivo_vp) || 0;
+  const w = v => obj ? Math.min(100, Math.round(v / obj * 100)) : 0, pct = w(fatto), wRep = w(Math.max(0, Math.min(rep, fatto)));
+  return `<div class="obiettivo"><div class="spread"><span>VP fatturati</span>
+    <span class="num">${num(fatto)} <span class="faint">/ ${num(obj)}</span></span></div>
+    <div class="bar doppia ${obj && fatto >= obj ? "fatto" : ""}" role="progressbar" aria-label="VP fatturati" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i class="rep" style="width:${wRep}%"></i><i style="width:${Math.max(0, pct - wRep)}%"></i></div></div>`;
+}
+function rigaVp(m){
+  const rep = vpReport(m), r = reportMio(m), dopo = vpMese(m) - (rep || 0);
+  if(rep == null) return vpMese(m) ? `<p class="small vp-report" style="margin:4px 0 0">I VP scritti da te: li vedi solo tu.
+    Sponsor e upline vedono i tuoi numeri quando arriva il report Amway.</p>` : "";
+  return `<p class="small vp-report" style="margin:4px 0 0">${num(rep)} VP dal report del ${esc(fmtDataOra.format(new Date(r.dati_al)))}${dopo
+    ? ` · ${dopo > 0 ? "+" : "−"} ${num(Math.abs(dopo))} VP dei tuoi ordini scritti dopo: li vedi solo tu.` : "."}</p>`;
+}
+
 function vSettimana(){
   const g = st.goal;
   return `<div class="card">
@@ -1704,9 +1748,8 @@ function vMese(){
       <h2 style="margin-top:2px">${nomeMese(m).replace(/^./, x => x.toUpperCase())}</h2></div>
       <span class="row" style="gap:6px"><button class="btn small ghost" data-act="storico">Storico</button>
       <button class="btn small ghost" data-act="obiettivo-mese">Obiettivo</button></span></div>
-    <div style="margin-top:12px">${barra("VP fatturati", vpMese(m), st.goalMese.obiettivo_vp)}</div>
-    ${vpReport(m) != null ? `<p class="small vp-report" style="margin:4px 0 0">VP dal report Amway: valgono su quelli scritti a mano.
-      Gli ordini registrati dopo il report contano dal prossimo report.</p>` : ""}
+    <div style="margin-top:12px">${barraVp(m)}</div>
+    ${rigaVp(m)}
     <div class="row" style="margin-top:10px;gap:8px">
       <button class="btn small grow" data-act="ordine">+ Ordine</button>
       <button class="btn small grow" data-act="totale-mese">Aggiorna il totale</button>
@@ -1939,14 +1982,17 @@ const ETICHETTE_GRUPPO = {
   followup: { nome:"VP sotto soglia", cl:"g", ordine:4 },
   crescita: { nome:"In crescita", cl:"v", ordine:5 }
 };
-/* I numeri di una persona nelle ultime 4 settimane */
+/* 034: di chi usa l'app (non io) sponsor e upline vedono solo i VP del report Amway, mai gli ordini scritti a mano */
+function soloReport(pid){ const p = st.struttura.find(x => x.id === pid); return pid !== st.profilo.id && !!p && p.stato !== "gestito"; }
+/* I numeri di una persona nelle ultime 4 settimane (i VP di chi usa l'app: quelli del report del mese) */
 function numeri4(pid){
   const dal = inizio4();
   const l = st.gruppo4.att.filter(a => a.partner_id === pid && a.data >= dal);
   const q = tipo => somma(l.filter(a => a.tipo === tipo), "quantita");
   const ultima = l.reduce((m, a) => a.data > m ? a.data : m, "");
   return { contatti:q("contatto"), piani:q("piano"), ordini:q("ordine"),
-           vp:somma(l.filter(a => a.tipo === "ordine" || a.tipo === "rettifica"), "vp"), ultima };
+           vp:soloReport(pid) ? Number((rigaDi(st.riep, pid) || {}).vp_personali) || 0
+             : somma(l.filter(a => a.tipo === "ordine" || a.tipo === "rettifica"), "vp"), ultima };
 }
 function obiettiviDi(pid){
   const pr = proposta();
@@ -2089,12 +2135,14 @@ function confrontoMese(pid){
   return { m, mp, stessoGiorno, righe: [
     { nome:"Contatti", ora:ora.contatti, allora:allora.contatti, prima:prima.contatti },
     { nome:"Piani", ora:ora.piani, allora:allora.piani, prima:prima.piani },
-    { nome:"Ordini", ora:ora.ordini, allora:allora.ordini, prima:prima.ordini },
+    soloReport(pid) ? null : { nome:"Ordini", ora:ora.ordini, allora:allora.ordini, prima:prima.ordini },
     { nome:"Nuovi clienti", ora:ora.clienti, allora:allora.clienti, prima:prima.clienti },
-    { nome:"VP personali", ora:ora.vp, allora:allora.vp, prima: rp.vp_personali != null ? Number(rp.vp_personali) : prima.vp },
+    soloReport(pid)
+      ? { nome:"VP personali", ora:Number(r.vp_personali) || 0, allora:null, prima:Number(rp.vp_personali) || 0 }
+      : { nome:"VP personali", ora:ora.vp, allora:allora.vp, prima: rp.vp_personali != null ? Number(rp.vp_personali) : prima.vp },
     { nome:"VP di gruppo", ora:Number(r.vp_gruppo) || 0, allora:null, prima:Number(rp.vp_gruppo) || 0 },
     { nome:"Linee attive", ora:Number(r.linee_attive) || 0, allora:null, prima:Number(rp.linee_attive) || 0 }
-  ]};
+  ].filter(Boolean)};
 }
 function vConfronto(p){
   const c = confrontoMese(p.id);
@@ -2107,7 +2155,7 @@ function vConfronto(p){
       <tbody>${c.righe.map(x => `<tr><td>${x.nome}</td>${cella(x.ora, x.allora)}
         <td class="num faint">${x.allora == null ? "–" : num(x.allora)}</td><td class="num faint">${num(x.prima)}</td></tr>`).join("")}</tbody>
     </table>
-    <p class="nota">▼ in rosso: sotto il mese prima allo stesso giorno. VP di gruppo e linee attive del mese prima ci sono solo come totale.</p>
+    <p class="nota">▼ in rosso: sotto il mese prima allo stesso giorno. ${soloReport(p.id) ? "I VP sono quelli del report Amway; " : ""}VP di gruppo e linee attive del mese prima ci sono solo come totale.</p>
   </div>`;
 }
 function vScheda(){
@@ -2646,7 +2694,7 @@ async function eseguiImport(f){
 /* ---- 10. Fogli in basso ---- */
 function vSheet(){
   const s = st.sheet;
-  const sp = vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s) || vSheetListino(s);
+  const sp = vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s) || vSheetListino(s) || vSheetMiei(s);
   if(sp) return sp;
   if(s === "codici-tolti") return `<h2>Codici Amway tolti</h2>
     <p class="small">Le persone tolte dalla struttura prima della conferma: con questi codici non si entra finché non li sblocchi.</p>
@@ -2681,11 +2729,11 @@ function vSheet(){
     const chi = st.target ? ` di ${esc(nomeSaluto(nomeDi(st.target)))}` : "";
     return `<h2>VP di ${nomeMese(m).split(" ")[0]}${chi}</h2>
     <p class="small">Scrivi il totale dei VP personali del mese${st.target ? chi : ""}, per esempio quello dell'ufficio virtuale Amway.
-      L'app registra solo la differenza con quanto è già inserito (${num(vpMese(m, lista()))} VP).</p>
+      L'app registra solo la differenza con quanto è già inserito (${num(vpAttuale(m))} VP).</p>
     <form data-form="totale-mese" novalidate>
       ${scelta}
       <label class="field"><span>Totale VP del mese</span>
-        <input name="vp" type="text" inputmode="decimal" autocomplete="off" autofocus value="" placeholder="${num(vpMese(m, lista()))}" data-vuoto></label>
+        <input name="vp" type="text" inputmode="decimal" autocomplete="off" autofocus value="" placeholder="${num(vpAttuale(m))}" data-vuoto></label>
       ${piede}${err}
     </form>`;
   }
@@ -2852,7 +2900,7 @@ async function registra(tipo, extra){
   const promessa = api.addActivity(riga);
   const per = perAltri ? ` per ${nomeSaluto(nomeDi(pid))}` : "";
   const msg = tipo === "ordine" ? `Ordine da ${num(riga.vp)} VP registrato${per}`
-    : tipo === "rettifica" ? `Totale di ${nomeMese(meseDi(riga.data)).split(" ")[0]} aggiornato${per}: ${num(vpMese(meseDi(riga.data), prendi()))} VP`
+    : tipo === "rettifica" ? `Totale di ${nomeMese(meseDi(riga.data)).split(" ")[0]} aggiornato${per}: ${num(perAltri ? vpMese(meseDi(riga.data), prendi()) : vpMese(meseDi(riga.data)))} VP`
     : `${ETICHETTE[tipo]} registrato${per}`;
   const dopo = () => { if(perAltri) caricaNumeri().then(render).catch(() => {}); };
   toast(msg, async () => {
@@ -3269,7 +3317,7 @@ const MODULI = {
     const totale = numIt(f.vp.value);
     if(!(totale >= 0) || totale > 100000){ mostraErroreForm(f, "Scrivi il totale dei VP del mese (un numero, anche con la virgola)."); return; }
     const m = st.meseTotale || meseDi(oggi());
-    const diff = Math.round((totale - vpMese(m, lista())) * 100) / 100;
+    const diff = Math.round((totale - vpAttuale(m)) * 100) / 100;
     st.sheet = null;
     if(diff === 0){ render(); toast("Il totale era già questo"); return; }
     /* nel mese precedente la correzione va all'ultimo giorno di quel mese */
@@ -5028,6 +5076,172 @@ Object.assign(MODULI, {
 document.addEventListener("change", e => { if(e.target && e.target.id === "file-listino") leggiPdfListino(e.target.files && e.target.files[0]); });
 document.addEventListener("input", e => {
   if(e.target && e.target.id === "cerca-listino"){ st.cercaListino = e.target.value; const u = document.getElementById("risultati-listino"); if(u) u.innerHTML = risultatiListino(e.target.value); }
+});
+
+/* ---- 11h. I miei ordini (034): la bozza d'ordine e lo storico, solo miei ----
+   La bozza resta nel database (una sola alla volta) finché non la confermo: allora il totale VP diventa un ordine del
+   mese, che vedo solo io finché non arriva il report Amway. Dallo storico si rifà un ordine o lo si toglie. */
+async function caricaOrdiniMiei(){
+  try{
+    const [ordini, righe] = await Promise.all([api.ordiniMiei(), api.righeMie()]);
+    st.mieiOrdini = ordini || []; st.mieRighe = righe || [];
+  }catch(e){ st.mieiOrdini = st.mieiOrdini || []; st.mieRighe = st.mieRighe || []; }
+}
+function bozzaMia(){ return (st.mieiOrdini || []).find(o => o.stato === "bozza") || null; }
+function righeMie(oid){ return (st.mieRighe || []).filter(r => r.ordine_id === oid).sort((a, b) => a.nome < b.nome ? -1 : 1); }
+function storicoMio(){ return (st.mieiOrdini || []).filter(o => o.stato === "confermato")
+  .sort((a, b) => a.data < b.data ? 1 : a.data > b.data ? -1 : a.confermato_il < b.confermato_il ? 1 : -1); }
+function totaliMiei(righe){
+  const t = { vp:0, partner:0, pubblico:0 };
+  for(const r of righe){ const q = Number(r.quantita) || 0;
+    t.vp += (Number(r.vp) || 0) * q; t.partner += (Number(r.prezzo_partner) || 0) * q; t.pubblico += (Number(r.prezzo_cliente) || 0) * q; }
+  return t;
+}
+function testoPrezzi(x){ return `${num(x.vp)} VP · Partner ${euro(x.partner)} · Pubblico ${euro(x.pubblico)}`; }
+function testoTotaliMiei(t){ return `<b>${num(t.vp)}</b> VP · Partner <b>${euro(t.partner)}</b> · Pubblico <b>${euro(t.pubblico)}</b>`; }
+function prezziRiga(r){ return { vp:Number(r.vp) || 0, partner:Number(r.prezzo_partner) || 0, pubblico:Number(r.prezzo_cliente) || 0 }; }
+function prodotti(n){ return plur(n, "prodotto", "prodotti"); }
+
+function vBozzaOrdine(){
+  const b = bozzaMia(), righe = b ? righeMie(b.id) : [];
+  return `<div class="card" id="bozza-ordine">
+    <div class="spread"><div><span class="eyebrow">Bozza ordine</span>
+      <h2 style="margin-top:2px">${righe.length ? prodotti(righe.length) : "Vuota"}</h2></div>
+      ${righe.length ? `<span class="pill">Salvata</span>` : ""}</div>
+    <input type="search" id="cerca-mio" class="cerca" style="margin-top:10px" placeholder="Cerca un prodotto (nome o codice)…" autocomplete="off" value="${esc(st.cercaMio || "")}">
+    <ul class="risultati-prodotto" id="risultati-mio">${risultatiMio(st.cercaMio)}</ul>
+    ${righe.length ? `<ul class="righe-ordine" style="margin-top:6px">${righe.map(r => `<li>
+      <span class="grow"><b>${esc(r.nome)}</b><br><span class="small">${testoPrezzi(prezziRiga(r))}</span></span>
+      <span class="qta"><button type="button" class="btn small ghost" data-act="mio-meno" data-id="${esc(r.id)}" aria-label="Uno in meno">−</button><b>${r.quantita}</b>
+        <button type="button" class="btn small ghost" data-act="mio-piu" data-id="${esc(r.id)}" aria-label="Uno in più">+</button></span></li>`).join("")}</ul>
+    <p class="tot-mio" style="margin:8px 0 0">${testoTotaliMiei(totaliMiei(righe))}</p>
+    <div class="row" style="margin-top:10px;gap:8px"><button class="btn small grow" data-act="mio-svuota">Svuota</button>
+      <button class="btn small primary grow" data-act="mio-conferma">Conferma ordine</button></div>` : ""}
+    <p class="small" style="margin:8px 0 0">La bozza la vedi solo tu.</p>
+  </div>`;
+}
+function risultatiMio(q){
+  const t = senzaAccenti(q || "");
+  if(t.length < 2) return "";
+  const cat = st.listino.filter(r => r.attivo !== false && senzaAccenti(r.codice + " " + r.nome).includes(t)).slice(0, 8);
+  if(!cat.length) return `<li class="small muted">Nessun prodotto del listino con «${esc(q.trim())}».</li>`;
+  return cat.map(r => `<li><button type="button" class="persona" data-act="mio-aggiungi" data-codice="${esc(r.codice)}">
+      <span class="grow">${esc(r.nome)}${r.formato ? ` (${esc(r.formato)})` : ""}<br><span class="small">${esc(r.codice)} · ${testoPrezzi({ vp:Number(r.vp) || 0,
+        partner:Number(r.prezzo_partner) || 0, pubblico:Number(r.prezzo_cliente) || 0 })}</span></span><b>+</b></button></li>`).join("");
+}
+function vMieiOrdini(){
+  const lista = storicoMio();
+  if(!lista.length) return "";
+  const tutti = st.mieiTutti || lista.length <= 5, vedi = tutti ? lista : lista.slice(0, 5);
+  return `<div class="card" id="miei-ordini">
+    <span class="eyebrow">I miei ordini</span>
+    <ul class="righe-ordine" style="margin-top:6px">${vedi.map(o => { const righe = righeMie(o.id), t = totaliMiei(righe), aperto = st.mioAperto === o.id;
+      return `<li style="flex-wrap:wrap">
+      <button type="button" class="apri-mio" data-act="mio-apri" data-id="${esc(o.id)}" aria-expanded="${aperto}">
+        <b>${esc(dataIt(o.data))}</b> · <b class="num">${num(o.vp != null ? o.vp : t.vp)} VP</b><br>
+        <span class="small">${prodotti(righe.length)} · Partner ${euro(t.partner)} · Pubblico ${euro(t.pubblico)}</span></button>
+      <button type="button" class="btn small ghost" data-act="mio-rifai" data-id="${esc(o.id)}">Rifai</button>
+      <button type="button" class="btn small ghost" data-act="mio-togli" data-id="${esc(o.id)}" aria-label="Togli l'ordine del ${esc(dataIt(o.data))}">×</button>
+      ${aperto ? `<ul class="small" style="flex-basis:100%;margin:4px 0 0;padding-left:18px">${righe.map(r =>
+        `<li style="display:list-item;border:0;padding:2px 0">${r.quantita} × ${esc(r.nome)} · ${testoPrezzi(prezziRiga(r))}</li>`).join("")}</ul>` : ""}
+    </li>`; }).join("")}</ul>
+    ${tutti ? "" : `<button class="btn small ghost wide" style="margin-top:8px" data-act="miei-tutti">Tutti gli ordini (${lista.length})</button>`}
+  </div>`;
+}
+function vSheetMiei(s){
+  if(s === "conferma-mio"){
+    const b = bozzaMia(); if(!b) return "";
+    const righe = righeMie(b.id), t = totaliMiei(righe), m = meseDi(st.dataMio || oggi());
+    return `<h2>Confermi l'ordine?</h2>
+    <p class="small">${prodotti(righe.length)} · ${testoTotaliMiei(t)}</p>
+    <form data-form="conferma-mio" novalidate>
+      <label class="field"><span>Data dell'ordine</span><input type="date" name="data" min="${primaDataAperta()}" max="${oggi()}" value="${esc(st.dataMio || oggi())}"></label>
+      <p class="small" id="testo-conferma-mio">I ${num(t.vp)} VP vanno nel tuo mese di ${nomeMese(m).split(" ")[0]}. Li vedi solo tu finché non arriva il report Amway.</p>
+      ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
+      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Indietro</button><button class="btn primary grow">Conferma</button></div>
+    </form>`;
+  }
+  if(s === "togli-mio"){
+    const o = (st.mieiOrdini || []).find(x => x.id === st.mioDaTogliere); if(!o) return "";
+    const righe = righeMie(o.id), vp = o.vp != null ? Number(o.vp) : totaliMiei(righe).vp;
+    return `<h2>Togli l'ordine del ${esc(dataIt(o.data))}?</h2>
+    <p class="small">${prodotti(righe.length)} · ${num(vp)} VP.${o.attivita_id ? ` I ${num(vp)} VP escono dal tuo mese di ${nomeMese(meseDi(o.data)).split(" ")[0]}.` : ""}</p>
+    ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
+    <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Indietro</button>
+      <button class="btn primary grow" data-act="mio-togli-ok">Togli</button></div>`;
+  }
+  return "";
+}
+/* aggiungo un prodotto (o ne aumento la quantità) nella bozza, creandola se non c'è */
+async function aggiungiMio(c, quantita){
+  let b = bozzaMia();
+  if(!b){ const id = uuid(); await api.nuovaBozzaMia(id); b = { id, stato:"bozza", data:oggi(), creato_il:new Date().toISOString() }; st.mieiOrdini.push(b); }
+  const r = righeMie(b.id).find(x => x.codice === c.codice);
+  if(r){ const qn = Math.min(99, r.quantita + quantita); await api.quantitaMia(r.id, qn); r.quantita = qn; return; }
+  const riga = { id:uuid(), ordine_id:b.id, codice:c.codice, nome:String(c.nome).slice(0, 160), quantita:Math.min(99, quantita),
+    vp:numOrNull(c.vp), prezzo_partner:numOrNull(c.prezzo_partner), prezzo_cliente:numOrNull(c.prezzo_cliente) };
+  await api.nuovaRigaMia(riga);
+  st.mieRighe.push(riga);
+}
+Object.assign(AZIONI, {
+  async "mio-aggiungi"(el){
+    const r = st.listino.find(x => x.codice === el.dataset.codice);
+    if(!r) return;
+    try{ await aggiungiMio({ codice:r.codice, nome:r.nome + (r.formato ? ` (${r.formato})` : ""), vp:r.vp, prezzo_partner:r.prezzo_partner,
+      prezzo_cliente:r.prezzo_cliente }, 1); st.cercaMio = ""; render(); }
+    catch(e){ toast(messaggio(e)); }
+  },
+  async "mio-piu"(el){ const r = st.mieRighe.find(x => x.id === el.dataset.id); if(!r || r.quantita >= 99) return;
+    try{ await api.quantitaMia(r.id, r.quantita + 1); r.quantita++; render(); }catch(e){ toast(messaggio(e)); } },
+  async "mio-meno"(el){ const r = st.mieRighe.find(x => x.id === el.dataset.id); if(!r) return;
+    try{
+      if(r.quantita > 1){ await api.quantitaMia(r.id, r.quantita - 1); r.quantita--; }
+      else { await api.togliRigaMia(r.id); st.mieRighe = st.mieRighe.filter(x => x.id !== r.id); }
+      render();
+    }catch(e){ toast(messaggio(e)); } },
+  async "mio-svuota"(){ const b = bozzaMia(); if(!b) return;
+    try{ await api.togliOrdineMio(b.id); st.mieiOrdini = st.mieiOrdini.filter(x => x.id !== b.id); st.mieRighe = st.mieRighe.filter(x => x.ordine_id !== b.id);
+      render(); toast("Bozza svuotata"); }catch(e){ toast(messaggio(e)); } },
+  "mio-conferma"(){ st.dataMio = oggi(); st.errore = null; st.sheet = "conferma-mio"; render(); },
+  "mio-apri"(el){ st.mioAperto = st.mioAperto === el.dataset.id ? null : el.dataset.id; render(); },
+  "miei-tutti"(){ st.mieiTutti = true; render(); },
+  async "mio-rifai"(el){
+    try{ for(const r of righeMie(el.dataset.id)) await aggiungiMio(r, r.quantita); render(); toast("Prodotti copiati nella bozza ordine"); }
+    catch(e){ await caricaOrdiniMiei(); render(); toast(messaggio(e)); }
+  },
+  "mio-togli"(el){ st.mioDaTogliere = el.dataset.id; st.errore = null; st.sheet = "togli-mio"; render(); },
+  async "mio-togli-ok"(){
+    const o = st.mieiOrdini.find(x => x.id === st.mioDaTogliere); if(!o) return;
+    try{
+      /* prima i VP dal mese (se il mese è chiuso si ferma qui), poi l'ordine con i suoi prodotti */
+      if(o.attivita_id){ await api.deleteActivity(o.attivita_id); st.att = st.att.filter(a => a.id !== o.attivita_id); }
+      await api.togliOrdineMio(o.id);
+      st.mieiOrdini = st.mieiOrdini.filter(x => x.id !== o.id); st.mieRighe = st.mieRighe.filter(x => x.ordine_id !== o.id);
+      st.sheet = null; render(); toast("Ordine tolto");
+    }catch(e){ st.errore = messaggio(e); render(); }
+  }
+});
+Object.assign(MODULI, {
+  async "conferma-mio"(f){
+    const b = bozzaMia(); if(!b) return;
+    const data = f.data.value || oggi();
+    if(data > oggi()){ mostraErroreForm(f, MESSAGGI_ERRORE.data_non_valida); return; }
+    if(data < primaDataAperta()){ mostraErroreForm(f, MESSAGGI_ERRORE.mese_chiuso); return; }
+    try{
+      const o = await api.confermaOrdine(b.id, data);
+      Object.assign(b, o);
+      st.att = await api.activities(st.profilo.id, [settimana(), primoDelMese()].sort()[0]) || st.att;
+      st.sheet = null; render(); toast(`Ordine confermato: ${num(o.vp)} VP nel mese`);
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  }
+});
+document.addEventListener("input", e => {
+  const t = e.target;
+  if(t && t.id === "cerca-mio"){ st.cercaMio = t.value; const u = document.getElementById("risultati-mio"); if(u) u.innerHTML = risultatiMio(t.value); }
+  if(t && t.name === "data" && t.closest && t.closest('[data-form="conferma-mio"]')){
+    st.dataMio = t.value; const b = bozzaMia(), p = document.getElementById("testo-conferma-mio");
+    if(b && p && t.value) p.textContent = `I ${num(totaliMiei(righeMie(b.id)).vp)} VP vanno nel tuo mese di ${nomeMese(meseDi(t.value)).split(" ")[0]}. Li vedi solo tu finché non arriva il report Amway.`;
+  }
 });
 
 /* ---- 11g. Il movimento (scelte di Stefano dalla tavola di prova: "Vivace"; tra le schede "Una sopra l'altra") ----

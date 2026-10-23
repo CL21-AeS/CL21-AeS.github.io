@@ -501,6 +501,8 @@ A("lino", "contatto", 3);
 A("ivo", "contatto", 25); A("ivo", "piano", 2);
 A("fede", "contatto", 22); A("fede", "piano", 6); A("fede", "ordine", 1, 20);
 A("cri", "contatto", 25); A("cri", "piano", 6); A("cri", "ordine", 2, 60);
+/* 034: di chi usa l'app la upline vede solo i VP del report (gli ordini a mano no) */
+DB.numeri = [{ visto_da:"R", partner_id:"cri", mese:oggiStr.slice(0, 7), vpp:120, vpg:120, percentuale:null, linee:[], dati_al:new Date().toISOString() }];
 DB.persone = (DB.persone || []).concat([{ id:"pv1", proprietario:"ivo", nome:"Nome Uno", fase:"lista", esito:null },
   { id:"pv2", proprietario:"ivo", nome:"Nome Due", fase:"invitato", esito:null }]);
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
@@ -565,6 +567,8 @@ const B = (tipo, n, data, vp) => { for(let i = 0; i < n; i++) DB.activities.push
   vp: vp != null ? vp : null, data, inserito_il:new Date().toISOString() }); };
 B("contatto", 2, oggiStr.slice(0, 7) + "-01"); B("piano", 1, oggiStr.slice(0, 7) + "-01");
 B("contatto", 5, mesePrec + "-01"); B("contatto", 3, ultimoPrec); B("ordine", 1, mesePrec + "-01", 80);
+DB.numeri = [{ visto_da:"R", partner_id:"cri", mese:oggiStr.slice(0, 7), vpp:0, vpg:0, percentuale:null, linee:[], dati_al:new Date().toISOString() },
+  { visto_da:"R", partner_id:"cri", mese:mesePrec, vpp:80, vpg:80, percentuale:null, linee:[], dati_al:new Date().toISOString() }];
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.click("button[data-act=vista-gruppo]");
@@ -577,9 +581,10 @@ check(rc[1] === "▼ 2" && rc[2] === (fineMese ? "8" : "5") && rc[3] === "8", "c
 const rp = await riga("Piani");
 check(rp[1] === "1" && rp[3] === "0", "piani sopra il mese prima: nessun ▼");
 const rv = await riga("VP personali");
-check(rv[1] === "▼ 0" && rv[2] === "80", "VP personali sotto il mese prima");
+check(rv[1] === "0" && rv[2] === "–" && rv[3] === "80", "034: VP personali di chi ha l'app dal report: questo mese e il mese prima (" + rv.join("|") + ")");
+check(!(await riga("Ordini")).length, "034: gli ordini a mano di chi ha l'app non si vedono");
 check((await riga("VP di gruppo"))[2] === "–", "VP di gruppo: solo il totale del mese prima");
-check(await page.locator(".confronto td.sotto").count() >= 2, "valori sotto evidenziati");
+check(await page.locator(".confronto td.sotto").count() >= 1, "valori sotto evidenziati");
 await page.screenshot({ path: S + "/e2e/15-confronto.png", fullPage:true });
 
 // 11. Fissa una chiamata: calendario e WhatsApp neutro
@@ -648,6 +653,7 @@ DB.storico = [
   { partner_id:"R", mese:mese2 + "-01", vp_personali:100, vp_gruppo:300, linee_attive:1, percentuale:3, qualifica:null },
   { partner_id:"R", mese:mesePrec + "-01", vp_personali:0, vp_gruppo:80, linee_attive:0, percentuale:null, qualifica:null }];
 DB.activities.push({ id:"st1", partner_id:"lino", tipo:"ordine", quantita:1, vp:50, data:mese2 + "-10", inserito_il:new Date().toISOString() });
+DB.numeri.push({ visto_da:"R", partner_id:"lino", mese:mese2, vpp:50, vpg:50, percentuale:null, linee:[], dati_al:new Date().toISOString() });
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor();
 await page.click("button[data-act=vista-gruppo]");
@@ -1652,7 +1658,7 @@ await ctx.close();
   G("ca", "Linea Alfa", "R", "7000001"); G("cb", "Linea Beta", "R", "7000002"); G("cb1", "Beta Uno", "cb"); G("cb2", "Beta Due", "cb"); G("cb3", "Beta Tre", "cb");
   G("cc", "Linea Gamma", "R", "7000003");
   V("R", 120); V("cb2", 5); V("cb3", 55); V("cc", 150);
-  const report = linee => { DB.numeri = [{ visto_da:"R", partner_id:"R", mese:oggiStr.slice(0, 7), vpg:120 + linee.reduce((t, l) => t + l.vpg, 0), percentuale:null, linee }]; };
+  const report = linee => { DB.numeri = [{ visto_da:"R", partner_id:"R", mese:oggiStr.slice(0, 7), vpp:120, vpg:120 + linee.reduce((t, l) => t + l.vpg, 0), percentuale:null, linee }]; };
   /* il report: Alfa 0, Beta 60, Gamma 150, più una linea che non è nell'app */
   report([{ codice:"7000001", vpg:0 }, { codice:"7000002", vpg:60 }, { codice:"7000003", vpg:150 }, { codice:"7000099", vpg:40 }]);
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
@@ -2016,6 +2022,82 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.click(".sheet button:has-text('Importa')");
   await page.locator(".sheet .errore").waitFor();
   check((await page.locator(".sheet .errore").innerText()).startsWith("Sei ancora in attesa della mappa"), "chi è in attesa non cambia la struttura degli altri");
+  await ctx.close();
+}
+
+// 39. I miei ordini (034): report + i miei ordini scritti dopo (solo per me), la bozza d'ordine e lo storico
+{
+  DB.listino = [{ codice:"9100001", nome:"Crema Prova", formato:"50 ml", categoria:"Bellezza", prezzo_cliente:52.9, prezzo_partner:41.3, vp:18.2, attivo:true },
+    { codice:"9100002", nome:"Detersivo Prova", formato:"1 l", categoria:"Casa", prezzo_cliente:17.6, prezzo_partner:13.7, vp:6.1, attivo:true }];
+  DB.ordiniMiei = []; DB.righeMie = [];
+  const unOraFa = new Date(Date.now() - 3600000).toISOString();
+  DB.numeri = DB.numeri.filter(x => !(x.partner_id === "R" && x.mese === oggiStr.slice(0, 7)))
+    .concat([{ visto_da:"R", partner_id:"R", mese:oggiStr.slice(0, 7), vpp:300, vpg:5000, percentuale:15, linee:[], dati_al:unOraFa }]);
+  DB.activities = DB.activities.filter(a => a.partner_id !== "R")
+    .concat([{ id:"prima1", partner_id:"R", tipo:"ordine", quantita:1, vp:40, data:oggiStr, inserito_da:"R", inserito_il:new Date(Date.now() - 7200000).toISOString() }]);
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  const mese = page.locator(".card", { hasText:"Il mio mese" });
+  const vpFatti = async () => (await mese.locator(".obiettivo .num").first().innerText()).split("/")[0].trim();
+  check(await vpFatti() === "300", "034: l'ordine scritto prima del report non si somma (300 VP)");
+  check((await mese.locator(".vp-report").innerText()).startsWith("300 VP dal report del "), "034: la riga dice da dove viene il numero");
+  // la bozza: cerco, aggiungo, cambio le quantità
+  const bozza = page.locator("#bozza-ordine");
+  check(await bozza.getByText("Vuota").isVisible() && await bozza.getByText("La bozza la vedi solo tu.").isVisible(), "bozza ordine vuota su Io");
+  await page.fill("#cerca-mio", "crema");
+  await bozza.locator("button[data-act=mio-aggiungi]").first().click();
+  await bozza.getByText("1 prodotto").waitFor();
+  await bozza.locator("button[data-act=mio-piu]").click();
+  await page.fill("#cerca-mio", "deters");
+  check((await bozza.locator("#risultati-mio").innerText()).includes("6,1 VP · Partner 13,7 € · Pubblico 17,6 €"), "nei risultati: VP, prezzo Partner e prezzo al pubblico");
+  await bozza.locator("button[data-act=mio-aggiungi]").first().click();
+  await bozza.getByText("2 prodotti").waitFor();
+  check((await bozza.locator(".righe-ordine li", { hasText:"Crema Prova" }).innerText()).includes("18,2 VP · Partner 41,3 € · Pubblico 52,9 €"), "per ogni prodotto VP, Partner e Pubblico");
+  check((await bozza.locator(".tot-mio").innerText()).replace(/\s+/g, " ") === "42,5 VP · Partner 96,3 € · Pubblico 123,4 €", "il totale: VP, Partner e Pubblico");
+  await bozza.screenshot({ path: S + "/e2e/39-bozza-ordine.png" });
+  await sync(page);
+  check(DB.ordiniMiei.length === 1 && DB.ordiniMiei[0].stato === "bozza" && DB.righeMie.length === 2, "la bozza è salvata nel database");
+  await ctx.close();
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  check(await page.locator("#bozza-ordine").getByText("2 prodotti").isVisible(), "riaprendo l'app la bozza c'è ancora");
+  // confermo: i VP vanno nel mese, solo per me
+  await page.click("#bozza-ordine button[data-act=mio-conferma]");
+  await page.locator(".sheet").getByText("Confermi l'ordine?").waitFor();
+  check((await page.locator("#testo-conferma-mio").innerText()).includes("Li vedi solo tu finché non arriva il report Amway"), "conferma: i VP li vedo solo io");
+  await page.click(".sheet button.primary");
+  await page.getByText("Ordine confermato: 42,5 VP nel mese").waitFor();
+  const mese2 = page.locator(".card", { hasText:"Il mio mese" });
+  check((await mese2.locator(".obiettivo .num").first().innerText()).startsWith("342,5"), "034: report + il mio ordine dopo il report (342,5 VP)");
+  check((await mese2.locator(".vp-report").innerText()).includes("+ 42,5 VP dei tuoi ordini scritti dopo: li vedi solo tu"), "034: la parte scritta da me si vede a parte");
+  check(await mese2.locator(".bar.doppia > i.rep").count() === 1, "la barra divide report e ordini scritti dopo");
+  check(await page.locator("#bozza-ordine").getByText("Vuota").isVisible(), "dopo la conferma la bozza è vuota");
+  const storico = page.locator("#miei-ordini");
+  await mese2.screenshot({ path: S + "/e2e/39-mio-mese.png" });
+  check((await storico.innerText()).includes("2 prodotti") && (await storico.innerText()).includes("42,5 VP"), "l'ordine è nello storico");
+  await storico.locator("button[data-act=mio-apri]").click();
+  check((await storico.innerText()).includes("2 × Crema Prova"), "toccando l'ordine si vedono i prodotti");
+  await storico.screenshot({ path: S + "/e2e/39-miei-ordini.png" });
+  // rifai: i prodotti tornano in una nuova bozza
+  await storico.locator("button[data-act=mio-rifai]").click();
+  await page.getByText("Prodotti copiati nella bozza ordine").waitFor();
+  check(await page.locator("#bozza-ordine").getByText("2 prodotti").isVisible()
+    && (await page.locator("#bozza-ordine .tot-mio").innerText()).startsWith("42,5"), "Rifai: stessi prodotti e quantità nella bozza");
+  await page.click("#bozza-ordine button[data-act=mio-svuota]");
+  await page.getByText("Bozza svuotata").waitFor();
+  // togli l'ordine: chiede conferma, poi i VP escono dal mese
+  await storico.locator("button[data-act=mio-togli]").click();
+  await page.locator(".sheet h2", { hasText:"Togli l'ordine del" }).waitFor();
+  check((await page.locator(".sheet").innerText()).includes("I 42,5 VP escono dal tuo mese di"), "togli: la conferma dice quanti VP escono dal mese");
+  await page.click(".sheet [data-act=chiudi]");
+  check(await page.locator("#miei-ordini").count() === 1, "Indietro: l'ordine resta");
+  await page.locator("#miei-ordini button[data-act=mio-togli]").click();
+  await page.click(".sheet [data-act=mio-togli-ok]");
+  await page.getByText("Ordine tolto").waitFor();
+  check(await page.locator("#miei-ordini").count() === 0 && (await page.locator(".card", { hasText:"Il mio mese" }).locator(".obiettivo .num").first().innerText()).startsWith("300"),
+    "ordine tolto: via dallo storico e i VP tornano al report");
+  await sync(page);
+  check(!DB.ordiniMiei.length && !DB.righeMie.length && !DB.activities.some(a => a.partner_id === "R" && a.vp === 42.5), "nel database: via l'ordine, i prodotti e i VP del mese");
   await ctx.close();
 }
 

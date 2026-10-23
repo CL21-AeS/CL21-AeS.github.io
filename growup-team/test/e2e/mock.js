@@ -26,6 +26,9 @@
       .concat([{ visto_da:io.id, partner_id:pid, mese:m, vpp:r.vpp, vpg:r.vpg, percentuale:r.percentuale, linee:r.linee || [], nascoste:!!r.nascoste, dati_al:al }]);
     return true; };
   const visibili = io => [io].concat(sotto(io.id).filter(p => vedo(io, p)));
+  /* 034: ordini e correzioni di chi ha l'app li legge solo lui (gli altri tipi e chi non ha l'app restano visibili) */
+  const leggoAtt = (io, a) => { if(!["ordine", "rettifica"].includes(a.tipo) || a.partner_id === io.id) return true;
+    const p = db.partners.find(x => x.id === a.partner_id); return !!p && p.stato === "gestito"; };
   /* struttura "ricucita": ognuno sotto il primo sopra di lui che vedo */
   const sponsorVis = (io, p) => { if(p.id === io.id) return null;
     for(let s = db.partners.find(x => x.id === p.sponsor_id); s; s = db.partners.find(x => x.id === s.sponsor_id)) if(vedo(io, s)) return s.id;
@@ -133,11 +136,17 @@
       const ric = visibiliRicuciti(io);
       const figliVis = id => ric.filter(p => p.sponsor_id === id);
       const num = id => numeroDi(id, m);
-      const pers = id => { const n = num(id); if(n && n.vpp != null) return Number(n.vpp);
-        return db.activities.filter(a => a.partner_id === id && (a.tipo === "ordine" || a.tipo === "rettifica") && a.data.slice(0, 7) === m).reduce((t, a) => t + Number(a.vp), 0); };
+      /* 034: per me il report + i miei ordini dopo il report; per chi ha l'app solo il report; per chi non l'ha i VP scritti */
+      const ordini = (id, n) => db.activities.filter(a => a.partner_id === id && (a.tipo === "ordine" || a.tipo === "rettifica") && a.data.slice(0, 7) === m
+        && (!n || (n.dati_al && a.inserito_il > n.dati_al && a.inserito_da === id))).reduce((t, a) => t + Number(a.vp), 0);
+      const pers = id => { const n = num(id), p = db.partners.find(x => x.id === id) || {};
+        if(id === io.id) return (n && n.vpp != null ? Number(n.vpp) : 0) + ordini(id, n);
+        if(n && n.vpp != null) return Number(n.vpp);
+        return p.stato === "gestito" ? ordini(id, null) : 0; };
       const grp = id => pers(id) + figliVis(id).reduce((t, p) => t + grp(p.id), 0);
       return ric.map(p => { const n = num(p.id);
-        return { partner_id:p.id, sponsor_id:p.sponsor_id || null, vp_personali:pers(p.id), vp_gruppo:n ? n.vpg : grp(p.id),
+        return { partner_id:p.id, sponsor_id:p.sponsor_id || null, vp_personali:pers(p.id),
+          vp_gruppo:n ? n.vpg + (p.id === io.id ? pers(p.id) - Number(n.vpp || 0) : 0) : grp(p.id),
           linee_attive:n ? n.linee.filter(l => l.vpg >= 100).length : 0, percentuale:n ? n.percentuale : null, qualifica:null, chiuso:false,
           da_report:!!n, linee_report:n ? n.linee : null, linee_nascoste:n ? !!n.nascoste : false }; }); },
     storico: async pid => (db.storico || []).filter(r => r.partner_id === pid),
@@ -170,6 +179,32 @@
       return sotto(io.id).filter(p => p.stato !== "gestito" && p.confermato_il === null && !p.is_admin)
         .map(p => ({ id:p.id, nome:p.nome, sponsor_id:p.sponsor_id, sponsor_nome:(db.partners.find(x => x.id === p.sponsor_id) || {}).nome || null,
           creato_il:p.creato_il || null, mio:p.sponsor_id === io.id, codice_amway:p.codice_amway || null })); },
+    mioReport: async (pid, dal) => (db.numeri || []).filter(x => x.partner_id === pid && x === numeroDi(pid, x.mese) && x.mese + "-01" >= dal)
+      .map(x => ({ mese:x.mese + "-01", vpp:x.vpp, vpg:x.vpg, percentuale:x.percentuale, dati_al:x.dati_al || "9999-12-31T00:00:00Z" })),
+    /* 034: la bozza d'ordine e lo storico, solo miei */
+    ordiniMiei: async () => (db.ordiniMiei || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
+    righeMie: async () => (db.righeMie || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
+    nuovaBozzaMia: async id => { const io = mio();
+      if((db.ordiniMiei || []).some(x => x.proprietario === io.id && x.stato === "bozza")) throw new Error("duplicate key value");
+      db.ordiniMiei = (db.ordiniMiei || []).concat([{ id, proprietario:io.id, stato:"bozza", data:new Date().toISOString().slice(0, 10), attivita_id:null, vp:null,
+        creato_il:new Date().toISOString(), confermato_il:null }]); salva(); },
+    nuovaRigaMia: async r => { const o = (db.ordiniMiei || []).find(x => x.id === r.ordine_id && x.proprietario === mio().id && x.stato === "bozza");
+      if(!o) throw new Error("violates row-level security");
+      db.righeMie = (db.righeMie || []).concat([Object.assign({ proprietario:mio().id }, r)]); salva(); },
+    quantitaMia: async (id, quantita) => { const r = (db.righeMie || []).find(x => x.id === id && x.proprietario === mio().id);
+      const o = r && db.ordiniMiei.find(x => x.id === r.ordine_id); if(r && o.stato === "bozza") r.quantita = quantita; salva(); },
+    togliRigaMia: async id => { db.righeMie = (db.righeMie || []).filter(x => !(x.id === id && x.proprietario === mio().id)); salva(); },
+    togliOrdineMio: async id => { const io = mio(); if(!(db.ordiniMiei || []).some(x => x.id === id && x.proprietario === io.id)) return;
+      db.ordiniMiei = db.ordiniMiei.filter(x => x.id !== id); db.righeMie = (db.righeMie || []).filter(x => x.ordine_id !== id); salva(); },
+    confermaOrdine: async (id, data) => { const io = mio(); const o = (db.ordiniMiei || []).find(x => x.id === id && x.proprietario === io.id && x.stato === "bozza");
+      if(!o) throw new Error("non_autorizzato");
+      const righe = (db.righeMie || []).filter(x => x.ordine_id === id); if(!righe.length) throw new Error("ordine_vuoto");
+      const tot = Math.round(righe.reduce((t, r) => t + (Number(r.vp) || 0) * r.quantita, 0) * 100) / 100;
+      let att = null;
+      if(tot > 0){ att = uid(); db.activities.push({ id:att, partner_id:io.id, tipo:"ordine", vp:tot, quantita:1, data:data || new Date().toISOString().slice(0, 10),
+        inserito_da:io.id, inserito_il:new Date().toISOString() }); }
+      Object.assign(o, { stato:"confermato", data:data || o.data, attivita_id:att, vp:tot, confermato_il:new Date().toISOString() }); salva();
+      return Object.assign({}, o); },
     datiAl: async (pid, mese) => { const n = numeroDi(pid, mese.slice(0, 7)); return n && n.dati_al ? [{ dati_al:n.dati_al }] : []; },
     salvaMesePassato: async a => { const io = mio(); const m = a.p_mese.slice(0, 7), al = a.p_dati_al || new Date().toISOString();
       if(io.confermato_il === null && !io.is_admin) throw new Error("in_attesa");
@@ -279,14 +314,15 @@
       db.importi = (db.importi || 0) + 1; salva();
       return { aggiornati, invariati, aggiunte, spostate, fuori }; },
     attivitaGruppo: async dal => { const io = mio(); if(!io) return [];
-      const ids = new Set(visibili(io).map(p => p.id)); return db.activities.filter(a => ids.has(a.partner_id) && a.data >= dal); },
+      const ids = new Set(visibili(io).map(p => p.id)); return db.activities.filter(a => ids.has(a.partner_id) && a.data >= dal && leggoAtt(io, a)); },
     obiettiviGruppo: async () => db.goals,
     obiettiviMeseGruppo: async () => db.mgoals,
     cambiaChiave: async () => { const p = mio(); p.chiave = hex();
       db.accessi = db.accessi.filter(a => a.partner_id !== p.id || a.user_id === session.user.id); salva(); return p.chiave; },
     stages: async () => db.stages,
     settings: async () => db.settings,
-    activities: async (pid, dal) => db.activities.filter(a => a.partner_id === pid && (a.data >= dal || ["ordine","rettifica","cliente"].includes(a.tipo))),
+    activities: async (pid, dal) => db.activities.filter(a => a.partner_id === pid && (a.data >= dal || ["ordine","rettifica","cliente"].includes(a.tipo))
+      && leggoAtt(mio(), a)),
     /* la Lista: solo mia; i passi contano le attività e aggiornano fase ed esito, come i trigger del database */
     persone: async () => (db.persone || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
     passi: async () => (db.passi || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),

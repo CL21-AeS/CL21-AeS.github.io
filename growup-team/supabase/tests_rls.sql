@@ -297,15 +297,15 @@ begin
   perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', b, '2222222'), 'A non cambia il codice di B, che usa l''app');
 
   -- ---- Calcoli per chi guarda: nessun doppio conteggio ----
-  -- vista di A: A 60, B 150, E 40, F 0, D 0 → A 250 (033: una sola E per tutti)
+  -- vista di A: A 60, B 0 (034: i 150 VP scritti a mano da B li vede solo B), E 40, F 0, D 0 → A 100
   -- vista di R: dal suo report R 120 e 470 di gruppo con 2 linee; A 250 come per A
   perform growup_test.come(u5);  -- A
   select * into x from public.riepilogo_mese(current_date) where partner_id = a;
-  perform growup_test.ok(x.vp_gruppo = 250, 'A: VP di gruppo con le sue persone importate (' || x.vp_gruppo || ')');
+  perform growup_test.ok(x.vp_gruppo = 100, '034: A: VP di gruppo senza gli ordini a mano di B (' || x.vp_gruppo || ')');
   perform growup_test.ok((select count(*) from public.riepilogo_mese(current_date)) = 5, 'A: riepilogo di sé, B, D, E, F');
   perform growup_test.come(u1);  -- R
   select * into x from public.riepilogo_mese(current_date) where partner_id = a;
-  perform growup_test.ok(x.vp_gruppo = 250, '033: R vede il gruppo di A uguale a come lo vede A (' || x.vp_gruppo || ')');
+  perform growup_test.ok(x.vp_gruppo = 40, '034: R vede il gruppo di A senza gli ordini a mano di A e B, solo E che non ha l''app (' || x.vp_gruppo || ')');
   select * into x from public.riepilogo_mese(current_date) where partner_id = r;
   perform growup_test.ok(x.vp_gruppo = 470 and x.linee_attive = 2 and x.vp_personali = 120, 'R: dal report 120 personali, 470 di gruppo, 2 linee attive (' || x.vp_gruppo || ')');
   perform growup_test.come(u4);  -- C
@@ -371,7 +371,7 @@ begin
   insert into public.nascosti (partner_id, nascosto_id) values (a, b);
   perform growup_test.deve_fallire(format('insert into public.nascosti (partner_id, nascosto_id) values (%L, %L)', a, c), 'A non nasconde chi non vede');
   perform growup_test.deve_fallire(format('insert into public.nascosti (partner_id, nascosto_id) values (%L, %L)', b, d), 'A non scrive le nascoste di B');
-  perform growup_test.ok((select vp_gruppo from public.riepilogo_mese(current_date) where partner_id = a) >= 210, 'B nascosto conta ancora nel VP di A');
+  perform growup_test.ok(exists (select 1 from public.riepilogo_mese(current_date) where partner_id = b), 'B nascosto resta nei numeri di A');
   perform growup_test.come(u1);  -- R
   perform growup_test.ok((select count(*) from public.nascosti) = 0, 'R non vede le nascoste di A');
 
@@ -794,6 +794,74 @@ begin
                          '033: il VPP del report vince sugli ordini scritti nell''app');
   perform growup_test.come(u4);  -- C, altra linea: non vede
   perform growup_test.ok(not exists (select 1 from public.numeri_mese where partner_id = b), '033: un''altra linea non vede i numeri di B');
+  execute 'reset role';
+
+  -- ---- 034: gli ordini a mano di chi ha l'app li vede solo lui; per lui contano solo quelli dopo il report ----
+  perform growup_test.come(u3);  -- B: i 150 VP scritti prima del report sono già dentro il report (90)
+  perform growup_test.ok((select vp_personali from public.riepilogo_mese(current_date) where partner_id = b) = 90,
+                         '034: per B gli ordini scritti prima del report non si sommano');
+  execute 'reset role';
+  update public.numeri_mese set dati_al = now() - interval '1 hour' where partner_id = b and mese = date_trunc('month', current_date)::date;
+  perform growup_test.come(u3);  -- B scrive un ordine dopo il file del report (i 150 di prima li aveva scritti un altro)
+  insert into public.activities (partner_id, tipo, vp) values (b, 'ordine', 60);
+  select * into x from public.riepilogo_mese(current_date) where partner_id = b;
+  perform growup_test.ok(x.vp_personali = 150 and x.vp_gruppo = 1060, '034: B vede report + i suoi ordini dopo il report (' || x.vp_personali || ', ' || x.vp_gruppo || ')');
+  perform growup_test.ok(exists (select 1 from public.activities where partner_id = b and tipo = 'ordine'), '034: B legge i suoi ordini');
+  perform growup_test.come(u5);  -- A, sponsor di B: solo il report
+  select * into x from public.riepilogo_mese(current_date) where partner_id = b;
+  perform growup_test.ok(x.vp_personali = 90 and x.vp_gruppo = 1000, '034: lo sponsor vede di B solo il report (' || x.vp_personali || ')');
+  perform growup_test.ok(not exists (select 1 from public.activities where partner_id = b and tipo in ('ordine', 'rettifica')),
+                         '034: lo sponsor non legge gli ordini a mano di B');
+  perform growup_test.ok(exists (select 1 from public.activities where partner_id = b and tipo = 'piano'), '034: lo sponsor legge ancora i piani di B');
+  execute 'reset role';
+  pq := (select id from public.partners where codice_amway = '3000002');  -- Fabio, sotto B, non ha l'app
+  insert into public.activities (partner_id, tipo, vp) values (pq, 'ordine', 25);
+  perform growup_test.come(u1);  -- R: gli ordini di chi non ha l'app restano visibili alla upline
+  perform growup_test.ok(exists (select 1 from public.activities where partner_id = pq and tipo = 'ordine' and vp = 25),
+                         '034: l''upline legge gli ordini di chi non ha l''app');
+  perform growup_test.ok(not exists (select 1 from public.activities where partner_id in (a, b) and tipo in ('ordine', 'rettifica')),
+                         '034: l''upline non legge gli ordini a mano di chi ha l''app');
+  execute 'reset role';
+  update public.numeri_mese set dati_al = now() where partner_id = b and mese = date_trunc('month', current_date)::date;
+  perform growup_test.come(u3);  -- B: un report nuovo assorbe gli ordini scritti prima
+  perform growup_test.ok((select vp_personali from public.riepilogo_mese(current_date) where partner_id = b) = 90,
+                         '034: con un report più nuovo il totale torna al dato del report');
+
+  -- ---- 034: la bozza d'ordine e lo storico, solo miei ----
+  insert into public.ordini_personali default values returning id into pp;
+  insert into public.righe_ordine_personale (ordine_id, codice, nome, quantita, vp, prezzo_partner, prezzo_cliente)
+    values (pp, '1001', 'Prodotto uno', 2, 10.5, 20, 26), (pp, '1002', 'Prodotto due', 1, 4, 9, 12);
+  perform growup_test.deve_fallire('insert into public.ordini_personali default values', '034: una sola bozza aperta');
+  perform growup_test.deve_fallire(format($q$insert into public.ordini_personali (proprietario) values (%L)$q$, a), '034: la bozza è solo mia');
+  perform growup_test.deve_fallire(format($q$update public.ordini_personali set stato = 'confermato' where id = %L$q$, pp),
+                                   '034: la bozza si conferma solo dalla funzione');
+  perform growup_test.come(u5);  -- A
+  perform growup_test.ok(not exists (select 1 from public.ordini_personali) and not exists (select 1 from public.righe_ordine_personale),
+                         '034: lo sponsor non vede la bozza di B');
+  perform growup_test.deve_fallire(format('select public.conferma_ordine(%L, null)', pp), '034: A non conferma la bozza di B');
+  perform growup_test.ok(growup_test.righe(format('delete from public.ordini_personali where id = %L', pp)) = 0, '034: A non toglie la bozza di B');
+  perform growup_test.come(null);
+  perform growup_test.deve_fallire('select count(*) from public.ordini_personali', '034: anon non legge gli ordini');
+  perform growup_test.deve_fallire(format('select public.conferma_ordine(%L, null)', pp), '034: anon non conferma');
+  perform growup_test.come(u3);  -- B conferma: 25 VP nel mese, l'ordine passa nello storico
+  att_prima := (select count(*) from public.activities where partner_id = b and tipo = 'ordine');
+  perform growup_test.ok((public.conferma_ordine(pp, null)->>'vp')::numeric = 25, '034: confermando, il totale VP dell''ordine');
+  perform growup_test.ok((select count(*) from public.activities where partner_id = b and tipo = 'ordine') = att_prima + 1
+                         and exists (select 1 from public.ordini_personali where id = pp and stato = 'confermato' and attivita_id is not null),
+                         '034: l''ordine confermato diventa un ordine del mese, collegato allo storico');
+  perform growup_test.deve_fallire(format('select public.conferma_ordine(%L, null)', pp), '034: un ordine si conferma una volta sola');
+  perform growup_test.deve_fallire(format($q$insert into public.righe_ordine_personale (ordine_id, codice, nome) values (%L, '1003', 'Tre')$q$, pp),
+                                   '034: un ordine confermato non si cambia');
+  perform growup_test.ok(growup_test.righe(format('update public.righe_ordine_personale set quantita = 5 where ordine_id = %L', pp)) = 0,
+                         '034: le righe di un ordine confermato restano come sono');
+  insert into public.ordini_personali default values returning id into pq;
+  perform growup_test.deve_fallire(format('select public.conferma_ordine(%L, null)', pq), '034: una bozza vuota non si conferma');
+  perform growup_test.ok(growup_test.righe(format('delete from public.activities where id = (select attivita_id from public.ordini_personali where id = %L)', pp)) = 1,
+                         '034: B toglie l''ordine del mese collegato al suo ordine');
+  att_prima := growup_test.righe(format('delete from public.ordini_personali where id = %L', pp));
+  perform growup_test.ok(att_prima = 1
+                         and not exists (select 1 from public.righe_ordine_personale where ordine_id = pp),
+                         '034: B toglie il suo ordine dallo storico, con le sue righe');
   execute 'reset role';
 
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
