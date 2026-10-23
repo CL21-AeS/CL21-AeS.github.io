@@ -78,6 +78,11 @@ function creaApi(){
     impostaCodice: (pid, codice) => q(sb.rpc("imposta_codice_amway", { p_partner:pid, p_codice:codice })),
     /* import della rete dal report Amway: le persone importate le vede solo chi le importa */
     importaRete:  a => q(sb.rpc("importa_rete", a)),
+    /* 033: una sola struttura, la mappa Amway: l'import aggiorna tutto il mio gruppo, vince il report più aggiornato */
+    importaMappa: a => q(sb.rpc("importa_mappa", a)),
+    salvaMesePassato: a => q(sb.rpc("salva_mese_passato", a)),
+    inAttesa:     () => q(sb.rpc("in_attesa")),
+    datiAl:       (pid, mese) => q(sb.from("numeri_mese").select("dati_al").eq("partner_id", pid).eq("mese", mese)),
     esclusi:      () => q(sb.from("esclusi_import").select("codice")),
     /* persone nascoste dalla mia struttura (i loro VP contano lo stesso) */
     nascosti:     () => q(sb.from("nascosti").select("nascosto_id")),
@@ -159,7 +164,8 @@ const st = {
   prossime: new Map(),     // la prossima qualifica di chi vedo (da Platino in su)
   mesiReport: [],          // i miei numeri dei report degli ultimi 13 mesi (percentuale per i mesi da Argento)
   mesiScheda: {},          // gli stessi, per le schede del gruppo
-  mesiLinee: new Map(),    // da Platino in su: i mesi dei report delle mie linee frontali (per Smeraldo, Diamante, Zaffiro)  // "Come arrivarci" aperto (per persona), così resta aperto quando la pagina si ridisegna
+  mesiLinee: new Map(),
+  inAttesa: [],            // chi usa l'app nella mia downline ma non è ancora nella mappa (solo il nome)    // da Platino in su: i mesi dei report delle mie linee frontali (per Smeraldo, Diamante, Zaffiro)  // "Come arrivarci" aperto (per persona), così resta aperto quando la pagina si ridisegna
   inviti: [], sezPersone: "lista", invitoId: null, archiviatiT: false,  // il Target (solo miei)
   ct: null,               // la pagina del contatto (le otto domande)
   listino: [],            // il listino Amway (dal database; una copia sul telefono)
@@ -232,6 +238,7 @@ const MESSAGGI_ERRORE = {
   profilo_esistente: "Questo telefono è già collegato a un profilo: ricarica la pagina.",
   data_futura: "La data di iscrizione non può essere nel futuro.",
   qualifica_non_valida: "Qualifica non riconosciuta.",
+  in_attesa: "Sei ancora in attesa della mappa: potrai importare dopo che un report della tua upline ti avrà inserito nella struttura.",
   codice_mancante: "Prima importa il report del mese in corso: salva il tuo codice Amway nell'app.",
   percentuale_non_valida: "Percentuale non riconosciuta.",
   posizione_non_valida: "Puoi aggiungere persone solo nel tuo gruppo.",
@@ -288,7 +295,15 @@ function perMese(lista, campo){
 }
 /* I VP: ordini più le correzioni fatte con "Aggiorna il totale del mese" (anche negative). */
 function movimentiVp(){ return st.att.filter(a => a.tipo === "ordine" || a.tipo === "rettifica"); }
+/* I miei VP del mese: quelli del report Amway quando il mese ne ha uno (anche importato dalla upline), altrimenti gli
+   ordini registrati nell'app. Con una lista esplicita (correzioni del totale) contano sempre gli ordini. */
+function vpReport(m){
+  const righe = m === meseDi(oggi()) ? st.riep : m === mesePrecedente() ? st.riepPrec : [];
+  const r = st.profilo ? rigaDi(righe || [], st.profilo.id) : null;
+  return r && r.da_report ? Number(r.vp_personali) || 0 : null;
+}
 function vpMese(m, lista){
+  if(!lista){ const v = vpReport(m); if(v != null) return v; }
   return somma((lista || st.att).filter(a => (a.tipo === "ordine" || a.tipo === "rettifica") && meseDi(a.data) === m), "vp");
 }
 /* Le attività su cui sto lavorando: le mie, o quelle del partner senza app aperto nella scheda */
@@ -791,6 +806,7 @@ async function caricaStruttura(){
   try{ st.preferiti = new Set((await api.preferiti() || []).map(r => r.preferito_id)); }catch(e){}
   try{ st.nascosti = new Set((await api.nascosti() || []).map(r => r.nascosto_id)); }catch(e){}
   try{ st.prossime = new Map((await api.prossime() || []).map(r => [r.partner_id, r.prossima_qualifica])); }catch(e){ st.prossime = new Map(); }
+  try{ st.inAttesa = await api.inAttesa() || []; }catch(e){ st.inAttesa = []; }
 }
 
 async function entraConChiave(k){
@@ -1159,10 +1175,12 @@ function vHome(){
   ${st.vista === "scheda" ? vScheda() : gruppo ? `
   ${vPreferiti()}
   ${vStruttura()}
+  ${vInAttesa()}
   ${vStoricoGruppo()}
   ${vInvita()}` : `
   ${leggiLocale(CHIAVE_SALVATA) === "1" || !st.chiave ? "" : vSalvaChiave()}
   ${vInstalla()}
+  ${vAttesaIo()}
   ${vObiettivoBreve()}
   ${vDaFare()}
   ${vClientiDaSentire()}
@@ -1687,6 +1705,8 @@ function vMese(){
       <span class="row" style="gap:6px"><button class="btn small ghost" data-act="storico">Storico</button>
       <button class="btn small ghost" data-act="obiettivo-mese">Obiettivo</button></span></div>
     <div style="margin-top:12px">${barra("VP fatturati", vpMese(m), st.goalMese.obiettivo_vp)}</div>
+    ${vpReport(m) != null ? `<p class="small vp-report" style="margin:4px 0 0">VP dal report Amway: valgono su quelli scritti a mano.
+      Gli ordini registrati dopo il report contano dal prossimo report.</p>` : ""}
     <div class="row" style="margin-top:10px;gap:8px">
       <button class="btn small grow" data-act="ordine">+ Ordine</button>
       <button class="btn small grow" data-act="totale-mese">Aggiorna il totale</button>
@@ -1823,6 +1843,30 @@ function posizioni(){
 }
 function testoPosizione(x){
   return x ? `Livello ${x.livello} · sotto ${esc(x.sponsor)}${x.sotto ? ` · ${plur(x.sotto, "persona sotto", "persone sotto")}` : ""}` : "";
+}
+/* Chi usa l'app nel mio gruppo ma non è ancora nella mappa Amway: solo il nome, nessun dato.
+   Lo può togliere solo il suo sponsor diretto (o un admin). */
+function vInAttesa(){
+  const l = st.inAttesa || [];
+  if(!l.length) return "";
+  return `<div class="card in-attesa">
+    <span class="eyebrow">In attesa della mappa · ${l.length}</span>
+    <p class="small" style="margin:6px 0 0">Usano l'app ma non sono ancora in un report mappe importato: i loro dati restano solo
+      nella loro app e non contano nei numeri. Entrano nella struttura al primo import che li mostra.</p>
+    <ul class="oggi">${l.map(x => `<li><span class="grow"><b>${esc(x.nome)}</b><br>
+      <span class="small">${x.mio ? "invitata da te" : `sponsor indicato: ${esc(x.sponsor_nome || "–")}`}</span></span>
+      ${x.mio || st.profilo.is_admin ? `<button class="btn small" data-act="togli-attesa" data-id="${esc(x.id)}">Togli</button>` : ""}</li>`).join("")}</ul>
+  </div>`;
+}
+/* io in attesa: avviso in Io */
+function vAttesaIo(){
+  const p = st.profilo;
+  if(!p || p.is_admin || p.confermato_il) return "";
+  return `<div class="card tight avviso-attesa">
+    <span class="eyebrow">In attesa della mappa</span>
+    <p class="small" style="margin:6px 0 0">Non sei ancora in un report mappe importato. Puoi usare l'app (obiettivi, lista, clienti,
+      ordini), ma i tuoi dati restano solo tuoi finché la mappa Amway non ti mostra: al primo import della tua upline entri nella struttura.</p>
+  </div>`;
 }
 function vStruttura(){
   /* Come nei report Amway: in cima chi usa l'app (livello 1), poi i suoi frontali (2), i loro (3) e così via;
@@ -2304,7 +2348,9 @@ function analizzaReport(rep){
     if(!io.codice_amway) return { errore:MESSAGGI_ERRORE.codice_mancante };
     return { passato:true, mese:m, prima, perCodice, totale:rep.righe.length };
   }
-  const altri = alberoSotto(io.id, 0).map(x => x.p);
+  /* 033: anche chi è in attesa della mappa (usa l'app ma non è nella struttura): l'import lo trova e lo conferma */
+  const altri = alberoSotto(io.id, 0).map(x => x.p)
+    .concat((st.inAttesa || []).filter(x => x.codice_amway).map(x => ({ id:x.id, nome:x.nome, sponsor_id:x.sponsor_id, stato:"attivo", codice_amway:x.codice_amway })));
   const attivi = new Map(altri.filter(p => p.stato !== "gestito" && p.codice_amway).map(p => [p.codice_amway, p]));
   const mie = altri.filter(p => p.stato === "gestito");
   const a = { mese:m, prima, codiceMio:!io.codice_amway, perCodice, aggiorna:[], mancanti:[], usanoApp:[], usanoAppMancanti:[],
@@ -2316,10 +2362,14 @@ function analizzaReport(rep){
     else if(p.codice_amway) a.usanoAppMancanti.push(p);
   }
   /* le mie persone importate: il codice viene dal report, quindi si abbinano sempre per codice */
+  /* chi sta sotto un gruppo che il report non mostra (per esempio un Platino) non è "fuori dal report" */
+  const nascostiReport = new Set(rep.righe.filter(r => r.dimensione > 1 && !rep.righe.some(x => x.sponsor === r.codice)).map(r => r.codice));
+  const sottoNascosto = p => { for(let s = st.struttura.find(x => x.id === p.sponsor_id), n = 0; s && n < 200; s = st.struttura.find(x => x.id === s.sponsor_id), n++)
+    if(s.codice_amway && nascostiReport.has(s.codice_amway)) return true; return false; };
   for(const p of mie){
     const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
     if(r){ a.aggiorna.push({ p, r }); usati.add(r.codice); }
-    else if(p.codice_amway && !p.fuori_report_dal) a.mancanti.push(p);
+    else if(p.codice_amway && !p.fuori_report_dal && !sottoNascosto(p)) a.mancanti.push(p);
   }
   /* l'import è sempre completo: tutte le persone del report entrano nella mia struttura */
   for(const r of rep.righe) if(!usati.has(r.codice)) a.nuovi.push(r);
@@ -2328,7 +2378,8 @@ function analizzaReport(rep){
     const sopra = antenatoNelReport(r, perCodice, c => c === prima.codice || attivi.has(c));
     const nuovo = !sopra || sopra === prima.codice ? io.id : attivi.get(sopra).id;
     if(nuovo !== p.sponsor_id && !alberoSotto(p.id, 0).some(x => x.p.id === nuovo))
-      a.spostati.push({ p, da:p.sponsor_id === io.id ? "te" : nomeDi(p.sponsor_id), a:nuovo === io.id ? "te" : nomeDi(nuovo) });
+      a.spostati.push({ p, da:p.sponsor_id === io.id ? "te" : nomeDi(p.sponsor_id) || (altri.find(x => x.id === p.sponsor_id) || {}).nome || "",
+        a:nuovo === io.id ? "te" : nomeDi(nuovo) || (altri.find(x => x.id === nuovo) || {}).nome || "" });
   }
   /* reimport: chi è già nella mia struttura (importato o con l'app), per riapplicare i filtri a tutti */
   a.esistenti = a.aggiorna.concat(a.usanoApp);
@@ -2353,8 +2404,9 @@ function vImporta(){
   if(!a || a.errore) return `<h2>Importa dal report Amway</h2>
     <p class="small">Sul sito Amway: <b>Linea di Sponsorizzazione (LOS)</b> → pulsante di download →
       <b>Intera Linea di Sponsorizzazione con tutti i KPI disponibili</b>, formato <b>CSV</b>. Prima togli i filtri.</p>
-    <p class="small">Tutta la tua linea entra nell'app; chi non la usa lo vedi solo tu, e puoi nascondere chi vuoi (resta nei numeri).
-      L'app aggiorna i VPP del mese tuoi e delle persone importate; chi usa l'app non viene toccato, i suoi numeri li aggiorna lui.
+    <p class="small">La struttura dell'app è la mappa Amway, la stessa per tutti: il tuo import aggiorna posizioni e numeri di
+      tutto il tuo gruppo (anche di chi usa l'app) e li vede anche la tua upline. Vale il report più aggiornato: conta la data
+      del file scaricato. Puoi nascondere chi vuoi (solo per te, resta nei numeri).
       Il file resta sul telefono: si salvano solo nome, codice e numeri.</p>
     <label class="btn primary wide" style="margin-top:12px">Scegli il file CSV
       <input type="file" id="file-report" accept=".csv,text/csv,text/comma-separated-values" multiple hidden></label>
@@ -2373,6 +2425,7 @@ function vImporta(){
         : a.corrente ? `<button class="btn primary grow">Continua</button>` : ""}</div>
   </form>`;
   if(a.passato) return `<h2>Report di ${nomeMese(a.mese)}</h2>
+  ${a.datiAl ? rigaDataReport(a) : ""}
   <p class="small">È un mese chiuso: salvo solo i numeri (percentuale, VP di gruppo, linee) per contare i mesi da Argento.
     La tua struttura e i VP non cambiano.</p>
   <ul class="imp"><li><span class="grow">${esc(st.profilo.nome)} (tu)</span>
@@ -2389,7 +2442,9 @@ function vImporta(){
   const aggiorna = [{ p:st.profilo, r:a.prima, io:true }].concat(a.aggiorna);
   const pos = posizioni(); [...pos.values()].forEach((x, i) => { x.ordine = i; });
   return `<h2>Report di ${nomeMese(a.mese)}</h2>
-  <p class="small">${plur(a.totale, "persona", "persone")} nel file${a.mese === meseDi(oggi()) ? " · mese in corso: puoi reimportarlo quando vuoi, i valori si sostituiscono" : ""}.</p>
+  ${a.datiAl ? rigaDataReport(a) : ""}
+  <p class="small">${plur(a.totale, "persona", "persone")} nel file. L'import aggiorna la struttura e i numeri di <b>tutto il tuo gruppo</b>,
+    anche per chi usa l'app: vale il report più aggiornato.</p>
   <form data-form="importa" novalidate>
     ${a.esistenti.length ? sezione("Chi vuoi vedere dopo l'import?",
       `<label class="check"><input type="radio" name="modo" value="tieni" checked>
@@ -2418,13 +2473,13 @@ function vImporta(){
         <span>Ho il consenso delle persone della mia linea a inserire il loro nome e i loro numeri nell'app.</span></label>`,
       "Entrano tutti nella tua struttura, nella posizione del report. Spunta chi vuoi <b>nascondere</b>: lo vedi solo nell'elenco «Nascoste» e i suoi VP contano lo stesso.",
       "imp-da-scegliere") : ""}
-    ${sezione(`Si aggiornano i VPP · ${aggiorna.length}`, `<ul class="imp">${aggiorna.map(x => `<li>${riga(x.io ? { nome:`${st.profilo.nome} (tu)` } : x.p,
+    ${sezione(`Si aggiornano i numeri · ${aggiorna.length}`, `<ul class="imp">${aggiorna.map(x => `<li>${riga(x.io ? { nome:`${st.profilo.nome} (tu)` } : x.p,
         x.io && a.codiceMio ? `il tuo codice ${esc(x.r.codice)} viene salvato` : "")}<b class="num">${num(x.r.vpp)} VP</b></li>`).join("")}</ul>`)}
     ${a.mancanti.length ? sezione(`Non più nel report · ${a.mancanti.length}`,
       `${a.troppiMancanti ? `<p class="avviso">Mancano molte persone insieme: controlla di aver esportato <b>l'intera linea senza filtri</b>.</p>` : ""}
       <p class="small">${a.mancanti.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})`).join(", ")}</p>`,
       "Codici che Amway non ha più (per esempio non rinnovati). Nessuno si cancella: restano nella tua struttura con il segno «non più nel report» e vanno tra le nascoste. Se tornano nel report, il segno sparisce.") : ""}
-    ${a.usanoApp.length || a.usanoAppMancanti.length ? sezione("Usano l'app: i loro numeri li aggiornano loro",
+    ${a.usanoApp.length || a.usanoAppMancanti.length ? sezione("Usano l'app: posizione e numeri dal report",
       `<p class="small">${plur(a.usanoApp.length, "persona trovata", "persone trovate")} nel report.
         ${a.spostati.length ? `<br>Vanno sotto il loro sponsor del report: ${a.spostati.map(x => `<b>${esc(x.p.nome)}</b> (da ${esc(x.da)} a ${esc(x.a)})`).join(", ")}.` : ""}
         ${a.usanoAppMancanti.length ? `<br>Non sono nel report: ${a.usanoAppMancanti.map(p => esc(p.nome)).join(", ")}.` : ""}</p>`) : ""}
@@ -2453,7 +2508,7 @@ async function leggiFileReport(files){
   for(const file of files){
     let a;
     if(/\.xlsx?$/i.test(file.name)) a = { errore:"è il file Excel: sul sito Amway scegli il formato CSV." };
-    else try{ const rep = leggiReport(await file.text()); a = rep.errore ? rep : analizzaReport(rep); }
+    else try{ const rep = leggiReport(await file.text()); a = rep.errore ? rep : await conData(analizzaReport(rep), file); }
     catch(e){ a = { errore:"non riesco a leggerlo: scaricalo di nuovo dal sito Amway." }; }
     if(a.errore) m.errori.push(`${file.name}: ${a.errore}`);
     else if(a.passato){ if(!m.passati.some(x => x.mese === a.mese)) m.passati.push(a); }
@@ -2469,7 +2524,7 @@ async function salvaReportPassati(m, f){
   st.occupato = true; render();
   const fatti = [];
   for(const a of m.passati){
-    try{ await api.salvaReportPassato(argomentiPassato(a)); fatti.push(nomeMese(a.mese)); }
+    try{ await api.salvaMesePassato(argomentiPassato(a)); fatti.push(nomeMese(a.mese)); }
     catch(e){ m.errori.push(`${nomeMese(a.mese)}: ${messaggio(e)}`); }
   }
   await caricaNumeri();
@@ -2489,10 +2544,28 @@ async function leggiUnReport(file){
     try{
       const rep = leggiReport(await file.text());
       if(!rep.errore) try{ st.esclusi = new Set((await api.esclusi() || []).map(x => x.codice)); }catch(e){}
-      a = rep.errore ? rep : analizzaReport(rep);
+      a = rep.errore ? rep : await conData(analizzaReport(rep), file);
     }catch(e){ a = { errore:"Non riesco a leggere il file: scaricalo di nuovo dal sito Amway." }; }
   }
   st.imp = a; render();
+}
+/* La data dei dati: il report Amway ha solo il mese, quindi vale la data e ora del file scaricato (mai nel futuro).
+   Si confronta con quella dei miei numeri già salvati per quel mese: un report più vecchio non cambia niente di
+   quello che viene da report più recenti. */
+async function conData(a, file){
+  if(!a || a.errore) return a;
+  const t = Number(file && file.lastModified) || Date.now();
+  a.datiAl = new Date(Math.min(t, Date.now())).toISOString();
+  try{
+    const r = (await api.datiAl(st.profilo.id, a.mese + "-01") || [])[0];
+    if(r && r.dati_al && r.dati_al > a.datiAl) a.piuVecchio = r.dati_al;
+  }catch(e){}
+  return a;
+}
+const fmtDataOra = new Intl.DateTimeFormat("it-IT", { timeZone:TZ, day:"numeric", month:"long", hour:"2-digit", minute:"2-digit" });
+function rigaDataReport(a){
+  return `<p class="small data-report" style="margin:4px 0 0">File del ${esc(fmtDataOra.format(new Date(a.datiAl)))}${a.piuVecchio
+    ? ` · <b>più vecchio dell'ultimo importato (${esc(fmtDataOra.format(new Date(a.piuVecchio)))})</b>: aggiorna solo chi non ha dati più recenti` : ""}</p>`;
 }
 
 /* i numeri ufficiali di ognuno: VPP, VPG, percentuale e i VPG delle sue linee frontali del report
@@ -2508,12 +2581,13 @@ function argomentiPassato(a){
   const numeri = numeriDelReport(a.perCodice);
   const altri = [...a.perCodice.values()].filter(r => r.codice !== a.prima.codice && r.vpg != null)
     .map(r => Object.assign({ codice:r.codice, vpp:r.vpp }, numeri(r)));
-  return { p_mese:a.mese + "-01", p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp }, numeri(a.prima)), p_altri:altri };
+  return { p_mese:a.mese + "-01", p_dati_al:a.datiAl || new Date().toISOString(),
+    p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp }, numeri(a.prima)), p_altri:altri };
 }
 async function salvaReportPassato(a, f){
   st.occupato = true;
   try{
-    await api.salvaReportPassato(argomentiPassato(a));
+    await api.salvaMesePassato(argomentiPassato(a));
     await caricaNumeri();
     st.sheet = null; st.imp = null; st.occupato = false; render();
     toast(`Numeri di ${nomeMese(a.mese)} salvati`);
@@ -2536,20 +2610,18 @@ async function eseguiImport(f){
   const daNascondere = elencati.filter(id => voglio.has(id) && !st.nascosti.has(id));
   const daMostrare = elencati.filter(id => !voglio.has(id) && st.nascosti.has(id));
   if(a.nuovi.length && !f.consenso.checked){ mostraErroreForm(f, "Conferma di avere il consenso delle persone della tua linea."); return; }
-  /* l'import è completo: le mie persone sono quelle già importate più tutte le nuove */
-  const mie = a.aggiorna.map(x => x.r).concat(a.nuovi);
+  /* 033: una sola struttura. Tutte le persone del report, dalla più vicina a me: posizione e numeri di tutto il mio
+     gruppo (chi usa l'app e chi no). Il database tiene il report più aggiornato per ognuno. */
   const numeri = numeriDelReport(a.perCodice);
-  const codiciMie = new Set(mie.map(r => r.codice));
-  const attivi = new Set(a.usanoApp.map(x => x.r.codice));
   const profondita = r => { let n = 0; for(let c = r.sponsor; c && a.perCodice.has(c) && n < 200; c = a.perCodice.get(c).sponsor) n++; return n; };
-  const persone = mie.slice().sort((x, y) => profondita(x) - profondita(y)).map(r => Object.assign({ codice:r.codice, nome:r.nome, vpp:r.vpp,
-    sponsor:antenatoNelReport(r, a.perCodice, c => c === a.prima.codice || attivi.has(c) || codiciMie.has(c)) }, numeri(r)));
-  const usanoApp = a.usanoApp.map(({ r }) => Object.assign({ codice:r.codice, vpp:r.vpp,
-    sponsor:antenatoNelReport(r, a.perCodice, c => c === a.prima.codice || attivi.has(c)) }, numeri(r)));
+  const persone = [...a.perCodice.values()].filter(r => r.codice !== a.prima.codice)
+    .sort((x, y) => profondita(x) - profondita(y))
+    .map(r => Object.assign({ codice:r.codice, nome:r.nome, vpp:r.vpp, sponsor:r.sponsor || null }, numeri(r)));
   st.occupato = true;
   try{
-    const esito = await api.importaRete({ p_mese:a.mese + "-01", p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp }, numeri(a.prima)), p_persone:persone,
-      p_attivi:usanoApp, p_nascondi:[...nascondi], p_fuori:a.mancanti.map(p => p.id) }) || {};
+    const esito = await api.importaMappa({ p_mese:a.mese + "-01", p_dati_al:a.datiAl || new Date().toISOString(),
+      p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp }, numeri(a.prima)), p_persone:persone,
+      p_nascondi:[...nascondi], p_fuori:a.mancanti.map(p => p.id) }) || {};
     if(a.codiceMio) st.profilo = Object.assign({}, io, { codice_amway:a.prima.codice });
     if(daNascondere.length) await api.nascondiTanti(io.id, daNascondere);
     if(daMostrare.length) await api.mostraTanti(io.id, daMostrare);
@@ -2560,7 +2632,7 @@ async function eseguiImport(f){
     riconosciPlatino();
     const n = k => Number(esito[k]) || 0;
     toast(`Import di ${nomeMese(a.mese).split(" ")[0]}: ${[n("aggiunte") ? plur(n("aggiunte"), "persona aggiunta", "persone aggiunte") : "",
-      plur(n("aggiornati"), "VPP aggiornato", "VPP aggiornati"), n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
+      plur(n("aggiornati"), "persona aggiornata", "persone aggiornate"), n("piu_vecchi") ? plur(n("piu_vecchi"), "già più aggiornata", "già più aggiornate") : "", n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
       n("fuori") ? plur(n("fuori"), "persona non più nel report", "persone non più nel report") : "",
       daNascondere.length ? plur(daNascondere.length, "nascosta", "nascoste") : "",
       daMostrare.length ? plur(daMostrare.length, "di nuovo visibile", "di nuovo visibili") : ""].filter(Boolean).join(", ")}`);
@@ -2956,6 +3028,12 @@ const AZIONI = {
     const p = st.struttura.find(x => x.id === el.dataset.id);
     if(!p || !confirm(`Creare un nuovo link personale per ${p.nome}? Quello vecchio smetterà di funzionare.`)) return;
     try{ st.linkGestito = { nome:p.nome, chiave: await api.nuovaChiavePer(p.id), nuovo:true }; st.sheet = "link-gestito"; render(); }
+    catch(e){ toast(messaggio(e)); }
+  },
+  async "togli-attesa"(el){
+    const p = (st.inAttesa || []).find(x => x.id === el.dataset.id);
+    if(!p || !confirm(`Togliere ${p.nome}?\n\nNon è nella mappa Amway: si cancellano il suo profilo e i suoi dati e l'app sul suo telefono si blocca. Non si può annullare.`)) return;
+    try{ await api.togliDallaStruttura(p.id); await caricaStruttura(); render(); toast(`${p.nome} tolta`); }
     catch(e){ toast(messaggio(e)); }
   },
   async "togli-struttura"(el){

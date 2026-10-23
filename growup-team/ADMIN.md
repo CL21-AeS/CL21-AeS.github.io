@@ -15,7 +15,7 @@ Nell'app ognuno di questi pulsanti ha sotto la scritta piccola **Solo Admin**.
 | Scheda di un partner → **Invita chi manca sopra** | link speciale, valido una volta sola; si possono spuntare altri frontali dello stesso sponsor | far entrare qualcuno **tra** lo sponsor e la persona (che passa sotto di lui con il suo gruppo) |
 | Scheda di un partner → **Correggi il codice Amway** | cambia il codice Amway di chi usa l'app (o il proprio, in fondo alla pagina Io) | solo per un errore di battitura all'ingresso: l'import di quella persona lo segnala ("chiedi a Stefano e Alessia di correggerlo") |
 | Scheda di chi usa l'app → **Blocca l'app / Sblocca l'app** | blocca o sblocca l'app di chiunque (non di sé né di un altro admin) | chi è bloccato non vede più niente; i dati restano e i VP contano; sponsor e upline vedono "Bloccato" |
-| Scheda di chi è **Da confermare** → **Togli dalla struttura** | lo possono fare anche sponsor e upline | cancella profilo e dati di chi non è ancora confermato dal report Amway; il suo telefono vede "accesso tolto" |
+| Gruppo → **In attesa della mappa** → **Togli** | lo può fare anche lo sponsor diretto (non l'upline) | cancella profilo e dati di chi non è ancora confermato dal report Amway; il suo telefono vede "accesso tolto" |
 | In fondo alle pagine → **Listino** | cerca, corregge e aggiunge prodotti (prezzo al cliente, prezzo Partner, VP); **Aggiorna dal PDF** legge il listino Amway sul telefono e mostra nuovi, prezzi cambiati e usciti prima di salvare | prodotti nuovi (5-6 volte l'anno) a mano; cambio prezzi annuale dal PDF |
 | In fondo alle pagine → **Codici Amway tolti** | elenco dei codici delle persone tolte, con **Sblocca** | con un codice tolto non si rientra finché non lo sblocchi |
 | Scheda di chi usa l'app → **Nuovo link personale** | crea un link personale nuovo; quello vecchio smette di funzionare | per chi ha perso il suo link |
@@ -24,8 +24,8 @@ Nell'app ognuno di questi pulsanti ha sotto la scritta piccola **Solo Admin**.
 Gli admin **non vedono le liste, gli inviti Target né i clienti** (pagina Persone) di nessuno, neanche nella copia di sicurezza: di ogni partner
 vedono solo i numeri della lista nella sua scheda, come ogni upline.
 
-Gli admin **vedono la struttura come tutti gli altri**: chi usa l'app nel proprio gruppo e le persone importate
-da loro. Le persone importate dagli altri le trovano solo nella copia di sicurezza.
+Gli admin **vedono la struttura come tutti gli altri**: la mappa Amway del proprio gruppo (una sola per tutti, 033), e chi è
+in attesa della mappa solo per nome.
 
 ## In Supabase (Table editor / SQL Editor)
 
@@ -42,7 +42,7 @@ da loro. Le persone importate dagli altri le trovano solo nella copia di sicurez
 **Cancellare persone confermate dall'app.** La struttura rispecchia il report Amway: chi non c'è più resta segnato "non più nel
 report" e nascosto. Ognuno può solo nascondere chi vuole dalla propria struttura (i VP contano lo stesso).
 Unica eccezione (027): chi è entrato con un link d'invito ed è ancora **Da confermare** (il suo codice Amway non è mai
-comparso in un report mappe importato) si può togliere da sponsor, upline e admin.
+comparso in un report mappe importato, "in attesa della mappa") si può togliere dal suo sponsor diretto e dall'admin.
 
 ## Richiesta di cancellazione dei dati (diritto all'oblio)
 
