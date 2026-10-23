@@ -6,8 +6,8 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 ## Ripartire da qui (fermi la sera del 21 ottobre 2026)
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
-dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **032** (027 incollata da
-Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#91**, nessuna aperta; il ramo di
+dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **033** (027 e la parte 2 della 033 — `togli_dalla_struttura` e `importa_mappa` —
+incollate da Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#97**, nessuna aperta; il ramo di
 lavoro è ricreato da main. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
 **Il 21 ottobre in breve** (dettagli sotto): «Come arrivarci» (consigli a richiesta in Obiettivo e nella scheda partner,
