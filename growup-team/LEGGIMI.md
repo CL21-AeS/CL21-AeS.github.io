@@ -83,7 +83,10 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     vede) e l'import "solo numeri" dei report dei mesi chiusi (non sposta persone, non tocca i VPP)
 29. `supabase/032_guadagni_oltre_argento.sql` — le cifre al mese da Platino in su (Fondatori uguali alla qualifica) e
     Argento senza incentivi Bronze (2.500 €)
-30. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+30. `supabase/033_struttura_unica.sql` — una sola struttura, la mappa Amway: ogni import aggiorna tutto il gruppo di chi
+    importa, vince il report più aggiornato (data del file), numeri ufficiali condivisi con la upline (`numeri_mese`),
+    chi è in attesa della mappa resta solo suo (lo toglie solo lo sponsor diretto), i VP del report vincono su quelli a mano
+31. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 17. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 18. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.

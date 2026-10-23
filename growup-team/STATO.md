@@ -35,6 +35,16 @@ qualificate della qualifica più altre linee aperte (ideale 10.000 VP, almeno 4.
 Arrivati a Platino, nella domanda della prossima qualifica è già scelta quella dell'obiettivo. La guida «Guadagnare
 con Amway» PY25 è stata letta e scartata (vecchia, solo esempi Fondatori, non coerente).
 
+**23 ottobre — una sola struttura, la mappa Amway** (migrazione 033; decisioni di Stefano): la struttura di Growup è sempre
+la copia della mappa ufficiale. Ogni import aggiorna posizioni e numeri di **tutto il gruppo** di chi importa (anche chi usa
+l'app, anche se qualcuno sotto aveva già importato). **Vince il report più aggiornato**: il CSV ha solo il mese, quindi conta la
+**data e ora del file** scaricato; un file più vecchio non cambia niente di quello che viene da file più recenti (l'anteprima
+lo dice). Numeri ufficiali condivisi (`numeri_mese`): li vede la persona e tutta la sua upline (anche quelli importati da un
+Platino in downline). Persone senza app: una sola copia, visibile a tutta la upline. **I VP del report vincono** su quelli
+scritti a mano ovunque (Io, Obiettivo, gruppo); prima del report contano gli ordini. Chi non è ancora nella mappa è **in attesa**:
+usa l'app ma i suoi dati restano suoi, l'upline lo vede solo per nome in «In attesa della mappa»; lo toglie **solo lo sponsor
+diretto** (o l'admin); non può importare. Le parti che il report non mostra (gruppo sotto un Platino) non si toccano.
+
 **Aperto, in attesa di Stefano**:
 - Confrontare nel report mappe la colonna **"VP Rubino"** con il VPG: se sono diversi, il Volume Rubino si prende da lì.
 - Controllare sul sito Amway che la **%** delle linee frontali nei report importati sia quella giusta (serve a «Come arrivarci»

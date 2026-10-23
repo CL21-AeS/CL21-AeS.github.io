@@ -11,9 +11,20 @@
     return p && !p.bloccato_il ? p : null; };
   const pub = p => { if(!p) return null; const c = Object.assign({}, p); delete c.chiave; return c; };
   const salva = () => { window.__DBOUT = db; };
-  /* come nel database: vedo me, chi usa l'app nel mio gruppo e le persone che ho importato io */
+  /* come nel database (033): vedo me e, nella mia downline, chi è nella mappa: le persone senza app (di chiunque le abbia
+     importate) e chi usa l'app confermato da un report. Chi è "in attesa" (confermato_il === null) resta solo suo. */
   const sotto = id => db.partners.filter(p => p.sponsor_id === id).flatMap(p => [p].concat(sotto(p.id)));
-  const vedo = (io, p) => p.id === io.id || (sotto(io.id).some(x => x.id === p.id) && (p.stato !== "gestito" || p.gestore_id === io.id));
+  const vedo = (io, p) => p.id === io.id || (sotto(io.id).some(x => x.id === p.id) && (p.stato === "gestito" || p.confermato_il !== null || !!p.is_admin));
+  /* i numeri ufficiali condivisi: per persona e mese vale il report più aggiornato */
+  const numeroDi = (id, m) => (db.numeri || []).filter(x => x.partner_id === id && x.mese === m)
+    .sort((x, y) => String(x.dati_al || "") < String(y.dati_al || "") ? -1 : 1).pop();
+  const salvaNumero = (io, pid, m, r, al) => {
+    const pp = db.partners.find(y => y.id === pid); if(pp && pp.stato !== "gestito" && !pp.confermato_il) pp.confermato_il = new Date().toISOString();
+    if(r.vpg == null) return false;
+    const ora = numeroDi(pid, m); if(ora && String(ora.dati_al || "") > al) return false;
+    db.numeri = (db.numeri || []).filter(x => !(x.partner_id === pid && x.mese === m))
+      .concat([{ visto_da:io.id, partner_id:pid, mese:m, vpp:r.vpp, vpg:r.vpg, percentuale:r.percentuale, linee:r.linee || [], nascoste:!!r.nascoste, dati_al:al }]);
+    return true; };
   const visibili = io => [io].concat(sotto(io.id).filter(p => vedo(io, p)));
   /* struttura "ricucita": ognuno sotto il primo sopra di lui che vedo */
   const sponsorVis = (io, p) => { if(p.id === io.id) return null;
@@ -44,9 +55,9 @@
       const a = db.accessi.find(x => x.user_id === session.user.id), p = a && db.partners.find(y => y.id === a.partner_id);
       return p && p.bloccato_il ? "bloccato" : (db.accessiTolti || []).includes(session.user.id) ? "tolto" : null; },
     togliDallaStruttura: async pid => { const io = mio(), t = db.partners.find(p => p.id === pid);
-      if(!io || !t || t.stato === "gestito" || t.id === io.id || t.is_admin || !(io.is_admin || sotto(io.id).some(x => x.id === t.id))) throw new Error("non_autorizzato");
+      if(!io || !t || t.stato === "gestito" || t.id === io.id || t.is_admin || !(io.is_admin || t.sponsor_id === io.id)) throw new Error("non_autorizzato");
       if(t.confermato_il) throw new Error("gia_confermato");
-      const via = db.partners.filter(p => p.gestore_id === t.id && p.stato === "gestito").map(p => p.id).concat([t.id]);
+      const via = [t.id];
       db.partners.filter(p => via.includes(p.sponsor_id) && !via.includes(p.id)).forEach(p => { p.sponsor_id = t.sponsor_id; });
       if(t.codice_amway) db.codiciTolti = (db.codiciTolti || []).filter(c => c.codice_amway !== t.codice_amway)
         .concat([{ codice_amway:t.codice_amway, nome:t.nome, tolto_il:new Date().toISOString() }]);
@@ -87,7 +98,7 @@
         for(const c of copie) if(c !== p){ db.partners.filter(x => x.sponsor_id === c.id).forEach(x => { x.sponsor_id = p.id; }); db.partners = db.partners.filter(x => x !== c); }
         Object.assign(p, dati, { gestore_id:null, sponsor_id:antenatoConApp(p), confermato_il:new Date().toISOString() });
       }else{
-        p = Object.assign({ id:uid(), sponsor_id:sp.id, codice_amway:a.p_codice_amway,
+        p = Object.assign({ id:uid(), sponsor_id:sp.id, codice_amway:a.p_codice_amway, confermato_il:null,
           codice_invito:"N" + Math.random().toString(36).slice(2,7).toUpperCase() }, dati);
         db.partners.push(p);
       }
@@ -121,8 +132,9 @@
     riepilogo: async mese => { const io = mio(); if(!io) return []; const m = mese.slice(0, 7);
       const ric = visibiliRicuciti(io);
       const figliVis = id => ric.filter(p => p.sponsor_id === id);
-      const num = id => (db.numeri || []).find(x => x.visto_da === io.id && x.partner_id === id && x.mese === m);
-      const pers = id => db.activities.filter(a => a.partner_id === id && (a.tipo === "ordine" || a.tipo === "rettifica") && a.data.slice(0, 7) === m).reduce((t, a) => t + Number(a.vp), 0);
+      const num = id => numeroDi(id, m);
+      const pers = id => { const n = num(id); if(n && n.vpp != null) return Number(n.vpp);
+        return db.activities.filter(a => a.partner_id === id && (a.tipo === "ordine" || a.tipo === "rettifica") && a.data.slice(0, 7) === m).reduce((t, a) => t + Number(a.vp), 0); };
       const grp = id => pers(id) + figliVis(id).reduce((t, p) => t + grp(p.id), 0);
       return ric.map(p => { const n = num(p.id);
         return { partner_id:p.id, sponsor_id:p.sponsor_id || null, vp_personali:pers(p.id), vp_gruppo:n ? n.vpg : grp(p.id),
@@ -141,7 +153,8 @@
       if(k && (ord(p.qualifica_iniziale) < ord("platino") || ord(k) <= ord(p.qualifica_iniziale))) throw new Error("qualifica_non_valida");
       p.prossima_qualifica = k || null; salva(); return pub(p); },
     mesiReport: async pid => { const io = mio(); if(!io) throw new Error("non_autorizzato");
-      return (db.numeri || []).filter(x => x.visto_da === io.id && x.partner_id === pid)
+      if(!vedo(io, db.partners.find(p => p.id === pid) || {})) throw new Error("non_autorizzato");
+      return (db.numeri || []).filter(x => x.partner_id === pid && x === numeroDi(pid, x.mese))
         .map(x => ({ mese:x.mese + "-01", percentuale:x.percentuale, vpg:x.vpg })).sort((a, b) => a.mese < b.mese ? -1 : 1); },
     /* come nel database: solo numeri, per me e per chi vedo; nessuno si sposta */
     salvaReportPassato: async a => { const io = mio(); const m = a.p_mese.slice(0, 7);
@@ -153,6 +166,51 @@
       const vis = visibiliRicuciti(io);
       for(const r of a.p_altri){ const x = vis.find(p => p.id !== io.id && p.codice_amway === r.codice); if(x) metti(x.id, r); }
       salva(); return 1; },
+    inAttesa: async () => { const io = mio(); if(!io) return [];
+      return sotto(io.id).filter(p => p.stato !== "gestito" && p.confermato_il === null && !p.is_admin)
+        .map(p => ({ id:p.id, nome:p.nome, sponsor_id:p.sponsor_id, sponsor_nome:(db.partners.find(x => x.id === p.sponsor_id) || {}).nome || null,
+          creato_il:p.creato_il || null, mio:p.sponsor_id === io.id, codice_amway:p.codice_amway || null })); },
+    datiAl: async (pid, mese) => { const n = numeroDi(pid, mese.slice(0, 7)); return n && n.dati_al ? [{ dati_al:n.dati_al }] : []; },
+    salvaMesePassato: async a => { const io = mio(); const m = a.p_mese.slice(0, 7), al = a.p_dati_al || new Date().toISOString();
+      if(io.confermato_il === null && !io.is_admin) throw new Error("in_attesa");
+      if(!io.codice_amway) throw new Error("codice_mancante");
+      if(a.p_io.codice !== io.codice_amway) throw new Error("import_di_altri");
+      let n = salvaNumero(io, io.id, m, a.p_io, al) ? 1 : 0;
+      for(const r of a.p_altri){ const x = sotto(io.id).find(p => p.codice_amway === r.codice); if(x && salvaNumero(io, x.id, m, r, al)) n++; }
+      salva(); return n; },
+    /* come importa_mappa (033): tutto il mio gruppo, vince il report più aggiornato */
+    importaMappa: async a => { const io = mio(); if(!io) throw new Error("non_autenticato");
+      if(io.confermato_il === null && !io.is_admin) throw new Error("in_attesa");
+      const m = a.p_mese.slice(0, 7), al = a.p_dati_al && a.p_dati_al < new Date().toISOString() ? a.p_dati_al : new Date().toISOString();
+      if(!io.codice_amway && a.p_io.codice) io.codice_amway = a.p_io.codice;
+      else if(a.p_io.codice !== io.codice_amway) throw new Error("import_di_altri");
+      let aggiunte = 0, spostate = 0, fuori = 0, numeri = 0, vecchi = 0;
+      if(salvaNumero(io, io.id, m, a.p_io, al)) numeri++; else vecchi++;
+      const giu = id => [id].concat(sotto(id).map(x => x.id));
+      for(const r of a.p_persone){
+        const mia = sotto(io.id);
+        const sp = (r.sponsor && r.sponsor !== io.codice_amway && (mia.find(p => p.codice_amway === r.sponsor) || {}).id) || io.id;
+        let x = mia.filter(p => p.codice_amway === r.codice).sort((p, q) => (q.stato !== "gestito") - (p.stato !== "gestito"))[0];
+        if(!x){
+          if(db.partners.some(p => p.codice_amway === r.codice)) continue;
+          x = { id:uid(), nome:r.nome, sponsor_id:sp, stato:"gestito", gestore_id:io.id, codice_amway:r.codice, codice_invito:codiceInvito(),
+            partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString(), posizione_al:al };
+          db.partners.push(x); aggiunte++;
+          if((a.p_nascondi || []).includes(r.codice) || (db.esclusi || []).some(e => e.partner_id === io.id && e.codice === r.codice))
+            db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:x.id }]);
+        } else if(!x.posizione_al || x.posizione_al <= al){
+          if(x.sponsor_id !== sp && sp !== x.id && !giu(x.id).includes(sp)){ x.sponsor_id = sp; spostate++; }
+          x.posizione_al = al; x.fuori_report_dal = null; if(x.stato === "gestito") x.gestore_id = io.id;
+        }
+        db.esclusi = (db.esclusi || []).filter(e => !(e.partner_id === io.id && e.codice === r.codice));
+        if(salvaNumero(io, x.id, m, r, al)) numeri++; else vecchi++;
+      }
+      for(const pid of a.p_fuori || []){ const x = db.partners.find(y => y.id === pid);
+        if(!x || x.stato !== "gestito" || !vedo(io, x)) throw new Error("non_autorizzato");
+        if(!x.fuori_report_dal && (!x.posizione_al || x.posizione_al <= al)){ x.fuori_report_dal = a.p_mese; x.posizione_al = al;
+          db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:x.id }]); fuori++; } }
+      salva();
+      return { aggiunte, spostate, fuori, aggiornati:numeri, piu_vecchi:vecchi }; },
     prossime: async () => { const io = mio(); if(!io) return [];
       return visibiliRicuciti(io).filter(p => p.prossima_qualifica).map(p => ({ partner_id:p.id, prossima_qualifica:p.prossima_qualifica })); },
     nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid); p.chiave = hex();

@@ -123,6 +123,24 @@ begin
   execute 'reset role';
   perform growup_test.ok((select sponsor_id from public.partners where id = b) = a, 'B agganciato ad A');
 
+  -- ---- 033: chi non è ancora nella mappa resta "in attesa": l'upline vede solo il nome ----
+  perform growup_test.come(u2);  -- A (in attesa)
+  perform growup_test.ok((select count(*) from public.partners) = 1, 'in attesa: A non vede B (in attesa anche lui), vede solo sé');
+  perform growup_test.ok((select mio from public.in_attesa() where id = b) and (select count(*) from public.in_attesa()) = 1,
+                         'A vede B per nome in «In attesa della mappa»');
+  perform growup_test.come(u1);  -- R
+  perform growup_test.ok(not exists (select 1 from public.partners where id in (a, b, c)), 'R non vede chi è in attesa');
+  perform growup_test.ok((select count(*) from public.in_attesa()) = 3 and not (select mio from public.in_attesa() where id = b),
+                         'R vede i tre in attesa per nome (B non è suo diretto)');
+  perform growup_test.deve_fallire(format('select public.importa_mappa(current_date, now(), %L, %L, %L, %L)',
+                         '{"codice":"2000001"}', '[]', '{}', '{}'), 'non per R: il report non è suo');
+  perform growup_test.come(u2);
+  perform growup_test.deve_fallire(format('select public.importa_mappa(current_date, now(), %L, %L, %L, %L)',
+                         '{"codice":"2000001"}', '[]', '{}', '{}'), 'chi è in attesa non può importare');
+  execute 'reset role';
+  -- come dopo un import della mappa: A, B e C sono nel report
+  update public.partners set confermato_il = now() where id in (a, b, c);
+
   -- ---- Visibilità: io e la mia downline, mai sopra né di lato ----
   perform growup_test.come(u2);  -- A
   perform growup_test.ok((select count(*) from public.partners) = 2, 'A vede solo sé e B');
@@ -243,7 +261,7 @@ begin
   perform growup_test.deve_fallire(format('select public.link_per_gestito(%L)', d), 'niente più link per le persone senza app');
   perform growup_test.deve_fallire($q$select public.iscrivi_con_codice('RRRR22', 'X', null)$q$, 'niente più ingresso senza codice Amway');
 
-  -- ---- Import della rete: le persone importate le vede solo chi le importa ----
+  -- ---- Import della rete (033: le persone importate le vede tutta la upline) ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire($q$select public.importa_rete(current_date, '{"codice":"9999999","vpp":0}', '[]', '[]', '{}', '{}')$q$,
                                    'il report di un altro partner è rifiutato');
@@ -263,33 +281,33 @@ begin
   k_e := public.nuova_chiave_per(b);
   perform growup_test.come(u3);
   perform public.entra_con_chiave(k_e);
-  perform growup_test.ok(not exists (select 1 from public.partners where id = e), 'B non vede E, anche se è sotto di lui: l''ha importata A');
+  perform growup_test.ok(exists (select 1 from public.partners where id = e), '033: B vede E, sotto di lui nella mappa, anche se l''ha importata A');
   perform growup_test.come(u1);  -- R
-  perform growup_test.ok(not exists (select 1 from public.partners where id in (e, f)), 'R non vede le persone importate da A');
+  perform growup_test.ok((select count(*) from public.partners where id in (e, f)) = 2, '033: R vede le persone importate da A (sono nella sua mappa)');
   perform growup_test.ok((select count(*) from public.nascosti) = 0, 'R non vede le persone nascoste da A');
-  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'contatto')$q$, e), 'R non scrive per E');
-  -- R importa anche lui E: la sua copia
-  perform growup_test.ok((public.importa_rete(current_date, '{"codice":"1000000","vpp":120}',
-      '[{"codice":"3000001","nome":"Elena copia di R","sponsor":"2000002","vpp":45}]', '[]', '{}', '{}')->>'aggiunte')::int = 1,
-      'R importa la sua copia di E');
+  -- 033: R importa la sua mappa: E c'è già (una sola struttura), nessuna copia
+  perform growup_test.ok((public.importa_mappa(current_date, now(),
+      '{"codice":"1000000","vpp":120,"vpg":470,"percentuale":3,"linee":[{"codice":"2000001","vpg":250},{"codice":"2000003","vpg":100}]}',
+      '[{"codice":"2000001","nome":"Anna","sponsor":"1000000"},{"codice":"2000002","nome":"Bruno","sponsor":"2000001"},{"codice":"3000001","nome":"Elena copia di R","sponsor":"2000002","vpp":45}]',
+      '{}', '{}')->>'aggiunte')::int = 0, '033: R importa: E è già nella struttura, nessuna copia');
   perform growup_test.ok((select codice_amway from public.partners where id = r) = '1000000', 'il codice di R viene dalla prima riga');
   perform growup_test.come(u5);  -- A
-  perform growup_test.ok((select count(*) from public.partners where codice_amway = '3000001') = 1, 'A vede solo la sua copia di E');
+  perform growup_test.ok((select count(*) from public.partners where codice_amway = '3000001') = 1, '033: una sola E per tutti');
   perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', f, '3000001'), 'tra le mie importate il codice è unico');
   perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', b, '2222222'), 'A non cambia il codice di B, che usa l''app');
 
   -- ---- Calcoli per chi guarda: nessun doppio conteggio ----
-  -- vista di A: A 60, B 150, E 40 (copia di A), F 0, D 0 → A 250
-  -- vista di R: R 120, A 60, B 150, E 45 (copia di R), D 0, C 100 → A 255, R 475
+  -- vista di A: A 60, B 150, E 40, F 0, D 0 → A 250 (033: una sola E per tutti)
+  -- vista di R: dal suo report R 120 e 470 di gruppo con 2 linee; A 250 come per A
   perform growup_test.come(u5);  -- A
   select * into x from public.riepilogo_mese(current_date) where partner_id = a;
   perform growup_test.ok(x.vp_gruppo = 250, 'A: VP di gruppo con le sue persone importate (' || x.vp_gruppo || ')');
   perform growup_test.ok((select count(*) from public.riepilogo_mese(current_date)) = 5, 'A: riepilogo di sé, B, D, E, F');
   perform growup_test.come(u1);  -- R
   select * into x from public.riepilogo_mese(current_date) where partner_id = a;
-  perform growup_test.ok(x.vp_gruppo = 255, 'R vede il gruppo di A con la propria copia di E (' || x.vp_gruppo || ')');
+  perform growup_test.ok(x.vp_gruppo = 250, '033: R vede il gruppo di A uguale a come lo vede A (' || x.vp_gruppo || ')');
   select * into x from public.riepilogo_mese(current_date) where partner_id = r;
-  perform growup_test.ok(x.vp_gruppo = 475 and x.linee_attive = 2, 'R: 475 di gruppo, 2 linee attive (' || x.vp_gruppo || ')');
+  perform growup_test.ok(x.vp_gruppo = 470 and x.linee_attive = 2 and x.vp_personali = 120, 'R: dal report 120 personali, 470 di gruppo, 2 linee attive (' || x.vp_gruppo || ')');
   perform growup_test.come(u4);  -- C
   perform growup_test.ok((select count(*) from public.riepilogo_mese(current_date)) = 1, 'C vede solo sé');
 
@@ -337,9 +355,9 @@ begin
                          'uno sponsor che C non vede: la persona va sotto C');
 
   -- ---- Non più nel report: nessuno si cancella, resta segnato e nascosto ----
-  perform growup_test.come(u1);  -- R
-  perform growup_test.deve_fallire(format($q$select public.importa_rete(current_date, '{"codice":"1000000","vpp":120}', '[]', '[]', '{}', '{%s}')$q$, f),
-                                   'R non segna le persone importate da A');
+  perform growup_test.come(u4);  -- C, un'altra linea
+  perform growup_test.deve_fallire(format($q$select public.importa_mappa(current_date, now(), '{"codice":"2000003"}', '[]', '{}', '{%s}')$q$, f),
+                                   '033: chi è in un''altra linea non segna F fuori dal report');
   perform growup_test.come(u5);  -- A
   perform growup_test.ok((public.importa_rete(current_date, '{"codice":"2000001","vpp":60}', '[]', '[]', '{}', array[f])->>'fuori')::int = 1,
                          'A: F non è più nel report');
@@ -427,9 +445,12 @@ begin
   perform growup_test.ok(x.vp_gruppo = 5300 and x.percentuale = 15 and x.linee_nascoste, 'Platino: VPG ufficiale, linee nascoste');
   select * into x from public.riepilogo_mese(current_date) where partner_id = a;
   perform growup_test.ok(x.vp_gruppo = 3173 and x.percentuale = 12, 'R vede i numeri ufficiali di A');
-  perform growup_test.come(u5);  -- A non ha importato quei numeri: per lei restano i suoi
-  perform growup_test.ok(not (select da_report from public.riepilogo_mese(current_date) where partner_id = a), 'A: numeri calcolati, il report è di R');
-  perform growup_test.ok((select count(*) from public.numeri_report) = 0, 'A non legge i numeri importati da R');
+  perform growup_test.come(u5);  -- 033: A vede i suoi numeri ufficiali anche se il report l'ha importato R
+  perform growup_test.ok((select da_report and vp_gruppo = 3173 from public.riepilogo_mese(current_date) where partner_id = a), '033: A ha i suoi numeri dal report di R');
+  perform growup_test.ok(exists (select 1 from public.numeri_mese where partner_id = a) and not exists (select 1 from public.numeri_mese where partner_id = r),
+                         '033: A legge i suoi numeri, non quelli di R (sopra di lei)');
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.ok(not exists (select 1 from public.numeri_mese where partner_id in (a, r)), '033: un''altra linea non legge i numeri');
 
   -- ---- Inviti degli admin: sotto una persona importata, e "chi manca sopra" ----
   perform growup_test.come(u1);
@@ -441,12 +462,13 @@ begin
   f := (public.entra_con_invito(k_e, 'Nora Sotto', '4000002')->'profilo'->>'id')::uuid;
   execute 'reset role';
   perform growup_test.ok((select sponsor_id from public.partners where id = f) = h, 'N entra sotto il Platino importato da R');
+  update public.partners set confermato_il = now() where id = f;  -- come dopo un import della mappa
   perform growup_test.come(u1);
   perform growup_test.ok((select sponsor_id from public.struttura_visibile() where id = f) = h, 'R vede N sotto il Platino');
-  perform growup_test.come(u5);  -- A non vede il Platino (importato da R): N è sotto A
-  perform growup_test.ok((select sponsor_id from public.struttura_visibile() where id = f) = a
-                         and not exists (select 1 from public.struttura_visibile() where id = h), 'A vede N sotto di sé, struttura ricucita');
-  perform growup_test.ok(exists (select 1 from public.riepilogo_mese(current_date) where partner_id = f and sponsor_id = a), 'i numeri di A contano N');
+  perform growup_test.come(u5);  -- 033: A vede anche il Platino importato da R, e N sotto di lui
+  perform growup_test.ok((select sponsor_id from public.struttura_visibile() where id = f) = h
+                         and exists (select 1 from public.struttura_visibile() where id = h), '033: A vede il Platino e N sotto di lui, come R');
+  perform growup_test.ok(exists (select 1 from public.riepilogo_mese(current_date) where partner_id = f and sponsor_id = h), 'i numeri di A contano N');
   perform growup_test.deve_fallire(format('select public.crea_invito_sopra(%L)', f), 'A non crea inviti speciali (non è admin)');
   perform growup_test.come(u1);
   k_e := public.crea_invito_sopra(f);
@@ -623,7 +645,9 @@ begin
   perform growup_test.come('00000000-0000-0000-0000-0000000000d2');
   h := (public.entra_con_invito('ZZZZ77', 'Ypsilon Test', '2000078')->'profilo'->>'id')::uuid;
   perform growup_test.come(u2);  -- A, sponsor di Z
-  perform growup_test.ok((select confermato_il is null from public.accessi_struttura() where id = g), 'Z è da confermare');
+  perform growup_test.ok(exists (select 1 from public.in_attesa() where id = g and mio) and not exists (select 1 from public.accessi_struttura() where id = g),
+                         '033: Z è in attesa della mappa (solo il nome per lo sponsor)');
+  perform growup_test.deve_fallire(format('select public.togli_dalla_struttura(%L)', h), '033: l''upline non toglie Y (lo toglie solo il suo sponsor Z)');
   perform growup_test.deve_fallire('select public.salva_numeri_report(null, null, current_date, ''{}'')', 'nessuno conferma a mano dall''app');
   perform growup_test.come(u3);  -- B, di lato
   perform growup_test.deve_fallire(format('select public.togli_dalla_struttura(%L)', g), 'chi è di lato non toglie');
@@ -738,18 +762,45 @@ begin
   perform growup_test.deve_fallire($q$select public.salva_report_passato(current_date, '{"codice":"2000001"}', '[]')$q$, 'il mese in corso non è un report passato');
   perform growup_test.deve_fallire(format($q$select public.salva_report_passato(%L, '{"codice":"1000000"}', '[]')$q$, mese_prec), 'il report di un altro non si salva');
   perform growup_test.come(u1);  -- R
-  perform growup_test.ok(not exists (select 1 from public.mesi_report(b) where mese = mese_prec), 'i numeri importati da A li vede solo A');
+  perform growup_test.ok(exists (select 1 from public.mesi_report(b) where mese = mese_prec), '033: i numeri importati da A li vede anche R (upline)');
   perform growup_test.come(null);
   perform growup_test.deve_fallire(format('select * from public.mesi_report(%L)', a), 'anon non legge i mesi');
   execute 'reset role';
   perform growup_test.ok((select sponsor_id from public.partners where id = b) = a, 'il report passato non sposta nessuno');
-  delete from public.numeri_report where mese = mese_prec;
+  delete from public.numeri_mese where mese = mese_prec;
+
+  -- ---- 033: l'import della mappa aggiorna tutto il gruppo; vince il report più aggiornato ----
+  perform growup_test.come(u1);  -- R, report di ieri: Fabio sotto B
+  perform public.importa_mappa(current_date, now() - interval '1 day', '{"codice":"1000000","vpp":120,"vpg":470}',
+    '[{"codice":"2000001","nome":"Anna","sponsor":"1000000"},{"codice":"2000002","nome":"Bruno","sponsor":"2000001"},
+      {"codice":"3000002","nome":"Fabio","sponsor":"2000002","vpp":80,"vpg":500,"percentuale":3}]', '{}', '{}');
+  execute 'reset role';
+  perform growup_test.ok((select sponsor_id from public.partners where codice_amway = '3000002') = b, '033: il report più recente sposta Fabio sotto B');
+  perform growup_test.come(u1);  -- R, un report più vecchio (di due giorni fa): non cambia niente
+  perform growup_test.ok((public.importa_mappa(current_date, now() - interval '2 days', '{"codice":"1000000","vpp":100,"vpg":400}',
+    '[{"codice":"3000002","nome":"Fabio","sponsor":"1000000","vpp":10,"vpg":300,"percentuale":3}]', '{}', '{}')->>'piu_vecchi')::int = 2,
+    '033: un report più vecchio non aggiorna numeri già più recenti');
+  execute 'reset role';
+  perform growup_test.ok((select sponsor_id from public.partners where codice_amway = '3000002') = b
+                         and (select vpg from public.numeri_mese where partner_id = (select id from public.partners where codice_amway = '3000002')
+                                and mese = date_trunc('month', current_date)::date) = 500, '033: Fabio resta sotto B con i numeri del report più recente');
+  perform growup_test.come(u3);  -- B importa adesso il suo report: lo vede tutta la sua upline
+  perform public.importa_mappa(current_date, now(), '{"codice":"2000002","vpp":90,"vpg":1000}',
+    '[{"codice":"3000002","nome":"Fabio","sponsor":"2000002","vpp":80,"vpg":777,"percentuale":6}]', '{}', '{}');
+  perform growup_test.come(u5);  -- A, upline di B
+  perform growup_test.ok((select vpg from public.numeri_mese where partner_id = (select id from public.partners where codice_amway = '3000002')
+                           and mese = date_trunc('month', current_date)::date) = 777, '033: A vede i numeri importati da B (sotto di lei)');
+  perform growup_test.ok((select vp_personali from public.riepilogo_mese(current_date) where partner_id = b) = 90,
+                         '033: il VPP del report vince sugli ordini scritti nell''app');
+  perform growup_test.come(u4);  -- C, altra linea: non vede
+  perform growup_test.ok(not exists (select 1 from public.numeri_mese where partner_id = b), '033: un''altra linea non vede i numeri di B');
+  execute 'reset role';
 
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');
   perform growup_test.come(u1);  -- R admin
-  perform growup_test.ok((select count(*) from jsonb_object_keys(public.copia_dati()->'tabelle')) = 14
+  perform growup_test.ok((select count(*) from jsonb_object_keys(public.copia_dati()->'tabelle')) = 15
                          and jsonb_array_length(public.copia_dati()->'tabelle'->'partners') >= 3, 'l''admin scarica la copia con tutte le tabelle');
   execute 'reset role';
 
