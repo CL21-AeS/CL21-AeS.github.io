@@ -63,7 +63,7 @@ decimali** (96,30 € · 18,20 VP) in bozza, storico, clienti e listino; cifre d
 **Aperto, in attesa di Stefano**:
 - Controllare sul sito Amway che la **%** delle linee frontali nei report importati sia quella giusta (serve a «Come arrivarci»
   da Argento a Platino).
-- Provare dal vivo (app v34): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,
+- Provare dal vivo (app v35): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,
   reimport di un report più nuovo che riporta il totale al report, due decimali, un nuovo partner che entra con il link e il
   codice (in attesa → al posto giusto con il primo import).
 - Verifica in due passaggi su GitHub: controllare in github.com/settings/security.
@@ -72,7 +72,7 @@ decimali** (96,30 € · 18,20 VP) in bozza, storico, clienti e listino; cifre d
 **24 ottobre — decisioni di Stefano**: il **Volume Rubino** non serve (è il VPG senza le linee qualificate 21%, con la regola
 dell'anno fiscale): si conta sempre il **VPG delle mappe**. Report dei mesi passati importati da settembre. Niente pulsante
 «Invitala nell'app»: si condivide il proprio link e l'import mette ognuno al posto giusto. Al primo ingresso il codice Amway
-si scrive **due volte** («Riscrivi il codice»: se non sono uguali non si entra) con l'avviso di controllarlo bene. Ogni mese
+si scrive **due volte** («Riscrivi il codice»: se non sono uguali non si entra) con l'avviso di controllarlo bene (si trova sul sito o nell'app Amway, nell'icona del profilo in alto a destra). Ogni mese
 copia dei dati e ZIP del codice; il piano Pro di Supabase si valuta **all'inizio della prova** con i Partner.
 
 **21 ottobre — avviso di Supabase (email "Final notice", grants dal 30 ottobre)**: dal 30 ottobre 2026 Supabase non dà
