@@ -1441,16 +1441,16 @@ function vMesiArgentoScheda(p){
   return `<p class="small mesi-argento" style="margin:6px 0 0">Mesi da Argento: <b>${x.mesi} su ${min}</b> per ${prossima}
     <span class="faint">(ultimi 12 mesi, dai report che hai importato)</span></p>`;
 }
-/* Il Performance Year in corso: da settembre al mese in corso */
-function annoPY(){
-  const ora = meseDi(oggi()), out = [];
+/* Il Performance Year in corso: da settembre al mese in corso (o fino al mese indicato) */
+function annoPY(fino){
+  const ora = fino || meseDi(oggi()), out = [];
   for(let m = `${Number(ora.slice(5)) >= 9 ? ora.slice(0, 4) : Number(ora.slice(0, 4)) - 1}-09`; m <= ora; m = spostaMese(m, 1)) out.push(m);
   return out;
 }
 /* I mesi del Performance Year dai report importati: mesi da Argento (21%), Rubino (VPG ≥ 20.000), Zaffiro (VPG ≥ 4.000
    e 2 linee al 21%, oppure 3 linee al 21%) e, per ogni linea frontale, i mesi al 21% */
-function contaPY(){
-  const mesi = annoPY(), mio = new Map(st.mesiReport.map(x => [meseDi(x.mese), x]));
+function contaPY(fino){
+  const mesi = annoPY(fino), mio = new Map(st.mesiReport.map(x => [meseDi(x.mese), x]));
   const linee = [...st.mesiLinee.values()].map(l => {
     const per = new Map(l.righe.map(x => [meseDi(x.mese), Number(x.percentuale) || 0]));
     return { nome:l.nome, per, mesi21:mesi.filter(m => (per.get(m) || 0) >= 21).length, ora:per.get(meseDi(oggi())) };
@@ -1464,6 +1464,21 @@ function contaPY(){
     if((vpg >= 4000 && l21 >= 2) || l21 >= 3) zaffiro++;
   }
   return { mesi:mesi.length, report:mesi.filter(m => mio.has(m)).length, argento, rubino, zaffiro, linee };
+}
+/* La qualifica dell'anno fiscale raggiunta fino al mese m (dai report importati da settembre): Oro 3 mesi da Argento,
+   Platino 6, Platino Fondatore 12; da Platino: Rubino (un mese Rubino; 12 Fondatore), Zaffiro 6 (12), Smeraldo 3 linee
+   al 21% per 6 mesi (12), Diamante 6 linee per 6 mesi (12). Null se non ne ha ancora nessuna. */
+function qualificaPY(m){
+  const c = contaPY(m), lineeDa = min => c.linee.filter(l => l.mesi21 >= min).length;
+  const platino = c.argento >= MESI_ARGENTO.platino || daPlatino(st.profilo.qualifica_iniziale);
+  const regole = [
+    ["diamante_fondatore", platino && lineeDa(12) >= 6], ["diamante", platino && lineeDa(6) >= 6],
+    ["smeraldo_fondatore", platino && lineeDa(12) >= 3], ["smeraldo", platino && lineeDa(6) >= 3],
+    ["zaffiro_fondatore", platino && c.zaffiro >= 12], ["zaffiro", platino && c.zaffiro >= 6],
+    ["rubino_fondatore", platino && c.rubino >= 12], ["rubino", platino && c.rubino >= 1],
+    ["platino_fondatore", c.argento >= 12], ["platino", c.argento >= MESI_ARGENTO.platino], ["oro", c.argento >= MESI_ARGENTO.oro]];
+  const x = regole.find(([k, ok]) => ok && ordineDi(k) > 0);
+  return x ? x[0] : null;
 }
 /* l'avanzamento verso la prossima qualifica: righe { ok, txt, val } */
 function avanzamentoPY(chiave){
@@ -1717,10 +1732,13 @@ function barraVp(m){
   const rep = vpReport(m);
   if(rep == null) return barra("VP fatturati", vpMese(m), st.goalMese.obiettivo_vp);
   const fatto = vpMese(m), obj = Number(st.goalMese.obiettivo_vp) || 0;
-  const w = v => obj ? Math.min(100, Math.round(v / obj * 100)) : 0, pct = w(fatto), wRep = w(Math.max(0, Math.min(rep, fatto)));
+  /* oltre l'obiettivo la barra si divide in proporzione al totale, così la parte scritta dopo il report si vede sempre */
+  const scala = Math.max(obj, fatto);
+  const w = v => scala ? Math.min(100, Math.round(v / scala * 100)) : 0, wRep = w(Math.max(0, Math.min(rep, fatto)));
+  const pct = obj ? Math.min(100, Math.round(fatto / obj * 100)) : 0, piena = w(fatto);
   return `<div class="obiettivo"><div class="spread"><span>VP fatturati</span>
     <span class="num">${num(fatto)} <span class="faint">/ ${num(obj)}</span></span></div>
-    <div class="bar doppia ${obj && fatto >= obj ? "fatto" : ""}" role="progressbar" aria-label="VP fatturati" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i class="rep" style="width:${wRep}%"></i><i style="width:${Math.max(0, pct - wRep)}%"></i></div></div>`;
+    <div class="bar doppia ${obj && fatto >= obj ? "fatto" : ""}" role="progressbar" aria-label="VP fatturati" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i class="rep" style="width:${wRep}%"></i><i style="width:${Math.max(0, piena - wRep)}%"></i></div></div>`;
 }
 function rigaVp(m){
   const rep = vpReport(m), r = reportMio(m), dopo = vpMese(m) - (rep || 0);
@@ -1782,9 +1800,12 @@ function vStorico(){
   const aperti = [meseDi(oggi())].concat(precedenteAperto() && !righe.some(r => r.mese === mesePrecedente()) ? [mesePrecedente()] : []);
   for(const m of aperti){
     const n = numeriMese(m);
-    const q = st.stages.filter(t => t.ordine >= 3 && !mancanze(t, n).length).pop();
+    /* la qualifica del mese si calcola fino ad Argento (le annuali si contano sull'anno fiscale, qui sotto) */
+    const q = st.stages.filter(t => t.ordine >= 3 && t.ordine <= ordineDi("argento") && !mancanze(t, n).length).pop();
     righe.push({ mese:m, personali:n.personali, gruppo:n.gruppo, attive:n.attive, pct:n.percentuale, qual:q ? q.nome : "", aperto:true });
   }
+  /* se nell'anno fiscale, fino a quel mese, è già raggiunta una qualifica annuale (Oro, Platino, …), vale quella */
+  for(const r of righe){ const a = qualificaPY(r.mese); if(a) r.qual = nome(a); }
   righe.sort((a, b) => a.mese < b.mese ? 1 : -1);
   return `<h2>Il mio storico</h2>
     <p class="small">Ogni mese si chiude il giorno ${giornoChiusura()} del mese dopo: da lì i numeri restano quelli.</p>

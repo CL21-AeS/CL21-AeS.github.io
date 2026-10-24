@@ -2105,6 +2105,36 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
 }
 
+// 40. La barra oltre l'obiettivo e la qualifica dello storico dall'anno fiscale
+{
+  const R = DB.partners.find(p => p.id === "R"), primaQ = R.qualifica_iniziale;
+  R.qualifica_iniziale = "platino_fondatore";
+  const numeroR = vpg => { DB.numeri = DB.numeri.filter(x => !(x.partner_id === "R" && x.mese === oggiStr.slice(0, 7)))
+    .concat([{ visto_da:"R", partner_id:"R", mese:oggiStr.slice(0, 7), vpp:400, vpg, percentuale:21, linee:[], dati_al:new Date(Date.now() - 3600000).toISOString() }]); };
+  numeroR(12000);
+  DB.activities = DB.activities.filter(a => a.partner_id !== "R")
+    .concat([{ id:"dopo40", partner_id:"R", tipo:"ordine", quantita:1, vp:300, data:oggiStr, inserito_da:"R", inserito_il:new Date().toISOString() }]);
+  const storicoR = async () => {
+    ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    await page.click(".card button[data-act=storico]");
+    await page.locator(".sheet .storico li").first().waitFor();
+    return (await page.locator(".sheet .storico li").first().innerText()).replace(/\s+/g, " ");
+  };
+  let t = await storicoR();
+  check(!/Diamante|Fondatore/.test(t), "storico: niente più Diamante Fondatore inventato (" + t + ")");
+  await page.click(".sheet [data-act=chiudi]");
+  const parti = await page.locator(".card", { hasText:"Il mio mese" }).locator(".bar.doppia > i").evaluateAll(l => l.map(i => parseFloat(i.style.width)));
+  check(parti.length === 2 && parti[0] > 0 && parti[1] > 0 && parti[0] + parti[1] <= 100,
+    "oltre l'obiettivo la barra si divide in proporzione: report e ordini scritti dopo (" + parti.join(" + ") + ")");
+  await ctx.close();
+  numeroR(21000);
+  t = await storicoR();
+  check(t.includes("Qualifica: Rubino"), "storico: un mese Rubino nell'anno fiscale (da Platino) → Rubino (" + t + ")");
+  await ctx.close();
+  R.qualifica_iniziale = primaQ;
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

@@ -63,7 +63,7 @@ decimali** (96,30 € · 18,20 VP) in bozza, storico, clienti e listino; cifre d
 **Aperto, in attesa di Stefano**:
 - Controllare sul sito Amway che la **%** delle linee frontali nei report importati sia quella giusta (serve a «Come arrivarci»
   da Argento a Platino).
-- Provare dal vivo (app v35): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,
+- Provare dal vivo (app v36): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,
   reimport di un report più nuovo che riporta il totale al report, due decimali, un nuovo partner che entra con il link e il
   codice (in attesa → al posto giusto con il primo import).
 - Verifica in due passaggi su GitHub: controllare in github.com/settings/security.
@@ -74,6 +74,13 @@ dell'anno fiscale): si conta sempre il **VPG delle mappe**. Report dei mesi pass
 «Invitala nell'app»: si condivide il proprio link e l'import mette ognuno al posto giusto. Al primo ingresso il codice Amway
 si scrive **due volte** («Riscrivi il codice»: se non sono uguali non si entra) con l'avviso di controllarlo bene (si trova sul sito o nell'app Amway, nell'icona del profilo in alto a destra). Ogni mese
 copia dei dati e ZIP del codice; il piano Pro di Supabase si valuta **all'inizio della prova** con i Partner.
+
+**24 ottobre — storico e barra** (dalle prove di Stefano): nello storico personale la qualifica del mese si calcola fino ad
+Argento; se nell'anno fiscale (da settembre fino a quel mese, dai report importati) è già raggiunta una qualifica annuale,
+vale quella: Oro 3 mesi da Argento, Platino 6, Platino Fondatore 12; da Platino: Rubino (un mese Rubino), Zaffiro 6 mesi,
+Smeraldo 3 linee al 21% per 6 mesi, Diamante 6 linee per 6 mesi (Fondatori: 12). Prima mostrava «Diamante Fondatore» per un
+errore (le qualifiche annuali non hanno requisiti del mese). La barra di «Il mio mese» oltre l'obiettivo si divide in
+proporzione al totale: la parte scritta dopo il report si vede sempre.
 
 **21 ottobre — avviso di Supabase (email "Final notice", grants dal 30 ottobre)**: dal 30 ottobre 2026 Supabase non dà
 più in automatico i permessi delle API alle **tabelle nuove** dello schema public (le esistenti non cambiano). Per Growup
