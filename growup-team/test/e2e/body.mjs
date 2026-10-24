@@ -19,7 +19,11 @@ await page.getByText("Due informazioni e iniziamo").waitFor(); check(true, "si t
 await page.fill("input[name=nome]", "Anna Bianchi");
 check(await page.getByText("Codice Amway Partner", { exact:true }).isVisible() && !(await page.getByText("Codice Amway Partner (facoltativo)").count()),
   "ingresso: codice Amway obbligatorio");
-await page.fill("input[name=codice_amway]", "2000001");
+await page.fill("input[name=codice_amway]", "2000001"); await page.fill("input[name=codice_amway2]", "2000010");
+check(await page.locator(".avviso-codice").getByText("Controlla bene il tuo codice Amway Partner.").isVisible(), "ingresso: l'avviso sul codice");
+await page.click("form button.primary");
+check(await page.locator(".errore").innerText() === "I due codici non sono uguali: controllali.", "ingresso: i due codici devono essere uguali");
+await page.fill("input[name=codice_amway]", "2000001"); await page.fill("input[name=codice_amway2]", "2000001");
 await page.click("form button.primary");
 check(await page.getByText("serve la data di iscrizione").isVisible(), "data obbligatoria per chi inizia");
 await page.fill("input[name=data]", "2026-10-01");
@@ -209,10 +213,10 @@ await page.selectOption("select[name=qualifica]", "pin:6");
 await page.check("input[name=privacy]");
 await page.click("form button.primary");
 check(await page.locator(".errore").innerText() === "Scrivi il tuo codice Amway Partner.", "ingresso: il codice Amway è obbligatorio");
-await page.fill("input[name=codice_amway]", "2000001");
+await page.fill("input[name=codice_amway]", "2000001"); await page.fill("input[name=codice_amway2]", "2000001");
 await page.click("form button.primary");
 check((await page.locator(".errore").innerText()).startsWith("Con questo codice Amway c'è già qualcuno che usa l'app"), "ingresso: codice di chi usa già l'app");
-await page.fill("input[name=codice_amway]", "1000001");
+await page.fill("input[name=codice_amway]", "1000001"); await page.fill("input[name=codice_amway2]", "1000001");
 await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor();
 await page.click("button[data-act=obiettivo-dopo]");
@@ -234,7 +238,7 @@ check(DB.partners.find(p => p.nome === "Marco Rossi").id === marco.id && DB.part
 ({ ctx, page } = await apri({}, "#RRRR22"));
 await page.getByText("Benvenuto in Growup").waitFor();
 await page.fill("input[name=nome]", "Bea Verdi");
-await page.fill("input[name=codice_amway]", "2000005");
+await page.fill("input[name=codice_amway]", "2000005"); await page.fill("input[name=codice_amway2]", "2000005");
 await page.selectOption("select[name=qualifica]", "pin:12");
 check(await page.getByText("(facoltativa)").isVisible(), "data facoltativa per chi ha già un pin");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
@@ -246,7 +250,7 @@ await sync(page); await ctx.close();
 // 6. Bronze Foundation con pagamenti (regressione)
 ({ ctx, page } = await apri({}, "#RRRR22"));
 await page.fill("input[name=nome]", "Ciro Neri");
-await page.fill("input[name=codice_amway]", "2000006");
+await page.fill("input[name=codice_amway]", "2000006"); await page.fill("input[name=codice_amway2]", "2000006");
 await page.selectOption("select[name=qualifica]", "foundation_9");
 check(await page.locator("input[name=mese]").isVisible(), "campi pagamenti visibili");
 await page.fill("input[name=mese]", "2026-07"); await page.fill("input[name=pagamenti]", "3");
@@ -919,7 +923,7 @@ await ctx.close();
 // Nora entra con il link sotto Bianca
 ({ ctx, page } = await apri({}, "#" + bianca.codice_invito));
 await page.getByText("Ti ha invitato Bianca Platini").waitFor();
-await page.fill("input[name=nome]", "Nora Sotto"); await page.fill("input[name=codice_amway]", "4000002");
+await page.fill("input[name=nome]", "Nora Sotto"); await page.fill("input[name=codice_amway]", "4000002"); await page.fill("input[name=codice_amway2]", "4000002");
 await page.fill("input[name=data]", oggiStr); await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor();
 await sync(page); await ctx.close();
@@ -939,7 +943,7 @@ check(/#S[A-Z0-9]{5}$/.test(linkSopra), "link speciale creato");
 await sync(page); await ctx.close();
 ({ ctx, page } = await apri({}, "#" + linkSopra.split("#")[1]));
 await page.getByText("Ti ha invitato Bianca Platini").waitFor();
-await page.fill("input[name=nome]", "Mirco Mezzo"); await page.fill("input[name=codice_amway]", "4000003");
+await page.fill("input[name=nome]", "Mirco Mezzo"); await page.fill("input[name=codice_amway]", "4000003"); await page.fill("input[name=codice_amway2]", "4000003");
 await page.fill("input[name=data]", oggiStr); await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor();
 await sync(page); await ctx.close();
@@ -1521,7 +1525,7 @@ await ctx.close();
 ({ ctx, page } = await apri({}, "#RRRR22"));
 await page.getByText("Benvenuto in Growup").waitFor();
 await page.fill("input[name=nome]", "Dino Prova");
-await page.fill("input[name=codice_amway]", "2000099");
+await page.fill("input[name=codice_amway]", "2000099"); await page.fill("input[name=codice_amway2]", "2000099");
 await page.selectOption("select[name=qualifica]", "pin:6");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
@@ -1714,7 +1718,7 @@ await ctx.close();
 // 32. Qualifiche oltre Argento: Platino all'ingresso, prossima qualifica, Volume Rubino dal report (dati inventati)
 ({ ctx, page } = await apri({}, "#RRRR22"));
 await page.getByText("Benvenuto in Growup").waitFor();
-await page.fill("input[name=nome]", "Pia Prova"); await page.fill("input[name=codice_amway]", "7100001");
+await page.fill("input[name=nome]", "Pia Prova"); await page.fill("input[name=codice_amway]", "7100001"); await page.fill("input[name=codice_amway2]", "7100001");
 check(await page.locator("select[name=qualifica] option").count() >= 1 + 7 + 6 + 11
   && await page.locator("select[name=qualifica] option", { hasText:"Diamante Fondatore" }).count() === 1, "nel menu le 11 qualifiche oltre Argento");
 await page.selectOption("select[name=qualifica]", "oro");
@@ -1774,7 +1778,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const mm = n => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7); };
   ({ ctx, page } = await apri({}, "#RRRR22"));
   await page.getByText("Benvenuto in Growup").waitFor();
-  await page.fill("input[name=nome]", "Gaia Prova"); await page.fill("input[name=codice_amway]", "7200001");
+  await page.fill("input[name=nome]", "Gaia Prova"); await page.fill("input[name=codice_amway]", "7200001"); await page.fill("input[name=codice_amway2]", "7200001");
   await page.selectOption("select[name=qualifica]", "argento");
   check(await page.locator("[data-etichetta-mese]").innerText() === "Mese della prima qualifica Argento" && await page.locator("[data-mostra=pagamenti]").isHidden(),
     "Argento: si chiede il mese della prima qualifica Argento (senza pagamenti)");
@@ -2011,7 +2015,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   // chi è appena entrato (in attesa) non può importare
   ({ ctx, page } = await apri({}, "#RRRR22"));
   await page.getByText("Benvenuto in Growup").waitFor();
-  await page.fill("input[name=nome]", "Quinto Prova"); await page.fill("input[name=codice_amway]", "7500001");
+  await page.fill("input[name=nome]", "Quinto Prova"); await page.fill("input[name=codice_amway]", "7500001"); await page.fill("input[name=codice_amway2]", "7500001");
   await page.selectOption("select[name=qualifica]", "pin:3");
   await page.check("input[name=privacy]"); await page.click("form button.primary");
   await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
