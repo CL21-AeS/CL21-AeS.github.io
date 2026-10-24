@@ -1087,8 +1087,11 @@ function vIngresso(){
       <label class="field" style="margin-top:0"><span>Nome e cognome</span>
         <input name="nome" autocomplete="name" required maxlength="80"></label>
       ${campoCodice(true)}
-      <p class="nota" style="margin-top:6px">È il numero del tuo accesso al sito Amway. Se il tuo sponsor ti ha già nella sua
-        struttura, con il codice ritrovi il tuo profilo con i tuoi numeri.</p>
+      <label class="field"><span>Riscrivi il codice</span>
+        <input name="codice_amway2" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="es. 1234567"></label>
+      <p class="avviso-interno avviso-codice"><b>Controlla bene il tuo codice Amway Partner.</b> È il numero con cui accedi al
+        sito Amway. L'app lo usa per metterti al posto giusto nel gruppo: se è sbagliato resti «in attesa della mappa» e i tuoi
+        numeri non arrivano a chi ti segue.</p>
       ${campiQualifica(true)}
       <p class="nota">Dichiara il punto giusto: è una tua responsabilità e lo potrai correggere tu dalla pagina Io.</p>
 
@@ -3279,6 +3282,7 @@ const MODULI = {
     if(!nome) err = "Scrivi il tuo nome.";
     else if(!codice) err = "Scrivi il tuo codice Amway Partner.";
     else if(!codiceValido(codice)) err = MESSAGGI_ERRORE.codice_amway_non_valido;
+    else if(soloCifre(f.codice_amway2.value) !== codice) err = "I due codici non sono uguali: controllali.";
     else if(!qual && !q.percentuale && !data) err = "Se stai iniziando serve la data di iscrizione: fa partire il conto alla rovescia del primo ordine.";
     else if(data && data > oggi()) err = "La data di iscrizione non può essere nel futuro.";
     else if(q.mancaMese) err = `Indica il ${etichettaMese(q.qualifica).toLowerCase()}.`;

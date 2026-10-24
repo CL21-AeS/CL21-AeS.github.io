@@ -7,7 +7,7 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
 dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **034** (027 e la parte 2 della 033 — `togli_dalla_struttura` e `importa_mappa` —
-incollate da Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#98**, nessuna aperta; il ramo di
+incollate da Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#99**, nessuna aperta; il ramo di
 lavoro è ricreato da main. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
 **Il 21 ottobre in breve** (dettagli sotto): «Come arrivarci» (consigli a richiesta in Obiettivo e nella scheda partner,
@@ -61,11 +61,19 @@ settimana, così il Gruppo è aggiornato. Stefano conferma: dopo un report conta
 decimali** (96,30 € · 18,20 VP) in bozza, storico, clienti e listino; cifre degli obiettivi e totali del mese come prima.
 
 **Aperto, in attesa di Stefano**:
-- Confrontare nel report mappe la colonna **"VP Rubino"** con il VPG: se sono diversi, il Volume Rubino si prende da lì.
 - Controllare sul sito Amway che la **%** delle linee frontali nei report importati sia quella giusta (serve a «Come arrivarci»
   da Argento a Platino).
-- Indicare il proprio mese della prima qualifica Argento e importare i report dei mesi passati (riquadro «Report da importare»).
+- Provare dal vivo (app v34): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,
+  reimport di un report più nuovo che riporta il totale al report, due decimali, un nuovo partner che entra con il link e il
+  codice (in attesa → al posto giusto con il primo import).
+- Verifica in due passaggi su GitHub: controllare in github.com/settings/security.
 - **Copie di sicurezza**: vedi la voce del 21 ottobre più sotto (la copia dall'app non contiene Liste e Clienti).
+
+**24 ottobre — decisioni di Stefano**: il **Volume Rubino** non serve (è il VPG senza le linee qualificate 21%, con la regola
+dell'anno fiscale): si conta sempre il **VPG delle mappe**. Report dei mesi passati importati da settembre. Niente pulsante
+«Invitala nell'app»: si condivide il proprio link e l'import mette ognuno al posto giusto. Al primo ingresso il codice Amway
+si scrive **due volte** («Riscrivi il codice»: se non sono uguali non si entra) con l'avviso di controllarlo bene. Ogni mese
+copia dei dati e ZIP del codice; il piano Pro di Supabase si valuta **all'inizio della prova** con i Partner.
 
 **21 ottobre — avviso di Supabase (email "Final notice", grants dal 30 ottobre)**: dal 30 ottobre 2026 Supabase non dà
 più in automatico i permessi delle API alle **tabelle nuove** dello schema public (le esistenti non cambiano). Per Growup
