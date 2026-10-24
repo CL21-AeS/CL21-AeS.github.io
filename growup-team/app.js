@@ -1089,8 +1089,8 @@ function vIngresso(){
       ${campoCodice(true)}
       <label class="field"><span>Riscrivi il codice</span>
         <input name="codice_amway2" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="es. 1234567"></label>
-      <p class="avviso-interno avviso-codice"><b>Controlla bene il tuo codice Amway Partner.</b> È il numero con cui accedi al
-        sito Amway. L'app lo usa per metterti al posto giusto nel gruppo: se è sbagliato resti «in attesa della mappa» e i tuoi
+      <p class="avviso-interno avviso-codice"><b>Controlla bene il tuo codice Amway Partner.</b> Lo trovi sul sito o nell'app
+        Amway, toccando l'icona del profilo (l'omino) in alto a destra; se non lo trovi, chiedilo al tuo sponsor. L'app lo usa per metterti al posto giusto nel gruppo: se è sbagliato resti «in attesa della mappa» e i tuoi
         numeri non arrivano a chi ti segue.</p>
       ${campiQualifica(true)}
       <p class="nota">Dichiara il punto giusto: è una tua responsabilità e lo potrai correggere tu dalla pagina Io.</p>
