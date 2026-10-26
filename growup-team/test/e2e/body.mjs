@@ -54,9 +54,11 @@ await page.click("button[data-act=vista-io]");
 await page.getByText("Ciao Anna").waitFor(); await apriTappa(page);
 check(await page.locator(".miei-numeri button[data-act=vista-obiettivo]").getByText("300 €").isVisible() && !(await page.locator(".obiettivo-breve").count()),
   "su Io: il mio obiettivo è la prima riga di «I miei numeri»");
+await page.click("button[data-act=vista-profilo]");
 check(await page.locator("button[data-act=copia-dati]").count() === 0, "chi non è admin non vede la copia dei dati");
 check(await page.locator("button[data-act=listino]").count() === 0, "chi non è admin non vede il listino");
 check(await page.getByText("Solo Admin", { exact:true }).count() === 0, "chi non è admin non vede le scritte Solo Admin");
+await page.click("button[data-act=vista-io]");
 await sync(page);
 const anna = DB.partners.find(p => p.nome === "Anna Bianchi");
 check(anna.sponsor_id === "R", "Anna sotto Stefano e Alessia");
@@ -131,7 +133,9 @@ await page.click(".sheet button:has-text('Salva')");
 await page.getByText("Il totale era già questo").waitFor(); check(true, "nessuna correzione se il totale non cambia");
 await page.locator(".card", { hasText:"Il mio mese" }).screenshot({ path: S + "/e2e/7-mese.png" });
 check(!(await page.getByText("La mia struttura").count()), "struttura non nella pagina Io");
-check(await page.getByText("Il mio link personale").isVisible(), "link personale in fondo alla pagina");
+await page.click("button[data-act=vista-profilo]");
+check(await page.getByText("Il mio link personale").isVisible(), "link personale nel Profilo (omino in alto a destra)");
+await page.click("button[data-act=vista-io]");
 check(!(await page.locator("button[data-act=menu]").count()), "niente più menu ⋯");
 
 // 3. Struttura: niente inserimenti a mano, si importa il report Amway (pagina Gruppo)
@@ -200,6 +204,7 @@ check(await page.getByText("importata da te dal report Amway: la vedi solo tu").
 check(!(await page.locator("button[data-act=in-mezzo]").count()) && !(await page.locator("button[data-act=manda-link]").count())
   && !(await page.locator("button[data-act=cambia-sponsor]").count()), "niente più Manca qualcuno sopra, link personale, cambia sponsor");
 check(!(await page.locator(".azioni").count()), "niente barra delle mie azioni nella scheda");
+await azioniScheda(page);
 await page.locator(".griglia-azioni button[data-act=contatto]").click();
 await page.getByText("Contatto registrato per Marco").waitFor();
 await page.locator(".griglia-azioni button[data-act=totale-mese]").click();
@@ -294,6 +299,7 @@ check(await page.getByText("Punto di partenza dichiarato: 12%").isVisible() && !
   "scheda: punto di partenza solo come informazione");
 await page.click("button.link[data-act=vista-gruppo]");
 // ognuno corregge il proprio, dal fondo della pagina
+await page.click("button[data-act=vista-profilo]");
 await page.click("button[data-act=partenza]");
 check(await page.locator(".sheet select[name=qualifica]").inputValue() === "", "il dichiarato è già selezionato");
 await page.selectOption(".sheet select[name=qualifica]", "pin:3");
@@ -301,11 +307,13 @@ await page.click(".sheet button:has-text('Salva')");
 await page.getByText("Punto di partenza aggiornato").waitFor();
 await sync(page);
 check(DB.partners.find(p => p.id === "R").percentuale_iniziale === 3, "il proprio punto di partenza corretto");
+await page.click("button[data-act=vista-profilo]");
 await page.click("button[data-act=partenza]");
 await page.selectOption(".sheet select[name=qualifica]", "");
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("Punto di partenza aggiornato").waitFor();
 await sync(page);
+await page.click("button[data-act=vista-gruppo]");
 // la radice importa la sua rete: Paolo e Luca (con VPP) sì, Zeno (0 VP) no; Bea è di Ciro secondo il report
 const reportRadice = creaCsv(meseFile, [persona(1, "9", "1111111", "ROSSI, MARIO", "120,00"),
   persona(2, "1111111", "2000001", "BIANCHI, ANNA", "80,00"), persona(3, "2000001", "1000003", "NERI, PAOLO", "10,00"),
@@ -379,6 +387,7 @@ await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator("
 check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isVisible(), "gruppo riaperto");
 // nascondi: sparisce solo Ciro (per la radice); Bea, sotto di lui, resta con il suo livello vero, e Ciro si rimette
 await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).locator("button[data-act=apri-scheda]").click();
+await azioniScheda(page);
 await page.click("button[data-act=nascondi]");
 await page.getByText("Ciro Neri nascosto dalla tua struttura").waitFor();
 check(!(await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).count()) && await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).isVisible(),
@@ -411,6 +420,7 @@ check(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).isVisi
 // nessuno cancella: anche le persone importate si nascondono soltanto
 await page.locator(".albero.struttura li", { hasText:"Paolo Neri" }).locator("button[data-act=apri-scheda]").click();
 check(!(await page.locator("button[data-act=cancella]").count()), "niente più Cancella dalla struttura");
+await azioniScheda(page);
 await page.click("button[data-act=nascondi]");
 await page.getByText("Paolo Neri nascosto dalla tua struttura").waitFor();
 await sync(page);
@@ -418,10 +428,12 @@ check(DB.partners.some(p => p.nome === "Paolo Neri") && !(await page.locator(".a
 await page.click("button[data-act=nascoste]");
 check(await page.locator(".sheet li", { hasText:"Zeno Zero" }).isVisible() && await page.locator(".sheet li", { hasText:"Paolo Neri" }).isVisible(), "elenco delle nascoste");
 await page.locator(".sheet li", { hasText:"Paolo Neri" }).locator("button[data-act=apri-nascosta]").click();
+await azioniScheda(page);
 check(await page.getByText("Mostra di nuovo nella mia struttura").isVisible(), "dalla scheda di una nascosta: Mostra di nuovo");
 await page.click("button.link[data-act=vista-gruppo]");
 // admin: nuovo link personale per chi usa l'app
 await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator("button[data-act=apri-scheda]").click();
+await azioniScheda(page);
 await page.getByText("Usa l'app: i suoi numeri li aggiorna lui.").waitFor();
 check(!(await page.locator(".griglia-azioni").count()), "nessun inserimento per chi usa l'app");
 await page.click("button[data-act=nuovo-link]");
@@ -601,6 +613,7 @@ check(await page.locator(".confronto td.sotto").count() >= 1, "valori sotto evid
 await page.screenshot({ path: S + "/e2e/15-confronto.png", fullPage:true });
 
 // 11. Fissa una chiamata: calendario e WhatsApp neutro
+await azioniScheda(page);
 await page.click("button[data-act=chiamata]");
 await page.getByText("Chiamata con Cri").waitFor();
 const domani = (() => { const d = new Date(oggiStr + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); })();
@@ -632,6 +645,7 @@ await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.evaluate(() => { window.__vai = null; window.GROWUP_VAI = u => { window.__vai = u; }; });
 await page.click("button[data-act=vista-gruppo]");
 await page.locator(".albero.struttura li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
+await azioniScheda(page);
 await page.click("button[data-act=chiamata]");
 check(await page.locator(".sheet select[name=avviso]").count() === 0, "Android: niente scelta del promemoria");
 await page.fill(".sheet input[name=ora]", "20:30");
@@ -650,6 +664,7 @@ await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.evaluate(() => { window.__vai = null; window.GROWUP_VAI = u => { window.__vai = u; }; });
 await page.click("button[data-act=vista-gruppo]");
 await page.locator(".albero.struttura li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
+await azioniScheda(page);
 await page.click("button[data-act=chiamata]");
 check(await page.locator(".sheet select[name=avviso]").count() === 1, "iPhone: promemoria nel file");
 await page.click(".sheet button:has-text('Calendario')");
@@ -698,6 +713,7 @@ check((await page.evaluate(() => navigator.clipboard.readText())).endsWith("#chi
 await page.click("button[data-act=installa-no]");
 check(await page.locator(".voci-passi li.fatta", { hasText:"Installa l'app" }).isVisible() && !(await page.getByText("Aggiungi alla schermata Home").count()),
   "Non ora: la guida si chiude e la voce è fatta");
+await page.click("button[data-act=vista-profilo]");
 await page.click("button[data-act=installa-si]");
 check(await page.getByText("Aggiungi alla schermata Home").first().isVisible(), "dal fondo pagina si riapre");
 check(await page.getByText("Forse hai aperto il link dentro WhatsApp o Telegram").isVisible(), "iPhone in Safari: nota per chi è dentro un'altra app");
@@ -800,6 +816,7 @@ await ctx.close();
 // 17. Copia di sicurezza: solo per gli admin
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
+await page.click("button[data-act=vista-profilo]");
 check(await page.getByText("Nessuna copia scaricata da questo telefono.").isVisible(), "admin: pulsante della copia dei dati");
 const [copia] = await Promise.all([page.waitForEvent("download"), page.click("button[data-act=copia-dati]")]);
 const datiCopia = JSON.parse(fs.readFileSync(await copia.path(), "utf8"));
@@ -925,6 +942,7 @@ await page.getByText(/3 persone aggiunte/).waitFor();
 check(await page.locator(".albero.struttura li", { hasText:"Bianca Platini" }).getByText("gruppo 5.300").isVisible(), "Platino: VP di gruppo dal report");
 await page.locator(".albero.struttura li", { hasText:"Bianca Platini" }).locator("button[data-act=apri-scheda]").click();
 check(await page.getByText("Linee non visibili nel report").isVisible() && await page.locator(".dati-scheda").getByText("15%").isVisible(), "scheda del Platino: 15%, linee non visibili");
+await azioniScheda(page);
 check(await page.locator(".card", { hasText:"Inviti · solo admin" }).isVisible(), "admin: inviti nella scheda");
 await sync(page);
 const bianca = DB.partners.find(p => p.codice_amway === "4100001");
@@ -949,6 +967,7 @@ await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 check(await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator(".livello").innerText() === "3", "Nora sotto Bianca nella struttura della radice");
 await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator("button[data-act=apri-scheda]").click();
+await azioniScheda(page);
 await page.click("button[data-act=invito-sopra]");
 await page.click(".sheet button:has-text('Crea il link')");
 const linkSopra = await page.locator(".sheet .linkbox").innerText();
@@ -1562,7 +1581,8 @@ DB.partners.find(p => p.nome === "Dino Prova").confermato_il = new Date().toISOS
 await radice();
 const rigaDino = page.locator(".albero.struttura li", { hasText:"Dino Prova" });
 await rigaDino.locator("button[data-act=apri-scheda]").click();
-check(await page.locator("button[data-act=blocca-app]", { hasText:"Blocca l'app" }).isVisible(), "scheda: (admin) Blocca l'app");
+await azioniScheda(page);
+check(await page.locator("button[data-act=blocca-app]", { hasText:"Blocca l'app" }).isVisible(), "scheda: (admin) Blocca l'app (in «Azioni»)");
 await page.click("button[data-act=blocca-app]");
 await page.getByText("App di Dino Prova bloccata").waitFor();
 check(await page.locator(".card .pill.r", { hasText:"Bloccato" }).first().isVisible(), "scheda: Bloccato");
@@ -1573,6 +1593,7 @@ check(!(await page.getByText("Ciao Dino").count()), "il telefono di Dino bloccat
 await ctx.close();
 await radice();
 await page.locator(".albero.struttura li", { hasText:"Dino Prova" }).locator("button[data-act=apri-scheda]").click();
+await azioniScheda(page);
 await page.click("button[data-act=blocca-app]");
 await page.getByText("App di Dino Prova sbloccata").waitFor();
 await sync(page); await ctx.close();
@@ -1584,6 +1605,7 @@ await page.getByText("Dino Prova tolta").waitFor();
 check(!(await page.locator(".in-attesa li", { hasText:"Dino Prova" }).count()), "Dino non è più in attesa");
 await sync(page);
 check(!DB.partners.some(p => p.nome === "Dino Prova"), "il profilo di Dino è cancellato");
+await page.click("button[data-act=vista-profilo]");
 await page.click("button[data-act=codici-tolti]");
 check(await page.locator(".sheet li", { hasText:"2000099" }).isVisible(), "l'admin vede il codice tolto");
 await ctx.close();
@@ -1591,6 +1613,7 @@ await ctx.close();
 await page.getByText("Accesso tolto").waitFor(); check(true, "il telefono di Dino: accesso tolto");
 await ctx.close();
 await radice();
+await page.click("button[data-act=vista-profilo]");
 await page.click("button[data-act=codici-tolti]");
 await page.locator(".sheet li", { hasText:"2000099" }).locator("button[data-act=sblocca-codice]").click();
 await page.getByText("Codice sbloccato").waitFor();
@@ -1612,6 +1635,7 @@ const pdfFinto = n => { const pagina = []; let y = 560;
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.evaluate(items => { window.pdfjsWorker = {}; window.pdfjsLib = { GlobalWorkerOptions:{},
   getDocument: () => ({ promise:Promise.resolve({ numPages:1, getPage: async () => ({ getTextContent: async () => ({ items }) }) }) }) }; }, pdfFinto(60));
+await page.click("button[data-act=vista-profilo]");
 check(await page.locator(".solo-admin-box", { has:page.locator("button[data-act=listino]") }).getByText("Solo Admin").isVisible()
   && await page.locator(".solo-admin-box", { has:page.locator("button[data-act=copia-dati]") }).getByText("Solo Admin").isVisible(), "admin: Solo Admin sotto i suoi pulsanti");
 await page.click("button[data-act=listino]");
@@ -2075,7 +2099,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
   await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   const mese = page.locator(".card", { hasText:"Il mio mese" });
-  const vpFatti = async () => (await mese.locator(".obiettivo", { hasText:"VP fatturati" }).locator(".num").innerText()).split("/")[0].trim();
+  const vpFatti = async () => (await mese.locator(".obiettivo", { hasText:"VP personali" }).locator(".num").innerText()).split("/")[0].trim();
   check(await vpFatti() === "300", "034: l'ordine scritto prima del report non si somma (300 VP)");
   check((await mese.locator(".vp-report").innerText()).startsWith("300 VP dal report del "), "034: la riga dice da dove viene il numero");
   // la bozza: dal foglio «Ordini»; cerco, aggiungo, cambio le quantità
@@ -2115,7 +2139,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const storico = page.locator(".sheet #miei-ordini");
   check(await storico.isVisible(), "dopo la conferma si vede «I miei ordini»");
   const mese2 = page.locator(".card", { hasText:"Il mio mese" });
-  check((await mese2.locator(".obiettivo", { hasText:"VP fatturati" }).locator(".num").innerText()).startsWith("342,5"), "034: report + il mio ordine dopo il report (342,5 VP)");
+  check((await mese2.locator(".obiettivo", { hasText:"VP personali" }).locator(".num").innerText()).startsWith("342,5"), "034: report + il mio ordine dopo il report (342,5 VP)");
   check((await mese2.locator(".vp-report").innerText()).includes("+ 42,5 VP dei tuoi ordini scritti dopo: li vedi solo tu"), "034: la parte scritta da me si vede a parte");
   check(await mese2.locator(".bar.doppia > i.rep").count() === 1, "la barra divide report e ordini scritti dopo");
   check((await storico.innerText()).includes("2 prodotti") && (await storico.innerText()).includes("42,50 VP"), "l'ordine è nello storico");
@@ -2148,7 +2172,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.click(".sheet [data-act=mio-togli-ok]");
   await page.getByText("Ordine tolto").waitFor();
   check(await page.locator("#miei-ordini").getByText("Ancora nessun ordine confermato").isVisible()
-    && (await page.locator(".card", { hasText:"Il mio mese" }).locator(".obiettivo", { hasText:"VP fatturati" }).locator(".num").innerText()).startsWith("300"),
+    && (await page.locator(".card", { hasText:"Il mio mese" }).locator(".obiettivo", { hasText:"VP personali" }).locator(".num").innerText()).startsWith("300"),
     "ordine tolto: via dallo storico e i VP tornano al report");
   await sync(page);
   check(!DB.ordiniMiei.length && !DB.righeMie.length && !DB.activities.some(a => a.partner_id === "R" && a.vp === 42.5), "nel database: via l'ordine, i prodotti e i VP del mese");
@@ -2480,6 +2504,34 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(!(await page.locator(".primi-passi").count()), "tutto fatto (30 nomi, obiettivo, link, import): Primi passi sparisce");
   await ctx.close();
   DB.persone = DB.persone.filter(x => !String(x.id).startsWith("n46"));
+}
+
+// 47. Ottimizzazione 3: «Il mio profilo» dall'omino, la scheda partner in «Numeri» e «Azioni», «VP personali»
+{
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  check(!(await page.locator(".fondo").count()) && await page.locator(".testata button.omino").isVisible(), "niente più fondo pagina: l'omino in alto a destra");
+  check(await page.locator(".miei-numeri .obiettivo", { hasText:"VP personali" }).count() === 1 && !(await page.getByText("VP fatturati").count()), "«VP personali» al posto di «VP fatturati»");
+  await page.click(".testata button.omino");
+  await page.locator(".testata h1", { hasText:"Il mio profilo" }).waitFor();
+  check(await page.getByText("Il mio link personale").isVisible() && await page.locator("button[data-act=partenza]").isVisible()
+    && await page.locator(".admin-profilo button[data-act=copia-dati]").isVisible(), "Profilo: link, punto di partenza e (admin) la sezione Admin");
+  await page.click("button[data-act=aiuto][data-k=glossario]");
+  const gl = await page.locator(".glossario").innerText();
+  check(gl.includes("Mese da Argento") && gl.includes("12 mesi che partono dal primo mese da Argento"), "Parole dell'app: Mese da Argento e Anno fiscale corretti");
+  await page.screenshot({ path: S + "/e2e/47-profilo.png", fullPage:true });
+  await page.click("button[data-act=profilo-indietro]");
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); check(true, "‹ Indietro torna alla pagina di prima");
+  // la scheda partner: si apre su «Numeri», chiamata e struttura in «Azioni»
+  await page.click("button[data-act=vista-gruppo]");
+  await page.locator(".albero.struttura li button[data-act=apri-scheda]").first().click();
+  await page.locator(".schede-scheda").waitFor();
+  check(await page.locator(".schede-scheda button.on").innerText() === "Numeri" && await page.locator(".dati-scheda").isVisible()
+    && !(await page.locator("button[data-act=chiamata]").count()), "la scheda si apre su «Numeri»");
+  await page.screenshot({ path: S + "/e2e/47-scheda-numeri.png", fullPage:true });
+  await azioniScheda(page);
+  check(await page.locator("button[data-act=chiamata]").isVisible() && !(await page.locator(".dati-scheda").count()), "«Azioni»: Fissa una chiamata, senza i numeri");
+  await ctx.close();
 }
 
 await browser.close();

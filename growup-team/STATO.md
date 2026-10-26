@@ -89,6 +89,15 @@ rimanenti** fuori da quella linea; altrimenti è solo «21%». Vale per i mesi v
 (al posto di `mesi_report` nell'app). Glossario da correggere nella PR 3: Oro e Platino la prima volta sui 12 mesi dal
 primo mese da Argento, poi sull'anno fiscale.
 
+**27 ottobre — Ottimizzazione 3 di 3: Profilo, scheda partner e parole uniche** (tavola «Profilo e scheda partner»,
+scelte di Stefano; solo interfaccia). L'**omino in alto a destra** apre «Il mio profilo»: nome, codice d'invito, codice
+Amway, punto di partenza, link personale, «Installa l'app» e «Mostra di nuovo i Primi passi» quando servono, **Parole
+dell'app** (glossario, con «Mese da Argento» e «Anno fiscale» corretti da Stefano), privacy, Esci e, solo per gli admin, la
+sezione **Admin** (copia dei dati, listino, codici Amway tolti, Correggi). Il fondo delle pagine non c'è più. La **scheda
+partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arrivarci, confronto, Analisi come pulsante,
+Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
+personali»**.
+
 **Dove siamo arrivati (27 ottobre)**: PR #106 unita. Ottimizzazione in 3 PR (vedi sopra), la 1 aperta. Lavori possibili dopo, da scegliere con
 Stefano: **notifiche vere** (un avviso al giorno, testo senza nomi: persone da risentire, Seguimi, clienti, scadenze; prove su
 Android e sull'iPhone di Alessia); **«Come arrivarci» da Platino in su** (Rubino, Zaffiro, Smeraldo, Diamante; prima il foglio
