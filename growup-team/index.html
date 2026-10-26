@@ -337,6 +337,16 @@ button.spunta-oggi{cursor:pointer}
 table.sette{width:100%;border-collapse:collapse;font-size:12.5px}
 table.sette th,table.sette td{padding:5px 3px;border-bottom:1px solid var(--line);text-align:center}
 table.sette th:first-child,table.sette td:first-child{text-align:left}
+table.analisi{border-collapse:collapse;font-size:12.5px;min-width:100%}
+table.analisi th,table.analisi td{padding:6px 5px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap}
+table.analisi td.nome,table.analisi th.nome{text-align:left;font-weight:700;white-space:normal;min-width:110px}
+table.analisi td span{font-size:11px;color:var(--ink3)}
+table.analisi th{font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em}
+table.analisi td.p21{background:var(--traccia)}
+table.analisi td.ok{color:var(--verde);font-weight:700} table.analisi td.manca{color:var(--rame);font-weight:700}
+table.analisi tr.totale td{font-weight:700;border-top:2px solid var(--line)}
+.t-crescita{color:var(--verde);font-weight:700} .t-calo{color:var(--rame);font-weight:700}
+.analisi-numeri{grid-template-columns:repeat(2,minmax(0,1fr))}
 .tot-mio{background:var(--traccia);border-radius:12px;padding:9px 12px;font-size:14px;font-variant-numeric:tabular-nums}
 input.mini{width:56px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;background:var(--card);color:var(--ink)}
 input.mini.prezzo{width:68px;text-align:right}

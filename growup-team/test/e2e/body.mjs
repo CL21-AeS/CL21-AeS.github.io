@@ -2200,7 +2200,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.getByText("Seguimi attivo").waitFor();
   check(await page.locator("button[data-act=seguimi-condividi]").getAttribute("aria-checked") === "false", "condividere con l'upline è spento di base");
   await page.click("button[data-act=seguimi-condividi]");
-  await page.getByText("Il tuo sponsor e la tua upline vedono i tuoi numeri del Seguimi").waitFor();
+  await page.getByText("Il tuo sponsor e la tua upline vedono i tuoi dati (mai i nomi)").waitFor();
   await page.click(".sezioni-io button[data-sez=giorno]");
   const oggiPerTe = page.locator(".oggi-per-te");
   await oggiPerTe.waitFor();
@@ -2282,6 +2282,48 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await sync(page);
   check(DB.guidaFatti.some(x => x.partner_id === "R" && x.chiave === "formazione" && x.giorno === ieriSett), "nel database la spunta del giorno passato");
   await ctx.close();
+}
+
+// 44. Analisi della persona (037): di sé dalla Guida, di un partner dalla scheda; i dati scritti a mano solo se condivisi
+{
+  const ora = new Date().toISOString(), mm = ora.slice(0, 7);
+  DB.partners.push({ id:"a44", nome:"Partner Analisi", sponsor_id:"R", stato:"attivo", codice_invito:"A44AAA", codice_amway:"8700001", confermato_il:ora, creato_il:ora });
+  DB.partners.push({ id:"a44l", nome:"Linea Esempio", sponsor_id:"a44", stato:"gestito", gestore_id:"R", codice_invito:"A44LLL", codice_amway:"8700002", creato_il:ora });
+  DB.numeri = DB.numeri.filter(x => !["a44", "a44l"].includes(x.partner_id)).concat([
+    { visto_da:"R", partner_id:"a44", mese:mm, vpp:250, vpg:3200, percentuale:12, linee:[{ codice:"8700002", vpg:900 }], dati_al:ora },
+    { visto_da:"R", partner_id:"a44l", mese:mm, vpp:300, vpg:900, percentuale:6, linee:[], dati_al:ora }]);
+  DB.seguimi = (DB.seguimi || []).filter(x => x.partner_id !== "a44").concat([{ partner_id:"a44", attivo:false, condividi:false }]);
+  DB.numeriCl21 = (DB.numeriCl21 || []).filter(x => x.partner_id !== "a44").concat([{ partner_id:"a44", app_cl21:7, training_day:8, convention:9 }]);
+  const analisiDi = async () => {
+    ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    await page.click("button[data-act=vista-gruppo]");
+    await page.locator(".albero.struttura li", { hasText:"Partner Analisi" }).locator("button[data-act=apri-scheda]").click();
+    await page.click("button[data-act=apri-analisi]");
+    await page.locator(".analisi-linee").waitFor();
+    return (await page.locator("#app").innerText()).replace(/\s+/g, " ");
+  };
+  let t = await analisiDi();
+  check(t.includes("Linea Esempio") && t.includes("900") && t.includes("6%"), "analisi di un partner: la linea con nome, volume e percentuale");
+  check(t.includes("Non li ha condivisi") && !/Codici alla Convention 9/.test(t), "senza condividere i numeri scritti a mano non si vedono");
+  await page.screenshot({ path: S + "/e2e/44-analisi.png", fullPage:true });
+  await page.click("button[data-act=analisi-indietro]");
+  await page.getByText("Questo mese e il mese prima").waitFor(); check(true, "‹ Indietro torna alla scheda");
+  await ctx.close();
+  DB.seguimi.find(x => x.partner_id === "a44").condividi = true;
+  t = await analisiDi();
+  check(!t.includes("Non li ha condivisi") && /Codici alla Convention 9/.test(t), "condividendo, l'upline vede anche i numeri scritti a mano");
+  await ctx.close();
+  // la mia analisi dalla Guida, e l'interruttore unico per condividere
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.click(".sezioni-io button[data-sez=guida]");
+  check(await page.locator(".guida-condividi button[data-act=seguimi-condividi]").count() === 1, "nella Guida un solo interruttore per condividere");
+  await page.click(".guida-condividi button[data-act=apri-analisi]");
+  await page.locator(".analisi-riep").waitFor();
+  check((await page.locator(".testata h1").innerText()).trim() === "La mia analisi", "la mia analisi dalla Guida");
+  await ctx.close();
+  DB.partners = DB.partners.filter(p => !["a44", "a44l"].includes(p.id));
 }
 
 await browser.close();
