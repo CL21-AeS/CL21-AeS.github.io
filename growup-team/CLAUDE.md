@@ -10,4 +10,5 @@
 - L'app non dà suggerimenti nelle schermate di tutti i giorni: mostra dati, percorso e mancanze. Eccezioni, che si
   aprono solo a richiesta: il riquadro «Come arrivarci» (pagina Obiettivo e scheda partner), chiuso finché non lo si
   apre, e la **Guida** (pulsante «Guida» in cima a Io, separata da «Il mio giorno»). «Oggi per te» compare in «Il mio
-  giorno» solo per chi ha scelto «Seguimi giorno per giorno» nella Guida.
+  giorno» solo per chi ha scelto «Seguimi giorno per giorno» nella Guida. L'«Analisi della persona» è una pagina a parte,
+  aperta solo a richiesta (dalla Guida e dalla scheda partner): solo dati, senza calcoli né consigli.

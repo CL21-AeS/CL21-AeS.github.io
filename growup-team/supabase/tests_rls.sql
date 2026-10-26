@@ -944,6 +944,34 @@ begin
   perform growup_test.deve_fallire(format('select * from public.seguimi_di(%L)', b), '036: anon non legge');
   execute 'reset role';
 
+  -- ---- 037: Analisi della persona e un solo interruttore per condividere ----
+  perform growup_test.come(u5);  -- A, sponsor di B
+  perform growup_test.ok((select count(*) from public.analisi_persona(b))
+                         = (select count(*) from generate_series(public.inizio_py(current_date), date_trunc('month', current_date)::date, interval '1 month')),
+                         '037: lo sponsor apre l''analisi di B: un rigo per mese dell''anno fiscale');
+  perform growup_test.ok((select vpg from public.analisi_persona(b) where mese = date_trunc('month', current_date)::date) = 1000,
+                         '037: l''analisi usa i numeri ufficiali del report');
+  perform growup_test.come(u3);  -- B, la sua
+  perform growup_test.ok(exists (select 1 from public.analisi_persona(b)), '037: B apre la sua analisi');
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.deve_fallire(format('select * from public.analisi_persona(%L)', b), '037: un''altra linea non apre l''analisi di B');
+  perform growup_test.come(null);
+  perform growup_test.deve_fallire(format('select * from public.analisi_persona(%L)', b), '037: anon non apre analisi');
+  perform growup_test.come(u3);  -- B condivide: con l'interruttore spento l'upline non vede numeri scritti e abitudini
+  update public.seguimi set condividi = false;
+  insert into public.numeri_cl21 (app_cl21, training_day, convention) values (4, 5, 6);
+  perform growup_test.come(u5);
+  perform growup_test.ok(public.dati_condivisi(b) is null, '037: senza condividere lo sponsor non vede i numeri scritti di B');
+  perform growup_test.come(u3);
+  update public.seguimi set condividi = true;
+  perform growup_test.come(u5);
+  perform growup_test.ok((public.dati_condivisi(b)->'cl21'->>'app_cl21')::int = 4, '037: condividendo, lo sponsor vede i numeri scritti di B');
+  perform growup_test.come(u4);
+  perform growup_test.ok(public.dati_condivisi(b) is null, '037: un''altra linea non vede i dati condivisi di B');
+  perform growup_test.come(null);
+  perform growup_test.deve_fallire(format('select public.dati_condivisi(%L)', b), '037: anon non legge i dati condivisi');
+  execute 'reset role';
+
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');

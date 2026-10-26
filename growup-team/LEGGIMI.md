@@ -94,7 +94,9 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     abitudini (tutto solo suo), `guida_conteggi`
 33. `supabase/036_seguimi.sql` — «Seguimi giorno per giorno»: la scelta del partner (`seguimi`) e le azioni di ogni giorno
     (`seguimi_giorni`), solo sue; all'upline solo i numeri, se lo condivide (`seguimi_di`)
-34. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+34. `supabase/037_analisi.sql` — l'Analisi della persona (`analisi_persona`: numeri dei report dell'anno fiscale, linee
+    con nome, VP e percentuale, conteggi della Stabilità) e i dati condivisi con l'upline (`dati_condivisi`)
+35. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 17. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 18. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.

@@ -109,6 +109,9 @@ function creaApi(){
     seguimiGiorni: dal => q(sb.from("seguimi_giorni").select("giorno,azioni,proposte,fatte,per_tipo").gte("giorno", dal).order("giorno")),
     salvaSeguimiGiorno: r => q(sb.from("seguimi_giorni").upsert(r, { onConflict:"partner_id,giorno" })),
     seguimiDi:    pid => q(sb.rpc("seguimi_di", { p_partner:pid })),
+    /* 037: l'Analisi della persona (numeri dei report) e i dati che un partner condivide (mai nomi) */
+    analisiPersona: pid => q(sb.rpc("analisi_persona", { p_partner:pid })),
+    datiCondivisi: pid => q(sb.rpc("dati_condivisi", { p_partner:pid })),
     esclusi:      () => q(sb.from("esclusi_import").select("codice")),
     /* persone nascoste dalla mia struttura (i loro VP contano lo stesso) */
     nascosti:     () => q(sb.from("nascosti").select("nascosto_id")),
@@ -215,6 +218,7 @@ const st = {
   sezIo: "giorno",        // in Io: "giorno" (la pagina di sempre) o "guida" (la Guida per l'azione)
   guida: { conteggi:{}, cl21:{}, obiettivi:new Map(), fatti:[] },
   seguimi: { attivo:false, condividi:false }, seguimiGiorni: [], seguimiScheda: {},
+  analisi: {}, condivisi: {}, analisiId: null,
   vista: "io",            // pagina della home: "io", "gruppo" (struttura, inviti) o "scheda" (un partner)
   schedaId: null,         // partner aperto nella scheda
   attScheda: [],          // le sue attività (mese aperto)
@@ -1214,6 +1218,13 @@ function vHome(){
   </div>
   ${vBarraFissa()}
   ${vPersone()}
+  ${vFondo()}`;
+  if(st.vista === "analisi") return `
+  <div class="testata">
+    <div>${marchio()}<h1>${st.analisiId === p.id ? "La mia analisi" : "Analisi"}</h1></div>
+  </div>
+  ${vBarraFissa()}
+  ${vAnalisi()}
   ${vFondo()}`;
   if(st.vista === "obiettivo") return `
   <div class="testata">
@@ -2256,6 +2267,7 @@ function vScheda(){
   </div>
   ${vComeArrivarci(p.id, "lui")}
   ${vConfronto(p)}
+  <button class="btn wide" style="margin-top:4px" data-act="apri-analisi" data-id="${esc(p.id)}">Analisi di ${esc(nomeSaluto(p.nome))} ›</button>
   ${vSeguimiScheda(p)}
   ${gestito ? `<div class="card">
     <span class="eyebrow">I suoi numeri · ${nomeMese(m)}</span>
@@ -5635,7 +5647,12 @@ function vGuidaSeguimi(){
     <span class="eyebrow">Fatti seguire giorno per giorno</span>
     <p class="small" style="margin:4px 0 0">Ogni mattina, in cima a «Il mio giorno», le azioni del giorno prese dai tuoi dati. Lo togli quando vuoi.</p>
     ${sw("seguimi-attivo", !!s.attivo, "Seguimi giorno per giorno", "")}
-    ${s.attivo ? sw("seguimi-condividi", !!s.condividi, "Fai vedere al tuo sponsor e alla tua upline cosa fai", "Vedono quante azioni fai ogni giorno, non i nomi.") : ""}
+  </div>
+  <div class="card guida-condividi">
+    <span class="eyebrow">Condividere con la tua upline</span>
+    ${sw("seguimi-condividi", !!s.condividi, "Condividi i tuoi dati con il tuo sponsor e la tua upline",
+      "Vedono i numeri del Seguimi, i numeri che scrivi a mano e le tue abitudini. Mai i nomi, e i VP restano quelli dei report.")}
+    <button class="btn wide" style="margin-top:10px" data-act="apri-analisi" data-id="${esc(st.profilo.id)}">La mia analisi ›</button>
   </div>`;
 }
 function vSeguimiScheda(p){
@@ -5660,15 +5677,119 @@ function vSeguimiScheda(p){
 }
 Object.assign(AZIONI, {
   async "seguimi-attivo"(){
-    const r = { attivo:!st.seguimi.attivo, condividi:st.seguimi.attivo ? false : !!st.seguimi.condividi };
+    const r = { attivo:!st.seguimi.attivo, condividi:!!st.seguimi.condividi };
     try{ await api.salvaSeguimi(r); st.seguimi = r; if(r.attivo) await preparaOggi(); render();
       toast(r.attivo ? "Seguimi attivo: trovi le azioni di oggi in «Il mio giorno»" : "Seguimi tolto"); }catch(e){ toast(messaggio(e)); }
   },
   async "seguimi-condividi"(){
-    const r = { attivo:true, condividi:!st.seguimi.condividi };
+    const r = { attivo:!!st.seguimi.attivo, condividi:!st.seguimi.condividi };
     try{ await api.salvaSeguimi(r); st.seguimi = r; render();
-      toast(r.condividi ? "Il tuo sponsor e la tua upline vedono i tuoi numeri del Seguimi" : "I numeri del Seguimi li vedi solo tu"); }catch(e){ toast(messaggio(e)); }
+      toast(r.condividi ? "Il tuo sponsor e la tua upline vedono i tuoi dati (mai i nomi)" : "I tuoi dati li vedi solo tu"); }catch(e){ toast(messaggio(e)); }
   }
+});
+
+/* ---- 11k. Analisi della persona (037): di sé (dalla Guida) e di chi è nel gruppo (dalla scheda partner). Pagina a parte,
+   aperta solo a richiesta. Numeri dei report dell'anno fiscale: per ogni linea solo percentuale e volume VP, mese per mese
+   (senza calcoli), peso sul gruppo, mesi al 21% e tendenza; poi la Stabilità Cum Laude 21 mese per mese. I numeri scritti
+   a mano e le abitudini di un altro si vedono solo se li ha condivisi. */
+async function apriAnalisi(pid){
+  st.analisiId = pid; st.vista = "analisi"; render(); window.scrollTo(0, 0);
+  try{
+    const [righe, cond] = await Promise.all([api.analisiPersona(pid), pid === st.profilo.id ? Promise.resolve(null) : api.datiCondivisi(pid)]);
+    st.analisi[pid] = righe || []; st.condivisi[pid] = cond || null; render();
+  }catch(e){ st.analisi[pid] = []; toast(messaggio(e)); render(); }
+}
+function tendenzaDi(valori){
+  const v = valori.filter(x => x != null);
+  if(v.length < 4) return null;
+  const ultimi = v.slice(-3), prima = v.slice(-6, -3);
+  const a = somma(ultimi.map(x => ({ x })), "x") / ultimi.length, b = somma(prima.map(x => ({ x })), "x") / prima.length;
+  if(!b) return a > 0 ? "in crescita" : "stabile";
+  return a > b * 1.1 ? "in crescita" : a < b * 0.9 ? "in calo" : "stabile";
+}
+const INIZIO_STABILITA = "2026-10";
+function sogliaCl21(r, pct){ const i = LIVELLI_CL21.reduce((x, l, j) => (Number(pct) || 0) >= l ? j : x, 0); return r.soglie[i]; }
+function vAnalisi(){
+  const pid = st.analisiId, mio = pid === st.profilo.id, righe = st.analisi[pid];
+  const indietro = `<button class="btn link" data-act="analisi-indietro" style="padding:0">‹ Indietro</button>`;
+  if(!righe) return `${indietro}<p class="muted">Carico i numeri…</p>`;
+  const nome = mio ? "" : nomeDi(pid);
+  const breve = m => MESI[Number(meseDi(m).slice(5)) - 1].slice(0, 3);
+  const conReport = righe.filter(r => r.vpg != null);
+  if(!conReport.length) return `${indietro}<div class="card"><span class="eyebrow">${mio ? "La mia analisi" : `Analisi di ${esc(nome)}`}</span>
+    <p class="small" style="margin:6px 0 0">Ancora nessun report importato in questo anno fiscale (da settembre).</p></div>`;
+  /* le linee frontali: per codice, con nome, VP di gruppo e percentuale di ogni mese */
+  const linee = new Map();
+  righe.forEach((r, i) => (r.linee || []).forEach(l => {
+    const k = l.codice; if(!linee.has(k)) linee.set(k, { nome:l.nome || `Codice ${l.codice}`, mesi:righe.map(() => null) });
+    const vp = Number(l.vpg) || 0;
+    linee.get(k).mesi[i] = { vp, pct:l.percentuale != null ? Number(l.percentuale) : percentualeDa(vp) };
+  }));
+  const ultimo = righe.length - 1 - [...righe].reverse().findIndex(r => r.vpg != null);
+  const gruppoUltimo = Number(righe[ultimo].vpg) || 0;
+  const lista = [...linee.values()].sort((a, b) => ((b.mesi[ultimo] || {}).vp || 0) - ((a.mesi[ultimo] || {}).vp || 0));
+  const forte = lista.slice().sort((a, b) => somma(b.mesi.map(x => ({ v:x ? x.vp : 0 })), "v") - somma(a.mesi.map(x => ({ v:x ? x.vp : 0 })), "v"))[0];
+  const mesi21 = conReport.filter(r => Number(r.percentuale) >= 21).length;
+  const media = somma(conReport.map(r => ({ v:Number(r.vpg) || 0 })), "v") / conReport.length;
+  const cella = x => x ? `<td class="num p${x.pct || 0}"><b>${num(x.vp)}</b><br><span>${x.pct ? x.pct + "%" : "–"}</span></td>` : `<td class="num faint">–</td>`;
+  const tend = t => t ? `<td class="t-${t.split(" ").pop()}">${{ "in crescita":"↗", "in calo":"↘", stabile:"→" }[t]} ${t}</td>` : "<td>–</td>";
+  const testa = `<tr><th class="nome"></th>${righe.map(r => `<th>${breve(r.mese)}</th>`).join("")}`;
+  const tabLinee = `<div class="tab-consigli"><table class="analisi">
+      <thead>${testa}<th>peso</th><th>mesi 21%</th><th>tendenza</th></tr></thead>
+      <tbody>${lista.map(l => `<tr><td class="nome">${esc(l.nome)}</td>${l.mesi.map(cella).join("")}
+        <td class="num">${gruppoUltimo && l.mesi[ultimo] ? Math.round(l.mesi[ultimo].vp / gruppoUltimo * 100) + "%" : "–"}</td>
+        <td class="num">${l.mesi.filter(x => x && x.pct >= 21).length}</td>${tend(tendenzaDi(l.mesi.map(x => x ? x.vp : null)))}</tr>`).join("")}
+        <tr class="totale"><td class="nome">${mio ? "Tutto il tuo gruppo" : "Tutto il gruppo"}</td>${righe.map(r => cella(r.vpg != null
+          ? { vp:Number(r.vpg) || 0, pct:r.percentuale != null ? Number(r.percentuale) : percentualeDa(Number(r.vpg) || 0) } : null)).join("")}
+          <td class="num">100%</td><td class="num">${mesi21}</td>${tend(tendenzaDi(righe.map(r => r.vpg != null ? Number(r.vpg) : null)))}</tr></tbody>
+    </table></div>`;
+  const stab = [{ k:"personali", nome:mio ? "I tuoi nuovi iscritti (con il tuo link)" : "Nuovi iscritti con il suo link" }]
+    .concat(STABILITA_CL21.filter(r => !r.scritto));
+  const tabStab = `<div class="tab-consigli"><table class="analisi">
+      <thead>${testa}</tr></thead>
+      <tbody>${stab.map(r => `<tr><td class="nome">${esc(r.nome)}</td>${righe.map(x => { const v = Number(x[r.k]) || 0;
+        /* i conteggi ci sono da quando c'è la Guida (fine ottobre 2026); senza report del mese niente soglia */
+        if(meseDi(x.mese) < INIZIO_STABILITA || (r.soglie && x.vpg == null)) return `<td class="num faint">–</td>`;
+        if(!r.soglie) return `<td class="num">${num(v)}</td>`;
+        const s = sogliaCl21(r, x.percentuale);
+        return `<td class="num ${v >= s ? "ok" : "manca"}">${num(v)}<br><span>su ${num(s)}</span></td>`; }).join("")}</tr>`).join("")}</tbody>
+    </table></div>`;
+  const cond = mio ? { cl21:st.guida.cl21, obiettivi:[...st.guida.obiettivi].map(([chiave, a_settimana]) => ({ chiave, a_settimana })), fatti:st.guida.fatti } : st.condivisi[pid];
+  const scritti = STABILITA_CL21.filter(r => r.scritto);
+  const blocco = cond ? `<ul class="req">${scritti.map(r => `<li><span class="grow">${esc(r.nome)}</span><span class="num">${
+      cond.cl21 && cond.cl21[r.k] != null ? num(cond.cl21[r.k]) : "–"}</span></li>`).join("")}</ul>
+    ${mio ? "" : `<p class="small" style="margin:8px 0 0"><b>Abitudini di questa settimana</b>: ${["formazione", "sponsor"].map(k => {
+      const o = (cond.obiettivi || []).find(x => x.chiave === k), f = (cond.fatti || []).filter(x => x.chiave === k && x.giorno >= settimana()).length;
+      return `${ABITUDINI[k].nome.toLowerCase()} ${f} su ${o ? o.a_settimana : ABITUDINI[k].base}`; }).join(" · ")}</p>`}`
+    : `<p class="small" style="margin:6px 0 0">Non li ha condivisi: li vede solo ${esc(nome)}.</p>`;
+  return `${indietro}
+  <div class="card analisi-riep">
+    <span class="eyebrow">${mio ? "La mia analisi" : `Analisi di ${esc(nome)}`} · anno fiscale</span>
+    <div class="numeri-guida analisi-numeri">
+      <div><b class="num">${conReport.length} su ${righe.length}</b><span>mesi con il report</span></div>
+      <div><b class="num">${mesi21}</b><span>mesi al 21%</span></div>
+      <div><b class="num">${num(Math.round(media))}</b><span>VP di gruppo medio</span></div>
+      <div><b style="font-size:16px">${forte ? esc(forte.nome) : "–"}</b><span>linea più forte</span></div>
+    </div>
+  </div>
+  <div class="card analisi-linee">
+    <span class="eyebrow">Andamento delle linee</span>
+    <p class="small" style="margin:4px 0 0">VP di gruppo e percentuale di ogni linea frontale, mese per mese. Peso: quanto conta la linea sul
+      gruppo nell'ultimo mese. Tendenza: ultimi 3 mesi rispetto ai 3 prima.</p>
+    ${lista.length ? tabLinee : `<p class="muted" style="margin:8px 0 0">Nei report non ci sono linee frontali.</p>`}
+  </div>
+  <div class="card analisi-stabilita">
+    <span class="eyebrow">Stabilità Cum Laude 21 mese per mese</span>
+    <p class="small" style="margin:4px 0 0">Sotto ogni numero, quello che serve per una qualifica solida alla percentuale di quel mese.</p>
+    ${tabStab}
+    <p class="small" style="margin:10px 0 0"><b>Scritti a mano</b> (il valore di oggi)</p>
+    ${blocco}
+  </div>`;
+}
+Object.assign(AZIONI, {
+  "apri-analisi"(el){ apriAnalisi(el.dataset.id || st.profilo.id); },
+  "analisi-indietro"(){ if(tornaIndietro()) return;
+    st.vista = st.analisiId === st.profilo.id ? "io" : "scheda"; render(); window.scrollTo(0, 0); }
 });
 
 /* ---- 11g. Il movimento (scelte di Stefano dalla tavola di prova: "Vivace"; tra le schede "Una sopra l'altra") ----

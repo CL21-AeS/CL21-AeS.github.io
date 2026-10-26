@@ -6,8 +6,8 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 ## Ripartire da qui (fermi la sera del 21 ottobre 2026)
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
-dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **036** (027 e la parte 2 della 033 — `togli_dalla_struttura` e `importa_mappa` —
-incollate da Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#104**, nessuna aperta; il ramo di
+dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **037** (027 e la parte 2 della 033 — `togli_dalla_struttura` e `importa_mappa` —
+incollate da Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#105**, nessuna aperta; il ramo di
 lavoro è ricreato da main. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
 **Il 21 ottobre in breve** (dettagli sotto): «Come arrivarci» (consigli a richiesta in Obiettivo e nella scheda partner,
@@ -63,7 +63,7 @@ decimali** (96,30 € · 18,20 VP) in bozza, storico, clienti e listino; cifre d
 **Aperto, in attesa di Stefano**:
 - Controllare sul sito Amway che la **%** delle linee frontali nei report importati sia quella giusta (serve a «Come arrivarci»
   da Argento a Platino).
-- Provare dal vivo (app v39): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,
+- Provare dal vivo (app v40): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,
   reimport di un report più nuovo che riporta il totale al report, due decimali, un nuovo partner che entra con il link e il
   codice (in attesa → al posto giusto con il primo import).
 - Verifica in due passaggi su GitHub: controllare in github.com/settings/security.
@@ -74,6 +74,18 @@ dell'anno fiscale): si conta sempre il **VPG delle mappe**. Report dei mesi pass
 «Invitala nell'app»: si condivide il proprio link e l'import mette ognuno al posto giusto. Al primo ingresso il codice Amway
 si scrive **due volte** («Riscrivi il codice»: se non sono uguali non si entra) con l'avviso di controllarlo bene (si trova sul sito o nell'app Amway, nell'icona del profilo in alto a destra). Ogni mese
 copia dei dati e ZIP del codice; il piano Pro di Supabase si valuta **all'inizio della prova** con i Partner.
+
+**27 ottobre — Analisi della persona** (migrazione 037; tavola «Analisi della persona» v3, decisioni di Stefano): pagina a
+parte, aperta solo a richiesta, di sé («La mia analisi» nella Guida) e di chi è nel proprio gruppo («Analisi di …» nella
+scheda partner). Anno fiscale (da settembre), dai report: riepilogo (mesi con il report, mesi al 21%, VP di gruppo medio, linea
+più forte); **andamento delle linee** con nome, VP di gruppo e percentuale mese per mese, **senza calcoli** (niente
+differenziale), peso sul gruppo, mesi al 21%, tendenza (ultimi 3 mesi sui 3 prima: oltre +10% in crescita, oltre −10% in calo,
+altrimenti stabile); **Stabilità Cum Laude 21 mese per mese** (nuovi iscritti con il link, nuovi nel gruppo, codici oltre 200 VP,
+con la soglia del livello del mese; da ottobre 2026) e i numeri scritti a mano. **Un solo interruttore** nella Guida, «Condividi
+i tuoi dati con il tuo sponsor e la tua upline» (spento di base, indipendente dal Seguimi): acceso, l'upline vede i numeri del
+Seguimi, i numeri scritti a mano e le abitudini; mai i nomi, e i VP restano sempre quelli dei report. Senza interruttore
+l'upline vede solo struttura, numeri dei report, obiettivo (cifra e data), prossima qualifica, contatti e piani della
+settimana con i suoi obiettivi, i numeri della Lista e l'ultimo aggiornamento.
 
 **26 ottobre — usabilità** (richieste di Stefano): **indietro con il dito**: tra le pagine principali il dito scorre come
 prima; chi arriva in una schermata da un collegamento (Lista o Gruppo dalla Guida, una persona da «Oggi per te» o da Io, una

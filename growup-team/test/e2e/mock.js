@@ -206,6 +206,25 @@
         inserito_da:io.id, inserito_il:new Date().toISOString() }); }
       Object.assign(o, { stato:"confermato", data:data || o.data, attivita_id:att, vp:tot, confermato_il:new Date().toISOString() }); salva();
       return Object.assign({}, o); },
+    /* 037: Analisi della persona e dati condivisi */
+    analisiPersona: async pid => { const io = mio(); const t = db.partners.find(p => p.id === pid);
+      if(!t || !vedo(io, t)) throw new Error("non_autorizzato");
+      const ora = new Date().toISOString().slice(0, 7), [y, m] = ora.split("-").map(Number), inizio = (m >= 9 ? y : y - 1) + "-09";
+      const mesi = []; for(let x = inizio; x <= ora; ){ mesi.push(x); const [a, b] = x.split("-").map(Number); x = b === 12 ? `${a + 1}-01` : `${a}-${String(b + 1).padStart(2, "0")}`; }
+      const giu = [pid].concat(sotto(pid).map(x => x.id));
+      return mesi.map(mm => { const n = numeroDi(pid, mm);
+        return { mese:mm + "-01", vpp:n ? n.vpp : null, vpg:n ? n.vpg : null, percentuale:n ? n.percentuale : null,
+          linee:(n ? n.linee || [] : []).map(l => { const q = db.partners.find(x => x.codice_amway === l.codice), nl = q ? numeroDi(q.id, mm) : null;
+            return { codice:l.codice, nome:q ? q.nome : null, vpg:l.vpg, percentuale:nl ? nl.percentuale : null }; }),
+          personali:db.partners.filter(x => x.invitato_da === pid && String(x.invitato_il || "").slice(0, 7) === mm).length,
+          nuovi_gruppo:db.partners.filter(x => x.id !== pid && giu.includes(x.id) && String(x.in_mappa_dal || "").slice(0, 7) === mm).length,
+          oltre_200:giu.filter(id => { const q = numeroDi(id, mm); return q && Number(q.vpp) > 200; }).length }; }); },
+    datiCondivisi: async pid => { const io = mio(); const t = db.partners.find(p => p.id === pid);
+      if(!t || pid === io.id || !vedo(io, t) || !(db.seguimi || []).some(x => x.partner_id === pid && x.condividi)) return null;
+      const c = (db.numeriCl21 || []).find(x => x.partner_id === pid);
+      return { cl21:c ? { app_cl21:c.app_cl21, training_day:c.training_day, convention:c.convention } : null,
+        obiettivi:(db.guidaObiettivi || []).filter(x => x.partner_id === pid).map(x => ({ chiave:x.chiave, a_settimana:x.a_settimana })),
+        fatti:(db.guidaFatti || []).filter(x => x.partner_id === pid).map(x => ({ chiave:x.chiave, giorno:x.giorno })) }; },
     /* 036: Seguimi giorno per giorno */
     seguimi: async () => (db.seguimi || []).filter(x => x.partner_id === mio().id).map(x => ({ attivo:x.attivo, condividi:x.condividi })),
     salvaSeguimi: async r => { const io = mio(); db.seguimi = (db.seguimi || []).filter(x => x.partner_id !== io.id).concat([Object.assign({ partner_id:io.id }, r)]); salva(); },
