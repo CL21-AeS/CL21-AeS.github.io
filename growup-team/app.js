@@ -4589,7 +4589,7 @@ function tipoMessaggio(p){
 function vSheetClienti(s){
   const p = st.persone.find(x => x.id === st.personaId);
   const annulla = `<button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>`;
-  if(s === "ordine" && p){
+  if(s === "ordine-cliente" && p){
     const b = st.bozza;
     return `<h2>${b.ordineId ? "Modifica l'ordine" : `Ordine di ${esc(nomeSaluto(p.nome))}`}</h2>
     <form data-form="ordine-cliente" novalidate>
@@ -4692,17 +4692,17 @@ Object.assign(AZIONI, {
   "torna-clienti"(){ st.personaId = null; render(); window.scrollTo(0, 0); },
   "filtro-clienti"(el){ st.filtroClienti = el.dataset.filtro; render(); },
   "cliente-nuovo"(){ st.errore = ""; st.nuovoCliente = true; st.sheet = "persona-nuova"; render(); },
-  "ordine-nuovo"(){ st.bozza = nuovaBozza([]); st.cercaProdotto = ""; st.sheet = "ordine"; render(); },
+  "ordine-nuovo"(){ st.bozza = nuovaBozza([]); st.cercaProdotto = ""; st.sheet = "ordine-cliente"; render(); },
   "ordine-modifica"(el){
     const o = st.ordini.find(x => x.id === el.dataset.id);
     if(!o) return;
     st.bozza = Object.assign(nuovaBozza(righeDi(o.id)), { ordineId:o.id, data:o.data, modo:o.modo, nota:o.nota || "", numero:o.numero_amway, vp:o.vp });
-    st.cercaProdotto = ""; st.sheet = "ordine"; render();
+    st.cercaProdotto = ""; st.sheet = "ordine-cliente"; render();
   },
   "importa-ordini"(){ st.errore = ""; st.impOrdini = null; st.sheet = "importa-ordini"; render(); },
   "ordine-ripeti"(){
     const o = ordiniDi(st.personaId)[0];
-    st.bozza = nuovaBozza(righeDi(o.id)); st.bozza.modo = o.modo; st.cercaProdotto = ""; st.sheet = "ordine"; render();
+    st.bozza = nuovaBozza(righeDi(o.id)); st.bozza.modo = o.modo; st.cercaProdotto = ""; st.sheet = "ordine-cliente"; render();
   },
   async riordinato(el){
     const x = scaffale(st.persone.find(p => p.id === st.personaId)).find(y => y.codice === el.dataset.codice);
