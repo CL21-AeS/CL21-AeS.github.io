@@ -5237,6 +5237,7 @@ function vOrdini(){
       ${scelta("apri-bozza", "Bozza ordine", nb ? `${prodotti(nb)} · salvata` : "Prepara l'ordine con i prodotti del listino")}
       ${scelta("apri-miei", "I miei ordini", lista.length ? `${plur(lista.length, "ordine", "ordini")} · l'ultimo il ${dataIt(lista[0].data)}` : "Ancora nessuno")}
       ${scelta("totale-mese", "Aggiorna il totale del mese", "La cifra dall'ufficio virtuale Amway")}
+      ${scelta("importa-ordini", "Ordini dal sito Amway", "I file CSV di ordini e clienti dal sito Amway")}
     </div>
     ${precedenteAperto() ? `<p class="small" style="margin:10px 0 0">Fino al ${giornoChiusura()} puoi ancora correggere ${nomeMese(mesePrecedente()).split(" ")[0]}.</p>` : ""}
     <button class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;

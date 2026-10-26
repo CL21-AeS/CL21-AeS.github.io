@@ -100,7 +100,7 @@ check(await oggiCard.getByText("Contatto: Paolo Rapido").isVisible() && await og
   "Oggi: contatto e piano con il nome della persona");
 await apriOrdini(page);
 check(await page.locator(".sheet .scelta-ordini").allInnerTexts().then(l => l.map(t => t.split("\n")[0])).then(l => l.join("|"))
-  === "Ordine veloce|Bozza ordine|I miei ordini|Aggiorna il totale del mese", "+ Ordine apre il foglio Ordini con le 4 scelte");
+  === "Ordine veloce|Bozza ordine|I miei ordini|Aggiorna il totale del mese|Ordini dal sito Amway", "+ Ordine apre il foglio Ordini con le 5 scelte");
 await page.click(".sheet button[data-act=ordine]");
 check(await page.inputValue(".sheet input[name=vp]") === "" && await page.getAttribute(".sheet input[name=vp]", "placeholder") === "0", "ordine: campo vuoto con lo 0 grigio");
 await page.click(".sheet button:has-text('Salva')");
@@ -2388,6 +2388,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.screenshot({ path: S + "/e2e/45-il-mio-giorno.png", fullPage:true });
   await apriOrdini(page);
   await page.locator(".sheet-box").screenshot({ path: S + "/e2e/45-ordini.png" });
+  await page.click(".sheet button[data-act=importa-ordini]");
+  check(await page.locator(".sheet h2", { hasText:"Clienti e ordini dal sito Amway" }).isVisible(), "dal foglio Ordini: l'import degli ordini dal sito Amway");
   await page.click(".sheet [data-act=chiudi]");
   await dfo.locator("button.riga-apri", { hasText:"Altri 3 in corso" }).click();
   check(await page.locator("button[data-act=vista-persone][aria-selected=true]").isVisible(), "la riga apre la Lista");
