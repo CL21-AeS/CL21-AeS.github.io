@@ -41,3 +41,11 @@ async function apri(ctxOpts, hash){
   return { ctx, page };
 }
 const sync = async page => Object.assign(DB, await page.evaluate(() => JSON.parse(JSON.stringify(window.__DBOUT || window.__DB))));
+/* ottimizzazione 1: tappa e diario si aprono toccandoli; gli ordini stanno nel foglio «Ordini» */
+const apriRiga = async (pg, act) => { const b = pg.locator(`button[data-act=${act}]`).first();
+  if(await pg.locator(".sheet").count()) return;
+  if(await b.getAttribute("aria-expanded") === "false") await b.click(); };
+const apriTappa = pg => apriRiga(pg, "apri-tappa");
+const apriDiario = pg => apriRiga(pg, "apri-diario");
+const apriOrdini = async (pg, scelta) => { await pg.click(".azioni button[data-act=ordini]");
+  if(scelta) await pg.click(`.sheet button[data-act=${scelta}]`); };

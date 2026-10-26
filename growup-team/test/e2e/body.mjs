@@ -51,8 +51,9 @@ check(await page.locator(".percorso li.attuale", { hasText:"Primo ordine" }).isV
 check(await page.getByText("«Per la famiglia»").isVisible(), "il perché si vede a chi l'ha scritto");
 await page.screenshot({ path: S + "/e2e/25-obiettivo.png", fullPage:true });
 await page.click("button[data-act=vista-io]");
-await page.getByText("Ciao Anna").waitFor();
-check(await page.locator(".obiettivo-breve").getByText("300 €").isVisible(), "su Io: il riquadro del mio obiettivo");
+await page.getByText("Ciao Anna").waitFor(); await apriTappa(page);
+check(await page.locator(".miei-numeri button[data-act=vista-obiettivo]").getByText("300 €").isVisible() && !(await page.locator(".obiettivo-breve").count()),
+  "su Io: il mio obiettivo è la prima riga di «I miei numeri»");
 check(await page.locator("button[data-act=copia-dati]").count() === 0, "chi non è admin non vede la copia dei dati");
 check(await page.locator("button[data-act=listino]").count() === 0, "chi non è admin non vede il listino");
 check(await page.getByText("Solo Admin", { exact:true }).count() === 0, "chi non è admin non vede le scritte Solo Admin");
@@ -92,10 +93,15 @@ check(await page.locator("button[data-act=piano-rapido] b").innerText() === "2 q
 await page.getByRole("button", { name:"Annulla" }).last().click();
 await page.getByText("Annullato").waitFor();
 check(await page.locator("button[data-act=piano-rapido] b").innerText() === "1 questa sett.", "annullato: di nuovo 1");
-const oggiCard = page.locator(".card", { hasText:"Oggi" }).filter({ has:page.locator("ul.oggi") }).first();
+check(!(await page.locator("ul.oggi").count()), "Diario di oggi chiuso di base");
+await apriDiario(page);
+const oggiCard = page.locator(".card.diario");
 check(await oggiCard.getByText("Contatto: Paolo Rapido").isVisible() && await oggiCard.getByText("Piano mostrato: Paolo Rapido").isVisible(),
   "Oggi: contatto e piano con il nome della persona");
-await page.click("button[data-act=ordine]");
+await apriOrdini(page);
+check(await page.locator(".sheet .scelta-ordini").allInnerTexts().then(l => l.map(t => t.split("\n")[0])).then(l => l.join("|"))
+  === "Ordine veloce|Bozza ordine|I miei ordini|Aggiorna il totale del mese", "+ Ordine apre il foglio Ordini con le 4 scelte");
+await page.click(".sheet button[data-act=ordine]");
 check(await page.inputValue(".sheet input[name=vp]") === "" && await page.getAttribute(".sheet input[name=vp]", "placeholder") === "0", "ordine: campo vuoto con lo 0 grigio");
 await page.click(".sheet button:has-text('Salva')");
 await page.locator(".sheet .errore").waitFor();
@@ -105,21 +111,22 @@ await page.click(".sheet button:has-text('Salva')"); await page.getByText("Ordin
 check(await page.getByText("Primi clienti").first().isVisible(), "primo ordine fatto -> tappa 2");
 
 // 2b. Il mio mese: + VP e niente struttura nella pagina Io
-check(await page.locator(".card", { hasText:"Il mio mese" }).locator("button[data-act=ordine]").isVisible(), "+ VP nel mio mese");
+check(!(await page.locator(".miei-numeri button[data-act=ordine], .miei-numeri button[data-act=totale-mese], .miei-numeri button[data-act=importa]").count()),
+  "nel mio mese niente più + Ordine, Aggiorna il totale, Importa");
 // Aggiorna il totale del mese: su a 100, poi giù a 80
-await page.click("button[data-act=totale-mese]");
+await apriOrdini(page, "totale-mese");
 check(await page.inputValue(".sheet input[name=vp]") === "" && await page.getAttribute(".sheet input[name=vp]", "placeholder") === "62,5", "totale proposto in grigio = VP già registrati");
 await page.fill(".sheet input[name=vp]", "100");
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("aggiornato: 100 VP").waitFor();
-check(await page.locator("button[data-act=ordine] b").first().innerText() === "100 VP nel mese", "totale del mese a 100");
-await page.click("button[data-act=totale-mese]");
+check(await page.locator("button[data-act=ordini] b").first().innerText() === "100 VP nel mese", "totale del mese a 100");
+await apriOrdini(page, "totale-mese");
 await page.fill(".sheet input[name=vp]", "80");
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("aggiornato: 80 VP").waitFor();
 check(await page.locator(".oggi li", { hasText:"-20 VP" }).isVisible(), "correzione negativa nella lista di oggi");
 check(await page.locator(".card", { hasText:"Il mio mese" }).getByText("/ 100").isVisible(), "obiettivo invariato");
-await page.click("button[data-act=totale-mese]");
+await apriOrdini(page, "totale-mese");
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("Il totale era già questo").waitFor(); check(true, "nessuna correzione se il totale non cambia");
 await page.locator(".card", { hasText:"Il mio mese" }).screenshot({ path: S + "/e2e/7-mese.png" });
@@ -138,7 +145,9 @@ const persona = (liv, sp, cod, nome, vpp) => [String(liv), "'" + sp, "'" + cod, 
 const creaCsv = (mese, righe) => "﻿" + [csvRiga(["Amway","CONFIDENZIALE - REPORT DI PROVA"]), csvRiga(["Mese di competenza", mese]), csvRiga(testaCsv)]
   .concat(righe.map(csvRiga)).join("\n");
 const scegliFile = async (pg, nome, testo, daGruppo) => {
-  await pg.click(daGruppo ? ".card button[data-act=importa]" : "button[data-act=importa]");
+  /* l'import sta in Gruppo (e nel promemoria di Io): se la pagina aperta non lo ha, si va in Gruppo */
+  if(!daGruppo && !(await pg.locator("button[data-act=importa]:visible").count())) await pg.click("button[data-act=vista-gruppo]");
+  await pg.locator(daGruppo ? ".card button[data-act=importa]" : "button[data-act=importa]:visible").first().click();
   await pg.locator(".sheet").getByText("Intera Linea di Sponsorizzazione con tutti i KPI disponibili").waitFor();
   await pg.setInputFiles("#file-report", { name:nome, mimeType:"text/csv", buffer:Buffer.from(testo) });
 };
@@ -220,7 +229,7 @@ await page.fill("input[name=codice_amway]", "1000001"); await page.fill("input[n
 await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor();
 await page.click("button[data-act=obiettivo-dopo]");
-await page.getByText("Ciao Marco").waitFor();
+await page.getByText("Ciao Marco").waitFor(); await apriTappa(page);
 check(await page.getByText("Scrivi il tuo obiettivo").isVisible(), "obiettivo rimandato: su Io l'invito a scriverlo");
 check(await page.getByText("6% raggiunto").isVisible(), "pin di Marco mostrato");
 check(await page.getByText("Path to Bronze").first().isVisible(), "pin senza Bronze -> Path to Bronze");
@@ -243,7 +252,7 @@ await page.selectOption("select[name=qualifica]", "pin:12");
 check(await page.getByText("(facoltativa)").isVisible(), "data facoltativa per chi ha già un pin");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
-await page.getByText("Ciao Bea").waitFor();
+await page.getByText("Ciao Bea").waitFor(); await apriTappa(page);
 check(await page.getByText("12% raggiunto").isVisible(), "pin 12% mostrato");
 await sync(page); await ctx.close();
 
@@ -256,7 +265,7 @@ check(await page.locator("input[name=mese]").isVisible(), "campi pagamenti visib
 await page.fill("input[name=mese]", "2026-07"); await page.fill("input[name=pagamenti]", "3");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
-await page.getByText("Ciao Ciro").waitFor();
+await page.getByText("Ciao Ciro").waitFor(); await apriTappa(page);
 check(await page.getByText("Pagamenti 3 di 12, restano 15 mesi su 18").isVisible(), "pagamenti");
 await page.screenshot({ path: S + "/e2e/5-avviato.png", fullPage:true });
 check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "niente scroll orizzontale");
@@ -267,7 +276,7 @@ await sync(page); await ctx.close();
 await page.getByText("Il tuo profilo è già pronto").waitFor();
 await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isVisible()
   && await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).count() > 0, "033: la radice vede anche le persone importate da Anna (una sola struttura)");
@@ -278,7 +287,7 @@ check(await page.locator(".in-attesa li", { hasText:"Bea Verdi" }).isVisible() &
 await sync(page); await ctx.close();
 DB.partners.find(p => p.nome === "Bea Verdi").confermato_il = new Date().toISOString();   // come dopo un import della mappa
 ({ ctx, page } = await apri({ colorScheme:"dark" }, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).locator("button[data-act=apri-scheda]").click();
 check(await page.getByText("Punto di partenza dichiarato: 12%").isVisible() && !(await page.locator("button[data-act=conferma]").count()),
@@ -434,8 +443,8 @@ const O = (pid, vp, tipo) => DB.activities.push({ id:"a" + DB.activities.length,
 O("R", 120); O("l1", 150); O("l1b", 100); O("l2", 120); O("l3", 80);
 for(let i = 0; i < 3; i++) DB.activities.push({ id:"c" + i, partner_id:"R", tipo:"cliente", quantita:1, data:oggiStr });
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
-check(await page.locator(".card h2", { hasText:"Path to Bronze" }).isVisible(), "radice alla tappa Path to Bronze");
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
+check(await page.locator(".miei-numeri .riga-apri", { hasText:"Path to Bronze" }).isVisible(), "radice alla tappa Path to Bronze");
 check(await page.locator(".req li", { hasText:"3 linee frontali" }).getByText("2 / 3").isVisible(), "linee attive vere: 2 su 3");
 check(await page.locator(".spinta").innerText() === "Linee attive: 2 su 3. Manca 1 linea da 100 VP per il Path to Bronze.", "linee mancanti come dato, senza consiglio");
 check(await page.locator(".linee li", { hasText:"Linea Uno" }).getByText("250 VP").isVisible(), "VP di gruppo della linea 1 (150 + 100)");
@@ -467,7 +476,7 @@ await sync(page); await ctx.close();
 // la terza linea arriva a 120: Path to Bronze fatto; poi tanti VP su una sola linea: 9% ma non Foundation
 O("l3", 40, "rettifica"); O("l1b", 700);
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 check(await page.getByText("✓ Path to Bronze").isVisible(), "Path to Bronze riconosciuto dai numeri");
 check(await page.getByText("9% questo mese").isVisible(), "1.310 VP di gruppo = 9%");
 check(await page.getByText(/9% raggiunto · Bronze Foundation 9% non qualificato: mancano 2 linee da almeno 200 VP/).isVisible(), "percentuale e qualifica distinte");
@@ -476,8 +485,8 @@ await sync(page); await ctx.close();
 // storico: un mese chiuso da Bronze Foundation 9% -> tappa successiva e pagamenti
 DB.storico = [{ partner_id:"R", mese:mesePrec + "-01", vp_personali:150, vp_gruppo:1300, linee_attive:3, percentuale:9, qualifica:"foundation_9" }];
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
-check(await page.locator(".card h2", { hasText:"Bronze Foundation 12%" }).isVisible(), "dopo un mese da Foundation 9% si punta al 12%");
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
+check(await page.locator(".miei-numeri .riga-apri", { hasText:"Bronze Foundation 12%" }).isVisible(), "dopo un mese da Foundation 9% si punta al 12%");
 check(await page.getByText(/Pagamenti 1 di 12, restano 17 mesi su 18/).isVisible(), "pagamenti contati dallo storico");
 await page.click("button[data-act=storico]");
 await page.getByText("Il mio storico").waitFor();
@@ -486,7 +495,7 @@ check(await page.locator(".storico li", { hasText:"chiuso" }).getByText("Bronze 
 await page.screenshot({ path: S + "/e2e/10-storico.png" });
 await page.click(".sheet button:has-text('Chiudi')");
 // l'ordine non accetta date di mesi chiusi
-await page.click("button[data-act=ordine]");
+await apriOrdini(page, "ordine");
 check(await page.locator(".sheet input[name=data]").getAttribute("min") >= mesePrec + "-01", "data minima dell'ordine nel mese aperto");
 await ctx.close();
 
@@ -510,7 +519,7 @@ DB.numeri = [{ visto_da:"R", partner_id:"cri", mese:oggiStr.slice(0, 7), vpp:120
 DB.persone = (DB.persone || []).concat([{ id:"pv1", proprietario:"ivo", nome:"Nome Uno", fase:"lista", esito:null },
   { id:"pv2", proprietario:"ivo", nome:"Nome Due", fase:"invitato", esito:null }]);
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 await page.getByText("Preferiti").first().waitFor();
 check(await page.getByText("Situazione per persona").count() === 0, "la sezione Situazione per persona non c'è più");
@@ -548,7 +557,7 @@ await ctx.close();
 // le etichette, in ordine di urgenza, nei preferiti (Gino è senza app: niente etichetta)
 DB.preferiti = ["rosa", "lino", "ivo", "fede", "cri", "gino"].map(id => ({ partner_id:"R", preferito_id:id }));
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 const etich = await page.locator(".card", { hasText:"Preferiti" }).locator("li.preferito").allInnerTexts();
 const etichettaDi = nome => (etich.find(t => t.includes(nome)) || "");
@@ -574,7 +583,7 @@ B("contatto", 5, mesePrec + "-01"); B("contatto", 3, ultimoPrec); B("ordine", 1,
 DB.numeri = [{ visto_da:"R", partner_id:"cri", mese:oggiStr.slice(0, 7), vpp:0, vpg:0, percentuale:null, linee:[], dati_al:new Date().toISOString() },
   { visto_da:"R", partner_id:"cri", mese:mesePrec, vpp:80, vpg:80, percentuale:null, linee:[], dati_al:new Date().toISOString() }];
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 await page.locator(".albero.struttura li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
 await page.getByText("Questo mese e il mese prima").waitFor();
@@ -619,7 +628,7 @@ await ctx.close();
 // 11b. Android: si apre la scelta dell'app di calendario; iPhone: il file si apre senza scaricarlo
 const UA_ANDROID = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36";
 ({ ctx, page } = await apri({ userAgent:UA_ANDROID }, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.evaluate(() => { window.__vai = null; window.GROWUP_VAI = u => { window.__vai = u; }; });
 await page.click("button[data-act=vista-gruppo]");
 await page.locator(".albero.struttura li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
@@ -637,7 +646,7 @@ check(scaricatoA.suggestedFilename().endsWith(".ics"), "Android: resta il file c
 await ctx.close();
 const UA_IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 ({ ctx, page } = await apri({ userAgent:UA_IPHONE }, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.evaluate(() => { window.__vai = null; window.GROWUP_VAI = u => { window.__vai = u; }; });
 await page.click("button[data-act=vista-gruppo]");
 await page.locator(".albero.struttura li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
@@ -659,7 +668,7 @@ DB.storico = [
 DB.activities.push({ id:"st1", partner_id:"lino", tipo:"ordine", quantita:1, vp:50, data:mese2 + "-10", inserito_il:new Date().toISOString() });
 DB.numeri.push({ visto_da:"R", partner_id:"lino", mese:mese2, vpp:50, vpg:50, percentuale:null, linee:[], dati_al:new Date().toISOString() });
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 await page.getByText("Storico del gruppo").waitFor();
 await page.locator(".card", { hasText:"Storico del gruppo" }).screenshot({ path: S + "/e2e/17a-storico-card.png" });
@@ -678,9 +687,9 @@ await ctx.close();
 // 13. Installare l'app e incollare il link personale
 const PERM = ["clipboard-read", "clipboard-write"];
 ({ ctx, page } = await apri({ userAgent:UA_IPHONE, permissions:PERM }, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.evaluate(() => localStorage.setItem("growup-team.chiave-salvata", "1"));
-await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 check(await page.getByText("Installa Growup sul telefono").isVisible() && await page.getByText("Aggiungi alla schermata Home").first().isVisible(), "iPhone: guida all'installazione");
 await page.screenshot({ path: S + "/e2e/18-installa-iphone.png" });
 await page.click("button[data-act=copia-chiave]");
@@ -694,17 +703,17 @@ await ctx.close();
 
 // 13b. iPhone dentro il browser di Telegram: avviso e passo "Apri in Safari"
 ({ ctx, page } = await apri({ userAgent:UA_IPHONE + " Telegram-iOS/11.0", permissions:PERM }, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.evaluate(() => localStorage.setItem("growup-team.chiave-salvata", "1"));
-await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 check(await page.getByText("Sei dentro Telegram").isVisible() && await page.getByText("Apri in Safari").isVisible(), "iPhone dentro Telegram: avviso e passo Apri in Safari");
 await page.locator(".avviso-interno").screenshot({ path: S + "/e2e/18b-installa-telegram.png" });
 await ctx.close();
 
 ({ ctx, page } = await apri({ userAgent:UA_ANDROID }, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.evaluate(() => localStorage.setItem("growup-team.chiave-salvata", "1"));
-await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 check(await page.getByText("Installa app").isVisible(), "Android senza proposta del browser: istruzioni dal menu");
 await page.evaluate(() => { const e = new Event("beforeinstallprompt", { cancelable:true });
   e.prompt = () => { window.__promptato = true; }; e.userChoice = Promise.resolve({ outcome:"accepted" }); window.dispatchEvent(e); });
@@ -729,14 +738,14 @@ await page.getByText("non è il tuo link personale").waitFor({ timeout:5000 }).c
 check(await page.getByText("non è il tuo link personale").isVisible(), "testo sbagliato negli appunti");
 await page.evaluate(k => navigator.clipboard.writeText("Il mio link Growup: http://127.0.0.1:8765/growup-team/#chiave=" + k), "a".repeat(32));
 await page.click("button[data-act=incolla-appunti]");
-await page.getByText("Ciao Stefano e Alessia").waitFor(); check(true, "incolla il link: entra");
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page); check(true, "incolla il link: entra");
 check(await page.getByText("Salva il tuo link personale").count() === 0 && await page.getByText("Installa Growup sul telefono").count() === 0,
   "dopo l'incolla: niente richiesta di salvare il link né guida all'installazione");
 await ctx.close();
 
 // 14. Invito: anteprima del link, testo con il nome e i tre passi, immagini da inviare
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 check(await page.locator('meta[property="og:image"]').getAttribute("content") === "https://cl21-aes.github.io/growup-team/anteprima.png", "anteprima del link: immagine");
 await page.click("button[data-act=vista-gruppo]");
 const waInvito = decodeURIComponent((await page.locator(".card", { hasText:"Invita un nuovo partner" }).locator("a.wa").getAttribute("href")).split("text=")[1]);
@@ -749,7 +758,7 @@ await ctx.close();
 
 // 15. Trascinare il dito: Io ⇄ Gruppo
 ({ ctx, page } = await apri({ hasTouch:true, isMobile:true }, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 const trascina = (x1, x2, y1 = 400, y2 = 400, su = "#app") => page.evaluate(([x1, x2, y1, y2, su]) => {
   const el = document.querySelector(su);
   const tocca = (tipo, x, y) => { const t = new Touch({ identifier:1, target:el, clientX:x, clientY:y });
@@ -777,7 +786,7 @@ await ctx.close();
 DB.obiettivi = [{ partner_id:"cri", cifra_mese:1000, entro:(new Date().getFullYear() + 1) + "-03-01", perche:"Segreto di Cri" }];
 DB.preferiti = [{ partner_id:"R", preferito_id:"cri" }];
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 check(await page.locator("li.preferito", { hasText:"Cri Crescita" }).getByText("Bronze Builder 15%").isVisible(), "preferiti: obiettivo di Cri (1.000 € → Builder 15%)");
 await page.locator(".albero.struttura li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
@@ -786,7 +795,7 @@ await ctx.close();
 
 // 17. Copia di sicurezza: solo per gli admin
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 check(await page.getByText("Nessuna copia scaricata da questo telefono.").isVisible(), "admin: pulsante della copia dei dati");
 const [copia] = await Promise.all([page.waitForEvent("download"), page.click("button[data-act=copia-dati]")]);
 const datiCopia = JSON.parse(fs.readFileSync(await copia.path(), "utf8"));
@@ -807,7 +816,7 @@ const righeCsv = [persona(1, "7654321", "1234567", "ROSSI, MARIO", "400,00"), pe
   persona(3, "3000001", "3000099", "NUOVO, NINO", "7,00")]
   .concat(altriGestiti.concat(usanoApp).map(p => persona(3, "1234567", p.codice_amway, p.nome.toUpperCase(), "1,00")));
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await scegliFile(page, "altro.csv", "nome,cognome\nMario,Rossi\n");
 await page.locator(".sheet .errore").waitFor();
 check(await page.locator(".sheet .errore").getByText("non sembra il report").isVisible(), "import: file sbagliato riconosciuto");
@@ -900,7 +909,7 @@ const riga2 = (liv, sp, cod, nome, vpp, vpg, perc, dim) => [String(liv), "'" + s
   "'" + vpg, "'" + vpp, "0", "'" + perc + "%", "0", "'0,00", "0", "'0", "0", "0", "'" + dim];
 const csv2 = righe => "﻿" + [csvRiga(["Amway","CONFIDENZIALE"]), csvRiga(["Mese di competenza", meseFile]), csvRiga(testa2)].concat(righe.map(csvRiga)).join("\n");
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 await scegliFile(page, "platino.csv", csv2([riga2(1, "1", "1234567", "ROSSI, MARIO", "120,00", "9.500,00", 18, 163),
   riga2(2, "1234567", "4100001", "PLATINI, BIANCA", "0,00", "5.300,00", 15, 191),
@@ -932,7 +941,7 @@ check(nora.sponsor_id === bianca.id && nora.stato === "attivo", "Nora sotto Bian
 nora.confermato_il = new Date().toISOString();   // 033: come dopo un import della mappa che la mostra
 // la radice crea il link per chi manca tra Bianca e Nora
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 check(await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator(".livello").innerText() === "3", "Nora sotto Bianca nella struttura della radice");
 await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator("button[data-act=apri-scheda]").click();
@@ -958,7 +967,7 @@ await ctx.close();
 DB.partners.push({ id:"xss1", nome:'<img src=x onerror="window.__xss=1">', sponsor_id:"R", stato:"attivo", codice_invito:"XSSAAA",
   codice_amway:"6000001", creato_il:new Date().toISOString(), partenza_confermata_il:new Date().toISOString() });
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 await page.locator(".albero.struttura li", { hasText:"<img" }).locator("button[data-act=apri-scheda]").click();
 await page.getByText("Scheda partner").waitFor();
@@ -974,12 +983,12 @@ await ctx.close();
 // 21. Captcha al primo ingresso: il gettone arriva a Supabase; se il controllo fallisce, un messaggio chiaro
 DB.captcha = null; DB.captchaKo = false;
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await sync(page);
 check(DB.captcha === "tok-prova" && !(await page.locator(".captcha").count()), "primo ingresso: captcha superato, gettone passato all'accesso");
 const stato = await ctx.storageState(); await ctx.close(); DB.captcha = null;
 ({ ctx, page } = await apri({ storageState:stato }));
-await page.getByText("Ciao Stefano e Alessia").waitFor(); await sync(page);
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page); await sync(page);
 check(DB.captcha === null, "chi è già dentro non rifà il captcha");
 await ctx.close();
 DB.captchaKo = true;
@@ -991,7 +1000,7 @@ await ctx.close(); DB.captchaKo = false;
 // 22. Persone → la Lista: nomi solo miei, passi che contano le attività, da fare, numeri per l'upline, import
 DB.persone = []; DB.passi = [];
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-persone]");
 check(await page.getByText("La tua lista è vuota").isVisible(), "Persone: lista vuota con l'invito a scrivere i nomi");
 await page.click("button[data-act=persona-nuova]");
@@ -1141,7 +1150,7 @@ DB.partners.push({ id:annaId, nome:"Lia Lista", sponsor_id:"R", stato:"attivo", 
 DB.persone.push({ id:"pa1", proprietario:annaId, nome:"Segreto Uno", fase:"lista", esito:null },
   { id:"pa2", proprietario:annaId, nome:"Segreto Due", fase:"piano", esito:null });
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 await page.locator(".albero.struttura li", { hasText:"Lia Lista" }).locator("button[data-act=apri-scheda]").first().click();
 await page.getByText("La sua lista:").waitFor();
@@ -1155,7 +1164,7 @@ await ctx.close();
 // 23. Persone → Target: invito, le otto domande del contatto, le risposte che tornano, Metti in lista
 DB.inviti = [];
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-persone]");
 await page.click("button[data-sez=target]");
 check(await page.getByText("Ancora nessun invito").isVisible(), "Target: nessun invito all'inizio");
@@ -1272,7 +1281,7 @@ DB.righe.push({ id:"r1", proprietario:"R", ordine_id:"o1", codice:"UU1", nome:"P
   { id:"r2", proprietario:"R", ordine_id:"o2", codice:"VV1", nome:"Prodotto Vera", quantita:1, prezzo:30 },
   { id:"r3", proprietario:"R", ordine_id:"o3", codice:"VV1", nome:"Prodotto Vera", quantita:1, prezzo:30 });
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 const cardCli = page.locator(".card", { hasText:"I tuoi clienti da sentire" });
 check(await cardCli.getByText("Sta finendo: Prodotto Ugo").isVisible(), "Io: Ugo da sentire, il prodotto sta finendo");
 check(await cardCli.getByText("Come si è trovato con Prodotto Vera").isVisible(), "Io: Vera, come si è trovata (prodotto nuovo da 10 giorni)");
@@ -1371,7 +1380,7 @@ const csvOrdini = ['"Amway","CONFIDENZIALE - prova"', '"Mese di competenza","202
   ordineCsv("Cliente, Gina", "7000000002", gg(-3), "170000003", "42,60", "96,38"),
   ordineCsv("VERDI, NUOVO", "7000000003", gg(-10), "170000004", "6,18", "13,96")].join("\n") + "\n";
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
 await page.click("button[data-act=importa-ordini]");
 await page.setInputFiles("#file-ordini", { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) });
@@ -1532,12 +1541,12 @@ await page.fill("input[name=codice_amway]", "2000099"); await page.fill("input[n
 await page.selectOption("select[name=qualifica]", "pin:6");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
-await page.getByText("Ciao Dino").waitFor();
+await page.getByText("Ciao Dino").waitFor(); await apriTappa(page);
 const sessDino = await page.evaluate(() => localStorage.getItem("mock.session"));
 await sync(page); await ctx.close();
 const telefonoDino = () => apri({ storageState:{ cookies:[], origins:[{ origin:"http://127.0.0.1:8765", localStorage:[{ name:"mock.session", value:sessDino }] }] } }, "");
 const radice = async () => { ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor(); await page.click("button[data-act=vista-gruppo]"); };
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page); await page.click("button[data-act=vista-gruppo]"); };
 await radice();
 /* 033: Dino è in attesa della mappa: fuori dalla struttura, solo il nome nell'elenco «In attesa» */
 check(await page.locator(".in-attesa li", { hasText:"Dino Prova" }).isVisible() && !(await page.locator(".albero.struttura li", { hasText:"Dino Prova" }).count()),
@@ -1596,7 +1605,7 @@ const pdfFinto = n => { const pagina = []; let y = 560;
   }
   return pagina; };
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.evaluate(items => { window.pdfjsWorker = {}; window.pdfjsLib = { GlobalWorkerOptions:{},
   getDocument: () => ({ promise:Promise.resolve({ numPages:1, getPage: async () => ({ getTextContent: async () => ({ items }) }) }) }) }; }, pdfFinto(60));
 check(await page.locator(".solo-admin-box", { has:page.locator("button[data-act=listino]") }).getByText("Solo Admin").isVisible()
@@ -1632,7 +1641,7 @@ await ctx.close();
 
 // 30. Il movimento (senza "riduci animazioni"): pagine, foglio dal basso, coriandoli al traguardo, una volta sola
 ({ ctx, page } = await apri({ reducedMotion:"no-preference" }, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 check(await page.evaluate(() => document.getAnimations().length > 0), "cambiando pagina il contenuto si muove");
 await page.click("button[data-act=vista-io]");
@@ -1669,7 +1678,7 @@ await ctx.close();
   /* il report: Alfa 0, Beta 60, Gamma 150, più una linea che non è nell'app */
   report([{ codice:"7000001", vpg:0 }, { codice:"7000002", vpg:60 }, { codice:"7000003", vpg:150 }, { codice:"7000099", vpg:40 }]);
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   check(!(await page.locator(".consigli").count()), "nessun consiglio nella pagina Io");
   await page.click("button[role=tab][data-act=vista-obiettivo]");
   const cons = page.locator("details.consigli");
@@ -1703,7 +1712,7 @@ await ctx.close();
   /* le tre linee ci sono (100+) ma Beta è sotto i 200: tante persone a 0, una vicina ai 100 → fatturato basso */
   report([{ codice:"7000001", vpg:400 }, { codice:"7000002", vpg:120 }, { codice:"7000003", vpg:250 }]);
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   await page.click("button[role=tab][data-act=vista-obiettivo]");
   await page.locator("details.consigli summary").click();
   check(await page.locator("details.consigli").getAttribute("data-chiave") === "linea_vp.fatturato"
@@ -1712,7 +1721,7 @@ await ctx.close();
   /* tutto a posto per la tappa */
   report([{ codice:"7000001", vpg:400 }, { codice:"7000002", vpg:400 }, { codice:"7000003", vpg:450 }]);
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   await page.click("button[role=tab][data-act=vista-obiettivo]");
   check(await page.locator("details.consigli").getAttribute("data-chiave") === "pronto", "con tutti i numeri della tappa: pronto");
   await ctx.close();
@@ -1733,7 +1742,7 @@ check(await page.locator("[data-mostra=prossima]").isVisible()
 await page.selectOption("select[name=prossima]", "smeraldo");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
-await page.getByText("Ciao Pia").waitFor();
+await page.getByText("Ciao Pia").waitFor(); await apriTappa(page);
 check(await page.getByText("Platino raggiunto 🎉").isVisible() && await page.getByText("Prossima qualifica: Smeraldo").isVisible(), "Io: Platino raggiunto e la prossima qualifica");
 check(await page.getByText("Volume Rubino questo mese: importa il report mappe per vederlo.").isVisible(), "senza report: il Volume Rubino si vede importando le mappe");
 await page.click("button[role=tab][data-act=vista-obiettivo]");
@@ -1749,12 +1758,12 @@ check(pia.qualifica_iniziale === "platino" && pia.prossima_qualifica === "smeral
 DB.numeri = (DB.numeri || []).concat([{ visto_da:pia.id, partner_id:pia.id, mese:oggiStr.slice(0, 7), vpg:21000, percentuale:21, linee:[] }]);
 const telefonoPia = () => apri({ storageState:{ cookies:[], origins:[{ origin:"http://127.0.0.1:8765", localStorage:[{ name:"mock.session", value:sessPia }] }] } }, "");
 ({ ctx, page } = await telefonoPia());
-await page.getByText("Ciao Pia").waitFor();
+await page.getByText("Ciao Pia").waitFor(); await apriTappa(page);
 check(await page.getByText("Volume Rubino questo mese: 21.000 su 20.000 VP ✓").isVisible(), "Volume Rubino dal report: 21.000 su 20.000 ✓");
 await ctx.close();
 // lo sponsor la vede nella scheda
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-await page.getByText("Ciao Stefano e Alessia").waitFor();
+await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 await page.locator(".albero.struttura li", { hasText:"Pia Prova" }).first().locator("button[data-act=apri-scheda]").first().click();
 await page.locator(".card h2", { hasText:"Pia Prova" }).waitFor();
@@ -1762,7 +1771,7 @@ check(await page.getByText("Prossima qualifica: Smeraldo").isVisible(), "lo spon
 await ctx.close();
 // Pia corregge: era Oro, non Platino → la prossima qualifica si toglie
 ({ ctx, page } = await telefonoPia());
-await page.getByText("Ciao Pia").waitFor();
+await page.getByText("Ciao Pia").waitFor(); await apriTappa(page);
 await page.click("button[role=tab][data-act=vista-obiettivo]");
 await page.click(".prossima-qualifica button[data-act=partenza]");
 check(await page.locator(".sheet select[name=prossima]").inputValue() === "smeraldo", "Modifica: la prossima qualifica già scelta");
@@ -1788,9 +1797,9 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.fill("input[name=mese]", mm(-3));
   await page.check("input[name=privacy]"); await page.click("form button.primary");
   await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
-  await page.getByText("Ciao Gaia").waitFor();
+  await page.getByText("Ciao Gaia").waitFor(); await apriTappa(page);
   const reqOro = page.locator(".req li", { hasText:"Mesi da Argento (21%)" });
-  check(await page.locator(".card h2", { hasText:/^Oro$/ }).isVisible() && (await reqOro.locator(".num").innerText()) === "0 / 3", "dopo Argento la tappa è Oro: 0 mesi su 3");
+  check(await page.locator(".miei-numeri .riga-apri b", { hasText:/^Oro$/ }).isVisible() && (await reqOro.locator(".num").innerText()) === "0 / 3", "dopo Argento la tappa è Oro: 0 mesi su 3");
   check(await page.locator(".report-da-importare .mesi-report li").count() === 3 && !(await page.locator(".report-da-importare li.ok").count()),
     "report da importare: i 3 mesi dalla prima qualifica Argento");
   // il report di un mese chiuso: solo numeri (033: chi è nella mappa può importare)
@@ -1810,15 +1819,15 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   numeroG(gaiaId, mm(-2), 21); numeroG(gaiaId, mm(-1), 21);
   const telefonoGaia = () => apri({ storageState:{ cookies:[], origins:[{ origin:"http://127.0.0.1:8765", localStorage:[{ name:"mock.session", value:sessGaia }] }] } }, "");
   ({ ctx, page } = await telefonoGaia());
-  await page.getByText("Ciao Gaia").waitFor();
-  check(await page.getByText("✓ Oro").isVisible() && await page.locator(".card h2", { hasText:/^Platino$/ }).isVisible()
+  await page.getByText("Ciao Gaia").waitFor(); await apriTappa(page);
+  check(await page.getByText("✓ Oro").isVisible() && await page.locator(".miei-numeri .riga-apri b", { hasText:/^Platino$/ }).isVisible()
     && (await page.locator(".req li", { hasText:"Mesi da Argento (21%)" }).locator(".num").innerText()) === "3 / 6", "3 mesi al 21%: Oro fatto, tappa Platino 3 su 6");
   check(!(await page.locator(".report-da-importare").count()), "tutti i report importati: il riquadro sparisce");
   await ctx.close();
   // lo sponsor: i mesi da Argento dai report che ha importato lui
   numeroG("R", mm(-2), 21); numeroG("R", mm(-1), 21);
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   await page.click("button[data-act=vista-gruppo]");
   await page.locator(".albero.struttura li", { hasText:"Gaia Prova" }).first().locator("button[data-act=apri-scheda]").first().click();
   await page.locator(".mesi-argento").waitFor();
@@ -1827,12 +1836,12 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   // altri 3 mesi al 21%: 6 mesi, 3 di fila → Platino riconosciuto e la domanda della prossima qualifica
   numeroG(gaiaId, mm(-6), 21); numeroG(gaiaId, mm(-5), 21); numeroG(gaiaId, mm(-4), 21);
   ({ ctx, page } = await telefonoGaia());
-  await page.getByText("Ciao Gaia").waitFor();
+  await page.getByText("Ciao Gaia").waitFor(); await apriTappa(page);
   await page.locator(".sheet h2", { hasText:"Platino! Qual è la tua prossima qualifica?" }).waitFor();
   check(!(await page.locator(".sheet select[name=prossima] option", { hasText:/^Oro$/ }).count()), "Platino riconosciuto: la prossima qualifica, solo sopra Platino");
   await page.selectOption(".sheet select[name=prossima]", "rubino");
   await page.click(".sheet button.primary");
-  await page.getByText("Prossima qualifica salvata").waitFor();
+  await page.getByText("Prossima qualifica salvata").waitFor(); await apriTappa(page);
   check(await page.getByText("Platino raggiunto 🎉").isVisible() && await page.getByText("Prossima qualifica: Rubino").isVisible(), "Io: Platino raggiunto, prossima Rubino");
   await sync(page); await ctx.close();
   const g2 = DB.partners.find(p => p.id === gaiaId);
@@ -1851,7 +1860,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     .concat([{ visto_da:"lea", partner_id:chi, mese:m, vpg, percentuale:perc, linee:linee || [] }]); };
   const consigliLea = async () => {
     ({ ctx, page } = await apri({}, "#chiave=" + chiaveLea));
-    await page.getByText("Ciao Lea").waitFor();
+    await page.getByText("Ciao Lea").waitFor(); await apriTappa(page);
     if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
     await page.click("button[role=tab][data-act=vista-obiettivo]");
     const c = page.locator("details.consigli"); await c.waitFor(); await c.locator("summary").click();
@@ -1888,7 +1897,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
   // lo sponsor: nella scheda di Lea, in terza persona
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   await page.click("button[data-act=vista-gruppo]");
   await page.locator(".albero.struttura li", { hasText:"Lea Prova" }).first().locator("button[data-act=apri-scheda]").first().click();
   await page.locator(".card h2", { hasText:"Lea Prova" }).waitFor();
@@ -1924,7 +1933,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.numeri = DB.numeri.filter(x => !(x.visto_da === "pf" && x.partner_id === "pf" && x.mese === ora))
     .concat([{ visto_da:"pf", partner_id:"pf", mese:ora, vpg:5000, percentuale:21,
       linee:[{ codice:"7400002", vpg:10500 }, { codice:"7400003", vpg:7000 }, { codice:"7400004", vpg:900 }] }]);
-  const apriPf = async () => { ({ ctx, page } = await apri({}, "#chiave=" + chiavePf)); await page.getByText("Ciao Pino").waitFor();
+  const apriPf = async () => { ({ ctx, page } = await apri({}, "#chiave=" + chiavePf)); await page.getByText("Ciao Pino").waitFor(); await apriTappa(page);
     if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]"); };
   await apriPf();
   check(await page.getByText(`Prossima qualifica: Smeraldo · linee al 21% per almeno 6 mesi: 0 / 3`).isVisible(), "Io: Smeraldo, linee al 21% da 6 mesi");
@@ -1952,7 +1961,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.numeri = DB.numeri.filter(x => x.visto_da !== "lea");
   const riga = perc => { const r = persona(1, "1000000", "7300001", "PROVA, LEA", "120"); r[10] = "'10.500,00"; r[13] = `'${perc}%`; return r; };
   ({ ctx, page } = await apri({}, "#chiave=" + "c0".repeat(16)));
-  await page.getByText("Ciao Lea").waitFor();
+  await page.getByText("Ciao Lea").waitFor(); await apriTappa(page);
   if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
   await page.locator("button[data-act=importa]").first().click();
   await page.locator(".sheet").getByText("Intera Linea di Sponsorizzazione con tutti i KPI disponibili").waitFor();
@@ -1981,7 +1990,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const obiettivoDi = async cifra => {
     DB.obiettivi = (DB.obiettivi || []).filter(o => o.partner_id !== "R").concat([{ partner_id:"R", cifra_mese:cifra, entro:"2027-12-01", perche:null }]);
     ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
     await page.click("button[role=tab][data-act=vista-obiettivo]");
     const h = (await page.locator(".card", { hasText:"La tappa che vale la tua cifra" }).locator("h2").innerText()).trim();
     await ctx.close(); return h;
@@ -2002,7 +2011,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.numeri = DB.numeri.filter(x => !(x.partner_id === "R" && x.mese === oggiStr.slice(0, 7)))
     .concat([{ visto_da:"R", partner_id:"R", mese:oggiStr.slice(0, 7), vpp:300, vpg:5000, percentuale:15, linee:[], dati_al:new Date().toISOString() }]);
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   await page.click("button[data-act=vista-gruppo]");
   await page.click(".card button[data-act=importa]");
   await page.locator(".sheet").getByText("Intera Linea di Sponsorizzazione con tutti i KPI disponibili").waitFor();
@@ -2022,7 +2031,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.selectOption("select[name=qualifica]", "pin:3");
   await page.check("input[name=privacy]"); await page.click("form button.primary");
   await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
-  await page.getByText("Ciao Quinto").waitFor();
+  await page.getByText("Ciao Quinto").waitFor(); await apriTappa(page);
   check(await page.locator(".avviso-attesa").isVisible(), "Quinto: in attesa della mappa");
   await scegliFile(page, "quinto.csv", creaCsv(meseFile, [persona(1, "9", "7500001", "PROVA, QUINTO", "50,00")]));
   await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
@@ -2043,14 +2052,16 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.activities = DB.activities.filter(a => a.partner_id !== "R")
     .concat([{ id:"prima1", partner_id:"R", tipo:"ordine", quantita:1, vp:40, data:oggiStr, inserito_da:"R", inserito_il:new Date(Date.now() - 7200000).toISOString() }]);
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   const mese = page.locator(".card", { hasText:"Il mio mese" });
-  const vpFatti = async () => (await mese.locator(".obiettivo .num").first().innerText()).split("/")[0].trim();
+  const vpFatti = async () => (await mese.locator(".obiettivo", { hasText:"VP fatturati" }).locator(".num").innerText()).split("/")[0].trim();
   check(await vpFatti() === "300", "034: l'ordine scritto prima del report non si somma (300 VP)");
   check((await mese.locator(".vp-report").innerText()).startsWith("300 VP dal report del "), "034: la riga dice da dove viene il numero");
-  // la bozza: cerco, aggiungo, cambio le quantità
-  const bozza = page.locator("#bozza-ordine");
-  check(await bozza.getByText("Vuota").isVisible() && await bozza.getByText("La bozza la vedi solo tu.").isVisible(), "bozza ordine vuota su Io");
+  // la bozza: dal foglio «Ordini»; cerco, aggiungo, cambio le quantità
+  check(!(await page.locator("#bozza-ordine").count()) && !(await page.locator("#miei-ordini").count()), "bozza e storico non sono più nella pagina Io");
+  await apriOrdini(page, "apri-bozza");
+  const bozza = page.locator(".sheet #bozza-ordine");
+  check(await bozza.getByText("Vuota").isVisible() && await bozza.getByText("La bozza la vedi solo tu.").isVisible(), "bozza ordine vuota nel foglio Ordini");
   await page.fill("#cerca-mio", "crema");
   await bozza.locator("button[data-act=mio-aggiungi]").first().click();
   await bozza.getByText("1 prodotto").waitFor();
@@ -2061,47 +2072,62 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await bozza.getByText("2 prodotti").waitFor();
   check((await bozza.locator(".righe-ordine li", { hasText:"Crema Prova" }).innerText()).includes("18,20 VP · Partner 41,30 € · Pubblico 52,90 €"), "per ogni prodotto VP, Partner e Pubblico");
   check((await bozza.locator(".tot-mio").innerText()).replace(/\s+/g, " ") === "42,50 VP · Partner 96,30 € · Pubblico 123,40 €", "il totale: VP, Partner e Pubblico");
-  await bozza.screenshot({ path: S + "/e2e/39-bozza-ordine.png" });
+  await page.locator(".sheet-box").screenshot({ path: S + "/e2e/39-bozza-ordine.png" });
+  await page.click(".sheet #bozza-ordine button[data-act=ordini]");
+  check((await page.locator(".sheet .scelta-ordini", { hasText:"Bozza ordine" }).innerText()).includes("2 prodotti · salvata"), "Indietro: il foglio Ordini dice quanti prodotti ha la bozza");
   await sync(page);
   check(DB.ordiniMiei.length === 1 && DB.ordiniMiei[0].stato === "bozza" && DB.righeMie.length === 2, "la bozza è salvata nel database");
   await ctx.close();
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
+  await apriOrdini(page, "apri-bozza");
   check(await page.locator("#bozza-ordine").getByText("2 prodotti").isVisible(), "riaprendo l'app la bozza c'è ancora");
   // confermo: i VP vanno nel mese, solo per me
   await page.click("#bozza-ordine button[data-act=mio-conferma]");
   await page.locator(".sheet").getByText("Confermi l'ordine?").waitFor();
   check((await page.locator("#testo-conferma-mio").innerText()).includes("Li vedi solo tu finché non arriva il report Amway"), "conferma: i VP li vedo solo io");
+  await page.click(".sheet button[data-act=apri-bozza]");
+  check(await page.locator(".sheet #bozza-ordine").getByText("2 prodotti").isVisible(), "conferma, Indietro: si torna alla bozza");
+  await page.click("#bozza-ordine button[data-act=mio-conferma]");
   await page.click(".sheet button.primary");
   await page.getByText("Ordine confermato: 42,50 VP nel mese").waitFor();
+  const storico = page.locator(".sheet #miei-ordini");
+  check(await storico.isVisible(), "dopo la conferma si vede «I miei ordini»");
   const mese2 = page.locator(".card", { hasText:"Il mio mese" });
-  check((await mese2.locator(".obiettivo .num").first().innerText()).startsWith("342,5"), "034: report + il mio ordine dopo il report (342,5 VP)");
+  check((await mese2.locator(".obiettivo", { hasText:"VP fatturati" }).locator(".num").innerText()).startsWith("342,5"), "034: report + il mio ordine dopo il report (342,5 VP)");
   check((await mese2.locator(".vp-report").innerText()).includes("+ 42,5 VP dei tuoi ordini scritti dopo: li vedi solo tu"), "034: la parte scritta da me si vede a parte");
   check(await mese2.locator(".bar.doppia > i.rep").count() === 1, "la barra divide report e ordini scritti dopo");
-  check(await page.locator("#bozza-ordine").getByText("Vuota").isVisible(), "dopo la conferma la bozza è vuota");
-  const storico = page.locator("#miei-ordini");
-  await mese2.screenshot({ path: S + "/e2e/39-mio-mese.png" });
   check((await storico.innerText()).includes("2 prodotti") && (await storico.innerText()).includes("42,50 VP"), "l'ordine è nello storico");
   await storico.locator("button[data-act=mio-apri]").click();
   check((await storico.innerText()).includes("2 × Crema Prova"), "toccando l'ordine si vedono i prodotti");
-  await storico.screenshot({ path: S + "/e2e/39-miei-ordini.png" });
+  await page.locator(".sheet-box").screenshot({ path: S + "/e2e/39-miei-ordini.png" });
+  await page.click(".sheet #miei-ordini button[data-act=ordini]");
+  check((await page.locator(".sheet .scelta-ordini", { hasText:"Bozza ordine" }).innerText()).includes("Prepara l'ordine"), "dopo la conferma la bozza è vuota");
+  await page.click(".sheet [data-act=chiudi]");
+  await mese2.screenshot({ path: S + "/e2e/39-mio-mese.png" });
   // rifai: i prodotti tornano in una nuova bozza
+  await apriOrdini(page, "apri-miei");
   await storico.locator("button[data-act=mio-rifai]").click();
   await page.getByText("Prodotti copiati nella bozza ordine").waitFor();
+  await page.click(".sheet #miei-ordini button[data-act=ordini]");
+  await page.click(".sheet button[data-act=apri-bozza]");
   check(await page.locator("#bozza-ordine").getByText("2 prodotti").isVisible()
     && (await page.locator("#bozza-ordine .tot-mio").innerText()).startsWith("42,50"), "Rifai: stessi prodotti e quantità nella bozza");
   await page.click("#bozza-ordine button[data-act=mio-svuota]");
   await page.getByText("Bozza svuotata").waitFor();
   // togli l'ordine: chiede conferma, poi i VP escono dal mese
+  await page.click(".sheet #bozza-ordine button[data-act=ordini]");
+  await page.click(".sheet button[data-act=apri-miei]");
   await storico.locator("button[data-act=mio-togli]").click();
   await page.locator(".sheet h2", { hasText:"Togli l'ordine del" }).waitFor();
   check((await page.locator(".sheet").innerText()).includes("I 42,50 VP escono dal tuo mese di"), "togli: la conferma dice quanti VP escono dal mese");
-  await page.click(".sheet [data-act=chiudi]");
-  check(await page.locator("#miei-ordini").count() === 1, "Indietro: l'ordine resta");
+  await page.click(".sheet [data-act=apri-miei]");
+  check(await page.locator("#miei-ordini button[data-act=mio-togli]").count() === 1, "Indietro: l'ordine resta");
   await page.locator("#miei-ordini button[data-act=mio-togli]").click();
   await page.click(".sheet [data-act=mio-togli-ok]");
   await page.getByText("Ordine tolto").waitFor();
-  check(await page.locator("#miei-ordini").count() === 0 && (await page.locator(".card", { hasText:"Il mio mese" }).locator(".obiettivo .num").first().innerText()).startsWith("300"),
+  check(await page.locator("#miei-ordini").getByText("Ancora nessun ordine confermato").isVisible()
+    && (await page.locator(".card", { hasText:"Il mio mese" }).locator(".obiettivo", { hasText:"VP fatturati" }).locator(".num").innerText()).startsWith("300"),
     "ordine tolto: via dallo storico e i VP tornano al report");
   await sync(page);
   check(!DB.ordiniMiei.length && !DB.righeMie.length && !DB.activities.some(a => a.partner_id === "R" && a.vp === 42.5), "nel database: via l'ordine, i prodotti e i VP del mese");
@@ -2119,7 +2145,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     .concat([{ id:"dopo40", partner_id:"R", tipo:"ordine", quantita:1, vp:300, data:oggiStr, inserito_da:"R", inserito_il:new Date().toISOString() }]);
   const storicoR = async () => {
     ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
     await page.click(".card button[data-act=storico]");
     await page.locator(".sheet .storico li").first().waitFor();
     return (await page.locator(".sheet .storico li").first().innerText()).replace(/\s+/g, " ");
@@ -2147,7 +2173,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.partners.push({ id:"g41b", nome:"Nuovo Nella Mappa", sponsor_id:"R", stato:"gestito", gestore_id:"R", codice_invito:"G41BBB", codice_amway:"8800002",
     in_mappa_dal:ora, creato_il:ora });
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   check(await page.locator(".sezioni-io button[data-sez=giorno]").getAttribute("aria-pressed") === "true", "Io: si apre su «Il mio giorno»");
   check(await page.locator(".guida-piano").count() === 0, "la Guida non è nella pagina di tutti i giorni");
   await page.click(".sezioni-io button[data-sez=guida]");
@@ -2193,7 +2219,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.persone = (DB.persone || []).filter(x => x.proprietario !== "R").concat(["Marta Esempio", "Luca Esempio", "Sara Esempio", "Dario Esempio"]
     .map((nome, i) => ({ id:"s42" + i, proprietario:"R", nome, fase:"lista", esito:null, creato_il:"2026-01-0" + (i + 1) + "T10:00:00Z" })));
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   check(await page.locator(".oggi-per-te").count() === 0, "Seguimi spento: niente «Oggi per te»");
   await page.click(".sezioni-io button[data-sez=guida]");
   await page.click("button[data-act=seguimi-attivo]");
@@ -2224,7 +2250,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.seguimi.push({ partner_id:"s42p", attivo:true, condividi:false });
   const schedaSeguito = async () => {
     ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
     await page.click("button[data-act=vista-gruppo]");
     await page.locator(".albero.struttura li", { hasText:"Partner Seguito" }).locator("button[data-act=apri-scheda]").click();
     await page.getByText("Questo mese e il mese prima").waitFor();
@@ -2242,7 +2268,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
 // 43. Usabilità: indietro con il dito da un collegamento, barra fissa in alto, spunte delle settimane prima
 {
   ({ ctx, page } = await apri({ hasTouch:true, isMobile:true }, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   const dito = (x1, x2) => page.evaluate(([x1, x2]) => {
     const el = document.querySelector("#app");
     const tocca = (tipo, x) => { const t = new Touch({ identifier:1, target:el, clientX:x, clientY:400 });
@@ -2296,7 +2322,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.numeriCl21 = (DB.numeriCl21 || []).filter(x => x.partner_id !== "a44").concat([{ partner_id:"a44", app_cl21:7, training_day:8, convention:9 }]);
   const analisiDi = async () => {
     ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
     await page.click("button[data-act=vista-gruppo]");
     await page.locator(".albero.struttura li", { hasText:"Partner Analisi" }).locator("button[data-act=apri-scheda]").click();
     await page.click("button[data-act=apri-analisi]");
@@ -2316,7 +2342,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
   // la mia analisi dalla Guida, e l'interruttore unico per condividere
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   await page.click(".sezioni-io button[data-sez=guida]");
   check(await page.locator(".guida-condividi button[data-act=seguimi-condividi]").count() === 1, "nella Guida un solo interruttore per condividere");
   await page.click(".guida-condividi button[data-act=apri-analisi]");
@@ -2324,6 +2350,58 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await page.locator(".testata h1").innerText()).trim() === "La mia analisi", "la mia analisi dalla Guida");
   await ctx.close();
   DB.partners = DB.partners.filter(p => !["a44", "a44l"].includes(p.id));
+}
+
+// 45. Ottimizzazione 1: «Il mio giorno» in tre blocchi, «Anche da sentire» senza doppioni, promemoria dell'import
+{
+  const ora = new Date(), oggiG = ora.toISOString().slice(0, 10), giorniFa = n => new Date(Date.now() - n * 86400000).toISOString();
+  const dataTra = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  DB.seguimiGiorni = []; DB.seguimi = (DB.seguimi || []).filter(x => x.partner_id !== "R").concat([{ partner_id:"R", attivo:true, condividi:false }]);
+  const persona45 = (i, nome, fase, data) => ({ id:"p45" + i, proprietario:"R", nome, fase, esito:null, prossima_data:data, creato_il:"2026-01-0" + (i % 9 + 1) + "T10:00:00Z" });
+  DB.persone = (DB.persone || []).filter(x => x.proprietario !== "R").concat([
+    persona45(1, "Lista Uno", "lista", null), persona45(2, "Lista Due", "lista", null),
+    ...["Ritardo Uno", "Ritardo Due", "Ritardo Tre", "Ritardo Quattro", "Ritardo Cinque"].map((n, i) => persona45(10 + i, n, "piano", dataTra(-(i + 1)))),
+    persona45(20, "Presto Uno", "invitato", dataTra(2)), persona45(21, "Presto Due", "invitato", dataTra(3)), persona45(22, "In Corso", "contattato", null)]);
+  DB.numeri = DB.numeri.filter(x => !(x.partner_id === "R" && x.mese === oggiG.slice(0, 7)))
+    .concat([{ visto_da:"R", partner_id:"R", mese:oggiG.slice(0, 7), vpp:120, vpg:900, percentuale:3, linee:[], dati_al:giorniFa(8) }]);
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  const dfo = page.locator(".da-fare-oggi");
+  await dfo.waitFor();
+  check((await dfo.locator(".eyebrow").innerText()).toLowerCase().startsWith("da fare oggi"), "con il Seguimi: il blocco «Da fare oggi»");
+  check(!(await page.locator(".card", { hasText:"Il tuo percorso con la lista" }).count()), "con il Seguimi: niente riquadro della lista a parte");
+  const nomiAzioni = await dfo.locator(":scope > ul button[data-act=apri-persona]").allInnerTexts();
+  const nomiAnche = await dfo.locator(".anche button[data-act=apri-persona] b").allInnerTexts();
+  check(nomiAzioni.filter(n => n.startsWith("Ritardo")).length === 3 && nomiAnche.length === 2 && !nomiAnche.some(n => nomiAzioni.includes(n)),
+    "«Anche da sentire»: gli altri follow-up in ritardo, senza ripetere le azioni (" + nomiAnche.join(", ") + ")");
+  check(await dfo.locator(".anche li", { hasText:"Follow-up · in ritardo" }).count() === 2, "«Anche da sentire»: con l'etichetta");
+  check(await dfo.locator("button.riga-apri", { hasText:"Altri 3 in corso nella Lista" }).isVisible(), "riga «Altri 3 in corso nella Lista»");
+  const ordineBlocchi = await page.evaluate(() => [...document.querySelectorAll("#app .card")].map(c => c.classList.contains("da-fare-oggi") ? "fare"
+    : c.classList.contains("miei-numeri") ? "numeri" : c.classList.contains("diario") ? "diario" : c.classList.contains("promemoria-import") ? "import" : "").filter(Boolean).join(","));
+  check(ordineBlocchi === "import,fare,numeri,diario", "Il mio giorno: promemoria, Da fare oggi, I miei numeri, Diario (" + ordineBlocchi + ")");
+  check((await page.locator(".promemoria-import").innerText()).includes("8 giorni fa"), "promemoria: l'ultimo report ha 8 giorni");
+  check(!(await page.locator(".tappa-aperta").count()) && !(await page.locator("ul.oggi").count()), "tappa e diario chiusi di base");
+  await page.click("button[data-act=apri-tappa]");
+  check(await page.locator(".tappa-aperta .req li").count() > 0, "toccando la tappa si vedono i requisiti");
+  await page.click("button[data-act=apri-tappa]");
+  check(!(await page.locator(".tappa-aperta").count()), "toccando di nuovo si richiude");
+  await page.screenshot({ path: S + "/e2e/45-il-mio-giorno.png", fullPage:true });
+  await apriOrdini(page);
+  await page.locator(".sheet-box").screenshot({ path: S + "/e2e/45-ordini.png" });
+  await page.click(".sheet [data-act=chiudi]");
+  await dfo.locator("button.riga-apri", { hasText:"Altri 3 in corso" }).click();
+  check(await page.locator("button[data-act=vista-persone][aria-selected=true]").isVisible(), "la riga apre la Lista");
+  await ctx.close();
+  // senza Seguimi: i due riquadri di prima; report di 3 giorni fa: niente promemoria
+  DB.seguimi.find(x => x.partner_id === "R").attivo = false;
+  DB.numeri.find(x => x.partner_id === "R" && x.mese === oggiG.slice(0, 7)).dati_al = giorniFa(3);
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  check(!(await page.locator(".da-fare-oggi").count()) && await page.locator(".card", { hasText:"Il tuo percorso con la lista" }).isVisible(),
+    "senza Seguimi: niente «Da fare oggi», resta il percorso con la lista");
+  check(!(await page.locator(".promemoria-import").count()), "report di 3 giorni fa: niente promemoria");
+  await ctx.close();
+  DB.persone = DB.persone.filter(x => !String(x.id).startsWith("p45"));
 }
 
 await browser.close();
