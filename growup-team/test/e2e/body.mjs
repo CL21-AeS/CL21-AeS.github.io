@@ -2361,7 +2361,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.persone = (DB.persone || []).filter(x => x.proprietario !== "R").concat([
     persona45(1, "Lista Uno", "lista", null), persona45(2, "Lista Due", "lista", null),
     ...["Ritardo Uno", "Ritardo Due", "Ritardo Tre", "Ritardo Quattro", "Ritardo Cinque"].map((n, i) => persona45(10 + i, n, "piano", dataTra(-(i + 1)))),
-    persona45(20, "Presto Uno", "invitato", dataTra(2)), persona45(21, "Presto Due", "invitato", dataTra(3)), persona45(22, "In Corso", "contattato", null)]);
+    persona45(20, "Presto Uno", "invitato", dataTra(2)), persona45(21, "Presto Due", "invitato", dataTra(3)), persona45(22, "In Corso", "contattato", null),
+    Object.assign(persona45(30, "Cliente Quarantacinque", "followup", null), { esito:"cliente" })]);
   DB.numeri = DB.numeri.filter(x => !(x.partner_id === "R" && x.mese === oggiG.slice(0, 7)))
     .concat([{ visto_da:"R", partner_id:"R", mese:oggiG.slice(0, 7), vpp:120, vpg:900, percentuale:3, linee:[], dati_al:giorniFa(8) }]);
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
@@ -2393,6 +2394,17 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.click(".sheet [data-act=chiudi]");
   await dfo.locator("button.riga-apri", { hasText:"Altri 3 in corso" }).click();
   check(await page.locator("button[data-act=vista-persone][aria-selected=true]").isVisible(), "la riga apre la Lista");
+  // dopo aver aperto l'ordine di un cliente, «Ordine veloce» apre sempre il suo foglio (solo VP), mai l'ordine del cliente
+  await page.click("button[data-sez=clienti]"); await page.click("button[data-filtro=tutti]");
+  await page.locator("button[data-act=apri-cliente]", { hasText:"Cliente Quarantacinque" }).click();
+  await page.click("button[data-act=ordine-nuovo]");
+  await page.locator(".sheet h2", { hasText:"Ordine di" }).waitFor();
+  await page.click(".sheet button:has-text('Annulla')");
+  await page.click("button[data-act=vista-io]");
+  await apriOrdini(page, "ordine");
+  check((await page.locator(".sheet h2").innerText()).trim() === "Nuovo ordine" && await page.locator(".sheet input[name=vp]").isVisible(),
+    "dopo un cliente aperto, «Ordine veloce» apre il foglio dei soli VP");
+  await page.click(".sheet button:has-text('Annulla')");
   await ctx.close();
   // senza Seguimi: i due riquadri di prima; report di 3 giorni fa: niente promemoria
   DB.seguimi.find(x => x.partner_id === "R").attivo = false;
