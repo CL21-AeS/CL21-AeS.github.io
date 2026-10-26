@@ -103,6 +103,12 @@ function creaApi(){
     guidaFatti:   dal => q(sb.from("guida_fatti").select("chiave,giorno").gte("giorno", dal)),
     segnaFatto:   (chiave, giorno) => q(sb.from("guida_fatti").insert({ chiave, giorno })),
     togliFatto:   (chiave, giorno) => q(sb.from("guida_fatti").delete().eq("chiave", chiave).eq("giorno", giorno)),
+    /* 036: Seguimi giorno per giorno (solo mio; all'upline solo i numeri, se lo condivido) */
+    seguimi:      () => q(sb.from("seguimi").select("attivo,condividi")),
+    salvaSeguimi: r => q(sb.from("seguimi").upsert(r, { onConflict:"partner_id" })),
+    seguimiGiorni: dal => q(sb.from("seguimi_giorni").select("giorno,azioni,proposte,fatte,per_tipo").gte("giorno", dal).order("giorno")),
+    salvaSeguimiGiorno: r => q(sb.from("seguimi_giorni").upsert(r, { onConflict:"partner_id,giorno" })),
+    seguimiDi:    pid => q(sb.rpc("seguimi_di", { p_partner:pid })),
     esclusi:      () => q(sb.from("esclusi_import").select("codice")),
     /* persone nascoste dalla mia struttura (i loro VP contano lo stesso) */
     nascosti:     () => q(sb.from("nascosti").select("nascosto_id")),
@@ -208,6 +214,7 @@ const st = {
   livelli: [],            // soglie delle percentuali
   sezIo: "giorno",        // in Io: "giorno" (la pagina di sempre) o "guida" (la Guida per l'azione)
   guida: { conteggi:{}, cl21:{}, obiettivi:new Map(), fatti:[] },
+  seguimi: { attivo:false, condividi:false }, seguimiGiorni: [], seguimiScheda: {},
   vista: "io",            // pagina della home: "io", "gruppo" (struttura, inviti) o "scheda" (un partner)
   schedaId: null,         // partner aperto nella scheda
   attScheda: [],          // le sue attività (mese aperto)
@@ -750,6 +757,7 @@ async function caricaTutto(){
   } else {
     st.goalMese = { obiettivo_vp:vpProposti(), salvato:false };
   }
+  await preparaOggi();   // il Seguimi fissa le azioni di oggi quando ci sono gli obiettivi
 }
 function obiettiviSett(){ return { obiettivo_contatti:st.goal.obiettivo_contatti, obiettivo_piani:st.goal.obiettivo_piani }; }
 
@@ -1224,6 +1232,7 @@ function vHome(){
   ${leggiLocale(CHIAVE_SALVATA) === "1" || !st.chiave ? "" : vSalvaChiave()}
   ${vInstalla()}
   ${vAttesaIo()}
+  ${vOggiPerTe()}
   ${vObiettivoBreve()}
   ${vDaFare()}
   ${vClientiDaSentire()}
@@ -2242,6 +2251,7 @@ function vScheda(){
   </div>
   ${vComeArrivarci(p.id, "lui")}
   ${vConfronto(p)}
+  ${vSeguimiScheda(p)}
   ${gestito ? `<div class="card">
     <span class="eyebrow">I suoi numeri · ${nomeMese(m)}</span>
     <div class="griglia-azioni">
@@ -3055,6 +3065,7 @@ const AZIONI = {
     try{ st.attScheda = (await api.activities(p.id, primaDataAperta()) || []).filter(a => a.data >= primaDataAperta()); render(); }
     catch(e){ toast(messaggio(e)); }
     if(p.stato !== "gestito") api.numeriPersone(p.id).then(n => { st.numeriLista[p.id] = n; render(); }).catch(() => {});
+    if(p.stato !== "gestito") api.seguimiDi(p.id).then(g => { st.seguimiScheda[p.id] = g || []; render(); }).catch(() => {});
     api.mesiReport(p.id).then(m => { st.mesiScheda[p.id] = m || []; render(); }).catch(() => {});
   },
   partenza(){ st.sheet = "partenza"; render(); },
@@ -5357,6 +5368,10 @@ async function caricaGuida(){
     const [c, n, o, f] = await Promise.all([api.guidaConteggi(primoDelMese()), api.numeriCl21(), api.guidaObiettivi(), api.guidaFatti(settimana())]);
     st.guida = { conteggi:c || {}, cl21:(n || [])[0] || {}, obiettivi:new Map((o || []).map(x => [x.chiave, Number(x.a_settimana)])), fatti:f || [] };
   }catch(e){}
+  try{
+    const [sg, gg] = await Promise.all([api.seguimi(), api.seguimiGiorni(piuGiorni(oggi(), -30))]);
+    st.seguimi = (sg || [])[0] || { attivo:false, condividi:false }; st.seguimiGiorni = gg || [];
+  }catch(e){}
 }
 function obiettivoAbitudine(k){ const v = st.guida.obiettivi.get(k); return v != null ? v : ABITUDINI[k].base; }
 function fattoIl(k, g){ return st.guida.fatti.some(x => x.chiave === k && x.giorno === g); }
@@ -5464,7 +5479,7 @@ function vGuidaAbitudini(){
       Meglio un obiettivo più basso, scelto da te e rispettato. Obiettivi e spunte li vedi solo tu.</p>
   </div>`;
 }
-function vGuida(){ return `${vGuidaPiano()}${vGuidaStabilita()}${vGuidaPassi()}${vGuidaAbitudini()}`; }
+function vGuida(){ return `${vGuidaPiano()}${vGuidaStabilita()}${vGuidaPassi()}${vGuidaAbitudini()}${vGuidaSeguimi()}`; }
 function vSheetGuida(s){
   if(s === "guida-cl21"){ const w = st.guida.cl21 || {};
     const campo = (k, t) => `<label class="field"><span>${t}</span><input name="${k}" type="number" min="0" max="100000" inputmode="numeric" value="${w[k] != null ? w[k] : ""}"></label>`;
@@ -5512,6 +5527,136 @@ Object.assign(MODULI, {
     const k = st.guidaK, max = ABITUDINI[k].giorni ? 7 : 50, n = Math.round(Number(f.n.value));
     if(!(n >= 0 && n <= max)){ mostraErroreForm(f, `Scrivi un numero da 0 a ${max}.`); return; }
     try{ await api.salvaGuidaObiettivo(k, n); st.guida.obiettivi.set(k, n); st.sheet = null; render(); toast("Obiettivo salvato"); }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  }
+});
+
+/* ---- 11j. Seguimi giorno per giorno (036): chi lo attiva trova in «Il mio giorno» le azioni del giorno, prese dai suoi
+   dati e fissate al mattino (al massimo 3 contatti, 3 follow-up e piani, 3 clienti, i VP del mese, formazione e sponsor).
+   Si spuntano da sole quando segna il passo o l'ordine; formazione e sponsor a mano. All'upline solo i numeri, se lo sceglie. */
+const SEGUIMI_TIPI = { contatto:"Contatto", followup:"Follow-up", cliente:"Cliente", vp:"VP del mese", formazione:"Formazione", sponsor:"Chiamata con il tuo sponsor" };
+const SEGUIMI_GRUPPO = { contatto:"contatti", followup:"followup", cliente:"clienti", vp:"vp", formazione:"crescita", sponsor:"crescita" };
+function oggiSeguimi(){ return st.seguimiGiorni.find(g => g.giorno === oggi()) || null; }
+function azioniDelGiorno(){
+  const out = [], sett = settimanaGiorni(), restano = sett.filter(g => g >= oggi()).length || 1;
+  const manca = Math.max(0, (Number(st.goal.obiettivo_contatti) || 0) - fattoSettimana("contatto"));
+  const n = Math.min(3, Math.ceil(manca / restano));
+  (st.persone || []).filter(p => p.fase === "lista" && !p.esito && !p.nascosta_io)
+    .sort((a, b) => String(a.creato_il || "") < String(b.creato_il || "") ? -1 : 1).slice(0, n)
+    .forEach(p => out.push({ tipo:"contatto", id:p.id }));
+  const d = daFare();
+  d.ritardo.concat(d.oggi).slice(0, 3).forEach(p => out.push({ tipo:"followup", id:p.id }));
+  clientiDaSentire().slice(0, 3).forEach(x => out.push({ tipo:"cliente", id:x.p.id }));
+  const vpManca = (Number(st.goalMese.obiettivo_vp) || 0) - vpMese(meseDi(oggi()));
+  if(vpManca > 0) out.push({ tipo:"vp", manca:Math.round(vpManca * 100) / 100 });
+  if(obiettivoAbitudine("formazione") > 0) out.push({ tipo:"formazione" });
+  if(obiettivoAbitudine("sponsor") > sett.filter(g => fattoIl("sponsor", g)).length) out.push({ tipo:"sponsor" });
+  return out;
+}
+/* il primo accesso del giorno fissa le azioni di oggi */
+async function preparaOggi(){
+  if(!st.seguimi.attivo || oggiSeguimi()) return;
+  const azioni = azioniDelGiorno();
+  const r = { giorno:oggi(), azioni, proposte:azioni.length, fatte:0, per_tipo:{} };
+  try{ await api.salvaSeguimiGiorno(r); st.seguimiGiorni = st.seguimiGiorni.filter(g => g.giorno !== oggi()).concat([r]); }catch(e){}
+}
+function passoOggi(id){ return (st.passi || []).some(x => x.persona_id === id && x.data === oggi()); }
+function azioneFatta(a){
+  if(a.tipo === "contatto" || a.tipo === "followup") return passoOggi(a.id);
+  if(a.tipo === "cliente") return passoOggi(a.id) || (st.ordini || []).some(o => o.persona_id === a.id && o.data === oggi())
+    || !clientiDaSentire().some(x => x.p.id === a.id);
+  if(a.tipo === "vp") return vpMese(meseDi(oggi())) >= (Number(st.goalMese.obiettivo_vp) || 0)
+    || movimentiVp().some(x => x.data === oggi() && Number(x.vp) > 0);
+  return fattoIl(a.tipo, oggi());
+}
+function riepilogoOggi(g){
+  const per = {}; let fatte = 0;
+  for(const a of g.azioni || []){ if(azioneFatta(a)){ fatte++; const k = SEGUIMI_GRUPPO[a.tipo]; per[k] = (per[k] || 0) + 1; } }
+  return { fatte, per };
+}
+/* giorni di fila (fino a oggi) con almeno metà delle azioni fatte */
+function serieSeguimi(fatteOggi){
+  let n = 0;
+  const g0 = oggiSeguimi();
+  if(g0 && g0.proposte && fatteOggi * 2 >= g0.proposte) n++;
+  for(let d = piuGiorni(oggi(), -1); ; d = piuGiorni(d, -1)){
+    const g = st.seguimiGiorni.find(x => x.giorno === d);
+    if(!g || !g.proposte || g.fatte * 2 < g.proposte) break;
+    n++;
+  }
+  return n;
+}
+let salvaOggiT = null;
+function vOggiPerTe(){
+  const g = st.seguimi.attivo ? oggiSeguimi() : null;
+  if(!g) return "";
+  const r = riepilogoOggi(g);
+  if(r.fatte !== g.fatte || JSON.stringify(r.per) !== JSON.stringify(g.per_tipo || {})){
+    g.fatte = r.fatte; g.per_tipo = r.per;
+    clearTimeout(salvaOggiT);
+    salvaOggiT = setTimeout(() => api.salvaSeguimiGiorno({ giorno:g.giorno, azioni:g.azioni, proposte:g.proposte, fatte:g.fatte, per_tipo:g.per_tipo }).catch(() => {}), 300);
+  }
+  const nome = id => { const p = (st.persone || []).find(x => x.id === id); return p ? p.nome : ""; };
+  const riga = a => {
+    const fatta = azioneFatta(a), manuale = a.tipo === "formazione" || a.tipo === "sponsor";
+    const segno = manuale
+      ? `<button class="spunta-oggi${fatta ? " si" : ""}" data-act="guida-spunta" data-k="${a.tipo}" data-giorno="${oggi()}" aria-pressed="${fatta}" aria-label="Fatto">${fatta ? "✓" : ""}</button>`
+      : `<span class="spunta-oggi${fatta ? " si" : ""}" aria-label="${fatta ? "Fatto" : "Da fare"}">${fatta ? "✓" : ""}</span>`;
+    let testo = "";
+    if(a.tipo === "contatto" || a.tipo === "followup" || a.tipo === "cliente"){
+      const n = nome(a.id); if(!n) return "";
+      testo = `<button class="btn link" style="padding:0;min-height:0" data-act="${a.tipo === "cliente" ? "apri-cliente" : "apri-persona"}" data-id="${esc(a.id)}">${esc(n)}</button>`;
+    } else if(a.tipo === "vp") testo = `Mancano ${num(a.manca)} VP al tuo obiettivo del mese: guarda la Bozza ordine`;
+    else if(a.tipo === "formazione") testo = "15 minuti: un audio o 10 pagine di un libro";
+    else testo = "Una chiamata questa settimana";
+    return `<li class="${fatta ? "fatta" : ""}">${segno}<span class="grow"><span class="tipo-oggi">${SEGUIMI_TIPI[a.tipo]}</span><br>${testo}</span></li>`;
+  };
+  const serie = serieSeguimi(r.fatte);
+  return `<div class="card oggi-per-te">
+    <span class="eyebrow">Oggi per te · ${esc(GIORNI_SETT[new Date(oggi() + "T12:00:00Z").getUTCDay()])} ${esc(dataIt(oggi()))}</span>
+    <ul>${(g.azioni || []).map(riga).join("")}</ul>
+    <p class="small" style="margin:8px 0 0"><b>Oggi: ${r.fatte} su ${g.proposte} fatte</b>${serie >= 2 ? ` · da ${serie} giorni di fila almeno metà delle azioni` : ""}</p>
+  </div>`;
+}
+function vGuidaSeguimi(){
+  const s = st.seguimi, sw = (act, on, testo, sotto) => `<button class="interruttore" data-act="${act}" role="switch" aria-checked="${on}">
+      <span class="grow" style="text-align:left">${testo}${sotto ? `<br><span class="small">${sotto}</span>` : ""}</span><span class="toggle${on ? " on" : ""}"></span></button>`;
+  return `<div class="card guida-seguimi">
+    <span class="eyebrow">Fatti seguire giorno per giorno</span>
+    <p class="small" style="margin:4px 0 0">Ogni mattina, in cima a «Il mio giorno», le azioni del giorno prese dai tuoi dati. Lo togli quando vuoi.</p>
+    ${sw("seguimi-attivo", !!s.attivo, "Seguimi giorno per giorno", "")}
+    ${s.attivo ? sw("seguimi-condividi", !!s.condividi, "Fai vedere al tuo sponsor e alla tua upline cosa fai", "Vedono quante azioni fai ogni giorno, non i nomi.") : ""}
+  </div>`;
+}
+function vSeguimiScheda(p){
+  const g = st.seguimiScheda[p.id];
+  if(!g || !g.length) return "";
+  const sett = settimanaGiorni(), di = d => g.find(x => x.giorno === d);
+  const cella = (d, f) => { const x = di(d); return `<td class="num">${x ? f(x) : d > oggi() ? "" : "–"}</td>`; };
+  const tipo = k => x => num(Number((x.per_tipo || {})[k]) || 0);
+  return `<div class="card seguimi-scheda">
+    <span class="eyebrow">Si fa seguire giorno per giorno</span>
+    <div class="tab-consigli"><table class="sette">
+      <thead><tr><th></th>${sett.map((d, i) => `<th>${"LMMGVSD"[i]}</th>`).join("")}</tr></thead>
+      <tbody>
+        <tr><td>Fatte / proposte</td>${sett.map(d => cella(d, x => `${x.fatte}/${x.proposte}`)).join("")}</tr>
+        <tr><td>Contatti</td>${sett.map(d => cella(d, tipo("contatti"))).join("")}</tr>
+        <tr><td>Follow-up e piani</td>${sett.map(d => cella(d, tipo("followup"))).join("")}</tr>
+        <tr><td>Clienti e VP</td>${sett.map(d => cella(d, x => num((Number((x.per_tipo || {}).clienti) || 0) + (Number((x.per_tipo || {}).vp) || 0)))).join("")}</tr>
+        <tr><td>Formazione e sponsor</td>${sett.map(d => cella(d, tipo("crescita"))).join("")}</tr>
+      </tbody></table></div>
+    <p class="nota">Questa settimana. Solo i numeri: i nomi della sua Lista e dei suoi clienti restano suoi.</p>
+  </div>`;
+}
+Object.assign(AZIONI, {
+  async "seguimi-attivo"(){
+    const r = { attivo:!st.seguimi.attivo, condividi:st.seguimi.attivo ? false : !!st.seguimi.condividi };
+    try{ await api.salvaSeguimi(r); st.seguimi = r; if(r.attivo) await preparaOggi(); render();
+      toast(r.attivo ? "Seguimi attivo: trovi le azioni di oggi in «Il mio giorno»" : "Seguimi tolto"); }catch(e){ toast(messaggio(e)); }
+  },
+  async "seguimi-condividi"(){
+    const r = { attivo:true, condividi:!st.seguimi.condividi };
+    try{ await api.salvaSeguimi(r); st.seguimi = r; render();
+      toast(r.condividi ? "Il tuo sponsor e la tua upline vedono i tuoi numeri del Seguimi" : "I numeri del Seguimi li vedi solo tu"); }catch(e){ toast(messaggio(e)); }
   }
 });
 

@@ -312,6 +312,22 @@ table.stabilita tr.personali td{background:var(--traccia)}
 .giorni-guida button{width:32px;height:32px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--ink3);font-weight:700;font-size:12px;cursor:pointer}
 .giorni-guida button.si{background:var(--verde);border-color:var(--verde);color:#fff}
 .giorni-guida button:disabled{opacity:.4;cursor:default}
+.oggi-per-te ul{list-style:none;margin:6px 0 0;padding:0}
+.oggi-per-te li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
+.oggi-per-te li:first-child{border-top:0}
+.oggi-per-te li.fatta .grow{opacity:.6}
+.spunta-oggi{flex:none;width:26px;height:26px;border-radius:99px;border:2px solid var(--line);background:var(--card);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;padding:0}
+.spunta-oggi.si{background:var(--verde);border-color:var(--verde)}
+button.spunta-oggi{cursor:pointer}
+.tipo-oggi{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+.interruttore{display:flex;width:100%;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;background:var(--card);color:inherit;font:inherit;cursor:pointer}
+.toggle{flex:none;width:44px;height:26px;border-radius:99px;background:var(--traccia);position:relative;border:1px solid var(--line)}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:99px;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.toggle.on{background:var(--verde);border-color:var(--verde)}
+.toggle.on::after{left:20px}
+table.sette{width:100%;border-collapse:collapse;font-size:12.5px}
+table.sette th,table.sette td{padding:5px 3px;border-bottom:1px solid var(--line);text-align:center}
+table.sette th:first-child,table.sette td:first-child{text-align:left}
 .tot-mio{background:var(--traccia);border-radius:12px;padding:9px 12px;font-size:14px;font-variant-numeric:tabular-nums}
 input.mini{width:56px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;background:var(--card);color:var(--ink)}
 input.mini.prezzo{width:68px;text-align:right}
