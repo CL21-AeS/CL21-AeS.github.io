@@ -60,7 +60,16 @@ settimana, così il Gruppo è aggiornato. Stefano conferma: dopo un report conta
 (quelli scritti da chi lo seguiva prima che entrasse nell'app restano al report). **Prezzi e VP di prodotti e ordini con due
 decimali** (96,30 € · 18,20 VP) in bozza, storico, clienti e listino; cifre degli obiettivi e totali del mese come prima.
 
+**Dove siamo arrivati (27 ottobre)**: PR **#106** (Analisi della persona e interruttore unico per condividere, migrazione
+037 già applicata) aperta, da unire; dopo l'unione: ricreare il ramo da main. Lavori possibili dopo, da scegliere con
+Stefano: **notifiche vere** (un avviso al giorno, testo senza nomi: persone da risentire, Seguimi, clienti, scadenze; prove su
+Android e sull'iPhone di Alessia); **«Come arrivarci» da Platino in su** (Rubino, Zaffiro, Smeraldo, Diamante; prima il foglio
+di revisione); la **fase di prova** con 2-3 leader (messaggio d'invito, primo ingresso, primo import, riscontri dopo una
+settimana). Pagina di riepilogo per i partner: «Da dove arrivano i dati di Growup» (artifact e PDF mandati a Stefano).
+
 **Aperto, in attesa di Stefano**:
+- Unire la PR #106 e provare dal vivo la v40: Guida (piano, Stabilità, abitudini con le settimane prima), Seguimi («Oggi
+  per te»), interruttore per condividere, Analisi (la mia e di un partner), indietro con il dito, barra fissa.
 - Controllare sul sito Amway che la **%** delle linee frontali nei report importati sia quella giusta (serve a «Come arrivarci»
   da Argento a Platino).
 - Provare dal vivo (app v40): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,
