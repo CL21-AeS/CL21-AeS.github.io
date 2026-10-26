@@ -67,7 +67,7 @@ ritardo o di oggi e i clienti da sentire senza doppioni, e la riga «Altri N in 
 due riquadri di prima, «Il tuo percorso con la lista» e «I tuoi clienti da sentire») · **«I miei numeri»** (riga
 dell'obiettivo, riga della tappa che si apre su requisiti/linee/note, settimana e mese in un solo riquadro) · **«Diario di
 oggi»** chiuso di base. **«+ Ordine»** nella barra in basso apre il foglio **«Ordini»**: Ordine veloce · Bozza ordine · I miei
-ordini · Aggiorna il totale del mese (bozza e storico non sono più nella pagina Io). «Importa dal report Amway» solo in Gruppo;
+ordini · Aggiorna il totale del mese · Ordini dal sito Amway (lo stesso import di Clienti, che resta anche lì; bozza e storico non sono più nella pagina Io). «Importa dal report Amway» solo in Gruppo;
 in Io un promemoria se ho un gruppo, ho già importato e l'ultimo report ha più di 7 giorni. Prossime: PR 2 (C+D, «Primi
 passi» con «Scrivi 30 nomi», spiegazioni a richiesta con «?») e PR 3 (E+F+G, Profilo, scheda partner a schede, parole
 uniche), ognuna con la sua tavola prima del codice.
