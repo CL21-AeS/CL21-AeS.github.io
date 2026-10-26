@@ -1157,6 +1157,12 @@ function vPrivacyPrimo(){
 }
 
 /* Due pagine, scelte dal selettore in alto a destra: "Io" e "Gruppo". */
+/* La barra in alto resta fissa scorrendo: le pagine principali e, sotto, i pulsanti della sezione
+   (Il mio giorno · Guida in Io; Target · Lista · Clienti in Persone). Il titolo con il nome scorre via. */
+function vBarraFissa(){
+  const sez = st.vista === "io" ? vSezioniIo() : st.vista === "persone" && (st.sezPersone === "target" ? !st.invitoId : !st.personaId) ? vSezioniPersone() : "";
+  return `<div class="barra-fissa">${vSelettore()}${sez}</div>`;
+}
 function vSelettore(){
   return `<div class="schede" role="tablist" aria-label="Pagina">
     <button role="tab" aria-selected="${st.vista === "obiettivo"}" class="${st.vista === "obiettivo" ? "on" : ""}" data-act="vista-obiettivo">Obiettivo</button>
@@ -1205,24 +1211,23 @@ function vHome(){
   if(st.vista === "persone") return `
   <div class="testata">
     <div>${marchio()}<h1>${st.invitoId ? "Target" : st.personaId ? (st.sezPersone === "clienti" ? "I miei clienti" : "La mia lista") : "Persone"}</h1></div>
-    ${vSelettore()}
   </div>
+  ${vBarraFissa()}
   ${vPersone()}
   ${vFondo()}`;
   if(st.vista === "obiettivo") return `
   <div class="testata">
     <div>${marchio()}<h1>Il mio obiettivo</h1></div>
-    ${vSelettore()}
   </div>
+  ${vBarraFissa()}
   ${vObiettivo()}
   ${vFondo()}`;
   return `
   <div class="testata">
     <div>${marchio()}<h1>${st.vista === "scheda" ? "Scheda partner" : gruppo ? "Il mio gruppo" : `Ciao ${esc(nomeSaluto(p.nome))}`}</h1>
       ${st.vista === "gruppo" ? `<p class="small" style="margin:0">${persone === 1 ? "1 persona" : `${num(persone)} persone`}</p>` : ""}</div>
-    ${vSelettore()}
   </div>
-  ${st.vista === "io" ? vSezioniIo() : ""}
+  ${vBarraFissa()}
   ${st.vista === "scheda" ? vScheda() : gruppo ? `
   ${vPreferiti()}
   ${vStruttura()}
@@ -3479,7 +3484,7 @@ function rigaPersona(p, suIo){
 
 function vPersone(){
   if(st.sezPersone === "clienti") return vClienti();
-  if(st.sezPersone === "target") return st.invitoId ? vTarget() : vSezioniPersone() + vTarget();
+  if(st.sezPersone === "target") return vTarget();
   if(st.personaId) return vPersona();
   const filtro = FILTRI_LISTA.find(x => x.id === st.filtroLista) || FILTRI_LISTA[0];
   const q = senzaAccenti(st.cercaLista || "");
@@ -3488,7 +3493,7 @@ function vPersone(){
   const l = nellaLista.filter(filtro.ok).filter(p => !q || senzaAccenti(p.nome + " " + (p.origine || "")).includes(q))
     .sort((a, b) => (a.prossima_data || "9999") < (b.prossima_data || "9999") ? -1 : (a.prossima_data || "9999") > (b.prossima_data || "9999") ? 1
       : a.nome.localeCompare(b.nome, "it"));
-  return `${vSezioniPersone()}<div class="card">
+  return `<div class="card">
     <div class="spread"><span class="eyebrow">La mia lista</span>
       <span class="row" style="gap:6px"><button class="btn small" data-act="persone-tante">Più nomi</button>
       <button class="btn small primary" data-act="persona-nuova">+ Un nome</button></span></div>
@@ -4449,7 +4454,7 @@ function vClienti(){
   const tutti = clientiTutti(), l = tutti.filter(filtro.ok).sort((a, b) => {
     const sa = statoCliente(a), sb = statoCliente(b);
     return (sa.primo ? sa.primo.finisce : "9999") < (sb.primo ? sb.primo.finisce : "9999") ? -1 : 1; });
-  return `${vSezioniPersone()}<div class="card">
+  return `<div class="card">
     <div class="spread"><span class="eyebrow">I miei clienti</span>
       <span class="row" style="gap:6px"><button class="btn small" data-act="importa-ordini">Dal sito Amway</button>
       <button class="btn small primary" data-act="cliente-nuovo">+ Un cliente</button></span></div>
@@ -5365,7 +5370,7 @@ function gruppoGuida(chiave){
 async function caricaGuida(){
   st.guida = st.guida || { conteggi:{}, cl21:{}, obiettivi:new Map(), fatti:[] };
   try{
-    const [c, n, o, f] = await Promise.all([api.guidaConteggi(primoDelMese()), api.numeriCl21(), api.guidaObiettivi(), api.guidaFatti(settimana())]);
+    const [c, n, o, f] = await Promise.all([api.guidaConteggi(primoDelMese()), api.numeriCl21(), api.guidaObiettivi(), api.guidaFatti(piuGiorni(settimana(), -7 * SETTIMANE_INDIETRO))]);
     st.guida = { conteggi:c || {}, cl21:(n || [])[0] || {}, obiettivi:new Map((o || []).map(x => [x.chiave, Number(x.a_settimana)])), fatti:f || [] };
   }catch(e){}
   try{
@@ -5375,7 +5380,8 @@ async function caricaGuida(){
 }
 function obiettivoAbitudine(k){ const v = st.guida.obiettivi.get(k); return v != null ? v : ABITUDINI[k].base; }
 function fattoIl(k, g){ return st.guida.fatti.some(x => x.chiave === k && x.giorno === g); }
-function settimanaGiorni(){ return [0, 1, 2, 3, 4, 5, 6].map(i => piuGiorni(settimana(), i)); }
+function settimanaGiorni(spost){ const l = piuGiorni(settimana(), 7 * (spost || 0)); return [0, 1, 2, 3, 4, 5, 6].map(i => piuGiorni(l, i)); }
+const SETTIMANE_INDIETRO = 8;   // formazione e sponsor si possono spuntare anche nelle settimane prima (mai nel futuro)
 function vSezioniIo(){
   const b = (k, t) => `<button class="btn small${(st.sezIo || "giorno") === k ? " on" : ""}" data-act="sez-io" data-sez="${k}" aria-pressed="${(st.sezIo || "giorno") === k}">${t}</button>`;
   return `<div class="row scelte-rapide sezioni-io" style="gap:6px">${b("giorno", "Il mio giorno")}${b("guida", "Guida")}</div>`;
@@ -5459,7 +5465,7 @@ function vGuidaPassi(){
   </div>`;
 }
 function vGuidaAbitudini(){
-  const sett = settimanaGiorni(), pp = (st.passi || []).filter(x => !x.importato && x.tipo === "followup" && x.data >= settimana());
+  const sp = st.guidaSett || 0, sett = settimanaGiorni(sp), pp = (st.passi || []).filter(x => !x.importato && x.tipo === "followup" && x.data >= settimana());
   const riga = (nome, fatto, obj, spiega, extra, k) => `<div class="abitudine" data-k="${esc(k)}">
       <div class="spread"><span>${esc(nome)}</span><b class="num">${num(fatto)} / ${k === "contatti" || k === "piani"
         ? num(obj) : `<button class="campo-cl21" data-act="guida-obiettivo" data-k="${esc(k)}" aria-label="Il tuo obiettivo">${num(obj)}</button>`}${
@@ -5469,10 +5475,14 @@ function vGuidaAbitudini(){
       ${g > oggi() ? "disabled" : ""} aria-pressed="${fattoIl(k, g)}" aria-label="${esc(GIORNI_SETT[(i + 1) % 7])}">${"LMMGVSD"[i]}</button>`).join("")}</div>`;
   const fatti = k => sett.filter(g => fattoIl(k, g)).length;
   return `<div class="card guida-abitudini">
-    <span class="eyebrow">Le tue abitudini · questa settimana</span>
+    <div class="spread"><span class="eyebrow">Le tue abitudini · ${sp ? `settimana dal ${esc(dataIt(sett[0]))}` : "questa settimana"}</span>
+      <span class="row" style="gap:4px">${sp > -SETTIMANE_INDIETRO ? `<button class="btn small ghost" data-act="guida-sett" data-d="-1">‹ Settimana prima</button>` : ""}${
+        sp < 0 ? `<button class="btn small ghost" data-act="guida-sett" data-d="1">Dopo ›</button>` : ""}</span></div>
+    ${sp ? `<p class="small" style="margin:6px 0 0">Contatti, piani e follow-up si vedono nella settimana in corso. Qui puoi spuntare
+      formazione e chiamata con lo sponsor dei giorni che ti eri dimenticato.</p>` : `
     ${riga("Contatti nuovi", fattoSettimana("contatto"), st.goal.obiettivo_contatti, "Dalla tua Lista · consigliato 2 al giorno", "", "contatti")}
     ${riga("Piani", fattoSettimana("piano"), st.goal.obiettivo_piani, "Dalla tua Lista · consigliato 3 a settimana", "", "piani")}
-    ${riga("Follow-up", pp.length, obiettivoAbitudine("followup"), `${ABITUDINI.followup.spiega} · dalla tua Lista · consigliato 1 al giorno`, "", "followup")}
+    ${riga("Follow-up", pp.length, obiettivoAbitudine("followup"), `${ABITUDINI.followup.spiega} · dalla tua Lista · consigliato 1 al giorno`, "", "followup")}`}
     ${riga("Formazione", fatti("formazione"), obiettivoAbitudine("formazione"), ABITUDINI.formazione.spiega, giorni("formazione"), "formazione")}
     ${riga("Chiamata con il tuo sponsor", fatti("sponsor"), obiettivoAbitudine("sponsor"), "Consigliato 1 a settimana", giorni("sponsor"), "sponsor")}
     <p class="nota">Contatti e piani li cambi in «Modifica» della tua settimana; gli altri obiettivi toccando il numero.
@@ -5501,6 +5511,7 @@ function vSheetGuida(s){
   return "";
 }
 Object.assign(AZIONI, {
+  "guida-sett"(el){ st.guidaSett = Math.max(-SETTIMANE_INDIETRO, Math.min(0, (st.guidaSett || 0) + Number(el.dataset.d))); render(); },
   "sez-io"(el){ st.sezIo = el.dataset.sez; render(); window.scrollTo(0, 0); },
   "guida-vai"(el){ const d = el.dataset.dove;
     if(d === "lista" || d === "clienti"){ st.vista = "persone"; st.sezPersone = d; st.personaId = null; st.invitoId = null; }
@@ -5834,8 +5845,29 @@ document.addEventListener("click", e => {
   if(!el) return;
   const act = el.dataset.act;
   if(act === "chiudi-fuori"){ if(e.target === el){ chiudiSheet(); render(); } return; }
-  if(AZIONI[act]){ e.preventDefault(); AZIONI[act](el); }
+  if(AZIONI[act]){ e.preventDefault(); const prima = statoPagina(); AZIONI[act](el); ricordaRitorno(act, prima); }
 });
+/* Tornare indietro con il dito: chi arriva in una schermata da un collegamento (la Lista dalla Guida, una persona da
+   «Oggi per te», una scheda partner) trascinando verso destra torna da dove era partito, allo stesso punto della pagina.
+   Le schede principali e i pulsanti di sezione (Il mio giorno · Guida, Target · Lista · Clienti) azzerano la strada. */
+const AZIONI_MENU = new Set(["vista-obiettivo", "vista-io", "vista-persone", "vista-gruppo", "sez-io", "sez-persone"]);
+const CAMPI_PAGINA = ["vista", "sezIo", "sezPersone", "personaId", "invitoId", "schedaId", "target"];
+function statoPagina(){ const f = { y:window.scrollY, schedaPila:(st.schedaPila || []).slice() }; for(const k of CAMPI_PAGINA) f[k] = st[k]; return f; }
+function ricordaRitorno(act, prima){
+  st.ritorni = st.ritorni || [];
+  if(AZIONI_MENU.has(act)){ st.ritorni = []; return; }
+  if(CAMPI_PAGINA.some(k => st[k] !== prima[k])){ prima.dopo = statoPagina(); st.ritorni.push(prima); if(st.ritorni.length > 20) st.ritorni.shift(); }
+}
+/* si torna indietro solo se si è ancora nella schermata a cui aveva portato il collegamento */
+function tornaIndietro(){
+  const f = (st.ritorni || [])[st.ritorni.length - 1];
+  if(!f || CAMPI_PAGINA.some(k => st[k] !== f.dopo[k])){ st.ritorni = []; return false; }
+  st.ritorni.pop();
+  for(const k of CAMPI_PAGINA) st[k] = f[k];
+  st.schedaPila = f.schedaPila;
+  render(); window.scrollTo(0, f.y);
+  return true;
+}
 
 document.addEventListener("submit", e => {
   const f = e.target.closest("form[data-form]");
@@ -5902,6 +5934,9 @@ document.addEventListener("touchend", e => {
   const t = e.changedTouches[0], dx = t.clientX - tocco.x, dy = t.clientY - tocco.y, ms = Date.now() - tocco.quando;
   tocco = null;
   if(Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8 || ms > 800) return;
+  /* arrivato da un collegamento: si torna da dove si era partiti */
+  if(dx > 0 && (st.ritorni || []).length && tornaIndietro()) return;
+  if(dx < 0) st.ritorni = [];
   /* ordine delle pagine: Obiettivo | Io | Gruppo */
   if(dx < 0 && st.vista === "obiettivo") scorri("vista-io");
   else if(dx < 0 && st.vista === "io") scorri("vista-persone");

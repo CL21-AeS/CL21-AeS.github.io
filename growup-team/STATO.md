@@ -7,7 +7,7 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
 dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **036** (027 e la parte 2 della 033 — `togli_dalla_struttura` e `importa_mappa` —
-incollate da Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#103**, nessuna aperta; il ramo di
+incollate da Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#104**, nessuna aperta; il ramo di
 lavoro è ricreato da main. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
 **Il 21 ottobre in breve** (dettagli sotto): «Come arrivarci» (consigli a richiesta in Obiettivo e nella scheda partner,
@@ -63,7 +63,7 @@ decimali** (96,30 € · 18,20 VP) in bozza, storico, clienti e listino; cifre d
 **Aperto, in attesa di Stefano**:
 - Controllare sul sito Amway che la **%** delle linee frontali nei report importati sia quella giusta (serve a «Come arrivarci»
   da Argento a Platino).
-- Provare dal vivo (app v38): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,
+- Provare dal vivo (app v39): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,
   reimport di un report più nuovo che riporta il totale al report, due decimali, un nuovo partner che entra con il link e il
   codice (in attesa → al posto giusto con il primo import).
 - Verifica in due passaggi su GitHub: controllare in github.com/settings/security.
@@ -74,6 +74,13 @@ dell'anno fiscale): si conta sempre il **VPG delle mappe**. Report dei mesi pass
 «Invitala nell'app»: si condivide il proprio link e l'import mette ognuno al posto giusto. Al primo ingresso il codice Amway
 si scrive **due volte** («Riscrivi il codice»: se non sono uguali non si entra) con l'avviso di controllarlo bene (si trova sul sito o nell'app Amway, nell'icona del profilo in alto a destra). Ogni mese
 copia dei dati e ZIP del codice; il piano Pro di Supabase si valuta **all'inizio della prova** con i Partner.
+
+**26 ottobre — usabilità** (richieste di Stefano): **indietro con il dito**: tra le pagine principali il dito scorre come
+prima; chi arriva in una schermata da un collegamento (Lista o Gruppo dalla Guida, una persona da «Oggi per te» o da Io, una
+scheda partner) trascinando verso destra torna dove era partito, allo stesso punto della pagina. **Barra fissa in alto**:
+le pagine (Obiettivo · Io · Persone · Gruppo) e i pulsanti della sezione (Il mio giorno · Guida, Target · Lista · Clienti)
+restano visibili scorrendo; il titolo con il nome scorre via. **Guida**: formazione e chiamata con lo sponsor si spuntano
+anche nelle settimane prima («‹ Settimana prima», fino a 8 settimane; mai nel futuro).
 
 **26 ottobre — Seguimi giorno per giorno** (migrazione 036; tavola «Seguimi giorno per giorno» v2): in fondo alla Guida due
 interruttori, «Seguimi giorno per giorno» e «Fai vedere al tuo sponsor e alla tua upline cosa fai» (spento di base). Chi lo

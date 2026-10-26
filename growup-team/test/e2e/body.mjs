@@ -1060,7 +1060,10 @@ await page.evaluate(() => { const el = document.querySelector("#app");
   const t = (tipo, x) => { const k = new Touch({ identifier:1, target:el, clientX:x, clientY:400 });
     el.dispatchEvent(new TouchEvent(tipo, { bubbles:true, cancelable:true, touches:tipo === "touchend" ? [] : [k], changedTouches:[k] })); };
   t("touchstart", 80); t("touchend", 320); });
-check(await page.locator(".card", { hasText:"La mia lista" }).isVisible() && !(await page.locator("button[data-act=passo]").count()), "scheda persona: col dito si torna alla lista");
+/* la persona era stata aperta da Io: col dito si torna a Io */
+await page.locator(".card", { hasText:"Il mio mese" }).waitFor();
+check(!(await page.locator("button[data-act=passo]").count()), "scheda persona aperta da Io: col dito si torna a Io");
+await page.click("button[data-act=vista-persone]");
 check(await page.getByText("Scarica una copia della mia lista").isVisible(), "la copia della lista è un piccolo link");
 // chiusure: Non ora (tra quanto e promemoria 2 giorni prima), No (solo la nota), Cliente (esce dalla lista, va nei Clienti)
 const chiudi = async (nome, esito) => {
@@ -2234,6 +2237,51 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const t = await schedaSeguito();
   check(/si fa seguire giorno per giorno/i.test(t) && t.includes("4/6") && !t.includes("Esempio"), "condividendo, l'upline vede solo i numeri (4/6)");
   DB.partners = DB.partners.filter(p => p.id !== "s42p");
+}
+
+// 43. Usabilità: indietro con il dito da un collegamento, barra fissa in alto, spunte delle settimane prima
+{
+  ({ ctx, page } = await apri({ hasTouch:true, isMobile:true }, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  const dito = (x1, x2) => page.evaluate(([x1, x2]) => {
+    const el = document.querySelector("#app");
+    const tocca = (tipo, x) => { const t = new Touch({ identifier:1, target:el, clientX:x, clientY:400 });
+      el.dispatchEvent(new TouchEvent(tipo, { bubbles:true, cancelable:true, touches: tipo === "touchend" ? [] : [t], changedTouches:[t] })); };
+    tocca("touchstart", x1); tocca("touchend", x2);
+  }, [x1, x2]);
+  // barra fissa: le pagine e i pulsanti della sezione restano visibili scorrendo
+  check(await page.locator(".barra-fissa .schede").count() === 1 && await page.locator(".barra-fissa .sezioni-io").count() === 1, "barra in alto: pagine e pulsanti della sezione insieme");
+  await page.screenshot({ path: S + "/e2e/43-barra-alto.png" });
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await new Promise(r => setTimeout(r, 200));
+  const alto = await page.locator(".barra-fissa").evaluate(b => b.getBoundingClientRect().top);
+  check(alto >= -1 && alto < 40, "scorrendo in basso la barra resta in alto (" + Math.round(alto) + ")");
+  await page.screenshot({ path: S + "/e2e/43-barra-scorsa.png" });
+  check(await page.locator(".testata h1").evaluate(h => h.getBoundingClientRect().bottom < 0), "il titolo con il nome scorre via");
+  // dalla Guida alla Lista con un collegamento, e indietro con il dito
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.click(".sezioni-io button[data-sez=guida]");
+  await page.locator(".guida-passi").waitFor();
+  await page.locator(".guida-passi button[data-act=guida-vai]").first().click();
+  await page.locator(".schede button.on", { hasText:/Persone|Gruppo/ }).waitFor();
+  await dito(60, 320);
+  await page.locator(".guida-passi").waitFor();
+  check(await page.locator(".sezioni-io button[data-sez=guida]").getAttribute("aria-pressed") === "true", "indietro con il dito: torna alla Guida da cui si era partiti");
+  // con le pagine principali il dito scorre come prima
+  await dito(320, 60);
+  await page.locator(".schede button.on", { hasText:"Persone" }).waitFor(); check(true, "dalle pagine principali il dito scorre tra le pagine");
+  await page.click(".schede button[data-act=vista-io]");
+  // spunte della settimana prima
+  await page.click(".sezioni-io button[data-sez=guida]");
+  await page.click(".guida-abitudini button[data-act=guida-sett][data-d='-1']");
+  const ieriSett = await page.locator(".guida-abitudini [data-k=formazione] button[data-act=guida-spunta]").first().getAttribute("data-giorno");
+  await page.locator(".guida-abitudini [data-k=formazione] button[data-act=guida-spunta]").first().click();
+  await page.locator(`.guida-abitudini [data-k=formazione] button[data-giorno="${ieriSett}"][aria-pressed=true]`).waitFor();
+  check(ieriSett < new Date().toISOString().slice(0, 10) && (await page.locator(".guida-abitudini .eyebrow").innerText()).toLowerCase().includes("settimana dal"),
+    "si spunta anche un giorno della settimana prima");
+  await sync(page);
+  check(DB.guidaFatti.some(x => x.partner_id === "R" && x.chiave === "formazione" && x.giorno === ieriSett), "nel database la spunta del giorno passato");
+  await ctx.close();
 }
 
 await browser.close();
