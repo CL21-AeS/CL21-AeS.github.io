@@ -1,6 +1,6 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 21 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 27 ottobre 2026 (sera). Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
 ## Ripartire da qui (fermi la sera del 21 ottobre 2026)
@@ -98,15 +98,25 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
-**Dove siamo arrivati (27 ottobre)**: PR #106 unita. Ottimizzazione in 3 PR (vedi sopra), la 1 aperta. Lavori possibili dopo, da scegliere con
+**Dove siamo arrivati (27 ottobre, sera — si riprende il 28)**: tutte le PR sono unite fino alla **#112**, nessuna aperta;
+il ramo di lavoro è ricreato da main. Migrazioni applicate su Supabase fino alla **038** (`mesi_qualifica`, mese da Argento con
+la linea al 21%). App **v45** (service worker `growup-team-v45`). Fatti oggi, in ordine: PR #107 «Il mio giorno» in tre
+blocchi e foglio «Ordini» · #108 «Ordini dal sito Amway» nel foglio · #109 correzione: «Ordine veloce» apriva l'ordine di un
+cliente · #110 «Primi passi» (30 nomi) e spiegazioni con «?» · #111 regola del mese da Argento (4.000 VP rimanenti fuori dalla
+linea al 21%; sui dati reali 1 mese su 5 al 21% non è più da Argento) · #112 Profilo dall'omino, scheda partner in Numeri e
+Azioni, «VP personali», glossario. E2E: **565 controlli**; test RLS: tutti superati. Tavole su claude.ai: «Il mio giorno e
+Ordini», «Primi passi e spiegazioni», «Profilo e scheda partner». Lasciato com'è per scelta di Stefano: «I miei ordini» solo
+con gli ordini dalla Bozza (gli ordini importati stanno nella scheda di ogni cliente), nessun avviso tra Ordine veloce e
+bozza aperta. Lavori possibili dopo, da scegliere con
 Stefano: **notifiche vere** (un avviso al giorno, testo senza nomi: persone da risentire, Seguimi, clienti, scadenze; prove su
 Android e sull'iPhone di Alessia); **«Come arrivarci» da Platino in su** (Rubino, Zaffiro, Smeraldo, Diamante; prima il foglio
 di revisione); la **fase di prova** con 2-3 leader (messaggio d'invito, primo ingresso, primo import, riscontri dopo una
 settimana). Pagina di riepilogo per i partner: «Da dove arrivano i dati di Growup» (artifact e PDF mandati a Stefano).
 
 **Aperto, in attesa di Stefano**:
-- Unire la PR #106 e provare dal vivo la v40: Guida (piano, Stabilità, abitudini con le settimane prima), Seguimi («Oggi
-  per te»), interruttore per condividere, Analisi (la mia e di un partner), indietro con il dito, barra fissa.
+- Provare dal vivo la **v45** sul telefono: «Il mio giorno» (Da fare oggi con il Seguimi, I miei numeri con la tappa che si
+  apre, Diario chiuso), foglio «Ordini» (5 scelte), «Primi passi» e la ×, i «?», l'omino e il Profilo (sezione Admin), la
+  scheda partner con Numeri e Azioni, il conteggio dei mesi da Argento dopo la regola 038.
 - Controllare sul sito Amway che la **%** delle linee frontali nei report importati sia quella giusta (serve a «Come arrivarci»
   da Argento a Platino).
 - Provare dal vivo (app v40): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,
