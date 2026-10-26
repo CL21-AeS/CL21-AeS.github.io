@@ -1200,24 +1200,53 @@ function vCopiaDati(){
       : "Nessuna copia scaricata da questo telefono."} Una volta al mese, dopo la chiusura del giorno 5.</p>
   </div>`;
 }
-function vFondo(){
-  return `<div class="fondo">
-    <div class="row wrap" style="justify-content:center">
-      <button class="btn small ghost" data-act="mia-chiave">Il mio link personale</button>
-      <button class="btn small ghost" data-act="privacy">Privacy</button>
-      ${puoInstallare() && leggiLocale(CHIAVE_INSTALLA_NO) === "1" ? `<button class="btn small ghost" data-act="installa-si">Installa l'app</button>` : ""}
-      <button class="btn small ghost" data-act="esci">Esci</button>
-    </div>
-    ${st.profilo.is_admin ? vCopiaDati() : ""}
-    ${st.profilo.is_admin ? `<div class="row" style="justify-content:center;margin-top:6px;gap:6px">${soloAdmin(`<button class="btn small ghost" data-act="listino">Listino</button>`)}
-      ${soloAdmin(`<button class="btn small ghost" data-act="codici-tolti">Codici Amway tolti</button>`)}</div>` : ""}
-    <p class="nota" style="text-align:center">${esc(st.profilo.nome)} · codice d'invito <b>${esc(st.profilo.codice_invito)}</b><br>
-      ${st.profilo.codice_amway ? `Codice Amway Partner <b>${esc(st.profilo.codice_amway)}</b>` : "Codice Amway Partner non ancora scritto"}
-      ${st.profilo.is_admin ? soloAdmin(`<button class="btn link small" data-act="codice" data-id="${esc(st.profilo.id)}" style="min-height:0;padding:0 4px">Correggi</button>`) : ""}<br>
-      Punto di partenza <b>${esc(testoPartenza(st.profilo))}</b>
-      <button class="btn link small" data-act="partenza" style="min-height:0;padding:0 4px">Modifica</button><br>
-      Per cancellare il profilo e i tuoi dati scrivi a Stefano e Alessia.</p>
-  </div>`;
+/* L'omino in alto a destra (ottimizzazione 3, come nell'app Amway): apre «Il mio profilo» */
+function omino(){
+  return `<button class="omino${st.vista === "profilo" ? " on" : ""}" data-act="vista-profilo" aria-label="Il mio profilo">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></button>`;
+}
+/* Le parole dell'app (glossario, testi approvati da Stefano) */
+const GLOSSARIO = [
+  ["VP personali (VPP)", "I punti volume dei tuoi ordini e di quelli dei tuoi clienti nel mese."],
+  ["VP di gruppo (VPG)", "I tuoi VP personali più quelli di tutte le persone sotto di te."],
+  ["Linea / linea attiva", "Una persona che hai sponsorizzato tu, con tutto il suo gruppo. È attiva quando il suo gruppo fa almeno la soglia di VP del mese."],
+  ["Mese da Argento", "Un mese al 21%: senza linee al 21%, con due o più linee al 21%, oppure con una linea al 21% e almeno 4.000 VP di gruppo fuori da quella linea. Altrimenti è solo «21%»."],
+  ["Report mappe", "Il file CSV della tua linea che scarichi dal sito Amway: da lì l'app prende i numeri ufficiali."],
+  ["Follow-up", "Risentire chi ha visto il piano, per rispondere alle sue domande e capire se vuole partire."],
+  ["Anno fiscale", "Da settembre ad agosto. Oro e Platino, la prima volta, si contano sui 12 mesi che partono dal primo mese da Argento; dal secondo anno sull'anno fiscale, come le qualifiche sopra."]];
+/* «Il mio profilo» (ottimizzazione 3): i dati del profilo, il link, le cose da fare una volta sola, il glossario, privacy ed
+   Esci; per gli admin la sezione Admin. Prima stava in fondo a ogni pagina. */
+function vProfilo(){
+  const p = st.profilo, adm = p.is_admin;
+  const voce = (act, testo, extra) => `<button class="voce-profilo" data-act="${act}"${extra || ""}><span class="grow">${testo}</span><span class="fr" aria-hidden="true">›</span></button>`;
+  const ppNascosti = leggiLocale(chiavePrimiPassiNo()) === "1" && primiPassi().some(x => !x.fatto);
+  const gloss = st.aiuti.has("glossario");
+  return `<button class="btn link" data-act="profilo-indietro" style="padding:0">‹ Indietro</button>
+  <div class="card profilo">
+    <h2>${esc(p.nome)}</h2>
+    <div class="riga-profilo"><span>Codice d'invito</span><b>${esc(p.codice_invito)}</b></div>
+    <div class="riga-profilo"><span>Codice Amway Partner</span><span>${p.codice_amway ? `<b>${esc(p.codice_amway)}</b>` : "non ancora scritto"}
+      ${adm ? soloAdmin(`<button class="btn link small" data-act="codice" data-id="${esc(p.id)}" style="min-height:0;padding:0 4px">Correggi</button>`) : ""}</span></div>
+    <div class="riga-profilo"><span>Punto di partenza <b>${esc(testoPartenza(p))}</b></span>
+      <button class="btn small ghost" data-act="partenza">Modifica</button></div>
+  </div>
+  <div class="card voci-profilo">
+    ${voce("mia-chiave", "Il mio link personale")}
+    ${puoInstallare() && leggiLocale(CHIAVE_INSTALLA_NO) === "1" ? voce("installa-si", "Installa l'app") : ""}
+    ${ppNascosti ? voce("primi-passi-si", "Mostra di nuovo i Primi passi") : ""}
+    <button class="voce-profilo" data-act="aiuto" data-k="glossario" aria-expanded="${gloss}"><span class="grow">Parole dell'app</span>
+      <span class="fr" aria-hidden="true">${gloss ? "▴" : "▾"}</span></button>
+    ${gloss ? `<dl class="glossario">${GLOSSARIO.map(([t, d]) => `<dt>${esc(t)}</dt><dd>${esc(d)}</dd>`).join("")}</dl>` : ""}
+    ${voce("privacy", "Privacy")}
+  </div>
+  ${adm ? `<div class="card admin-profilo">
+    <span class="eyebrow">Admin</span>
+    ${vCopiaDati()}
+    <div class="row" style="margin-top:8px;gap:6px">${soloAdmin(`<button class="btn small ghost" data-act="listino">Listino</button>`)}
+      ${soloAdmin(`<button class="btn small ghost" data-act="codici-tolti">Codici Amway tolti</button>`)}</div>
+  </div>` : ""}
+  <p class="nota" style="text-align:center">Per cancellare il profilo e i tuoi dati scrivi a Stefano e Alessia.</p>
+  <div class="row" style="justify-content:center"><button class="btn ghost" data-act="esci">Esci</button></div>`;
 }
 
 function vHome(){
@@ -1227,28 +1256,39 @@ function vHome(){
   if(st.vista === "persone") return `
   <div class="testata">
     <div>${marchio()}<h1>${st.invitoId ? "Target" : st.personaId ? (st.sezPersone === "clienti" ? "I miei clienti" : "La mia lista") : "Persone"}</h1></div>
+    ${omino()}
   </div>
   ${vBarraFissa()}
   ${vPersone()}
-  ${vFondo()}`;
+  `;
   if(st.vista === "analisi") return `
   <div class="testata">
     <div>${marchio()}<h1>${st.analisiId === p.id ? "La mia analisi" : "Analisi"}</h1></div>
+    ${omino()}
   </div>
   ${vBarraFissa()}
   ${vAnalisi()}
-  ${vFondo()}`;
+  `;
+  if(st.vista === "profilo") return `
+  <div class="testata">
+    <div>${marchio()}<h1>Il mio profilo</h1></div>
+    ${omino()}
+  </div>
+  ${vBarraFissa()}
+  ${vProfilo()}`;
   if(st.vista === "obiettivo") return `
   <div class="testata">
     <div>${marchio()}<h1>Il mio obiettivo</h1></div>
+    ${omino()}
   </div>
   ${vBarraFissa()}
   ${vObiettivo()}
-  ${vFondo()}`;
+  `;
   return `
   <div class="testata">
     <div>${marchio()}<h1>${st.vista === "scheda" ? "Scheda partner" : gruppo ? "Il mio gruppo" : `Ciao ${esc(nomeSaluto(p.nome))}`}</h1>
       ${st.vista === "gruppo" ? `<p class="small" style="margin:0">${persone === 1 ? "1 persona" : `${num(persone)} persone`}</p>` : ""}</div>
+    ${omino()}
   </div>
   ${vBarraFissa()}
   ${st.vista === "scheda" ? vScheda() : gruppo ? `
@@ -1262,7 +1302,7 @@ function vHome(){
   ${st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : `${vDaFare()}${vClientiDaSentire()}`}
   ${vMieiNumeri()}
   ${vOggi()}`}
-  ${vFondo()}`;
+  `;
 }
 
 function testoChiave(){ return "La mia chiave per entrare in Growup Team. È personale, non inoltrarla:"; }
@@ -1842,15 +1882,15 @@ function barra(nome, fatto, obj){
 /* VP del mese (034): in verde la parte del report Amway, in rame i miei ordini scritti dopo (li vedo solo io) */
 function barraVp(m){
   const rep = vpReport(m);
-  if(rep == null) return barra("VP fatturati", vpMese(m), st.goalMese.obiettivo_vp);
+  if(rep == null) return barra("VP personali", vpMese(m), st.goalMese.obiettivo_vp);
   const fatto = vpMese(m), obj = Number(st.goalMese.obiettivo_vp) || 0;
   /* oltre l'obiettivo la barra si divide in proporzione al totale, così la parte scritta dopo il report si vede sempre */
   const scala = Math.max(obj, fatto);
   const w = v => scala ? Math.min(100, Math.round(v / scala * 100)) : 0, wRep = w(Math.max(0, Math.min(rep, fatto)));
   const pct = obj ? Math.min(100, Math.round(fatto / obj * 100)) : 0, piena = w(fatto);
-  return `<div class="obiettivo"><div class="spread"><span>VP fatturati</span>
+  return `<div class="obiettivo"><div class="spread"><span>VP personali</span>
     <span class="num">${num(fatto)} <span class="faint">/ ${num(obj)}</span></span></div>
-    <div class="bar doppia ${obj && fatto >= obj ? "fatto" : ""}" role="progressbar" aria-label="VP fatturati" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i class="rep" style="width:${wRep}%"></i><i style="width:${Math.max(0, piena - wRep)}%"></i></div></div>`;
+    <div class="bar doppia ${obj && fatto >= obj ? "fatto" : ""}" role="progressbar" aria-label="VP personali" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i class="rep" style="width:${wRep}%"></i><i style="width:${Math.max(0, piena - wRep)}%"></i></div></div>`;
 }
 function rigaVp(m){
   const rep = vpReport(m), r = reportMio(m), dopo = vpMese(m) - (rep || 0);
@@ -2261,6 +2301,7 @@ function vScheda(){
   const gestito = p.stato === "gestito";
   const m = meseDi(oggi());
   const recenti = st.attScheda.slice().sort((a, b) => a.inserito_il < b.inserito_il ? 1 : -1).slice(0, 12);
+  const azioni = st.schedaTab === "azioni";   // ottimizzazione 3: la scheda si apre su «Numeri»
   /* scendendo lungo le linee: "‹ Indietro" torna alla scheda di prima, "Il mio gruppo" all'elenco */
   return `${st.schedaPila.length ? `<div class="spread"><button class="btn link" data-act="scheda-indietro" style="padding:0">‹ Indietro</button>
     <button class="btn link" data-act="vista-gruppo" style="padding:0">Il mio gruppo</button></div>`
@@ -2272,7 +2313,12 @@ function vScheda(){
       ${etichetteAccesso(p)}<span class="pill ${sp.cl}">${sp.txt}</span></span></div>
     <p class="small" style="margin:2px 0 0">${gestito ? "importata da te dal report Amway: la vedi solo tu, i suoi numeri li aggiorni tu"
       : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</p>
-    ${p.stato === "gestito" ? "" : `<p class="small" style="margin:6px 0 0">${rigaObiettivoDi(p.id)}</p>`}
+    <div class="schede-scheda" role="tablist" aria-label="Scheda">
+      <button role="tab" class="${azioni ? "" : "on"}" aria-selected="${!azioni}" data-act="scheda-tab" data-tab="numeri">Numeri</button>
+      <button role="tab" class="${azioni ? "on" : ""}" aria-selected="${azioni}" data-act="scheda-tab" data-tab="azioni">Azioni</button></div>
+  </div>
+  ${azioni ? "" : `<div class="card">
+    ${p.stato === "gestito" ? "" : `<p class="small" style="margin:0">${rigaObiettivoDi(p.id)}</p>`}
     ${vRubino(p.id)}
     ${vMesiArgentoScheda(p)}
     <p class="small" style="margin:6px 0 0">${p.codice_amway ? `Codice Amway <b>${esc(p.codice_amway)}</b>` : "Codice Amway non scritto"}
@@ -2293,12 +2339,12 @@ function vScheda(){
       <span class="num ${x.vp >= soglia() ? "" : "faint"}">${num(x.vp)} VP</span></li>`; }).join("")}</ul>` : ""; })()}
     <p class="small" style="margin:10px 0 0">Punto di partenza dichiarato: <b>${esc(testoPartenza(p))}</b></p>
     ${gestito ? "" : vNumeriLista(p.id)}
-    <button class="btn wide" style="margin-top:12px" data-act="chiamata" data-id="${esc(p.id)}">Fissa una chiamata</button>
   </div>
   ${vComeArrivarci(p.id, "lui")}
   ${vConfronto(p)}
   <button class="btn wide" style="margin-top:4px" data-act="apri-analisi" data-id="${esc(p.id)}">Analisi di ${esc(nomeSaluto(p.nome))} ›</button>
-  ${vSeguimiScheda(p)}
+  ${vSeguimiScheda(p)}`}
+  ${!azioni ? "" : `<button class="btn wide primary" style="margin:4px 0 12px" data-act="chiamata" data-id="${esc(p.id)}">Fissa una chiamata</button>
   ${gestito ? `<div class="card">
     <span class="con-aiuto"><span class="eyebrow">I suoi numeri · ${nomeMese(m)}</span>${aiutoBtn("gestito")}</span>
     ${aiutoTesto("gestito", `Se vuole usare l'app, mandale il tuo link d'invito: scrivendo il suo codice Amway ritrova il suo profilo
@@ -2331,7 +2377,7 @@ function vScheda(){
     <p class="nota">Nascosta sparisce solo per te, e solo lei: chi sta sotto di lei resta visibile. I suoi VP contano lo stesso
       nei numeri personali e di gruppo.
       La rimetti quando vuoi da «Nascoste». Nell'app nessuno si cancella: la struttura rispecchia il report Amway.</p>
-  </div>`;
+  </div>`}`;
 }
 
 /* Da confermare: sponsor, upline e admin la possono togliere. Bloccare l'app: solo admin. */
@@ -2889,9 +2935,9 @@ function vSheet(){
   }
   if(s === "mese-gruppo") return vMeseGruppo();
   if(s === "obiettivo-mese") return `<h2>Obiettivo del mese</h2>
-    <p class="small">VP fatturati in ${nomeMese(meseDi(oggi()))}. Il mese prossimo riparte da questo.</p>
+    <p class="small">VP personali di ${nomeMese(meseDi(oggi()))}. Il mese prossimo riparte da questo.</p>
     <form data-form="obiettivo-mese" novalidate>
-      <label class="field"><span>VP fatturati nel mese</span><input name="vp" type="text" inputmode="decimal" autocomplete="off" value="" placeholder="${num(st.goalMese.obiettivo_vp)}" data-vuoto></label>
+      <label class="field"><span>VP personali del mese</span><input name="vp" type="text" inputmode="decimal" autocomplete="off" value="" placeholder="${num(st.goalMese.obiettivo_vp)}" data-vuoto></label>
       ${piede}${err}
     </form>`;
   if(s === "mia-chiave") return `<h2>Il mio link personale</h2>
@@ -3069,6 +3115,10 @@ const AZIONI = {
     AZIONI["apri-scheda"]({ dataset:{ id, indietro:"1" } });
   },
   "vista-obiettivo"(){ st.vista = "obiettivo"; st.target = null; render(); window.scrollTo(0, 0); },
+  "scheda-tab"(el){ st.schedaTab = el.dataset.tab; render(); },
+  "vista-profilo"(){ if(st.vista === "profilo") return; st.vista = "profilo"; st.target = null; render(); window.scrollTo(0, 0); },
+  "profilo-indietro"(){ if(!tornaIndietro()){ st.vista = "io"; render(); window.scrollTo(0, 0); } },
+  "primi-passi-si"(){ salvaLocale(chiavePrimiPassiNo(), null); st.vista = "io"; st.sezIo = "giorno"; render(); window.scrollTo(0, 0); },
   "obiettivo-modifica"(){ st.errore = ""; st.sheet = "obiettivo"; render(); },
   "obiettivo-dopo"(){ st.fase = "home"; render(); },
   async "copia-dati"(){
@@ -3107,7 +3157,7 @@ const AZIONI = {
     if(el.dataset.indietro){}
     else if(st.vista === "scheda" && st.schedaId && st.schedaId !== p.id) st.schedaPila.push(st.schedaId);
     else st.schedaPila = [];
-    st.schedaId = p.id; st.target = p.stato === "gestito" ? p.id : null; st.attScheda = [];
+    st.schedaId = p.id; st.schedaTab = "numeri"; st.target = p.stato === "gestito" ? p.id : null; st.attScheda = [];
     st.vista = "scheda"; render(); window.scrollTo(0, 0);
     try{ st.attScheda = (await api.activities(p.id, primaDataAperta()) || []).filter(a => a.data >= primaDataAperta()); render(); }
     catch(e){ toast(messaggio(e)); }
@@ -6146,7 +6196,8 @@ document.addEventListener("touchend", e => {
   else if(dx > 0 && st.vista === "persone") scorri("vista-io");
   else if(dx > 0 && st.vista === "io") scorri("vista-obiettivo");
   else if(dx > 0 && st.vista === "gruppo") scorri("vista-persone");
-  else if(dx > 0 && st.vista === "scheda") scorri("scheda-indietro");   // alla scheda di prima, o al gruppo
+  else if(dx > 0 && st.vista === "scheda") scorri("scheda-indietro");
+  else if(dx > 0 && st.vista === "profilo") scorri("profilo-indietro");   // alla scheda di prima, o al gruppo
 }, { passive:true });
 function scorri(azione){ AZIONI[azione](); }   // il movimento della pagina lo fa render (muoviDopo)
 

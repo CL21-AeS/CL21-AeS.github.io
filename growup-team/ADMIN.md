@@ -11,15 +11,15 @@ Nell'app ognuno di questi pulsanti ha sotto la scritta piccola **Solo Admin**.
 
 | Dove | Cosa | A cosa serve |
 |---|---|---|
-| Scheda di un partner → **Invita sotto questa persona** | link d'invito di quella persona (WhatsApp, Telegram, Copia) | far entrare qualcuno sotto una persona precisa, anche nei gruppi dei Platino che il report Amway non mostra |
-| Scheda di un partner → **Invita chi manca sopra** | link speciale, valido una volta sola; si possono spuntare altri frontali dello stesso sponsor | far entrare qualcuno **tra** lo sponsor e la persona (che passa sotto di lui con il suo gruppo) |
-| Scheda di un partner → **Correggi il codice Amway** | cambia il codice Amway di chi usa l'app (o il proprio, in fondo alla pagina Io) | solo per un errore di battitura all'ingresso: l'import di quella persona lo segnala ("chiedi a Stefano e Alessia di correggerlo") |
-| Scheda di chi usa l'app → **Blocca l'app / Sblocca l'app** | blocca o sblocca l'app di chiunque (non di sé né di un altro admin) | chi è bloccato non vede più niente; i dati restano e i VP contano; sponsor e upline vedono "Bloccato" |
+| Scheda di un partner → Azioni → **Invita sotto questa persona** | link d'invito di quella persona (WhatsApp, Telegram, Copia) | far entrare qualcuno sotto una persona precisa, anche nei gruppi dei Platino che il report Amway non mostra |
+| Scheda di un partner → Azioni → **Invita chi manca sopra** | link speciale, valido una volta sola; si possono spuntare altri frontali dello stesso sponsor | far entrare qualcuno **tra** lo sponsor e la persona (che passa sotto di lui con il suo gruppo) |
+| Scheda di un partner → Numeri → **Correggi il codice Amway** | cambia il codice Amway di chi usa l'app (o il proprio, nel Profilo: l'omino in alto a destra) | solo per un errore di battitura all'ingresso: l'import di quella persona lo segnala ("chiedi a Stefano e Alessia di correggerlo") |
+| Scheda di chi usa l'app → Azioni → **Blocca l'app / Sblocca l'app** | blocca o sblocca l'app di chiunque (non di sé né di un altro admin) | chi è bloccato non vede più niente; i dati restano e i VP contano; sponsor e upline vedono "Bloccato" |
 | Gruppo → **In attesa della mappa** → **Togli** | lo può fare anche lo sponsor diretto (non l'upline) | cancella profilo e dati di chi non è ancora confermato dal report Amway; il suo telefono vede "accesso tolto" |
-| In fondo alle pagine → **Listino** | cerca, corregge e aggiunge prodotti (prezzo al cliente, prezzo Partner, VP); **Aggiorna dal PDF** legge il listino Amway sul telefono e mostra nuovi, prezzi cambiati e usciti prima di salvare | prodotti nuovi (5-6 volte l'anno) a mano; cambio prezzi annuale dal PDF |
-| In fondo alle pagine → **Codici Amway tolti** | elenco dei codici delle persone tolte, con **Sblocca** | con un codice tolto non si rientra finché non lo sblocchi |
-| Scheda di chi usa l'app → **Nuovo link personale** | crea un link personale nuovo; quello vecchio smette di funzionare | per chi ha perso il suo link |
-| In fondo alle pagine → **Scarica la copia dei dati** | file `growup-copia-AAAA-MM-GG.json` con tutte le tabelle | copia di sicurezza mensile (procedura in `LEGGIMI.md`) |
+| Profilo (omino in alto a destra) → Admin → **Listino** | cerca, corregge e aggiunge prodotti (prezzo al cliente, prezzo Partner, VP); **Aggiorna dal PDF** legge il listino Amway sul telefono e mostra nuovi, prezzi cambiati e usciti prima di salvare | prodotti nuovi (5-6 volte l'anno) a mano; cambio prezzi annuale dal PDF |
+| Profilo → Admin → **Codici Amway tolti** | elenco dei codici delle persone tolte, con **Sblocca** | con un codice tolto non si rientra finché non lo sblocchi |
+| Scheda di chi usa l'app → Azioni → **Nuovo link personale** | crea un link personale nuovo; quello vecchio smette di funzionare | per chi ha perso il suo link |
+| Profilo → Admin → **Scarica la copia dei dati** | file `growup-copia-AAAA-MM-GG.json` con tutte le tabelle | copia di sicurezza mensile (procedura in `LEGGIMI.md`) |
 
 Gli admin **non vedono le liste, gli inviti Target né i clienti** (pagina Persone) di nessuno, neanche nella copia di sicurezza: di ogni partner
 vedono solo i numeri della lista nella sua scheda, come ogni upline.

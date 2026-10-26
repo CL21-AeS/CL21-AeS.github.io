@@ -49,3 +49,6 @@ const apriTappa = pg => apriRiga(pg, "apri-tappa");
 const apriDiario = pg => apriRiga(pg, "apri-diario");
 const apriOrdini = async (pg, scelta) => { await pg.click(".azioni button[data-act=ordini]");
   if(scelta) await pg.click(`.sheet button[data-act=${scelta}]`); };
+/* ottimizzazione 3: nella scheda partner chiamata, numeri da aggiornare, accesso, inviti e struttura stanno in «Azioni» */
+const azioniScheda = async pg => { const b = pg.locator("button[data-act=scheda-tab][data-tab=azioni]");
+  if(await b.count() && await b.getAttribute("aria-selected") !== "true") await b.click(); };

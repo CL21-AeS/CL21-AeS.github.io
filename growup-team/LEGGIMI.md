@@ -173,7 +173,7 @@ Il codice è al sicuro su GitHub; i **dati** (persone, attività, obiettivi, sto
 gratuito **non fa copie automatiche**. Per questo, una volta al mese:
 
 1. **Quando**: dopo il giorno **5** (il mese precedente è chiuso e congelato nello storico).
-2. **Dall'app**, con il vostro profilo (solo gli admin lo vedono): in fondo a qualsiasi pagina,
+2. **Dall'app**, con il vostro profilo (solo gli admin lo vedono): nel Profilo (l'omino in alto a destra), sezione Admin,
    **Scarica la copia dei dati**. Si scarica il file `growup-copia-AAAA-MM-GG.json` (su Android in *Download*).
    Sotto il pulsante l'app ricorda la data dell'ultima copia e avvisa se è passato più di un mese.
 3. **Dove tenerla**: carica il file su **Google Drive**, in una cartella "Growup – copie". Tenete almeno le ultime 6.

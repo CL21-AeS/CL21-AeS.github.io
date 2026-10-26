@@ -358,6 +358,25 @@ table.stabilita tr.personali td{background:var(--traccia)}
 .aiuto-btn.on{background:var(--accent);border-color:var(--accent);color:var(--card)}
 .aiuto-testo{background:var(--bg);border-radius:10px;padding:8px 10px;margin-top:8px}
 .con-aiuto{display:inline-flex;align-items:center;gap:8px}
+/* ottimizzazione 3: l'omino del profilo, la pagina «Il mio profilo», le schede della scheda partner */
+.omino{flex:none;width:40px;height:40px;border-radius:99px;border:1.5px solid var(--head-ink2);background:transparent;
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.omino svg{width:20px;height:20px;fill:none;stroke:var(--head-ink);stroke-width:2;stroke-linecap:round}
+.omino.on{background:var(--oro);border-color:var(--oro)}
+.omino.on svg{stroke:#0a3a2c}
+.profilo h2{margin:0 0 6px}
+.riga-profilo{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}
+.voce-profilo{display:flex;width:100%;align-items:center;gap:8px;background:none;border:0;border-top:1px solid var(--line);
+  padding:12px 0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.voci-profilo .voce-profilo:first-child{border-top:0;padding-top:2px}
+.voce-profilo .fr{color:var(--ink3);font-size:18px}
+.glossario{margin:0 0 10px;font-size:14px}
+.glossario dt{font-weight:700;margin-top:8px}
+.glossario dd{margin:2px 0 0;color:var(--ink2)}
+.admin-profilo{border-style:dashed}
+.schede-scheda{display:flex;gap:6px;background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:4px;margin-top:12px}
+.schede-scheda button{flex:1;border:0;background:none;border-radius:99px;padding:8px 0;font:700 14px var(--f-testo);color:var(--ink2);cursor:pointer}
+.schede-scheda button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .oggi-per-te li.fatta .grow{opacity:.6}
 .spunta-oggi{flex:none;width:26px;height:26px;border-radius:99px;border:2px solid var(--line);background:var(--card);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;padding:0}
 .spunta-oggi.si{background:var(--verde);border-color:var(--verde)}
