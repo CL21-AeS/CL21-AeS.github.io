@@ -972,6 +972,32 @@ begin
   perform growup_test.deve_fallire(format('select public.dati_condivisi(%L)', b), '037: anon non legge i dati condivisi');
   execute 'reset role';
 
+  -- ---- 038: il mese da Argento con una sola linea al 21% (servono 4.000 VP rimanenti) ----
+  declare
+    m38 date := (date_trunc('month', current_date) - interval '2 months')::date;
+    x38 uuid := (select id from public.partners where codice_amway = '3000002');
+  begin
+    delete from public.numeri_mese where mese = m38 and partner_id in (b, x38);
+    insert into public.numeri_mese (partner_id, mese, vpg, percentuale, dati_al)
+      values (x38, m38, 9000, 21, now());
+    insert into public.numeri_mese (partner_id, mese, vpg, percentuale, linee, dati_al)
+      values (b, m38, 12000, 21, '[{"codice":"3000002","vpg":9000}]', now());
+    perform growup_test.come(u5);  -- A, sponsor di B
+    perform growup_test.ok((select not argento from public.mesi_qualifica(b) where mese = m38),
+                           '038: 21% con una linea al 21% e 3.000 VP rimanenti: non è un mese da Argento');
+    execute 'reset role';
+    update public.numeri_mese set linee = '[{"codice":"3000002","vpg":7000}]' where partner_id = b and mese = m38;
+    perform growup_test.come(u5);
+    perform growup_test.ok((select argento from public.mesi_qualifica(b) where mese = m38),
+                           '038: con 5.000 VP rimanenti il mese è da Argento');
+    perform growup_test.come(u4);  -- C, altra linea
+    perform growup_test.deve_fallire(format('select * from public.mesi_qualifica(%L)', b), '038: un''altra linea non legge i mesi di B');
+    perform growup_test.come(null);
+    perform growup_test.deve_fallire(format('select * from public.mesi_qualifica(%L)', b), '038: anon non legge');
+    execute 'reset role';
+    delete from public.numeri_mese where mese = m38 and partner_id in (b, x38);
+  end;
+
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');

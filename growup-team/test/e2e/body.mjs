@@ -1828,6 +1828,23 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     && (await page.locator(".req li", { hasText:"Mesi da Argento (21%)" }).locator(".num").innerText()) === "3 / 6", "3 mesi al 21%: Oro fatto, tappa Platino 3 su 6");
   check(!(await page.locator(".report-da-importare").count()), "tutti i report importati: il riquadro sparisce");
   await ctx.close();
+  // 038: al 21% con una sola linea al 21% serve che restino almeno 4.000 VP fuori da quella linea
+  DB.partners.push({ id:"g21", nome:"Linea Ventuno", sponsor_id:gaiaId, stato:"gestito", codice_amway:"7200099", codice_invito:"G21XXX" });
+  DB.numeri.push({ visto_da:gaiaId, partner_id:"g21", mese:mm(-4), vpg:9000, percentuale:21, linee:[] });
+  DB.numeri.push({ visto_da:gaiaId, partner_id:gaiaId, mese:mm(-4), vpg:12000, percentuale:21, linee:[{ codice:"7200099", vpg:9000 }] });
+  ({ ctx, page } = await telefonoGaia());
+  await page.getByText("Ciao Gaia").waitFor(); await apriTappa(page);
+  check((await page.locator(".req li", { hasText:"Mesi da Argento (21%)" }).locator(".num").innerText()) === "3 / 6",
+    "038: 21% con una linea al 21% e 3.000 VP rimanenti: solo 21%, non conta come mese da Argento");
+  await ctx.close();
+  DB.numeri.find(x => x.partner_id === gaiaId && x.mese === mm(-4)).linee = [{ codice:"7200099", vpg:7000 }];
+  ({ ctx, page } = await telefonoGaia());
+  await page.getByText("Ciao Gaia").waitFor(); await apriTappa(page);
+  check((await page.locator(".req li", { hasText:"Mesi da Argento (21%)" }).locator(".num").innerText()) === "4 / 6",
+    "038: con 5.000 VP rimanenti fuori dalla linea al 21% il mese conta");
+  await ctx.close();
+  DB.numeri = DB.numeri.filter(x => !(x.mese === mm(-4) && (x.partner_id === gaiaId || x.partner_id === "g21")));
+  DB.partners = DB.partners.filter(p => p.id !== "g21");
   // lo sponsor: i mesi da Argento dai report che ha importato lui
   numeroG("R", mm(-2), 21); numeroG("R", mm(-1), 21);
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
@@ -1882,11 +1899,11 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(await c.getAttribute("data-chiave") === "mese_vicino" && await c.getByText("per il 21% ne mancano 1.500. Lavora con le tue linee").isVisible(), "vicino al 21%: mancano 1.500 VP");
   check(await c.locator("th", { hasText:/^%$/ }).count() === 1 && (await c.locator("tr", { hasText:"Linea Uno" }).locator("td").nth(1).innerText()) === "12%", "la tabellina con la % della linea");
   await ctx.close();
-  // una linea al 21% e meno di 4.000 VP di gruppo
-  numeriLea("lea", mm(0), 3000, 15, [{ codice:"7300002", vpg:10400 }]); numeriLea("la1", mm(0), 10400, 21);
+  // una linea al 21% e meno di 4.000 VP di gruppo fuori da quella linea (038: 13.400 − 10.400 = 3.000 rimanenti)
+  numeriLea("lea", mm(0), 13400, 15, [{ codice:"7300002", vpg:10400 }]); numeriLea("la1", mm(0), 10400, 21);
   c = await consigliLea();
   check(await c.getAttribute("data-chiave") === "linea_21" && await c.getByText("La linea di Linea Uno è al 21%").isVisible() && await c.getByText("ne mancano 1.000").isVisible(),
-    "una linea al 21%: bastano 4.000 VP, ne mancano 1.000");
+    "una linea al 21%: servono 4.000 VP fuori dalla linea, ne mancano 1.000");
   await ctx.close();
   // una linea vicina al 21%
   numeriLea("lea", mm(0), 5000, 15, [{ codice:"7300002", vpg:8200 }]); numeriLea("la1", mm(0), 8200, 18);

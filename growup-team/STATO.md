@@ -82,6 +82,13 @@ link non è salvato). Le spiegazioni lunghe di Lista, Clienti, Target, Struttura
 scheda partner e Guida sono dietro un **«?»** accanto al titolo; restano visibili note sui guadagni, avvisi prima di
 cancellare o bloccare, istruzioni dei fogli. Prossima: PR 3 (Profilo, scheda partner a schede, parole uniche).
 
+**27 ottobre — Il mese da Argento con la linea al 21%** (migrazione 038, regola di Stefano): un mese al 21% conta come
+mese da Argento solo senza linee al 21%, con 2 o più linee al 21%, o con una linea al 21% e almeno **4.000 VP di gruppo
+rimanenti** fuori da quella linea; altrimenti è solo «21%». Vale per i mesi verso Oro e Platino, il Performance Year e
+«Come arrivarci» (il consiglio «linea al 21%» ora conta i VP fuori dalla linea). Nuova funzione `mesi_qualifica`
+(al posto di `mesi_report` nell'app). Glossario da correggere nella PR 3: Oro e Platino la prima volta sui 12 mesi dal
+primo mese da Argento, poi sull'anno fiscale.
+
 **Dove siamo arrivati (27 ottobre)**: PR #106 unita. Ottimizzazione in 3 PR (vedi sopra), la 1 aperta. Lavori possibili dopo, da scegliere con
 Stefano: **notifiche vere** (un avviso al giorno, testo senza nomi: persone da risentire, Seguimi, clienti, scadenze; prove su
 Android e sull'iPhone di Alessia); **«Come arrivarci» da Platino in su** (Rubino, Zaffiro, Smeraldo, Diamante; prima il foglio
