@@ -99,9 +99,11 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     (`seguimi_giorni`), solo sue; all'upline solo i numeri, se lo condivide (`seguimi_di`)
 34. `supabase/037_analisi.sql` — l'Analisi della persona (`analisi_persona`: numeri dei report dell'anno fiscale, linee
     con nome, VP e percentuale, conteggi della Stabilità) e i dati condivisi con l'upline (`dati_condivisi`)
-35. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
-17. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
-18. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
+35. `supabase/038_mese_argento.sql` — il mese da Argento con la linea al 21% (`mesi_qualifica`: al 21% conta come mese
+    da Argento senza linee al 21%, con 2 o più, o con una e almeno 4.000 VP di gruppo rimanenti fuori da quella linea).
+36. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+18. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
+19. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
 
 In alternativa ai punti 1-16: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.

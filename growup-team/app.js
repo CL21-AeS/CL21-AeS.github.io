@@ -59,7 +59,7 @@ function creaApi(){
     modificaPartenza: args => q(sb.rpc("modifica_partenza", args)),
     impostaProssima: chiave => q(sb.rpc("imposta_prossima_qualifica", { p_chiave:chiave })),
     prossime:     () => q(sb.rpc("prossime_qualifiche")),
-    mesiReport:   pid => q(sb.rpc("mesi_report", { p_partner:pid })),
+    mesiReport:   pid => q(sb.rpc("mesi_qualifica", { p_partner:pid })),
     salvaReportPassato: args => q(sb.rpc("salva_report_passato", args)),
     preferiti:    () => q(sb.from("preferiti").select("preferito_id")),
     copiaDati:    () => q(sb.rpc("copia_dati")),
@@ -415,14 +415,24 @@ function ordineDi(chiave){ const t = st.stages.find(s => s.chiave === chiave); r
 function oltreArgento(s){ return !!s && ordineDi("argento") > 0 && s.ordine > ordineDi("argento"); }
 function oltrePlatino(s){ return !!s && ordineDi("platino") > 0 && s.ordine > ordineDi("platino"); }
 const MESI_ARGENTO = { oro:3, platino:6 };   // la prima volta: in 12 mesi consecutivi; Platino con 3 mesi di fila
+/* Un mese da Argento (038, regola di Stefano): al 21% senza linee al 21%, oppure con 2 o più linee al 21%, oppure con una
+   linea al 21% e almeno 4.000 VP di gruppo rimanenti (fuori da quella linea). Altrimenti è solo «21%». Il calcolo lo fa il
+   database (mesi_qualifica: «argento»); per i numeri del mese in corso c'è argentoDaNumeri. */
+const ARGENTO_RIMANENTI = 4000;
+function daArgento(x){ return !!x && (x.argento != null ? !!x.argento : Number(x.percentuale) >= 21); }
+function argentoDaNumeri(pct, vpg, linee){
+  if(!(Number(pct) >= 21)) return false;
+  const l21 = (linee || []).filter(l => Number(l.pct) >= 21);
+  return l21.length !== 1 || (Number(vpg) || 0) - (Number(l21[0].vp) || 0) >= ARGENTO_RIMANENTI;
+}
 /* i mesi da Argento negli ultimi 12 mesi (compreso quello in corso): { mesi, fila, conReport } */
 function mesiArgento(righe){
   const fine = meseDi(oggi()), inizio = spostaMese(fine, -11);
-  const per = new Map((righe || []).map(x => [meseDi(x.mese), Number(x.percentuale) || 0]));
+  const per = new Map((righe || []).map(x => [meseDi(x.mese), daArgento(x)]));
   let mesi = 0, fila = 0, run = 0, conReport = 0;
   for(let m = inizio; m <= fine; m = spostaMese(m, 1)){
     if(per.has(m)) conReport++;
-    if((per.get(m) || 0) >= 21){ mesi++; run++; fila = Math.max(fila, run); } else run = 0;
+    if(per.get(m)){ mesi++; run++; fila = Math.max(fila, run); } else run = 0;
   }
   return { mesi, fila, conReport };
 }
@@ -449,7 +459,7 @@ function tappaFatta(t){
   if(oltrePlatino(t)) return false;
   if(oltreArgento(t)) return tappaAnnualeFatta(t, st.mesiReport);
   /* Argento: anche un mese al 21% in un report mappe importato (anche di un mese passato) */
-  if(t.chiave === "argento" && st.mesiReport.some(x => Number(x.percentuale) >= 21)) return true;
+  if(t.chiave === "argento" && st.mesiReport.some(daArgento)) return true;
   if(t.chiave === "primo_ordine"){
     const f = finestraPrimoOrdine(t);
     if(f && f.vp >= t.vp_personali) return true;
@@ -564,9 +574,9 @@ const CONSIGLI = {
     io:["Hai {mesi} mesi da Argento, ma non ancora 3 di fila: per Platino ne servono 3 consecutivi al 21%. {fila_testo}"],
     lui:["Ha {mesi} mesi da Argento ma non ancora 3 di fila. {fila_testo}", "Aiutalo a pianificare i prossimi mesi insieme, mese per mese."] },
   linea_21:{
-    io:["La linea di {nome_linea} è al 21%: con una linea al 21% per il tuo mese da Argento bastano 4.000 VP di gruppo. Ne hai {vpg}: ne mancano {manca}.",
+    io:["La linea di {nome_linea} è al 21%: con una linea al 21% per il tuo mese da Argento servono almeno 4.000 VP di gruppo fuori da quella linea. Ne hai {rimanenti}: ne mancano {manca}.",
       "Guarda le altre linee nella tabella: la più vicina è quella da sentire per prima."],
-    lui:["La linea di {nome_linea} è al 21%: gli bastano 4.000 VP di gruppo. Ne ha {vpg}, ne mancano {manca}.", "Guardate insieme le sue altre linee: la più vicina è la prima da aiutare."] },
+    lui:["La linea di {nome_linea} è al 21%: gli servono almeno 4.000 VP di gruppo fuori da quella linea. Ne ha {rimanenti}, ne mancano {manca}.", "Guardate insieme le sue altre linee: la più vicina è la prima da aiutare."] },
   mese_vicino:{
     io:["Questo mese sei a {vpg} VP di gruppo: per il 21% ne mancano {manca}. Lavora con le tue linee: un ordine o un cliente in più per linea fa la differenza.",
       "{vicine} tra 50 e 99 VP: con un cliente in più si arriva a 100. Partirei da lì."],
@@ -659,7 +669,7 @@ function situazione(pid){
     /* nella scheda: chi è tra Argento e Platino (dichiarato o con un mese al 21% nei miei report) */
     const p = st.struttura.find(x => x.id === pid) || {}, righe = st.mesiScheda[pid] || [];
     if(daPlatino(p.qualifica_iniziale)) return null;
-    if(ordineDi(p.qualifica_iniziale) >= ordineDi("argento") || righe.some(x => Number(x.percentuale) >= 21)){
+    if(ordineDi(p.qualifica_iniziale) >= ordineDi("argento") || righe.some(daArgento)){
       const x = mesiArgento(righe), t = st.stages.find(s => s.chiave === (x.mesi >= MESI_ARGENTO.oro || p.qualifica_iniziale === "oro" ? "platino" : "oro"));
       return t ? situazioneArgento(pid, t, righe) : null;
     }
@@ -1510,7 +1520,7 @@ function contaPY(fino){
   for(const m of mesi){
     const x = mio.get(m); if(!x) continue;
     const vpg = Number(x.vpg) || 0, l21 = linee.filter(l => (l.per.get(m) || 0) >= 21).length;
-    if(Number(x.percentuale) >= 21) argento++;
+    if(daArgento(x)) argento++;
     if(vpg >= RUBINO_VP) rubino++;
     if((vpg >= 4000 && l21 >= 2) || l21 >= 3) zaffiro++;
   }
@@ -1575,11 +1585,11 @@ function vProssimaQualifica(){
 /* "Come arrivarci": chiuso finché non lo si tocca. chi: "io" (per me, in Obiettivo) o "lui" (per lo sponsor, nella scheda) */
 /* Da Argento a Platino: un mese da Argento = 21% nel report (10.000 VP di gruppo, o 1 linea al 21% e 4.000 VP,
    o 2 linee al 21%). Vince la prima situazione che scatta. */
-const ARGENTO_VPG = 10000, ARGENTO_VPG_CON_LINEA = 4000, ARGENTO_VICINO = 8000;
+const ARGENTO_VPG = 10000, ARGENTO_VICINO = 8000;
 function filaInCorso(righe){
-  const per = new Map((righe || []).map(x => [meseDi(x.mese), Number(x.percentuale) || 0]));
+  const per = new Map((righe || []).map(x => [meseDi(x.mese), daArgento(x)]));
   let n = 0;
-  for(let m = spostaMese(meseDi(oggi()), -1); (per.get(m) || 0) >= 21 && n < 12; m = spostaMese(m, -1)) n++;
+  for(let m = spostaMese(meseDi(oggi()), -1); per.get(m) && n < 12; m = spostaMese(m, -1)) n++;
   return n;
 }
 function situazioneArgento(pid, t, righe){
@@ -1600,9 +1610,9 @@ function situazioneArgento(pid, t, righe){
     s.chiave = "report_mancanti";
     dati.report_di = (mancanti.length === 1 ? "il report di " : "i report di ") + mancanti.map(m => nomeMese(m.mese)).join(", ");
   }
-  else if(pct >= 21){
-    /* il mese in corso conta già se il suo report al 21% è importato, altrimenti si aggiunge */
-    const giaContato = (righe || []).some(y => meseDi(y.mese) === meseDi(oggi()) && Number(y.percentuale) >= 21);
+  else if(argentoDaNumeri(pct, n.gruppo, linee)){
+    /* il mese in corso conta già se il suo report da Argento è importato, altrimenti si aggiunge */
+    const giaContato = (righe || []).some(y => meseDi(y.mese) === meseDi(oggi()) && daArgento(y));
     s.chiave = "mese_ok"; dati.mesi = Math.min(x.mesi + (giaContato ? 0 : 1), servono);
   }
   else if(t.chiave === "platino" && x.mesi >= servono && x.fila < 3){
@@ -1612,8 +1622,9 @@ function situazioneArgento(pid, t, righe){
     dati.fila_testo = f === 0 ? `Il mese scorso non ${eri} al 21%: questo mese, se ${arrivi} al 21%, è il primo dei 3.`
       : f === 1 ? `Il mese scorso ${eri} al 21%: questo mese è il secondo dei 3.` : `Gli ultimi 2 mesi ${eri} al 21%: questo mese è il terzo, quello che fa Platino.`;
   }
-  else if(l21 && n.gruppo < ARGENTO_VPG_CON_LINEA){
-    s.chiave = "linea_21"; Object.assign(dati, { nome_linea:l21.nome, manca:num(ARGENTO_VPG_CON_LINEA - n.gruppo) });
+  else if(l21 && linee.filter(l => l.pct >= 21).length === 1 && n.gruppo - l21.vp < ARGENTO_RIMANENTI){
+    const rimanenti = Math.max(0, n.gruppo - l21.vp);
+    s.chiave = "linea_21"; Object.assign(dati, { nome_linea:l21.nome, rimanenti:num(rimanenti), manca:num(ARGENTO_RIMANENTI - rimanenti) });
   }
   else if(n.gruppo >= ARGENTO_VICINO){
     s.chiave = "mese_vicino"; Object.assign(dati, { manca:num(ARGENTO_VPG - n.gruppo), vicine:vicine(tipoLinee(linee)) });

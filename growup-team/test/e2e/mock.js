@@ -165,7 +165,11 @@
     mesiReport: async pid => { const io = mio(); if(!io) throw new Error("non_autorizzato");
       if(!vedo(io, db.partners.find(p => p.id === pid) || {})) throw new Error("non_autorizzato");
       return (db.numeri || []).filter(x => x.partner_id === pid && x === numeroDi(pid, x.mese))
-        .map(x => ({ mese:x.mese + "-01", percentuale:x.percentuale, vpg:x.vpg })).sort((a, b) => a.mese < b.mese ? -1 : 1); },
+        .map(x => { /* 038: mese da Argento = 21% senza linee al 21%, o con 2+, o con 1 e 4.000 VP rimanenti */
+          const l21 = (x.linee || []).filter(l => { const q = db.partners.find(p => p.codice_amway === l.codice); const nl = q && numeroDi(q.id, x.mese);
+            return nl && Number(nl.percentuale) >= 21; });
+          const argento = Number(x.percentuale) >= 21 && (l21.length !== 1 || (Number(x.vpg) || 0) - (Number(l21[0].vpg) || 0) >= 4000);
+          return { mese:x.mese + "-01", percentuale:x.percentuale, vpg:x.vpg, argento }; }).sort((a, b) => a.mese < b.mese ? -1 : 1); },
     /* come nel database: solo numeri, per me e per chi vedo; nessuno si sposta */
     salvaReportPassato: async a => { const io = mio(); const m = a.p_mese.slice(0, 7);
       if(!io.codice_amway) throw new Error("codice_mancante");
