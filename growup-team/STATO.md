@@ -72,6 +72,16 @@ in Io un promemoria se ho un gruppo, ho già importato e l'ultimo report ha più
 passi» con «Scrivi 30 nomi», spiegazioni a richiesta con «?») e PR 3 (E+F+G, Profilo, scheda partner a schede, parole
 uniche), ognuna con la sua tavola prima del codice.
 
+**27 ottobre — Ottimizzazione 2 di 3: «Primi passi» e spiegazioni a richiesta** (tavola «Primi passi e spiegazioni»,
+scelte di Stefano; solo interfaccia). In cima a Io un solo riquadro **«Primi passi»** al posto di «Salva il link», «Installa
+l'app», «Scrivi il tuo obiettivo» e «In attesa della mappa»: voci con ✓, contatore «N su M» e barra; ogni voce si apre lì
+sotto (link personale aperto finché non è salvato; installa solo dal telefono, «Non ora» la segna fatta; obiettivo; **Scrivi
+30 nomi nella tua Lista** con «12 / 30» e la frase «Senza decidere tu…»; primo import solo per chi ha persone sotto);
+«In attesa della mappa» è una riga con «?». Sparisce a tutto fatto; la **×** lo nasconde su quel telefono (non finché il
+link non è salvato). Le spiegazioni lunghe di Lista, Clienti, Target, Struttura, Preferiti, In attesa, Storico del gruppo,
+scheda partner e Guida sono dietro un **«?»** accanto al titolo; restano visibili note sui guadagni, avvisi prima di
+cancellare o bloccare, istruzioni dei fogli. Prossima: PR 3 (Profilo, scheda partner a schede, parole uniche).
+
 **Dove siamo arrivati (27 ottobre)**: PR #106 unita. Ottimizzazione in 3 PR (vedi sopra), la 1 aperta. Lavori possibili dopo, da scegliere con
 Stefano: **notifiche vere** (un avviso al giorno, testo senza nomi: persone da risentire, Seguimi, clienti, scadenze; prove su
 Android e sull'iPhone di Alessia); **«Come arrivarci» da Platino in su** (Rubino, Zaffiro, Smeraldo, Diamante; prima il foglio

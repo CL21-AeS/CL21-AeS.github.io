@@ -215,6 +215,8 @@ const st = {
   riepPrec: [],           // lo stesso per il mese precedente, finché non è chiuso
   storico: [],            // i miei mesi chiusi (monthly_totals)
   livelli: [],            // soglie delle percentuali
+  aiuti: new Set(),       // le spiegazioni aperte con il «?» (ottimizzazione 2)
+  passoAperto: null,      // la voce aperta di «Primi passi»
   sezIo: "giorno",        // in Io: "giorno" (la pagina di sempre) o "guida" (la Guida per l'azione)
   guida: { conteggi:{}, cl21:{}, obiettivi:new Map(), fatti:[] },
   seguimi: { attivo:false, condividi:false }, seguimiGiorni: [], seguimiScheda: {},
@@ -1245,12 +1247,9 @@ function vHome(){
   ${vInAttesa()}
   ${vStoricoGruppo()}
   ${vInvita()}` : st.sezIo === "guida" ? vGuida() : `
-  ${leggiLocale(CHIAVE_SALVATA) === "1" || !st.chiave ? "" : vSalvaChiave()}
-  ${vInstalla()}
-  ${vAttesaIo()}
+  ${vPrimiPassi()}
   ${vPromemoriaImport()}
   ${st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : `${vDaFare()}${vClientiDaSentire()}`}
-  ${st.obiettivo ? "" : vObiettivoBreve()}
   ${vMieiNumeri()}
   ${vOggi()}`}
   ${vFondo()}`;
@@ -1283,8 +1282,8 @@ function browserInterno(){
   if(/WhatsApp/i.test(u)) return "WhatsApp";
   return "";
 }
-function vInstalla(){
-  if(!puoInstallare() || leggiLocale(CHIAVE_SALVATA) !== "1" || leggiLocale(CHIAVE_INSTALLA_NO) === "1") return "";
+/* la guida per installare (dentro «Primi passi») */
+function corpoInstalla(){
   const interno = suIos() ? browserInterno() : "", chrome = /CriOS/.test(navigator.userAgent);
   const corpo = suIos() ? `
     ${interno ? `<p class="avviso-interno">Sei dentro <b>${interno}</b>: da qui l'app non si può installare. Copia il link e apri la pagina in <b>Safari</b>.</p>` : ""}
@@ -1307,25 +1306,60 @@ function vInstalla(){
     <p class="nota">Si apre a schermo intero, come un'app, ed entri già con il tuo profilo.</p>
     <div class="row" style="margin-top:10px">${promptInstalla ? `<button class="btn primary grow" data-act="installa">Installa</button>` : ""}
       <button class="btn ghost${promptInstalla ? "" : " grow"}" data-act="installa-no">${promptInstalla ? "Non ora" : "Fatto"}</button></div>`;
-  return `<div class="card">
-    <span class="eyebrow">Consigliato</span>
-    <h2 style="margin-top:4px">Installa Growup sul telefono</h2>
-    <p class="small" style="margin:6px 0 0">Avrai l'icona sulla Home e l'app a schermo intero, senza la barra del browser.</p>
-    ${corpo}
-  </div>`;
+  return `<p class="small" style="margin:0">Avrai l'icona sulla Home e l'app a schermo intero, senza la barra del browser.</p>${corpo}`;
 }
 
-function vSalvaChiave(){
-  return `<div class="card" style="border-color:var(--accent)">
-    <span class="eyebrow">Importante · una volta sola</span>
-    <h2 style="margin-top:4px">Salva il tuo link personale</h2>
-    <p class="small" style="margin:6px 0 0">È la tua chiave: con questo link rientri da qualsiasi telefono o computer.
-      Mandalo <b>a te stesso</b>: su WhatsApp scegli la chat con te stesso, su Telegram i «Messaggi salvati».
-      Non inoltrarlo a nessuno.</p>
-    ${bottoniChiave()}
-    <button class="btn wide primary" style="margin-top:10px" data-act="chiave-salvata">Fatto, l'ho salvato</button>
+/* ---- «Primi passi» (ottimizzazione 2): le cose da fare una volta sola, in un riquadro solo che sparisce a tutto fatto.
+   Con la × si nasconde su questo telefono (tranne se il link personale non è ancora salvato). ---- */
+const NOMI_PRIMI_PASSI = 30;
+const chiavePrimiPassiNo = () => "growup-team.primi-passi-no." + st.profilo.id;
+function nomiInLista(){ return (st.persone || []).filter(p => p.esito !== "cliente").length; }
+function primiPassi(){
+  const io = st.profilo.id, l = [];
+  if(st.chiave) l.push({ k:"link", nome:"Salva il tuo link personale", fatto:leggiLocale(CHIAVE_SALVATA) === "1",
+    sotto:"La tua chiave per rientrare da qualsiasi telefono o computer", corpo:() => `<p class="small" style="margin:0">Mandalo <b>a te stesso</b>:
+      su WhatsApp scegli la chat con te stesso, su Telegram i «Messaggi salvati». Non inoltrarlo a nessuno.</p>
+      ${bottoniChiave()}
+      <button class="btn wide primary" style="margin-top:10px" data-act="chiave-salvata">Fatto, l'ho salvato</button>` });
+  if(puoInstallare())
+    l.push({ k:"installa", nome:"Installa l'app", fatto:leggiLocale(CHIAVE_INSTALLA_NO) === "1",
+      sotto:"Un'icona sul telefono, come le altre app", corpo:corpoInstalla });
+  l.push({ k:"obiettivo", nome:"Scrivi il tuo obiettivo", fatto:!!st.obiettivo, sotto:"Quanto vorresti guadagnare al mese, e per quando",
+    corpo:() => `<button class="btn primary wide" data-act="obiettivo-modifica">Scrivi il tuo obiettivo</button>` });
+  const n = nomiInLista();
+  l.push({ k:"lista", nome:`Scrivi ${NOMI_PRIMI_PASSI} nomi nella tua Lista`, fatto:n >= NOMI_PRIMI_PASSI, sotto:`${num(Math.min(n, NOMI_PRIMI_PASSI))} / ${NOMI_PRIMI_PASSI}`,
+    corpo:() => `<p class="small" style="margin:0">Senza decidere tu chi potrebbe essere interessato: parenti, amici, colleghi, vicini.</p>
+      <button class="btn primary" style="margin-top:8px" data-act="guida-vai" data-dove="lista">Apri la Lista</button>` });
+  if(figli(io).length) l.push({ k:"import", nome:"Importa il tuo primo report", sotto:"Il report mappe dal sito Amway",
+    fatto:[...(st.mioReport || new Map()).values()].some(r => r.importato_da === io),
+    corpo:() => `<button class="btn primary" data-act="importa">Importa dal report Amway</button>` });
+  return l;
+}
+function vPrimiPassi(){
+  const l = primiPassi(), fatti = l.filter(x => x.fatto).length, linkDaSalvare = l.some(x => x.k === "link" && !x.fatto);
+  const attesa = !st.profilo.is_admin && !st.profilo.confermato_il;
+  if(fatti === l.length && !attesa) return "";
+  if(leggiLocale(chiavePrimiPassiNo()) === "1" && !linkDaSalvare) return attesa ? vAttesaIo() : "";
+  const pct = Math.round(fatti / l.length * 100);
+  return `<div class="card primi-passi">
+    <div class="spread"><span class="eyebrow">Primi passi</span><span class="row" style="gap:8px"><span class="pill">${fatti} su ${l.length}</span>
+      ${linkDaSalvare ? "" : `<button class="x" data-act="primi-passi-no" aria-label="Nascondi i primi passi">×</button>`}</span></div>
+    <div class="bar${pct === 100 ? " fatto" : ""}" role="progressbar" aria-label="Primi passi" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+    <ul class="voci-passi">${l.map(x => { const aperta = (st.passoAperto || (linkDaSalvare ? "link" : null)) === x.k && !x.fatto;
+      return `<li class="${x.fatto ? "fatta" : ""}"><button class="riga-apri prima" data-act="passo-apri" data-k="${x.k}" aria-expanded="${aperta}"${x.fatto ? " disabled" : ""}>
+        <span class="spunta-oggi${x.fatto ? " si" : ""}" aria-hidden="true">${x.fatto ? "✓" : ""}</span>
+        <span class="grow"><b>${esc(x.nome)}</b>${x.fatto ? "" : `<br><span class="small">${esc(x.sotto)}</span>`}</span>
+        ${x.fatto ? "" : `<span class="fr" aria-hidden="true">${aperta ? "▴" : "▾"}</span>`}</button>
+        ${aperta ? `<div class="passo-aperto">${x.corpo()}</div>` : ""}</li>`; }).join("")}</ul>
+    ${attesa ? `<div class="stato-attesa"><span class="grow">In attesa della mappa: i tuoi numeri restano solo tuoi.</span>${aiutoBtn("attesa-io")}</div>
+      ${aiutoTesto("attesa-io", `Non sei ancora in un report mappe importato. Puoi usare l'app (obiettivi, lista, clienti, ordini), ma i tuoi
+        dati restano solo tuoi finché la mappa Amway non ti mostra: al primo import della tua upline entri nella struttura.`)}` : ""}
   </div>`;
 }
+/* ---- Le spiegazioni a richiesta (ottimizzazione 2): un «?» accanto al titolo apre e chiude il testo ---- */
+function aiutoBtn(k){ const on = st.aiuti.has(k);
+  return `<button class="aiuto-btn${on ? " on" : ""}" data-act="aiuto" data-k="${k}" aria-expanded="${on}" aria-label="${on ? "Chiudi la spiegazione" : "Spiegazione"}">?</button>`; }
+function aiutoTesto(k, html){ return st.aiuti.has(k) ? `<p class="nota aiuto-testo">${html}</p>` : ""; }
 
 /* ---- Il primo obiettivo: cifra al mese, entro quando, perché ---- */
 /* la prima tappa dal Path to Bronze in su che vale almeno la cifra (oltre l'ultima con una cifra: l'ultima) */
@@ -1356,22 +1390,6 @@ function rigaObiettivoDi(pid){
   if(!o) return prossima || "Obiettivo: non ancora scritto";
   const t = tappaPerCifra(o.cifra_mese);
   return `Obiettivo: <b>${euro(o.cifra_mese)}/mese</b> ${esc(testoTraguardo(o.entro))}${t && !prossima ? ` · ${esc(t.tappa.nome)}` : ""}${prossima ? "<br>" + prossima : ""}`;
-}
-function vObiettivoBreve(){
-  const o = st.obiettivo;
-  if(!o) return `<div class="card tight visione">
-    <span class="eyebrow">Il mio obiettivo</span>
-    <h2 style="margin-top:2px">Quanto vorresti guadagnare al mese?</h2>
-    <p class="small" style="margin:4px 0 0">Scrivi la cifra e per quando: l'app ti mostra la tappa che la vale e il percorso per arrivarci.</p>
-    <button class="btn wide" style="margin-top:12px" data-act="obiettivo-modifica">Scrivi il tuo obiettivo</button>
-  </div>`;
-  const t = tappaPerCifra(o.cifra_mese);
-  return `<div class="card tight visione obiettivo-breve" data-act="vista-obiettivo" role="button" tabindex="0">
-    <span class="eyebrow">Il mio obiettivo</span>
-    <div class="spread" style="margin-top:2px"><h2><span class="num">${euro(o.cifra_mese)}</span> al mese</h2><span class="small">›</span></div>
-    <p class="small" style="margin:2px 0 0">${esc(testoTraguardo(o.entro))}</p>
-    ${t ? `<p class="small" style="margin:6px 0 0">Tappa: <b>${esc(t.tappa.nome)}</b>${t.oltre ? " e oltre" : ""}</p>` : ""}
-  </div>`;
 }
 function campiObiettivo(o){
   o = o || {};
@@ -1869,13 +1887,13 @@ function vStoricoGruppo(){
     .sort((a, b) => a.mese < b.mese ? 1 : -1).slice(0, 12);
   const prossima = meseAvanti(meseDi(oggi()), precedenteAperto() ? 0 : 1) + "-" + String(giornoChiusura()).padStart(2, "0");
   return `<div class="card">
-    <span class="eyebrow">Storico del gruppo</span>
+    <span class="con-aiuto"><span class="eyebrow">Storico del gruppo</span>${righe.length ? aiutoBtn("storico-gruppo") : ""}</span>
+    ${aiutoTesto("storico-gruppo", "Mesi chiusi, i tuoi totali. Tocca un mese per vedere ogni persona del gruppo.")}
     ${righe.length ? `<table class="confronto mesi">
       <thead><tr><th></th><th>VP di gruppo</th><th>Linee</th><th>%</th></tr></thead>
       <tbody>${righe.map(r => `<tr data-act="mese-gruppo" data-mese="${r.mese}"><td><button class="btn link" data-act="mese-gruppo" data-mese="${r.mese}">${nomeMese(r.mese).replace(/^./, c => c.toUpperCase())}</button></td>
         <td class="num">${num(r.gruppo)}</td><td class="num">${r.attive}</td><td class="num">${r.pct ? r.pct + "%" : "–"}</td></tr>`).join("")}</tbody>
-    </table>
-    <p class="nota">Mesi chiusi, i tuoi totali. Tocca un mese per vedere ogni persona del gruppo.</p>`
+    </table>`
     : `<p class="muted" style="margin:8px 0 0">Ancora nessun mese chiuso: il primo si chiude il ${dataIt(prossima)}.</p>`}
   </div>`;
 }
@@ -1961,9 +1979,9 @@ function vInAttesa(){
   const l = st.inAttesa || [];
   if(!l.length) return "";
   return `<div class="card in-attesa">
-    <span class="eyebrow">In attesa della mappa · ${l.length}</span>
-    <p class="small" style="margin:6px 0 0">Usano l'app ma non sono ancora in un report mappe importato: i loro dati restano solo
-      nella loro app e non contano nei numeri. Entrano nella struttura al primo import che li mostra.</p>
+    <span class="con-aiuto"><span class="eyebrow">In attesa della mappa · ${l.length}</span>${aiutoBtn("in-attesa")}</span>
+    ${aiutoTesto("in-attesa", `Usano l'app ma non sono ancora in un report mappe importato: i loro dati restano solo
+      nella loro app e non contano nei numeri. Entrano nella struttura al primo import che li mostra.`)}
     <ul class="oggi">${l.map(x => `<li><span class="grow"><b>${esc(x.nome)}</b><br>
       <span class="small">${x.mio ? "invitata da te" : `sponsor indicato: ${esc(x.sponsor_nome || "–")}`}</span></span>
       ${x.mio || st.profilo.is_admin ? `<button class="btn small" data-act="togli-attesa" data-id="${esc(x.id)}">Togli</button>` : ""}</li>`).join("")}</ul>
@@ -2001,8 +2019,11 @@ function vStruttura(){
       <button class="piega" data-act="piega" data-id="${esc(io)}" data-quanti="${righe.length}" aria-expanded="${!chiusoIo}"
         aria-label="${chiusoIo ? "Mostra" : "Nascondi"} il tuo gruppo">${chiusoIo ? "▸" : "▾"} ${righe.length}</button></li>`;
   return `<div class="card">
-    <div class="spread"><span class="eyebrow">La mia struttura</span>
+    <div class="spread"><span class="con-aiuto"><span class="eyebrow">La mia struttura</span>${tutte.length ? aiutoBtn("struttura") : ""}</span>
       <button class="btn small" data-act="importa">Importa dal report Amway</button></div>
+    ${tutte.length ? aiutoTesto("struttura", `Il numero è il livello, come nei report Amway: 1 sei tu, 2 i tuoi frontali, 3 i loro, e così via.
+      ▾ chiude o riapre il gruppo di una persona. Tocca un nome per aprire la sua scheda.${completa ? ` Le nascoste sono in grigio, al loro posto.
+      I gruppi partono chiusi: ▸ apre il gruppo di una persona. Mostra o Nascondi su ogni riga.` : ""}`) : ""}
     ${righe.length > 1 ? `<input type="search" id="cerca-struttura" class="cerca" placeholder="Cerca un nome nel tuo gruppo…"
         autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Cerca un nome nel tuo gruppo" value="${esc(st.cerca || "")}">
       <p class="small" id="cerca-esito" aria-live="polite" style="margin:6px 0 0"></p>` : ""}
@@ -2024,15 +2045,10 @@ function vStruttura(){
       ${completa ? (nascosta ? `<button class="btn small" data-act="mostra" data-id="${esc(p.id)}">Mostra</button>`
         : `<button class="btn small ghost" data-act="nascondi-qui" data-id="${esc(p.id)}">Nascondi</button>`)
         : `<span class="pill ${sp.cl}">${sp.txt}</span>`}</li>`; }).join("")}</ul>
-      <p class="nota">Il numero è il livello, come nei report Amway: 1 sei tu, 2 i tuoi frontali, 3 i loro, e così via.
-        ▾ chiude o riapre il gruppo di una persona.
-        Tocca un nome per aprire la sua scheda.</p>
       <p class="small" style="margin:6px 0 0">${nascoste ? plur(nascoste, "persona nascosta", "persone nascoste") : "Nessuna persona nascosta"}
         <button class="btn link small" data-act="nascoste" style="min-height:0;padding:0 4px">${nascoste ? "Rivedi" : "Scegli chi nascondere"}</button></p>
       ${nascoste ? `<button class="btn small ghost${completa ? " on" : ""}" data-act="con-nascoste" aria-pressed="${!!completa}" style="margin-top:8px">
-        ${completa ? "Torna alla mia struttura" : "Mostra anche le nascoste"}</button>
-        ${completa ? `<p class="nota">Le nascoste sono in grigio, al loro posto. I gruppi partono chiusi: ▸ apre il gruppo di una persona.
-          Mostra o Nascondi su ogni riga.</p>` : ""}` : ""}`
+        ${completa ? "Torna alla mia struttura" : "Mostra anche le nascoste"}</button>` : ""}`
       : `<p class="muted" style="margin:8px 0 0">Ancora nessuno nel tuo gruppo. Invita chi vuole usare l'app con il link qui sotto,
           oppure importa il report Amway per vedere anche chi non la usa.</p>`}
   </div>`;
@@ -2119,10 +2135,10 @@ function vPreferiti(){
     </li>` };
   }).sort((a, b) => a.ordine - b.ordine || a.p.nome.localeCompare(b.p.nome));
   return `<div class="card">
-    <div class="spread"><span class="eyebrow">Preferiti</span><span class="small">${l.length === 1 ? "1 persona" : `${l.length} persone`}</span></div>
+    <div class="spread"><span class="con-aiuto"><span class="eyebrow">Preferiti</span>${aiutoBtn("preferiti")}</span><span class="small">${l.length === 1 ? "1 persona" : `${l.length} persone`}</span></div>
+    ${aiutoTesto("preferiti", `Contatti e piani delle ultime 4 settimane rispetto al loro obiettivo settimanale × 4; VP del mese rispetto
+      al loro obiettivo del mese. Evidenziata la parte sotto soglia. Per togliere una persona: ★ nella sua scheda.`)}
     <ul class="preferiti">${schede.map(x => x.html).join("")}</ul>
-    <p class="nota">Contatti e piani delle ultime 4 settimane rispetto al loro obiettivo settimanale × 4; VP del mese rispetto
-      al loro obiettivo del mese. Evidenziata la parte sotto soglia. Per togliere una persona: ★ nella sua scheda.</p>
   </div>`;
 }
 
@@ -2217,13 +2233,13 @@ function vConfronto(p){
   const breve = m => MESI[Number(m.slice(5, 7)) - 1].slice(0, 3);
   const cella = (v, rif) => rif != null && v < rif ? `<td class="num sotto">▼ ${num(v)}</td>` : `<td class="num">${num(v)}</td>`;
   return `<div class="card">
-    <span class="eyebrow">Questo mese e il mese prima</span>
+    <span class="con-aiuto"><span class="eyebrow">Questo mese e il mese prima</span>${aiutoBtn("confronto")}</span>
+    ${aiutoTesto("confronto", `▼ in rosso: sotto il mese prima allo stesso giorno. ${soloReport(p.id) ? "I VP sono quelli del report Amway; " : ""}VP di gruppo e linee attive del mese prima ci sono solo come totale.`)}
     <table class="confronto">
       <thead><tr><th></th><th>${breve(c.m)}<br><span>fino a oggi</span></th><th>${breve(c.mp)}<br><span>al ${Number(c.stessoGiorno.slice(8))}</span></th><th>${breve(c.mp)}<br><span>totale</span></th></tr></thead>
       <tbody>${c.righe.map(x => `<tr><td>${x.nome}</td>${cella(x.ora, x.allora)}
         <td class="num faint">${x.allora == null ? "–" : num(x.allora)}</td><td class="num faint">${num(x.prima)}</td></tr>`).join("")}</tbody>
     </table>
-    <p class="nota">▼ in rosso: sotto il mese prima allo stesso giorno. ${soloReport(p.id) ? "I VP sono quelli del report Amway; " : ""}VP di gruppo e linee attive del mese prima ci sono solo come totale.</p>
   </div>`;
 }
 function vScheda(){
@@ -2273,7 +2289,9 @@ function vScheda(){
   <button class="btn wide" style="margin-top:4px" data-act="apri-analisi" data-id="${esc(p.id)}">Analisi di ${esc(nomeSaluto(p.nome))} ›</button>
   ${vSeguimiScheda(p)}
   ${gestito ? `<div class="card">
-    <span class="eyebrow">I suoi numeri · ${nomeMese(m)}</span>
+    <span class="con-aiuto"><span class="eyebrow">I suoi numeri · ${nomeMese(m)}</span>${aiutoBtn("gestito")}</span>
+    ${aiutoTesto("gestito", `Se vuole usare l'app, mandale il tuo link d'invito: scrivendo il suo codice Amway ritrova il suo profilo
+      e da lì i suoi numeri li aggiorna lei.`)}
     <div class="griglia-azioni">
       <button class="btn" data-act="contatto">+ Contatto</button>
       <button class="btn" data-act="piano">+ Piano</button>
@@ -2286,8 +2304,6 @@ function vScheda(){
         <br><span class="small">${dataIt(a.data)}${inseritoDa(a, p) ? " · " + esc(inseritoDa(a, p)) : ""}</span></span>
       ${String(a.id).startsWith("tmp") ? "" : `<button class="x" data-act="elimina" data-id="${esc(a.id)}" aria-label="Elimina">×</button>`}</li>`).join("")}</ul>`
       : `<p class="muted" style="margin:8px 0 0">Ancora niente questo mese.</p>`}
-    <p class="nota">Se vuole usare l'app, mandale il tuo link d'invito: scrivendo il suo codice Amway ritrova il suo profilo
-      e da lì i suoi numeri li aggiorna lei.</p>
   </div>` : `<div class="card">
     <p class="small" style="margin:0">Usa l'app: i suoi numeri li aggiorna lui.</p>
     ${st.profilo.is_admin ? `<div style="margin-top:12px">${soloAdmin(`<button class="btn wide" data-act="nuovo-link" data-id="${esc(p.id)}">Nuovo link personale</button>`, true)}</div>
@@ -3191,7 +3207,11 @@ const AZIONI = {
     render();
   },
   "installa-no"(){ salvaLocale(CHIAVE_INSTALLA_NO, "1"); render(); },
-  "installa-si"(){ salvaLocale(CHIAVE_INSTALLA_NO, null); st.vista = "io"; render(); window.scrollTo(0, 0); },
+  "installa-si"(){ salvaLocale(CHIAVE_INSTALLA_NO, null); salvaLocale(chiavePrimiPassiNo(), null); st.passoAperto = "installa";
+    st.vista = "io"; st.sezIo = "giorno"; render(); window.scrollTo(0, 0); },
+  "primi-passi-no"(){ salvaLocale(chiavePrimiPassiNo(), "1"); render(); toast("Primi passi nascosti"); },
+  "passo-apri"(el){ st.passoAperto = el.getAttribute("aria-expanded") === "true" ? "nessuno" : el.dataset.k; render(); },
+  aiuto(el){ const k = el.dataset.k; if(st.aiuti.has(k)) st.aiuti.delete(k); else st.aiuti.add(k); render(); },
   "copia-chiave"(){ copiaTesto(linkPersonale(), "Link copiato: ora aggiungi Growup alla schermata Home"); },
   async "incolla-appunti"(el){
     const f = el.closest("form");
@@ -3479,11 +3499,11 @@ function vDaFare(){
     .filter(([, l]) => l.length);
   if(!gruppi.length) return "";
   return `<div class="card">
-    <span class="eyebrow">Il tuo percorso con la lista</span>
+    <span class="con-aiuto"><span class="eyebrow">Il tuo percorso con la lista</span>${aiutoBtn("lista-io")}</span>
+    ${aiutoTesto("lista-io", `× toglie una persona da qui (non dalla lista). Torna da sola quando segni un passo o fissi una data,
+      oppure dalla sua scheda con "Rimetti in Io".`)}
     ${gruppi.map(([t, l]) => `<p class="small da-fare-t">${t}</p>
       <ul class="persone">${l.map(p => rigaPersona(p, true)).join("")}</ul>`).join("")}
-    <p class="nota">× toglie una persona da qui (non dalla lista). Torna da sola quando segni un passo o fissi una data,
-      oppure dalla sua scheda con "Rimetti in Io".</p>
   </div>`;
 }
 /* registrato come cliente sul sito Amway (ha il codice cliente) ma senza nessun ordine */
@@ -3509,9 +3529,10 @@ function vPersone(){
     .sort((a, b) => (a.prossima_data || "9999") < (b.prossima_data || "9999") ? -1 : (a.prossima_data || "9999") > (b.prossima_data || "9999") ? 1
       : a.nome.localeCompare(b.nome, "it"));
   return `<div class="card">
-    <div class="spread"><span class="eyebrow">La mia lista</span>
+    <div class="spread"><span class="con-aiuto"><span class="eyebrow">La mia lista</span>${aiutoBtn("lista")}</span>
       <span class="row" style="gap:6px"><button class="btn small" data-act="persone-tante">Più nomi</button>
       <button class="btn small primary" data-act="persona-nuova">+ Un nome</button></span></div>
+    ${aiutoTesto("lista", "I nomi della tua lista li vedi solo tu. A chi ti segue arrivano soltanto i numeri.")}
     ${st.persone.length ? `
     <input type="search" id="cerca-lista" class="cerca" placeholder="Cerca un nome…" autocomplete="off" aria-label="Cerca un nome" value="${esc(st.cercaLista || "")}">
     <div class="row wrap scelte-rapide" style="gap:6px;margin-top:8px">${FILTRI_LISTA.map(x => {
@@ -3520,8 +3541,7 @@ function vPersone(){
     ${l.length ? `<ul class="persone">${l.map(p => rigaPersona(p)).join("")}</ul>` : `<p class="muted" style="margin:10px 0 0">Nessun nome qui.</p>`}`
     : `<p class="muted" style="margin:8px 0 0">La tua lista è vuota. Scrivi i nomi delle persone che conosci: amici, parenti,
         colleghi, vicini. Basta il nome; il resto lo aggiungi quando serve.</p>`}
-    <p class="nota">I nomi della tua lista li vedi solo tu. A chi ti segue arrivano soltanto i numeri.
-      ${st.persone.length ? `<button class="btn link small" data-act="scarica-persone" style="min-height:0;padding:0">Scarica una copia della mia lista</button>` : ""}</p>
+    ${st.persone.length ? `<p class="nota"><button class="btn link small" data-act="scarica-persone" style="min-height:0;padding:0">Scarica una copia della mia lista</button></p>` : ""}
   </div>`;
 }
 
@@ -4142,13 +4162,13 @@ function vInvito(){
   const indietro = `<button class="btn link" data-act="torna-target" style="padding:0">‹ Target</button>`;
   if(!x.risposte) return `${indietro}
   <div class="card">
-    <div class="spread"><h2>${esc(x.nome)}</h2><span class="pill ${s.cl}">${esc(s.txt)}</span></div>
+    <div class="spread"><span class="con-aiuto"><h2>${esc(x.nome)}</h2>${aiutoBtn("target-attesa")}</span><span class="pill ${s.cl}">${esc(s.txt)}</span></div>
+    ${aiutoTesto("target-attesa", `Quando risponde ti arriva un messaggio con il link "Apri le risposte": aprilo da qui, oppure usa "Leggi una risposta".`)}
     <p class="small" style="margin:4px 0 0">Invito del ${dataIt(String(x.creato_il).slice(0, 10))} · ${x.scade ? `il link vale fino al ${dataIt(x.scade)}` : "il link non scade"}</p>
     <div class="row" style="gap:8px;margin-top:12px">
       <a class="btn wa grow" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(messaggioTarget(x))}">WhatsApp</a>
       <a class="btn tg grow" target="_blank" rel="noopener" href="${esc(telegram(linkTarget(x), messaggioTarget(x, "")))}">Telegram</a>
       <button class="btn grow" data-act="target-copia">Copia</button></div>
-    <p class="nota">Quando risponde ti arriva un messaggio con il link "Apri le risposte": aprilo da qui, oppure usa "Leggi una risposta".</p>
   </div>
   <div class="row" style="gap:6px;justify-content:center">
     <button class="btn small ghost" data-act="target-blocca">${x.bloccato ? "Riapri il link" : "Blocca il link"}</button>
@@ -4168,11 +4188,11 @@ function vInvito(){
       : `<button class="btn primary wide" style="margin-top:12px" data-act="target-in-lista">Metti in lista</button>`}
   </div>
   <div class="card">
-    <span class="eyebrow">Le risposte</span>
+    <span class="con-aiuto"><span class="eyebrow">Le risposte</span>${aiutoBtn("target-punti")}</span>
+    ${aiutoTesto("target-punti", "0 è un no secco, 2 un sì con riserva, 4 un sì pieno. La prima domanda non dà punti.")}
     <ul class="risposte-t">${a.map((k, qi) => { const o = DOMANDE[qi].o[k], senza = DOMANDE[qi].senzaPunti;
       return `<li><span class="grow"><b>${esc(DOMANDE[qi].tema)}</b><br><span class="small">${esc(o.t)}</span></span>
         <span class="num${!senza && o.p === 0 ? " zero" : ""}">${senza ? "–" : o.p}</span></li>`; }).join("")}</ul>
-    <p class="nota">0 è un no secco, 2 un sì con riserva, 4 un sì pieno. La prima domanda non dà punti.</p>
   </div>
   <details class="card metodo"><summary><span class="eyebrow">Il metodo</span></summary>
     <p class="small">${esc(v.azione)}</p>
@@ -4470,9 +4490,10 @@ function vClienti(){
     const sa = statoCliente(a), sb = statoCliente(b);
     return (sa.primo ? sa.primo.finisce : "9999") < (sb.primo ? sb.primo.finisce : "9999") ? -1 : 1; });
   return `<div class="card">
-    <div class="spread"><span class="eyebrow">I miei clienti</span>
+    <div class="spread"><span class="con-aiuto"><span class="eyebrow">I miei clienti</span>${aiutoBtn("clienti")}</span>
       <span class="row" style="gap:6px"><button class="btn small" data-act="importa-ordini">Dal sito Amway</button>
       <button class="btn small primary" data-act="cliente-nuovo">+ Un cliente</button></span></div>
+    ${aiutoTesto("clienti", "I tuoi clienti li vedi solo tu. Gli ordini servono ai riordini: non cambiano i tuoi VP.")}
     ${tutti.length ? `<div class="row wrap scelte-rapide" style="gap:6px;margin-top:10px">${FILTRI_CLIENTI.map(x =>
       `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-clienti" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${tutti.filter(x.ok).length}</button>`).join("")}</div>
     ${l.length ? `<ul class="persone">${l.map(p => { const s = statoCliente(p);
@@ -4481,7 +4502,6 @@ function vClienti(){
         <span class="etichette">${etichetteOrdini(p)}<span class="pill ${s.cl}">${esc(s.txt)}</span></span></button></li>`; }).join("")}</ul>`
       : `<p class="muted" style="margin:10px 0 0">${filtro.id === "sentire" ? "Nessuno da sentire adesso." : "Nessun cliente qui."}</p>`}`
     : `<p class="muted" style="margin:8px 0 0">Ancora nessun cliente. Entrano da qui con "+ Un cliente", oppure dalla Lista quando chiudi una persona come Cliente.</p>`}
-    <p class="nota">I tuoi clienti li vedi solo tu. Gli ordini servono ai riordini: non cambiano i tuoi VP.</p>
   </div>`;
 }
 
@@ -5464,16 +5484,16 @@ function vGuidaPiano(){
   const r = rapportiLista(), piani = Math.ceil(r.pps), contatti = Math.ceil(r.pps * r.cpp);
   const fmt = x => num(Math.round(x * 10) / 10);
   return `<div class="card guida-piano">
-    <span class="eyebrow">Il tuo piano</span>
+    <span class="con-aiuto"><span class="eyebrow">Il tuo piano</span>${aiutoBtn("guida-piano")}</span>
     <h2 style="margin-top:2px">Verso ${esc(tp.nome)}</h2>
+    ${aiutoTesto("guida-piano", `Dalla tua Lista: ${plur(r.contatti, "contatto", "contatti")}, ${plur(r.piani, "piano", "piani")}, ${plur(r.si, "sì", "sì")}.
+      ${r.miei ? "" : "Con almeno 10 piani l'app usa i tuoi rapporti."}`)}
     <p class="small" style="margin:2px 0 0">La tua cifra: ${euro(o.cifra_mese)} al mese ${esc(testoTraguardo(o.entro))}</p>
     ${numeri}
     <p class="small" style="margin:10px 0 0"><b>Cosa vuol dire in attività.</b> Una linea nuova parte da un sì. ${r.miei
       ? `Dalla tua Lista: 1 sì ogni ${fmt(r.pps)} piani e 1 piano ogni ${fmt(r.cpp)} contatti.`
       : "Con i numeri di base (1 piano ogni 2-3 contatti, 1 sì ogni 5 piani)."} Per un sì servono circa
       <b>${piani} piani</b> e <b>${contatti} contatti</b>.</p>
-    <p class="nota">Dalla tua Lista: ${plur(r.contatti, "contatto", "contatti")}, ${plur(r.piani, "piano", "piani")}, ${plur(r.si, "sì", "sì")}.
-      ${r.miei ? "" : "Con almeno 10 piani l'app usa i tuoi rapporti."}</p>
   </div>`;
 }
 function vGuidaStabilita(){
@@ -5485,7 +5505,10 @@ function vGuidaStabilita(){
     return v >= s ? `<td class="num ok">${num(s)} ✓</td>` : `<td class="num manca">${num(s)} · −${num(s - v)}</td>`; };
   const tu = r => r.scritto ? `<button class="campo-cl21" data-act="guida-cl21">${val(r) != null ? num(val(r)) : "–"}</button>` : num(Number(val(r)) || 0);
   return `<div class="card guida-stabilita">
-    <span class="eyebrow">Verifica la tua attività · Stabilità</span>
+    <span class="con-aiuto"><span class="eyebrow">Verifica la tua attività · Stabilità</span>${aiutoBtn("stabilita")}</span>
+    ${aiutoTesto("stabilita", `I tuoi nuovi iscritti sono le persone entrate nell'app con il tuo link questo mese: contano come tue anche
+      se l'import le mette in profondità. Nuovi nel gruppo (dal secondo import) e codici oltre 200 VP vengono dai report
+      importati; le ultime tre righe le scrivi tu: tocca il numero.`)}
     <p class="small" style="margin:2px 0 0">${i >= 0 ? `Questo mese sei al ${LIVELLI_CL21[i]}%` : "Questo mese non hai ancora una percentuale"}${
       i < LIVELLI_CL21.length - 1 ? `: per una qualifica solida al ${LIVELLI_CL21[prossimo]}% servono` : ": i numeri per una qualifica solida al 21%"}</p>
     <div class="tab-consigli"><table class="stabilita">
@@ -5496,9 +5519,7 @@ function vGuidaStabilita(){
         ${STABILITA_CL21.map(r => `<tr><td>${esc(r.nome)}</td><td class="num">${tu(r)}</td>${i >= 0 && i !== prossimo
           ? `<td class="num">${num(r.soglie[i])}</td>` : ""}${cella(r, prossimo)}</tr>`).join("")}
       </tbody></table></div>
-    <p class="nota">I tuoi nuovi iscritti sono le persone entrate nell'app con il tuo link questo mese: contano come tue anche
-      se l'import le mette in profondità. Nuovi nel gruppo (dal secondo import) e codici oltre 200 VP vengono dai report
-      importati; le ultime tre righe le scrivi tu: tocca il numero.</p>
+
   </div>`;
 }
 function vGuidaPassi(){
@@ -5520,7 +5541,7 @@ function vGuidaAbitudini(){
       ${g > oggi() ? "disabled" : ""} aria-pressed="${fattoIl(k, g)}" aria-label="${esc(GIORNI_SETT[(i + 1) % 7])}">${"LMMGVSD"[i]}</button>`).join("")}</div>`;
   const fatti = k => sett.filter(g => fattoIl(k, g)).length;
   return `<div class="card guida-abitudini">
-    <div class="spread"><span class="eyebrow">Le tue abitudini · ${sp ? `settimana dal ${esc(dataIt(sett[0]))}` : "questa settimana"}</span>
+    <div class="spread"><span class="con-aiuto"><span class="eyebrow">Le tue abitudini · ${sp ? `settimana dal ${esc(dataIt(sett[0]))}` : "questa settimana"}</span>${aiutoBtn("abitudini")}</span>
       <span class="row" style="gap:4px">${sp > -SETTIMANE_INDIETRO ? `<button class="btn small ghost" data-act="guida-sett" data-d="-1">‹ Settimana prima</button>` : ""}${
         sp < 0 ? `<button class="btn small ghost" data-act="guida-sett" data-d="1">Dopo ›</button>` : ""}</span></div>
     ${sp ? `<p class="small" style="margin:6px 0 0">Contatti, piani e follow-up si vedono nella settimana in corso. Qui puoi spuntare
@@ -5530,8 +5551,8 @@ function vGuidaAbitudini(){
     ${riga("Follow-up", pp.length, obiettivoAbitudine("followup"), `${ABITUDINI.followup.spiega} · dalla tua Lista · consigliato 1 al giorno`, "", "followup")}`}
     ${riga("Formazione", fatti("formazione"), obiettivoAbitudine("formazione"), ABITUDINI.formazione.spiega, giorni("formazione"), "formazione")}
     ${riga("Chiamata con il tuo sponsor", fatti("sponsor"), obiettivoAbitudine("sponsor"), "Consigliato 1 a settimana", giorni("sponsor"), "sponsor")}
-    <p class="nota">Contatti e piani li cambi in «Modifica» della tua settimana; gli altri obiettivi toccando il numero.
-      Meglio un obiettivo più basso, scelto da te e rispettato. Obiettivi e spunte li vedi solo tu.</p>
+    ${aiutoTesto("abitudini", `Contatti e piani li cambi in «Modifica» della tua settimana; gli altri obiettivi toccando il numero.
+      Meglio un obiettivo più basso, scelto da te e rispettato. Obiettivi e spunte li vedi solo tu.`)}
   </div>`;
 }
 function vGuida(){ return `${vGuidaPiano()}${vGuidaStabilita()}${vGuidaPassi()}${vGuidaAbitudini()}${vGuidaSeguimi()}`; }
