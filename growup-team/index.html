@@ -296,6 +296,22 @@ ul.imp li:first-child{border-top:0}
 .qta{display:flex;align-items:center;gap:4px}
 .qta .btn{min-width:32px;padding:0 8px}
 .apri-mio{flex:1;min-width:0;border:0;background:none;color:inherit;font:inherit;text-align:left;padding:4px 0;cursor:pointer}
+.numeri-guida{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.numeri-guida div{background:var(--traccia);border-radius:12px;padding:8px;text-align:center;min-width:0}
+.numeri-guida b{display:block;font-size:22px}
+.numeri-guida span{font-size:11px;color:var(--ink2)}
+.guida-passi ol.passi{margin:8px 0 0;padding-left:20px}
+.guida-passi ol.passi li{margin-top:8px}
+table.stabilita td.ok{color:var(--verde);font-weight:700}
+table.stabilita td.manca{color:var(--rame);font-weight:700}
+table.stabilita tr.personali td{background:var(--traccia)}
+.campo-cl21{min-width:36px;border:1px solid var(--line);border-radius:8px;padding:2px 8px;background:var(--bg);color:inherit;font:inherit;font-weight:700;cursor:pointer}
+.abitudine{border-top:1px solid var(--line);padding:10px 0 2px}
+.abitudine:first-of-type{border-top:0}
+.giorni-guida{display:flex;gap:4px;margin-top:6px}
+.giorni-guida button{width:32px;height:32px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--ink3);font-weight:700;font-size:12px;cursor:pointer}
+.giorni-guida button.si{background:var(--verde);border-color:var(--verde);color:#fff}
+.giorni-guida button:disabled{opacity:.4;cursor:default}
 .tot-mio{background:var(--traccia);border-radius:12px;padding:9px 12px;font-size:14px;font-variant-numeric:tabular-nums}
 input.mini{width:56px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;background:var(--card);color:var(--ink)}
 input.mini.prezzo{width:68px;text-align:right}

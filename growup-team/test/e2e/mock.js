@@ -102,6 +102,7 @@
         Object.assign(p, dati, { gestore_id:null, sponsor_id:antenatoConApp(p), confermato_il:new Date().toISOString() });
       }else{
         p = Object.assign({ id:uid(), sponsor_id:sp.id, codice_amway:a.p_codice_amway, confermato_il:null,
+          invitato_da:sp.id, invitato_il:new Date().toISOString(),
           codice_invito:"N" + Math.random().toString(36).slice(2,7).toUpperCase() }, dati);
         db.partners.push(p);
       }
@@ -205,6 +206,23 @@
         inserito_da:io.id, inserito_il:new Date().toISOString() }); }
       Object.assign(o, { stato:"confermato", data:data || o.data, attivita_id:att, vp:tot, confermato_il:new Date().toISOString() }); salva();
       return Object.assign({}, o); },
+    /* 035: la Guida */
+    guidaConteggi: async mese => { const io = mio(); if(!io) throw new Error("non_autenticato"); const m = mese.slice(0, 7);
+      return { personali:db.partners.filter(p => p.invitato_da === io.id && String(p.invitato_il || "").slice(0, 7) === m).length,
+        nuovi_gruppo:db.partners.filter(p => p.id !== io.id && String(p.in_mappa_dal || "").slice(0, 7) === m && vedo(io, p)).length,
+        oltre_200:(db.numeri || []).filter(x => x.mese === m && x === numeroDi(x.partner_id, m) && Number(x.vpp) > 200
+          && vedo(io, db.partners.find(p => p.id === x.partner_id) || {})).length }; },
+    numeriCl21: async () => (db.numeriCl21 || []).filter(x => x.partner_id === mio().id).map(x => Object.assign({}, x)),
+    salvaNumeriCl21: async r => { const io = mio(); db.numeriCl21 = (db.numeriCl21 || []).filter(x => x.partner_id !== io.id)
+      .concat([Object.assign({ partner_id:io.id }, r)]); salva(); },
+    guidaObiettivi: async () => (db.guidaObiettivi || []).filter(x => x.partner_id === mio().id).map(x => Object.assign({}, x)),
+    salvaGuidaObiettivo: async (chiave, n) => { const io = mio(); db.guidaObiettivi = (db.guidaObiettivi || [])
+      .filter(x => !(x.partner_id === io.id && x.chiave === chiave)).concat([{ partner_id:io.id, chiave, a_settimana:n }]); salva(); },
+    guidaFatti: async dal => (db.guidaFatti || []).filter(x => x.partner_id === mio().id && x.giorno >= dal).map(x => Object.assign({}, x)),
+    segnaFatto: async (chiave, giorno) => { const io = mio(); if(giorno > new Date().toISOString().slice(0, 10)) throw new Error("violates row-level security");
+      db.guidaFatti = (db.guidaFatti || []).concat([{ partner_id:io.id, chiave, giorno }]); salva(); },
+    togliFatto: async (chiave, giorno) => { const io = mio(); db.guidaFatti = (db.guidaFatti || [])
+      .filter(x => !(x.partner_id === io.id && x.chiave === chiave && x.giorno === giorno)); salva(); },
     datiAl: async (pid, mese) => { const n = numeroDi(pid, mese.slice(0, 7)); return n && n.dati_al ? [{ dati_al:n.dati_al }] : []; },
     salvaMesePassato: async a => { const io = mio(); const m = a.p_mese.slice(0, 7), al = a.p_dati_al || new Date().toISOString();
       if(io.confermato_il === null && !io.is_admin) throw new Error("in_attesa");
@@ -220,6 +238,8 @@
       if(!io.codice_amway && a.p_io.codice) io.codice_amway = a.p_io.codice;
       else if(a.p_io.codice !== io.codice_amway) throw new Error("import_di_altri");
       let aggiunte = 0, spostate = 0, fuori = 0, numeri = 0, vecchi = 0;
+      /* 035: i codici nuovi contano nel gruppo solo dal secondo import di chi importa */
+      const secondo = !!io.primo_import_il; if(!io.primo_import_il) io.primo_import_il = new Date().toISOString();
       if(salvaNumero(io, io.id, m, a.p_io, al)) numeri++; else vecchi++;
       const giu = id => [id].concat(sotto(id).map(x => x.id));
       for(const r of a.p_persone){
@@ -229,7 +249,8 @@
         if(!x){
           if(db.partners.some(p => p.codice_amway === r.codice)) continue;
           x = { id:uid(), nome:r.nome, sponsor_id:sp, stato:"gestito", gestore_id:io.id, codice_amway:r.codice, codice_invito:codiceInvito(),
-            partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString(), posizione_al:al };
+            partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString(), posizione_al:al,
+            in_mappa_dal:secondo ? new Date().toISOString() : null };
           db.partners.push(x); aggiunte++;
           if((a.p_nascondi || []).includes(r.codice) || (db.esclusi || []).some(e => e.partner_id === io.id && e.codice === r.codice))
             db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:x.id }]);

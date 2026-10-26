@@ -22,7 +22,7 @@ dice diversamente. Gli esempi concreti stanno nei file di `growup-team/` citati 
 
 - **L'app non dà suggerimenti** nelle schermate di tutti i giorni: mostra dati, percorso, mancanze e soglie; come
   muoversi lo decide la persona. Niente "allena…", "costruisci…", "lavora su…". Se servono consigli, stanno in una
-  sezione a parte che si apre a richiesta (in Growup: «Come arrivarci»), con i testi scritti e approvati da chi guida.
+  sezione a parte che si apre a richiesta (in Growup: «Come arrivarci» e la «Guida»), con i testi scritti e approvati da chi guida.
 - **Semplicità**: registrare un dato in 1-2 tocchi; campi numerici vuoti con lo 0 grigio (se non scrivi, vale quello).
 - **Privacy**: ognuno vede i suoi dati e quelli del proprio gruppo, mai quelli di altre linee; i dati intimi
   (es. il "perché" dell'obiettivo) solo la persona. Dati in UE.

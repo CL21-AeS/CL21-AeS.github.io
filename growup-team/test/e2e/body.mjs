@@ -2135,6 +2135,54 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   R.qualifica_iniziale = primaQ;
 }
 
+// 41. La Guida per l'azione (035): pulsanti in cima a Io, piano, Stabilità Cum Laude 21, passi e abitudini
+{
+  const ora = new Date().toISOString();
+  DB.guidaFatti = []; DB.guidaObiettivi = []; DB.numeriCl21 = [];
+  DB.partners.push({ id:"g41a", nome:"Entrato Col Link", sponsor_id:"R", stato:"attivo", codice_invito:"G41AAA", codice_amway:"8800001",
+    invitato_da:"R", invitato_il:ora, confermato_il:ora, creato_il:ora });
+  DB.partners.push({ id:"g41b", nome:"Nuovo Nella Mappa", sponsor_id:"R", stato:"gestito", gestore_id:"R", codice_invito:"G41BBB", codice_amway:"8800002",
+    in_mappa_dal:ora, creato_il:ora });
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  check(await page.locator(".sezioni-io button[data-sez=giorno]").getAttribute("aria-pressed") === "true", "Io: si apre su «Il mio giorno»");
+  check(await page.locator(".guida-piano").count() === 0, "la Guida non è nella pagina di tutti i giorni");
+  await page.click(".sezioni-io button[data-sez=guida]");
+  await page.locator(".guida-piano").waitFor();
+  check(await page.locator(".card", { hasText:"Il mio mese" }).count() === 0, "in «Guida» solo la Guida");
+  check((await page.locator(".guida-piano h2").innerText()).startsWith("Verso "), "il piano parte dalla cifra dell'obiettivo");
+  check((await page.locator(".guida-piano").innerText()).includes("Per un sì servono circa"), "il piano in attività (piani e contatti per un sì)");
+  const stab = page.locator(".guida-stabilita");
+  const attesi = DB.partners.filter(p => p.invitato_da === "R" && String(p.invitato_il || "").slice(0, 7) === ora.slice(0, 7)).length;
+  check(attesi >= 1 && (await stab.locator("tr.personali").innerText()).replace(/\s+/g, " ").includes("I tuoi nuovi iscritti del mese entrati con il tuo link " + attesi),
+    "Stabilità: i miei nuovi iscritti (entrati con il mio link)");
+  check((await stab.locator("tr", { hasText:"Nuovi nel gruppo del mese" }).locator("td").nth(1).innerText()).trim() === "1", "Stabilità: i nuovi nel gruppo dagli import");
+  await stab.locator("button[data-act=guida-cl21]").first().click();
+  await page.locator(".sheet h2", { hasText:"I tuoi numeri Cum Laude 21" }).waitFor();
+  await page.fill(".sheet input[name=app_cl21]", "9"); await page.fill(".sheet input[name=training_day]", "10"); await page.fill(".sheet input[name=convention]", "40");
+  await page.click(".sheet button.primary");
+  await page.getByText("Numeri salvati").waitFor();
+  check((await stab.locator("tr", { hasText:"Codici alla Convention" }).innerText()).includes("✓"), "Stabilità: un numero scritto oltre la soglia ha la spunta");
+  check(await page.locator(".guida-passi ol.passi li").count() >= 3, "Cosa fare adesso: i passi della tappa");
+  // abitudini: spunto oggi la formazione e cambio l'obiettivo
+  const oggiG = new Date().toISOString().slice(0, 10);
+  await page.locator(`.guida-abitudini [data-k=formazione] button[data-giorno="${oggiG}"]`).click();
+  await page.locator(`.guida-abitudini [data-k=formazione] button[data-giorno="${oggiG}"][aria-pressed=true]`).waitFor();
+  await page.click(".guida-abitudini button[data-act=guida-obiettivo][data-k=formazione]");
+  await page.fill(".sheet input[name=n]", "3"); await page.click(".sheet button.primary");
+  await page.getByText("Obiettivo salvato").waitFor();
+  check((await page.locator(".guida-abitudini [data-k=formazione] .spread").innerText()).replace(/\s+/g, " ").includes("1 / 3 giorni"), "abitudini: 1 giorno su 3, obiettivo scelto da me");
+  check((await page.locator(".guida-abitudini").innerText()).includes("(risentire chi ha visto il piano"), "follow-up con la spiegazione");
+  await page.screenshot({ path: S + "/e2e/41-guida.png", fullPage:true });
+  await sync(page);
+  check(DB.guidaFatti.length === 1 && DB.guidaObiettivi.some(x => x.chiave === "formazione" && x.a_settimana === 3)
+    && DB.numeriCl21.some(x => x.convention === 40), "nel database: spunta, obiettivo e numeri scritti");
+  await page.click(".sezioni-io button[data-sez=giorno]");
+  await page.locator(".card", { hasText:"Il mio mese" }).waitFor(); check(true, "si torna a «Il mio giorno»");
+  await ctx.close();
+  DB.partners = DB.partners.filter(p => !["g41a", "g41b"].includes(p.id));
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
