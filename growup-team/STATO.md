@@ -6,8 +6,8 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 ## Ripartire da qui (fermi la sera del 21 ottobre 2026)
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
-dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **034** (027 e la parte 2 della 033 — `togli_dalla_struttura` e `importa_mappa` —
-incollate da Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#99**, nessuna aperta; il ramo di
+dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **035** (027 e la parte 2 della 033 — `togli_dalla_struttura` e `importa_mappa` —
+incollate da Stefano nell'SQL Editor; 028b: permesso sul codice del listino). PR unite fino alla **#102**, nessuna aperta; il ramo di
 lavoro è ricreato da main. Il listino di aprile 2026 è caricato da Stefano dal PDF: funziona.
 
 **Il 21 ottobre in breve** (dettagli sotto): «Come arrivarci» (consigli a richiesta in Obiettivo e nella scheda partner,
@@ -63,7 +63,7 @@ decimali** (96,30 € · 18,20 VP) in bozza, storico, clienti e listino; cifre d
 **Aperto, in attesa di Stefano**:
 - Controllare sul sito Amway che la **%** delle linee frontali nei report importati sia quella giusta (serve a «Come arrivarci»
   da Argento a Platino).
-- Provare dal vivo (app v36): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,
+- Provare dal vivo (app v37): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,
   reimport di un report più nuovo che riporta il totale al report, due decimali, un nuovo partner che entra con il link e il
   codice (in attesa → al posto giusto con il primo import).
 - Verifica in due passaggi su GitHub: controllare in github.com/settings/security.
@@ -74,6 +74,20 @@ dell'anno fiscale): si conta sempre il **VPG delle mappe**. Report dei mesi pass
 «Invitala nell'app»: si condivide il proprio link e l'import mette ognuno al posto giusto. Al primo ingresso il codice Amway
 si scrive **due volte** («Riscrivi il codice»: se non sono uguali non si entra) con l'avviso di controllarlo bene (si trova sul sito o nell'app Amway, nell'icona del profilo in alto a destra). Ogni mese
 copia dei dati e ZIP del codice; il piano Pro di Supabase si valuta **all'inizio della prova** con i Partner.
+
+**26 ottobre — la Guida per l'azione** (migrazione 035; tavola «Guida per l'azione» v4, decisioni di Stefano): in cima a Io
+due pulsanti, «Il mio giorno» (la pagina di sempre, senza consigli) e «Guida». La Guida ha: **il tuo piano** (dalla cifra e
+dalla tappa dell'obiettivo a quanto manca, e in attività: piani e contatti per un sì, con i rapporti della Lista dopo 10 piani,
+altrimenti di base 1 piano ogni 2-3 contatti e 1 sì ogni 5 piani); la tabella **Stabilità di Cum Laude 21** (livello del mese e
+successivo; i miei nuovi iscritti = entrati con il mio link nel mese, anche se poi vanno in profondità; nuovi nel gruppo = codici
+nuovi nella mappa solo dal secondo import di chi importa; codici oltre 200 VP dai report; codici nell'app CumLaude21, al Training
+Day e alla Convention scritti dal partner, restano finché non li cambia); **cosa fare adesso** (i passi della tappa, testi di
+Stefano); **le abitudini** della settimana (contatti, piani e follow-up dalla Lista; formazione e chiamata con lo sponsor con
+obiettivo scelto dal partner e spunta per giorno; eventi e audio: «apri l'app CumLaude21»). Obiettivi, spunte e numeri scritti
+sono solo del partner. **Procedura d'ingresso confermata**: il nuovo partner entra con un link del suo gruppo e il suo codice
+(scritto due volte); se il codice non è ancora nella mappa resta «in attesa» sotto chi ha mandato il link; il primo import che
+lo mostra lo **sposta e lo conferma** da solo: nessuno conferma a mano (lo sponsor diretto può solo toglierlo da «In attesa»).
+Prossimi: Fase B «Seguimi giorno per giorno» (il partner sceglie se l'upline vede cosa fa), poi Fase C «Analisi della persona».
 
 **24 ottobre — storico e barra** (dalle prove di Stefano): nello storico personale la qualifica del mese si calcola fino ad
 Argento; se nell'anno fiscale (da settembre fino a quel mese, dai report importati) è già raggiunta una qualifica annuale,

@@ -864,6 +864,59 @@ begin
                          '034: B toglie il suo ordine dallo storico, con le sue righe');
   execute 'reset role';
 
+  -- ---- 035: la Guida (tabella Stabilità e abitudini) ----
+  execute 'reset role';
+  insert into auth.users (id, aud, role) values ('00000000-0000-0000-0000-0000000000f7', 'authenticated', 'authenticated');
+  perform growup_test.come(u5);  -- A: i suoi nuovi iscritti prima
+  att_prima := (public.guida_conteggi(current_date)->>'personali')::int;
+  k_a2 := (select codice_invito from public.partners where id = a);
+  perform growup_test.come('00000000-0000-0000-0000-0000000000f7');
+  perform public.entra_con_invito(k_a2, 'Nuovo Guida', '8000001');
+  perform growup_test.come(u5);
+  perform growup_test.ok((public.guida_conteggi(current_date)->>'personali')::int = att_prima + 1, '035: chi entra con il link di A conta tra i suoi nuovi iscritti');
+  execute 'reset role';
+  update public.partners set sponsor_id = b where codice_amway = '8000001';  -- l'import lo sposta in profondità
+  perform growup_test.come(u5);
+  perform growup_test.ok((public.guida_conteggi(current_date)->>'personali')::int = att_prima + 1, '035: resta di A anche se va in profondità');
+  perform growup_test.come(u3);  -- B non lo conta come suo
+  perform growup_test.ok((public.guida_conteggi(current_date)->>'personali')::int = 0, '035: per B non è un nuovo iscritto personale');
+  -- nuovi nel gruppo: il primo import non conta, dal secondo sì
+  execute 'reset role';
+  update public.partners set primo_import_il = null where id = r;
+  perform growup_test.come(u1);  -- R
+  att_prima := (public.guida_conteggi(current_date)->>'nuovi_gruppo')::int;
+  perform public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":470}',
+    '[{"codice":"8100001","nome":"Primo Import","sponsor":"2000001","vpp":250,"vpg":250}]', '{}', '{}');
+  perform growup_test.ok((public.guida_conteggi(current_date)->>'nuovi_gruppo')::int = att_prima, '035: il primo import non porta nuovi codici');
+  execute 'reset role';
+  perform growup_test.ok((select primo_import_il from public.partners where id = r) is not null, '035: il primo import di R è segnato');
+  update public.partners set primo_import_il = now() - interval '1 day' where id = r;
+  perform growup_test.come(u1);
+  pp := null;
+  att_prima := (public.guida_conteggi(current_date)->>'oltre_200')::int;
+  perform public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":470}',
+    '[{"codice":"8100002","nome":"Secondo Import","sponsor":"2000001","vpp":300,"vpg":300}]', '{}', '{}');
+  perform growup_test.ok((public.guida_conteggi(current_date)->>'nuovi_gruppo')::int = 1, '035: dal secondo import il codice nuovo conta nel gruppo');
+  perform growup_test.ok((public.guida_conteggi(current_date)->>'oltre_200')::int = att_prima + 1, '035: i codici del gruppo oltre 200 VP');
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.ok((public.guida_conteggi(current_date)->>'nuovi_gruppo')::int = 0, '035: un''altra linea non vede i nuovi codici di R');
+  perform growup_test.come(null);
+  perform growup_test.deve_fallire('select public.guida_conteggi(current_date)', '035: anon non legge i conteggi');
+  -- numeri scritti e abitudini: solo miei
+  perform growup_test.come(u5);  -- A
+  insert into public.numeri_cl21 (app_cl21, training_day, convention) values (9, 10, 12);
+  insert into public.guida_obiettivi (chiave, a_settimana) values ('formazione', 5);
+  insert into public.guida_fatti (chiave, giorno) values ('formazione', current_date);
+  perform growup_test.deve_fallire($q$insert into public.guida_fatti (chiave, giorno) values ('formazione', current_date + 2)$q$, '035: non si spunta un giorno futuro');
+  perform growup_test.deve_fallire(format($q$insert into public.numeri_cl21 (partner_id, app_cl21) values (%L, 1)$q$, b), '035: i numeri di B non li scrive A');
+  perform growup_test.come(u1);  -- R, upline di A
+  perform growup_test.ok(not exists (select 1 from public.numeri_cl21) and not exists (select 1 from public.guida_obiettivi)
+                         and not exists (select 1 from public.guida_fatti), '035: l''upline non vede numeri e abitudini di A');
+  perform growup_test.come(null);
+  perform growup_test.deve_fallire('select count(*) from public.guida_fatti', '035: anon non legge le abitudini');
+  execute 'reset role';
+  perform growup_test.deve_fallire('select public.partners_guida()', '035: la funzione del trigger non si chiama da fuori');
+
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');
