@@ -9,6 +9,8 @@ Growup Team sostituisce `growup/` con un database condiviso. **Non si usa l'emai
 - **Link personale** (`…/growup-team/#chiave=…`): è la chiave del proprio profilo. L'app lo consegna al primo
   ingresso e chiede di mandarlo **a sé stessi** (WhatsApp: chat con sé stessi · Telegram: Messaggi salvati).
   Toccandolo si rientra da qualsiasi telefono o computer. Non va inoltrato.
+- "Primi passi" (finché non sono fatti, si può nascondere con ×): salva il link, installa, obiettivo, 30 nomi in Lista,
+  primo import. Le spiegazioni lunghe si aprono con il «?» accanto al titolo.
 - "I miei numeri": obiettivo, tappa (si apre toccandola), settimana (contatti e piani) e mese (VP e nuovi clienti);
   **+ Contatto**, **+ Piano**, **+ Ordine** sempre in basso (+ Ordine apre il foglio «Ordini»: ordine veloce, bozza,
   i miei ordini, totale del mese).

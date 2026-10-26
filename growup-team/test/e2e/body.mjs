@@ -152,7 +152,7 @@ const scegliFile = async (pg, nome, testo, daGruppo) => {
   await pg.setInputFiles("#file-report", { name:nome, mimeType:"text/csv", buffer:Buffer.from(testo) });
 };
 /* 033: chi è appena entrato è "in attesa della mappa" finché un report della upline non lo mostra */
-check(await page.locator(".avviso-attesa").isVisible(), "chi è appena entrato è in attesa della mappa");
+check(await page.locator(".primi-passi .stato-attesa").isVisible(), "chi è appena entrato è in attesa della mappa (riga in Primi passi)");
 const confermaCodice = async (pg, codice) => pg.evaluate(c => { const p = window.__DB.partners.find(x => x.codice_amway === c); p.confermato_il = new Date().toISOString(); }, codice);
 await confermaCodice(page, "2000001");   // come dopo l'import della sua upline
 await page.click("button[data-act=vista-gruppo]");
@@ -690,14 +690,16 @@ const PERM = ["clipboard-read", "clipboard-write"];
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.evaluate(() => localStorage.setItem("growup-team.chiave-salvata", "1"));
 await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
-check(await page.getByText("Installa Growup sul telefono").isVisible() && await page.getByText("Aggiungi alla schermata Home").first().isVisible(), "iPhone: guida all'installazione");
+await page.click("button[data-act=passo-apri][data-k=installa]");
+check(await page.getByText("Aggiungi alla schermata Home").first().isVisible(), "iPhone: guida all'installazione (voce di Primi passi)");
 await page.screenshot({ path: S + "/e2e/18-installa-iphone.png" });
 await page.click("button[data-act=copia-chiave]");
 check((await page.evaluate(() => navigator.clipboard.readText())).endsWith("#chiave=" + "a".repeat(32)), "iPhone: link personale copiato");
 await page.click("button[data-act=installa-no]");
-check(await page.getByText("Installa Growup sul telefono").count() === 0, "Non ora: la guida sparisce");
+check(await page.locator(".voci-passi li.fatta", { hasText:"Installa l'app" }).isVisible() && !(await page.getByText("Aggiungi alla schermata Home").count()),
+  "Non ora: la guida si chiude e la voce è fatta");
 await page.click("button[data-act=installa-si]");
-check(await page.getByText("Installa Growup sul telefono").isVisible(), "dal fondo pagina si riapre");
+check(await page.getByText("Aggiungi alla schermata Home").first().isVisible(), "dal fondo pagina si riapre");
 check(await page.getByText("Forse hai aperto il link dentro WhatsApp o Telegram").isVisible(), "iPhone in Safari: nota per chi è dentro un'altra app");
 await ctx.close();
 
@@ -706,6 +708,7 @@ await ctx.close();
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.evaluate(() => localStorage.setItem("growup-team.chiave-salvata", "1"));
 await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
+await page.click("button[data-act=passo-apri][data-k=installa]");
 check(await page.getByText("Sei dentro Telegram").isVisible() && await page.getByText("Apri in Safari").isVisible(), "iPhone dentro Telegram: avviso e passo Apri in Safari");
 await page.locator(".avviso-interno").screenshot({ path: S + "/e2e/18b-installa-telegram.png" });
 await ctx.close();
@@ -714,6 +717,7 @@ await ctx.close();
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.evaluate(() => localStorage.setItem("growup-team.chiave-salvata", "1"));
 await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
+await page.click("button[data-act=passo-apri][data-k=installa]");
 check(await page.getByText("Installa app").isVisible(), "Android senza proposta del browser: istruzioni dal menu");
 await page.evaluate(() => { const e = new Event("beforeinstallprompt", { cancelable:true });
   e.prompt = () => { window.__promptato = true; }; e.userChoice = Promise.resolve({ outcome:"accepted" }); window.dispatchEvent(e); });
@@ -722,7 +726,7 @@ await page.screenshot({ path: S + "/e2e/19-installa-android.png" });
 await page.click("button[data-act=installa]");
 await page.waitForFunction(() => !document.querySelector("button[data-act=installa]"));
 check(await page.evaluate(() => window.__promptato) === true, "Android: il pulsante Installa apre la proposta del browser");
-check(await page.getByText("Installa Growup sul telefono").count() === 0, "installata: la guida non c'è più");
+check(await page.locator(".voci-passi li.fatta", { hasText:"Installa l'app" }).isVisible(), "installata: la voce è fatta");
 await ctx.close();
 
 // app installata (iPhone): ingresso con il link copiato
@@ -739,7 +743,7 @@ check(await page.getByText("non è il tuo link personale").isVisible(), "testo s
 await page.evaluate(k => navigator.clipboard.writeText("Il mio link Growup: http://127.0.0.1:8765/growup-team/#chiave=" + k), "a".repeat(32));
 await page.click("button[data-act=incolla-appunti]");
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page); check(true, "incolla il link: entra");
-check(await page.getByText("Salva il tuo link personale").count() === 0 && await page.getByText("Installa Growup sul telefono").count() === 0,
+check(!(await page.locator(".voci-passi li:not(.fatta) button[data-k=link]").count()) && !(await page.locator(".voci-passi li:not(.fatta) button[data-k=installa]").count()),
   "dopo l'incolla: niente richiesta di salvare il link né guida all'installazione");
 await ctx.close();
 
@@ -2032,7 +2036,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.check("input[name=privacy]"); await page.click("form button.primary");
   await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
   await page.getByText("Ciao Quinto").waitFor(); await apriTappa(page);
-  check(await page.locator(".avviso-attesa").isVisible(), "Quinto: in attesa della mappa");
+  check(await page.locator(".primi-passi .stato-attesa").isVisible(), "Quinto: in attesa della mappa");
   await scegliFile(page, "quinto.csv", creaCsv(meseFile, [persona(1, "9", "7500001", "PROVA, QUINTO", "50,00")]));
   await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
   await page.click(".sheet button:has-text('Importa')");
@@ -2416,6 +2420,49 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(!(await page.locator(".promemoria-import").count()), "report di 3 giorni fa: niente promemoria");
   await ctx.close();
   DB.persone = DB.persone.filter(x => !String(x.id).startsWith("p45"));
+}
+
+// 46. Ottimizzazione 2: «Primi passi» (30 nomi, × per nasconderlo) e le spiegazioni dietro il «?»
+{
+  const oggiG = new Date().toISOString().slice(0, 10);
+  const nomi46 = n => Array.from({ length:n }, (_, i) => ({ id:"n46" + i, proprietario:"R", nome:"Nome " + (i + 1), fase:"lista", esito:null, creato_il:oggiG + "T09:00:00Z" }));
+  DB.persone = (DB.persone || []).filter(x => x.proprietario !== "R").concat(nomi46(12));
+  DB.obiettivi = (DB.obiettivi || []).filter(o => o.partner_id !== "R").concat([{ partner_id:"R", cifra_mese:3000, entro:(Number(oggiG.slice(0, 4)) + 1) + "-06-01", perche:"" }]);
+  DB.seguimi = (DB.seguimi || []).filter(x => x.partner_id !== "R");
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  const pp = page.locator(".primi-passi");
+  check(await pp.isVisible() && await pp.getByText("Fatto, l'ho salvato").isVisible(), "Primi passi: il link da salvare è aperto");
+  check(!(await pp.locator("button[data-act=primi-passi-no]").count()), "finché il link non è salvato, niente ×");
+  check((await pp.locator("li", { hasText:"Scrivi 30 nomi nella tua Lista" }).innerText()).includes("12 / 30"), "Lista: il contatore dei 30 nomi");
+  check(await pp.locator("li.fatta", { hasText:"Scrivi il tuo obiettivo" }).isVisible(), "obiettivo scritto: voce fatta");
+  await page.screenshot({ path: S + "/e2e/46-primi-passi.png", fullPage:true });
+  await pp.getByText("Fatto, l'ho salvato").click();
+  check((await pp.locator(".pill").innerText()).startsWith("3 su"), "dopo il link: 3 su 4 (link, obiettivo, import)");
+  await pp.locator("button[data-act=passo-apri][data-k=lista]").click();
+  check(await pp.getByText("Senza decidere tu chi potrebbe essere interessato").isVisible(), "la voce della Lista si apre con la frase della Guida");
+  await pp.locator("button[data-act=primi-passi-no]").click();
+  check(!(await page.locator(".primi-passi").count()), "× nasconde Primi passi");
+  await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor();
+  check(!(await page.locator(".primi-passi").count()) && await page.evaluate(() => localStorage.getItem("growup-team.primi-passi-no.R")) === "1",
+    "resta nascosto (salvato su questo telefono)");
+  // il «?»: si apre e si richiude
+  await page.click("button[data-act=vista-gruppo]");
+  check(!(await page.getByText("Il numero è il livello").count()), "Struttura: la spiegazione è chiusa");
+  await page.click("button[data-act=aiuto][data-k=struttura]");
+  check(await page.getByText("Il numero è il livello").isVisible(), "il «?» apre la spiegazione");
+  await page.click("button[data-act=aiuto][data-k=struttura]");
+  check(!(await page.getByText("Il numero è il livello").count()), "toccandolo di nuovo si richiude");
+  await ctx.close();
+  // con 30 nomi e tutto fatto, il riquadro non c'è
+  DB.persone = DB.persone.filter(x => x.proprietario !== "R").concat(nomi46(30));
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.evaluate(() => localStorage.setItem("growup-team.chiave-salvata", "1"));
+  await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor();
+  check(!(await page.locator(".primi-passi").count()), "tutto fatto (30 nomi, obiettivo, link, import): Primi passi sparisce");
+  await ctx.close();
+  DB.persone = DB.persone.filter(x => !String(x.id).startsWith("n46"));
 }
 
 await browser.close();

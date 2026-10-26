@@ -182,7 +182,6 @@ ul.imp li:first-child{border-top:0}
 .storico li:first-child{border-top:0}
 .storico .dati{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:6px;font-size:14px;color:var(--ink2)}
 .storico .dati b{color:var(--ink)}
-.obiettivo-breve{cursor:pointer}
 .perche{margin:10px 0 0;font-family:var(--f-titoli);font-size:19px;line-height:1.35;font-style:italic}
 .percorso{list-style:none;margin:10px 0 0;padding:0}
 .percorso>li{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
@@ -344,6 +343,21 @@ table.stabilita tr.personali td{background:var(--traccia)}
 .scelta-ordini b{display:block;font-size:15px}
 .scelta-ordini .fr{color:var(--ink3);font-size:18px}
 .promemoria-import .spread{gap:10px}
+/* ottimizzazione 2: «Primi passi» e il «?» delle spiegazioni */
+.primi-passi .bar{margin-top:8px}
+.voci-passi{list-style:none;margin:6px 0 0;padding:0}
+.voci-passi li{border-top:1px solid var(--line);padding:8px 0}
+.voci-passi li:first-child{border-top:0}
+.voci-passi .riga-apri{gap:10px}
+.voci-passi .riga-apri:disabled{cursor:default}
+.voci-passi li.fatta b{color:var(--ink3);text-decoration:line-through;font-weight:600}
+.passo-aperto{background:var(--wash, var(--bg));border-radius:12px;padding:10px 12px;margin:8px 0 2px 32px}
+.stato-attesa{display:flex;gap:8px;align-items:center;font-size:13px;border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
+.aiuto-btn{flex:none;width:24px;height:24px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--ink2);
+  font:800 12px/1 var(--f-testo);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;vertical-align:middle}
+.aiuto-btn.on{background:var(--accent);border-color:var(--accent);color:var(--card)}
+.aiuto-testo{background:var(--bg);border-radius:10px;padding:8px 10px;margin-top:8px}
+.con-aiuto{display:inline-flex;align-items:center;gap:8px}
 .oggi-per-te li.fatta .grow{opacity:.6}
 .spunta-oggi{flex:none;width:26px;height:26px;border-radius:99px;border:2px solid var(--line);background:var(--card);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;padding:0}
 .spunta-oggi.si{background:var(--verde);border-color:var(--verde)}
