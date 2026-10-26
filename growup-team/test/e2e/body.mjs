@@ -2183,6 +2183,59 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.partners = DB.partners.filter(p => !["g41a", "g41b"].includes(p.id));
 }
 
+// 42. Seguimi giorno per giorno (036): «Oggi per te» e i numeri all'upline solo se il partner lo sceglie
+{
+  const ora = new Date().toISOString(), oggiG = ora.slice(0, 10);
+  DB.seguimi = []; DB.seguimiGiorni = []; DB.guidaFatti = [];
+  DB.persone = (DB.persone || []).filter(x => x.proprietario !== "R").concat(["Marta Esempio", "Luca Esempio", "Sara Esempio", "Dario Esempio"]
+    .map((nome, i) => ({ id:"s42" + i, proprietario:"R", nome, fase:"lista", esito:null, creato_il:"2026-01-0" + (i + 1) + "T10:00:00Z" })));
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  check(await page.locator(".oggi-per-te").count() === 0, "Seguimi spento: niente «Oggi per te»");
+  await page.click(".sezioni-io button[data-sez=guida]");
+  await page.click("button[data-act=seguimi-attivo]");
+  await page.getByText("Seguimi attivo").waitFor();
+  check(await page.locator("button[data-act=seguimi-condividi]").getAttribute("aria-checked") === "false", "condividere con l'upline è spento di base");
+  await page.click("button[data-act=seguimi-condividi]");
+  await page.getByText("Il tuo sponsor e la tua upline vedono i tuoi numeri del Seguimi").waitFor();
+  await page.click(".sezioni-io button[data-sez=giorno]");
+  const oggiPerTe = page.locator(".oggi-per-te");
+  await oggiPerTe.waitFor();
+  const contatti = await oggiPerTe.locator("li", { hasText:"Contatto" }).count();
+  check(contatti >= 1 && contatti <= 3, "Oggi per te: da 1 a 3 contatti dalla Lista (" + contatti + ")");
+  check((await oggiPerTe.locator("li", { hasText:"Contatto" }).first().innerText()).includes("Marta Esempio"), "i contatti sono i primi «In lista»");
+  const prima = await oggiPerTe.locator("p.small b").innerText();
+  await oggiPerTe.locator("button[data-act=guida-spunta][data-k=formazione]").click();
+  await oggiPerTe.locator("button[data-act=guida-spunta][data-k=formazione][aria-pressed=true]").waitFor();
+  const dopo = await oggiPerTe.locator("p.small b").innerText();
+  check(prima !== dopo && /^Oggi: 1 su \d+ fatte$/.test(dopo), "spuntare la formazione conta tra le azioni fatte (" + dopo + ")");
+  await page.screenshot({ path: S + "/e2e/42-oggi-per-te.png" });
+  await new Promise(r => setTimeout(r, 500));
+  await sync(page);
+  const g = (DB.seguimiGiorni || []).find(x => x.partner_id === "R" && x.giorno === oggiG);
+  check(g && g.fatte === 1 && g.proposte >= 2 && DB.seguimi.some(x => x.partner_id === "R" && x.attivo && x.condividi), "nel database: azioni di oggi, fatte e scelta di condividere");
+  await ctx.close();
+  // l'upline: vede i numeri solo se il partner condivide
+  DB.partners.push({ id:"s42p", nome:"Partner Seguito", sponsor_id:"R", stato:"attivo", codice_invito:"S42PPP", codice_amway:"8900001", confermato_il:ora, creato_il:ora });
+  DB.seguimiGiorni.push({ partner_id:"s42p", giorno:oggiG, azioni:[], proposte:6, fatte:4, per_tipo:{ contatti:2, crescita:1, clienti:1 } });
+  DB.seguimi.push({ partner_id:"s42p", attivo:true, condividi:false });
+  const schedaSeguito = async () => {
+    ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    await page.click("button[data-act=vista-gruppo]");
+    await page.locator(".albero.struttura li", { hasText:"Partner Seguito" }).locator("button[data-act=apri-scheda]").click();
+    await page.getByText("Questo mese e il mese prima").waitFor();
+    await new Promise(r => setTimeout(r, 300));
+    const n = await page.locator(".seguimi-scheda").count(), t = n ? await page.locator(".seguimi-scheda").innerText() : "";
+    await ctx.close(); return t;
+  };
+  check(await schedaSeguito() === "", "senza condividere l'upline non vede niente del Seguimi");
+  DB.seguimi.find(x => x.partner_id === "s42p").condividi = true;
+  const t = await schedaSeguito();
+  check(/si fa seguire giorno per giorno/i.test(t) && t.includes("4/6") && !t.includes("Esempio"), "condividendo, l'upline vede solo i numeri (4/6)");
+  DB.partners = DB.partners.filter(p => p.id !== "s42p");
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

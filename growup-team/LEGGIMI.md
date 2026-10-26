@@ -92,7 +92,9 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 32. `supabase/035_guida.sql` — la Guida per l'azione: chi entra con il link di chi (`invitato_da`), i codici nuovi nella
     mappa dal secondo import (`in_mappa_dal`), i numeri Cum Laude 21 scritti dal partner, obiettivi e spunte delle
     abitudini (tutto solo suo), `guida_conteggi`
-33. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+33. `supabase/036_seguimi.sql` — «Seguimi giorno per giorno»: la scelta del partner (`seguimi`) e le azioni di ogni giorno
+    (`seguimi_giorni`), solo sue; all'upline solo i numeri, se lo condivide (`seguimi_di`)
+34. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 17. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 18. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.

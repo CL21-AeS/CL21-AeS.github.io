@@ -206,6 +206,15 @@
         inserito_da:io.id, inserito_il:new Date().toISOString() }); }
       Object.assign(o, { stato:"confermato", data:data || o.data, attivita_id:att, vp:tot, confermato_il:new Date().toISOString() }); salva();
       return Object.assign({}, o); },
+    /* 036: Seguimi giorno per giorno */
+    seguimi: async () => (db.seguimi || []).filter(x => x.partner_id === mio().id).map(x => ({ attivo:x.attivo, condividi:x.condividi })),
+    salvaSeguimi: async r => { const io = mio(); db.seguimi = (db.seguimi || []).filter(x => x.partner_id !== io.id).concat([Object.assign({ partner_id:io.id }, r)]); salva(); },
+    seguimiGiorni: async dal => (db.seguimiGiorni || []).filter(x => x.partner_id === mio().id && x.giorno >= dal).map(x => JSON.parse(JSON.stringify(x))),
+    salvaSeguimiGiorno: async r => { const io = mio(); if(r.giorno > new Date().toISOString().slice(0, 10)) throw new Error("violates row-level security");
+      db.seguimiGiorni = (db.seguimiGiorni || []).filter(x => !(x.partner_id === io.id && x.giorno === r.giorno)).concat([Object.assign({ partner_id:io.id }, JSON.parse(JSON.stringify(r)))]); salva(); },
+    seguimiDi: async pid => { const io = mio(); const t = db.partners.find(p => p.id === pid);
+      if(!t || pid === io.id || !vedo(io, t) || !(db.seguimi || []).some(x => x.partner_id === pid && x.attivo && x.condividi)) return [];
+      return (db.seguimiGiorni || []).filter(x => x.partner_id === pid).map(x => ({ giorno:x.giorno, proposte:x.proposte, fatte:x.fatte, per_tipo:x.per_tipo })); },
     /* 035: la Guida */
     guidaConteggi: async mese => { const io = mio(); if(!io) throw new Error("non_autenticato"); const m = mese.slice(0, 7);
       return { personali:db.partners.filter(p => p.invitato_da === io.id && String(p.invitato_il || "").slice(0, 7) === m).length,

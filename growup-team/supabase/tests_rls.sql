@@ -917,6 +917,33 @@ begin
   execute 'reset role';
   perform growup_test.deve_fallire('select public.partners_guida()', '035: la funzione del trigger non si chiama da fuori');
 
+  -- ---- 036: Seguimi giorno per giorno: i numeri all'upline solo se il partner lo sceglie ----
+  perform growup_test.come(u3);  -- B attiva il Seguimi, senza condividere
+  insert into public.seguimi (attivo, condividi) values (true, false);
+  insert into public.seguimi_giorni (giorno, azioni, proposte, fatte, per_tipo)
+    values (current_date, '[{"tipo":"contatto","id":"x"}]', 5, 3, '{"contatti":2,"crescita":1}');
+  perform growup_test.deve_fallire($q$insert into public.seguimi_giorni (giorno, proposte, fatte) values (current_date + 1, 1, 0)$q$, '036: non si scrive un giorno futuro');
+  perform growup_test.come(u5);  -- A, sponsor di B
+  perform growup_test.ok(not exists (select 1 from public.seguimi) and not exists (select 1 from public.seguimi_giorni), '036: lo sponsor non legge le tabelle del Seguimi di B');
+  perform growup_test.ok(not exists (select 1 from public.seguimi_di(b)), '036: senza condividere lo sponsor non vede niente');
+  perform growup_test.come(u3);
+  update public.seguimi set condividi = true;
+  perform growup_test.come(u5);
+  select * into x from public.seguimi_di(b);
+  perform growup_test.ok(x.proposte = 5 and x.fatte = 3 and (x.per_tipo->>'contatti')::int = 2, '036: condividendo, lo sponsor vede solo i numeri');
+  perform growup_test.come(u1);  -- R, upline
+  perform growup_test.ok(exists (select 1 from public.seguimi_di(b)), '036: anche l''upline vede i numeri');
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.ok(not exists (select 1 from public.seguimi_di(b)), '036: un''altra linea non vede niente');
+  perform growup_test.come(u3);
+  update public.seguimi set attivo = false;
+  perform growup_test.come(u5);
+  perform growup_test.ok(not exists (select 1 from public.seguimi_di(b)), '036: Seguimi spento: lo sponsor non vede niente');
+  perform growup_test.deve_fallire(format($q$insert into public.seguimi (partner_id, attivo) values (%L, true)$q$, b), '036: A non attiva il Seguimi di B');
+  perform growup_test.come(null);
+  perform growup_test.deve_fallire(format('select * from public.seguimi_di(%L)', b), '036: anon non legge');
+  execute 'reset role';
+
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');
