@@ -181,7 +181,7 @@
         .map(p => ({ id:p.id, nome:p.nome, sponsor_id:p.sponsor_id, sponsor_nome:(db.partners.find(x => x.id === p.sponsor_id) || {}).nome || null,
           creato_il:p.creato_il || null, mio:p.sponsor_id === io.id, codice_amway:p.codice_amway || null })); },
     mioReport: async (pid, dal) => (db.numeri || []).filter(x => x.partner_id === pid && x === numeroDi(pid, x.mese) && x.mese + "-01" >= dal)
-      .map(x => ({ mese:x.mese + "-01", vpp:x.vpp, vpg:x.vpg, percentuale:x.percentuale, dati_al:x.dati_al || "9999-12-31T00:00:00Z" })),
+      .map(x => ({ mese:x.mese + "-01", vpp:x.vpp, vpg:x.vpg, percentuale:x.percentuale, dati_al:x.dati_al || "9999-12-31T00:00:00Z", importato_da:x.visto_da })),
     /* 034: la bozza d'ordine e lo storico, solo miei */
     ordiniMiei: async () => (db.ordiniMiei || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
     righeMie: async () => (db.righeMie || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),

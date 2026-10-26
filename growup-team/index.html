@@ -321,9 +321,29 @@ table.stabilita tr.personali td{background:var(--traccia)}
 .giorni-guida button{width:32px;height:32px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--ink3);font-weight:700;font-size:12px;cursor:pointer}
 .giorni-guida button.si{background:var(--verde);border-color:var(--verde);color:#fff}
 .giorni-guida button:disabled{opacity:.4;cursor:default}
-.oggi-per-te ul{list-style:none;margin:6px 0 0;padding:0}
-.oggi-per-te li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
-.oggi-per-te li:first-child{border-top:0}
+.oggi-per-te > ul{list-style:none;margin:6px 0 0;padding:0}
+.oggi-per-te > ul > li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
+.oggi-per-te > ul > li:first-child{border-top:0}
+/* ottimizzazione 1: righe che si aprono, «I miei numeri», «Anche da sentire», foglio «Ordini» */
+.riga-apri{display:flex;width:100%;align-items:center;gap:8px;background:none;border:0;border-top:1px solid var(--line);margin-top:10px;
+  padding:10px 0 0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.riga-apri.prima{border-top:0;margin-top:4px;padding-top:0}
+.riga-apri .fr{color:var(--ink3);font-size:18px;flex:none}
+.riga-apri .grow{min-width:0}
+.tappa-aperta{margin-top:4px}
+.blocco-numeri{border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
+.blocco-numeri h3{margin:0;font-size:15px}
+.blocco-numeri h3 .small{font-weight:500;margin-left:4px}
+.blocco-numeri .obiettivo{margin-top:8px}
+.anche h3{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+.diario .eyebrow{display:inline}
+.diario .riga-apri .small{margin-left:6px}
+.scelte-ordini{display:grid;gap:8px;margin-top:12px}
+.scelta-ordini{display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:10px 12px;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.scelta-ordini b{display:block;font-size:15px}
+.scelta-ordini .fr{color:var(--ink3);font-size:18px}
+.promemoria-import .spread{gap:10px}
 .oggi-per-te li.fatta .grow{opacity:.6}
 .spunta-oggi{flex:none;width:26px;height:26px;border-radius:99px;border:2px solid var(--line);background:var(--card);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;padding:0}
 .spunta-oggi.si{background:var(--verde);border-color:var(--verde)}

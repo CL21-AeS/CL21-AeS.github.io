@@ -60,7 +60,27 @@ settimana, così il Gruppo è aggiornato. Stefano conferma: dopo un report conta
 (quelli scritti da chi lo seguiva prima che entrasse nell'app restano al report). **Prezzi e VP di prodotti e ordini con due
 decimali** (96,30 € · 18,20 VP) in bozza, storico, clienti e listino; cifre degli obiettivi e totali del mese come prima.
 
+**27 ottobre — Ottimizzazione 1 di 3: «Il mio giorno» e Ordini** (tavola «Il mio giorno e Ordini», scelte di Stefano;
+solo interfaccia, nessuna migrazione, annullabile con «Revert» della PR). «Il mio giorno» in tre blocchi fissi:
+**«Da fare oggi»** (solo con il Seguimi attivo: le azioni del Seguimi, sotto «Anche da sentire» con gli altri follow-up in
+ritardo o di oggi e i clienti da sentire senza doppioni, e la riga «Altri N in corso nella Lista ›»; senza Seguimi restano i
+due riquadri di prima, «Il tuo percorso con la lista» e «I tuoi clienti da sentire») · **«I miei numeri»** (riga
+dell'obiettivo, riga della tappa che si apre su requisiti/linee/note, settimana e mese in un solo riquadro) · **«Diario di
+oggi»** chiuso di base. **«+ Ordine»** nella barra in basso apre il foglio **«Ordini»**: Ordine veloce · Bozza ordine · I miei
+ordini · Aggiorna il totale del mese (bozza e storico non sono più nella pagina Io). «Importa dal report Amway» solo in Gruppo;
+in Io un promemoria se ho un gruppo, ho già importato e l'ultimo report ha più di 7 giorni. Prossime: PR 2 (C+D, «Primi
+passi» con «Scrivi 30 nomi», spiegazioni a richiesta con «?») e PR 3 (E+F+G, Profilo, scheda partner a schede, parole
+uniche), ognuna con la sua tavola prima del codice.
+
+**Dove siamo arrivati (27 ottobre)**: PR #106 unita. Ottimizzazione in 3 PR (vedi sopra), la 1 aperta. Lavori possibili dopo, da scegliere con
+Stefano: **notifiche vere** (un avviso al giorno, testo senza nomi: persone da risentire, Seguimi, clienti, scadenze; prove su
+Android e sull'iPhone di Alessia); **«Come arrivarci» da Platino in su** (Rubino, Zaffiro, Smeraldo, Diamante; prima il foglio
+di revisione); la **fase di prova** con 2-3 leader (messaggio d'invito, primo ingresso, primo import, riscontri dopo una
+settimana). Pagina di riepilogo per i partner: «Da dove arrivano i dati di Growup» (artifact e PDF mandati a Stefano).
+
 **Aperto, in attesa di Stefano**:
+- Unire la PR #106 e provare dal vivo la v40: Guida (piano, Stabilità, abitudini con le settimane prima), Seguimi («Oggi
+  per te»), interruttore per condividere, Analisi (la mia e di un partner), indietro con il dito, barra fissa.
 - Controllare sul sito Amway che la **%** delle linee frontali nei report importati sia quella giusta (serve a «Come arrivarci»
   da Argento a Platino).
 - Provare dal vivo (app v40): bozza ordine → conferma → VP solo nella propria app (l'upline non li vede), «Rifai» e «×»,

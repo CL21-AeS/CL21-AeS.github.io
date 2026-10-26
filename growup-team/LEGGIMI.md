@@ -9,8 +9,9 @@ Growup Team sostituisce `growup/` con un database condiviso. **Non si usa l'emai
 - **Link personale** (`…/growup-team/#chiave=…`): è la chiave del proprio profilo. L'app lo consegna al primo
   ingresso e chiede di mandarlo **a sé stessi** (WhatsApp: chat con sé stessi · Telegram: Messaggi salvati).
   Toccandolo si rientra da qualsiasi telefono o computer. Non va inoltrato.
-- "La mia settimana": obiettivi di contatti e piani; "Il mio mese": obiettivo VP e nuovi clienti;
-  **+ Contatto**, **+ Piano**, **+ Ordine** sempre in basso.
+- "I miei numeri": obiettivo, tappa (si apre toccandola), settimana (contatti e piani) e mese (VP e nuovi clienti);
+  **+ Contatto**, **+ Piano**, **+ Ordine** sempre in basso (+ Ordine apre il foglio «Ordini»: ordine veloce, bozza,
+  i miei ordini, totale del mese).
 - Il percorso base: visione Argento, tappa attuale, conto alla rovescia dei 30 giorni per il primo ordine.
 
 `growup/` resta com'è e continua a funzionare.
@@ -194,7 +195,7 @@ Nell'app non si inseriscono più persone a mano: la rete rispecchia sempre quell
   del report e VPP già inseriti). Se il link è di qualcuno di un'altra linea, l'app gli dice di chiederlo al suo sponsor.
 - **Chi non usa l'app** arriva solo dall'import, e lo vede **solo chi l'ha importato**.
 
-Ognuno importa il report della **propria** linea, quando vuole (pagina Io → Il mio mese, o pagina Gruppo → La mia
+Ognuno importa il report della **propria** linea, quando vuole (pagina Gruppo → La mia
 struttura → **Importa dal report Amway**).
 1. Sul sito Amway: Business Centre → **Linea di Sponsorizzazione (LOS)** → togliere i filtri → pulsante di download →
    **Intera Linea di Sponsorizzazione con tutti i KPI disponibili** → formato **CSV**.

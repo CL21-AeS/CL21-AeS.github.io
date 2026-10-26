@@ -84,7 +84,7 @@ function creaApi(){
     inAttesa:     () => q(sb.rpc("in_attesa")),
     datiAl:       (pid, mese) => q(sb.from("numeri_mese").select("dati_al").eq("partner_id", pid).eq("mese", mese)),
     /* 034: i miei numeri ufficiali (per sommare i miei ordini scritti dopo il report) */
-    mioReport:    (pid, dal) => q(sb.from("numeri_mese").select("mese,vpp,vpg,percentuale,dati_al").eq("partner_id", pid).gte("mese", dal)),
+    mioReport:    (pid, dal) => q(sb.from("numeri_mese").select("mese,vpp,vpg,percentuale,dati_al,importato_da").eq("partner_id", pid).gte("mese", dal)),
     /* 034: la bozza d'ordine e lo storico dei miei ordini (solo miei, RLS) */
     ordiniMiei:   () => q(sb.from("ordini_personali").select("*").order("creato_il")),
     righeMie:     () => q(sb.from("righe_ordine_personale").select("*")),
@@ -1248,15 +1248,10 @@ function vHome(){
   ${leggiLocale(CHIAVE_SALVATA) === "1" || !st.chiave ? "" : vSalvaChiave()}
   ${vInstalla()}
   ${vAttesaIo()}
-  ${vOggiPerTe()}
-  ${vObiettivoBreve()}
-  ${vDaFare()}
-  ${vClientiDaSentire()}
-  ${vTappa()}
-  ${vSettimana()}
-  ${vMese()}
-  ${vBozzaOrdine()}
-  ${vMieiOrdini()}
+  ${vPromemoriaImport()}
+  ${st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : `${vDaFare()}${vClientiDaSentire()}`}
+  ${st.obiettivo ? "" : vObiettivoBreve()}
+  ${vMieiNumeri()}
   ${vOggi()}`}
   ${vFondo()}`;
 }
@@ -1656,18 +1651,18 @@ function vVisione(){
   </div>`;
 }
 
-function vTappa(){
+/* La tappa del percorso, dentro «I miei numeri»: una riga (nome e requisiti fatti) che si apre su tutto il dettaglio */
+function datiTappa(){
   const { raggiunta, attuale, indice } = percorso();
   const pag = pagamenti(raggiunta);
   if(!attuale){
     const pq = st.profilo.prossima_qualifica;
-    return `<div class="card"><span class="eyebrow">Il tuo percorso</span><h2 style="margin-top:4px">${esc(raggiunta ? raggiunta.nome : "Argento")} raggiunto 🎉</h2>
+    return { riga:`<b>${esc(raggiunta ? raggiunta.nome : "Argento")}</b> raggiunto 🎉`, sempre:"", corpo:`
       ${pq ? `<p class="small" style="margin:4px 0 0">Prossima qualifica: <b>${esc(nomeQualifica(pq))}</b>${(() => {
           const x = avanzamentoPY(pq).righe[0]; return x && !x.attesa ? ` · ${esc(x.txt.toLowerCase())}: ${esc(x.val)}` : ""; })()}</p>`
         : `<button class="btn" style="margin-top:10px;min-height:38px" data-act="scegli-prossima">Scegli la prossima qualifica</button>`}
       ${vRubino(st.profilo.id)}
-      <p class="muted">Hai completato il percorso fino a Platino. Ora l'obiettivo è aiutare le tue linee a fare lo stesso.</p></div>
-      ${vReportDaImportare()}`;
+      <p class="muted">Hai completato il percorso fino a Platino. Ora l'obiettivo è aiutare le tue linee a fare lo stesso.</p>` };
   }
   const req = requisiti(attuale);
   let scadenza = "";
@@ -1692,16 +1687,15 @@ function vTappa(){
     ? `<ul class="linee">${n.linee.map(l => `<li><span class="grow">${esc(l.nome)}</span>
         <span class="num ${l.vp >= soglia() ? "" : "faint"}">${num(l.vp)} VP</span></li>`).join("")}</ul>
        <p class="nota" style="margin-top:4px">Le tue linee frontali questo mese, con i VP di tutto il loro gruppo. Attiva da ${num(soglia())} VP.</p>` : "";
-  return `<div class="card">
-    <div class="spread"><span class="eyebrow">Tappa ${indice + 1} di ${(st.stages.findIndex(s => s.chiave === "platino") + 1) || st.stages.length}</span>
-      <span class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end">
+  const fatti = req.filter(r => r.ok).length;
+  return { riga:`Tappa ${indice + 1} di ${(st.stages.findIndex(s => s.chiave === "platino") + 1) || st.stages.length} · <b>${esc(attuale.nome)}</b>
+      <span class="small">· ${fatti} su ${req.length} requisiti</span>`, sempre:scadenza, corpo:`
+    <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px">
       ${n.percentuale ? `<span class="pill s">${n.percentuale}% questo mese</span>` : ""}
       ${n.daReport ? `<span class="pill">dal report Amway</span>` : ""}
       ${pinMax && pinMax > (n.percentuale || 0) ? `<span class="pill">${pinMax}% raggiunto</span>` : ""}
-      ${raggiunta ? `<span class="pill v">✓ ${esc(raggiunta.nome)}</span>` : ""}</span></div>
-    <h2 style="margin-top:4px">${esc(attuale.nome)}</h2>
-    ${attuale.guadagno_mese ? `<p class="small" style="margin:2px 0 0">Circa ${euro(attuale.guadagno_mese)} al mese* con ${esc(attuale.struttura_calcolo || "")}</p>` : ""}
-    ${scadenza}
+      ${raggiunta ? `<span class="pill v">✓ ${esc(raggiunta.nome)}</span>` : ""}</div>
+    ${attuale.guadagno_mese ? `<p class="small" style="margin:6px 0 0">Circa ${euro(attuale.guadagno_mese)} al mese* con ${esc(attuale.struttura_calcolo || "")}</p>` : ""}
     <ul class="req">${req.map(r => `<li class="${r.ok ? "ok" : ""} ${r.attesa ? "attesa" : ""}">
       <span class="mark">${r.ok ? "✓" : r.attesa ? "·" : "○"}</span>
       <span class="grow">${esc(r.txt)}${r.cliente ? ` <button class="btn link small" data-act="cliente" style="min-height:0">+ Cliente</button>` : ""}</span>
@@ -1713,9 +1707,60 @@ function vTappa(){
     ${nelMese ? `<p class="nota">Tutti i requisiti valgono nello stesso mese di calendario (${nomeMese(meseDi(oggi()))}).</p>` : ""}
     ${oltreArgento(attuale) ? `<p class="nota">Un mese da Argento è un mese in cui il report mappe importato ti dà al 21%.
       La prima volta Oro e Platino si contano su 12 mesi consecutivi.</p>` : ""}
-    ${attuale.guadagno_mese ? `<p class="nota">* ${notaGuadagni()}</p>` : ""}
+    ${attuale.guadagno_mese ? `<p class="nota">* ${notaGuadagni()}</p>` : ""}` };
+}
+
+/* «I miei numeri» (ottimizzazione 1): obiettivo, tappa, settimana e mese in un solo riquadro. Gli ordini stanno nel
+   foglio «Ordini» (+ Ordine nella barra in basso), l'import in Gruppo. */
+function vMieiNumeri(){
+  const o = st.obiettivo, t = datiTappa(), aperta = !!st.tappaAperta;
+  const g = st.goal, m = meseDi(oggi()), c = clientiMese(m), nm = numeriMese(m);
+  return `<div class="card miei-numeri">
+    <span class="eyebrow">I miei numeri</span>
+    ${o ? `<button class="riga-apri prima" data-act="vista-obiettivo"><span class="grow"><b class="num">${euro(o.cifra_mese)}</b> al mese
+      <span class="small">· ${esc(testoTraguardo(o.entro))}</span></span><span class="fr" aria-hidden="true">›</span></button>` : ""}
+    <button class="riga-apri${o ? "" : " prima"}" data-act="apri-tappa" aria-expanded="${aperta}"><span class="grow">${t.riga}</span>
+      <span class="fr" aria-hidden="true">${aperta ? "▴" : "▾"}</span></button>
+    ${t.sempre}
+    ${aperta ? `<div class="tappa-aperta">${t.corpo}</div>` : ""}
+    <div class="blocco-numeri">
+      <div class="spread"><h3>La mia settimana <span class="small">${dataIt(settimana())} – ${dataIt(piuGiorni(settimana(), 6))}</span></h3>
+        <button class="btn small ghost" data-act="obiettivi">Modifica</button></div>
+      ${g.salvato && st.goalMese.salvato ? "" : `<p class="small" style="margin:6px 0 0">Ti proponiamo questi obiettivi per iniziare. Vanno bene?
+        <button class="btn link small" data-act="conferma-obiettivi">Sì, confermo</button></p>`}
+      ${barra("Nuovi contatti", fattoSettimana("contatto"), g.obiettivo_contatti)}
+      ${barra("Piani mostrati", fattoSettimana("piano"), g.obiettivo_piani)}
+    </div>
+    <div class="blocco-numeri">
+      <div class="spread"><h3>Il mio mese <span class="small">${nomeMese(m).replace(/^./, x => x.toUpperCase())}</span></h3>
+        <span class="row" style="gap:6px"><button class="btn small ghost" data-act="storico">Storico</button>
+        <button class="btn small ghost" data-act="obiettivo-mese">Obiettivo</button></span></div>
+      ${barraVp(m)}
+      ${rigaVp(m)}
+      ${nm.gruppo > nm.personali || nm.linee.length
+        ? `<div class="spread" style="margin-top:10px"><span>VP di gruppo</span><b class="num">${num(nm.gruppo)}</b></div>` : ""}
+      <div class="spread" style="margin-top:10px">
+        <span>Nuovi clienti nel mese <b class="num">${num(c)}</b></span>
+        <button class="btn small" data-act="cliente" style="white-space:nowrap">+ Cliente</button>
+      </div>
+      ${clientiTotali() >= 3 ? "" : `<p class="small" style="margin:4px 0 0">I tuoi primi 3 clienti (anche in mesi diversi) completano la tappa «Primi clienti»: ${num(clientiTotali())} su 3.</p>`}
+    </div>
   </div>
   ${vReportDaImportare()}`;
+}
+
+/* Il promemoria dell'import (solo per chi ha un gruppo e ha già importato): l'ultimo report ha più di 7 giorni */
+const GIORNI_PROMEMORIA_IMPORT = 7;
+function vPromemoriaImport(){
+  const io = st.profilo.id, righe = [...(st.mioReport || new Map()).values()];
+  if(!figli(io).length || !righe.some(r => r.importato_da === io)) return "";
+  const ultimo = righe.map(r => String(r.dati_al || "")).sort().pop();
+  const giorno = ultimo ? ultimo.slice(0, 10) : "";
+  const giorni = giorno ? giorniTra(giorno, oggi()) : 99;
+  if(giorni <= GIORNI_PROMEMORIA_IMPORT) return "";
+  return `<div class="card tight promemoria-import"><div class="spread">
+    <span>${giorno ? `L'ultimo report è del <b>${dataIt(giorno)}</b>: ${plur(giorni, "giorno", "giorni")} fa.` : "Questo mese non hai ancora importato il report."}</span>
+    <button class="btn small primary" data-act="importa">Importa</button></div></div>`;
 }
 
 /* I report mappe da importare per contare i mesi: chi ha dichiarato Argento o Oro dal mese della prima qualifica
@@ -1784,50 +1829,6 @@ function rigaVp(m){
     Sponsor e upline vedono i tuoi numeri quando arriva il report Amway.</p>` : "";
   return `<p class="small vp-report" style="margin:4px 0 0">${num(rep)} VP dal report del ${esc(fmtDataOra.format(new Date(r.dati_al)))}${dopo
     ? ` · ${dopo > 0 ? "+" : "−"} ${num(Math.abs(dopo))} VP dei tuoi ordini scritti dopo: li vedi solo tu.` : "."}</p>`;
-}
-
-function vSettimana(){
-  const g = st.goal;
-  return `<div class="card">
-    <div class="spread"><div><span class="eyebrow">La mia settimana</span>
-      <h2 style="margin-top:2px">${dataIt(settimana())} – ${dataIt(piuGiorni(settimana(), 6))}</h2></div>
-      <button class="btn small ghost" data-act="obiettivi">Modifica</button></div>
-    ${g.salvato && st.goalMese.salvato ? "" : `<p class="small" style="margin:8px 0 0">Ti proponiamo questi obiettivi per iniziare. Vanno bene?
-      <button class="btn link small" data-act="conferma-obiettivi">Sì, confermo</button></p>`}
-    <div style="margin-top:12px">
-      ${barra("Nuovi contatti", fattoSettimana("contatto"), g.obiettivo_contatti)}
-      ${barra("Piani mostrati", fattoSettimana("piano"), g.obiettivo_piani)}
-    </div>
-  </div>`;
-}
-
-function vMese(){
-  const m = meseDi(oggi());
-  const c = clientiMese(m);
-  const primiFatti = clientiTotali() >= 3;
-  return `<div class="card">
-    <div class="spread"><div><span class="eyebrow">Il mio mese</span>
-      <h2 style="margin-top:2px">${nomeMese(m).replace(/^./, x => x.toUpperCase())}</h2></div>
-      <span class="row" style="gap:6px"><button class="btn small ghost" data-act="storico">Storico</button>
-      <button class="btn small ghost" data-act="obiettivo-mese">Obiettivo</button></span></div>
-    <div style="margin-top:12px">${barraVp(m)}</div>
-    ${rigaVp(m)}
-    <div class="row" style="margin-top:10px;gap:8px">
-      <button class="btn small grow" data-act="ordine">+ Ordine</button>
-      <button class="btn small grow" data-act="totale-mese">Aggiorna il totale</button>
-    </div>
-    <button class="btn small wide" style="margin-top:8px" data-act="importa">Importa dal report Amway</button>
-    <p class="small" style="margin:6px 0 0">Registra ogni ordine, oppure scrivi il totale del mese (per esempio dall'ufficio virtuale Amway),
-      oppure importa il file CSV della tua linea scaricato dal sito Amway.
-      ${precedenteAperto() ? `Fino al ${giornoChiusura()} puoi ancora correggere ${nomeMese(mesePrecedente()).split(" ")[0]}.` : ""}</p>
-    ${(() => { const n = numeriMese(m); return n.gruppo > n.personali || n.linee.length
-      ? `<div class="spread" style="margin-top:12px"><span>VP di gruppo</span><b class="num">${num(n.gruppo)}</b></div>` : ""; })()}
-    <div class="spread" style="margin-top:12px">
-      <span>Nuovi clienti nel mese <b class="num">${num(c)}</b></span>
-      <button class="btn small" data-act="cliente" style="white-space:nowrap">+ Cliente</button>
-    </div>
-    ${primiFatti ? "" : `<p class="small" style="margin:4px 0 0">I tuoi primi 3 clienti (anche in mesi diversi) completano la tappa «Primi clienti»: ${num(clientiTotali())} su 3.</p>`}
-  </div>`;
 }
 
 /* Storico: i mesi chiusi (congelati il giorno 5) e quelli ancora aperti, dal più recente */
@@ -1912,11 +1913,13 @@ function nomeDiAttivita(a){
   const s = (st.passi || []).find(x => x.attivita_id && x.attivita_id === a.id), p = s && (st.persone || []).find(x => x.id === s.persona_id);
   return p ? p.nome : "";
 }
+/* Diario di oggi: chiuso di base, si apre toccandolo (resta aperto finché non lo richiudi) */
 function vOggi(){
-  const l = st.att.filter(a => a.data === oggi()).slice().reverse();
-  return `<div class="card">
-    <div class="spread"><span class="eyebrow">Oggi</span><span class="small">${dataIt(oggi())}</span></div>
-    ${l.length ? `<ul class="oggi">${l.map(a => `<li>
+  const l = st.att.filter(a => a.data === oggi()).slice().reverse(), aperto = !!st.diarioAperto;
+  return `<div class="card diario">
+    <button class="riga-apri prima" data-act="apri-diario" aria-expanded="${aperto}"><span class="grow"><span class="eyebrow">Diario di oggi · ${l.length}</span>
+      <span class="small">${dataIt(oggi())}</span></span><span class="fr" aria-hidden="true">${aperto ? "▴" : "▾"}</span></button>
+    ${!aperto ? "" : l.length ? `<ul class="oggi">${l.map(a => `<li>
       <span class="grow">${ETICHETTE[a.tipo]}${nomeDiAttivita(a) ? `: <b>${esc(nomeDiAttivita(a))}</b>` : ""}${a.tipo === "ordine" ? ` · <b>${num(a.vp)} VP</b>` : a.tipo === "rettifica" ? ` · <b>${vpFirmati(a.vp)} VP</b>` : a.quantita > 1 ? ` × ${a.quantita}` : ""}</span>
       <span class="small">${a.inserito_il ? fmtOra.format(new Date(a.inserito_il)) : ""}</span>
       ${String(a.id).startsWith("tmp") ? "" : `<button class="x" data-act="elimina" data-id="${esc(a.id)}" aria-label="Elimina">×</button>`}</li>`).join("")}</ul>`
@@ -2377,7 +2380,7 @@ function vAzioni(){
   return `<div class="azioni"><div class="in">
     <button class="btn primary c1" data-act="contatto-rapido">+ Contatto<b>${num(fattoSettimana("contatto"))} questa sett.</b></button>
     <button class="btn primary c2" data-act="piano-rapido">+ Piano<b>${num(fattoSettimana("piano"))} questa sett.</b></button>
-    <button class="btn primary c3" data-act="ordine">+ Ordine<b>${num(vpMese(meseDi(oggi())))} VP nel mese</b></button>
+    <button class="btn primary c3" data-act="${st.target ? "ordine" : "ordini"}">+ Ordine<b>${num(vpMese(meseDi(oggi())))} VP nel mese</b></button>
   </div></div>`;
 }
 
@@ -5171,11 +5174,12 @@ function testoTotaliMiei(t){ return `<b>${num2(t.vp)}</b> VP · Partner <b>${pre
 function prezziRiga(r){ return { vp:Number(r.vp) || 0, partner:Number(r.prezzo_partner) || 0, pubblico:Number(r.prezzo_cliente) || 0 }; }
 function prodotti(n){ return plur(n, "prodotto", "prodotti"); }
 
+/* La bozza ordine, nel foglio «Ordini» (ottimizzazione 1: non più nella pagina Io) */
 function vBozzaOrdine(){
   const b = bozzaMia(), righe = b ? righeMie(b.id) : [];
-  return `<div class="card" id="bozza-ordine">
-    <div class="spread"><div><span class="eyebrow">Bozza ordine</span>
-      <h2 style="margin-top:2px">${righe.length ? prodotti(righe.length) : "Vuota"}</h2></div>
+  return `<div id="bozza-ordine">
+    <div class="spread"><div><h2>Bozza ordine</h2>
+      <p class="small" style="margin:2px 0 0">${righe.length ? prodotti(righe.length) : "Vuota"}</p></div>
       ${righe.length ? `<span class="pill">Salvata</span>` : ""}</div>
     <input type="search" id="cerca-mio" class="cerca" style="margin-top:10px" placeholder="Cerca un prodotto (nome o codice)…" autocomplete="off" value="${esc(st.cercaMio || "")}">
     <ul class="risultati-prodotto" id="risultati-mio">${risultatiMio(st.cercaMio)}</ul>
@@ -5187,6 +5191,7 @@ function vBozzaOrdine(){
     <div class="row" style="margin-top:10px;gap:8px"><button class="btn small grow" data-act="mio-svuota">Svuota</button>
       <button class="btn small primary grow" data-act="mio-conferma">Conferma ordine</button></div>` : ""}
     <p class="small" style="margin:8px 0 0">La bozza la vedi solo tu.</p>
+    <button class="btn ghost wide" style="margin-top:12px" data-act="ordini">Indietro</button>
   </div>`;
 }
 function risultatiMio(q){
@@ -5200,10 +5205,12 @@ function risultatiMio(q){
 }
 function vMieiOrdini(){
   const lista = storicoMio();
-  if(!lista.length) return "";
   const tutti = st.mieiTutti || lista.length <= 5, vedi = tutti ? lista : lista.slice(0, 5);
-  return `<div class="card" id="miei-ordini">
-    <span class="eyebrow">I miei ordini</span>
+  const indietro = `<button class="btn ghost wide" style="margin-top:12px" data-act="ordini">Indietro</button>`;
+  if(!lista.length) return `<div id="miei-ordini"><h2>I miei ordini</h2>
+    <p class="muted">Ancora nessun ordine confermato dalla Bozza ordine.</p>${indietro}</div>`;
+  return `<div id="miei-ordini">
+    <h2>I miei ordini</h2>
     <ul class="righe-ordine" style="margin-top:6px">${vedi.map(o => { const righe = righeMie(o.id), t = totaliMiei(righe), aperto = st.mioAperto === o.id;
       return `<li style="flex-wrap:wrap">
       <button type="button" class="apri-mio" data-act="mio-apri" data-id="${esc(o.id)}" aria-expanded="${aperto}">
@@ -5215,9 +5222,29 @@ function vMieiOrdini(){
         `<li style="display:list-item;border:0;padding:2px 0">${r.quantita} × ${esc(r.nome)} · ${testoPrezzi(prezziRiga(r))}</li>`).join("")}</ul>` : ""}
     </li>`; }).join("")}</ul>
     ${tutti ? "" : `<button class="btn small ghost wide" style="margin-top:8px" data-act="miei-tutti">Tutti gli ordini (${lista.length})</button>`}
+    ${indietro}
   </div>`;
 }
+/* Il foglio «Ordini» (+ Ordine nella barra in basso): un solo posto per ordine veloce, bozza, storico e totale del mese */
+function vOrdini(){
+  const m = meseDi(oggi()), b = bozzaMia(), nb = b ? righeMie(b.id).length : 0, lista = storicoMio();
+  const scelta = (act, titolo, sotto) => `<button class="scelta-ordini" data-act="${act}"><span class="grow"><b>${titolo}</b>
+    <span class="small">${sotto}</span></span><span class="fr" aria-hidden="true">›</span></button>`;
+  return `<h2>Ordini</h2>
+    <p class="small" style="margin:2px 0 0">${nomeMese(m).replace(/^./, x => x.toUpperCase())} · ${num(vpMese(m))} VP nel mese</p>
+    <div class="scelte-ordini">
+      ${scelta("ordine", "Ordine veloce", "Scrivi solo i VP")}
+      ${scelta("apri-bozza", "Bozza ordine", nb ? `${prodotti(nb)} · salvata` : "Prepara l'ordine con i prodotti del listino")}
+      ${scelta("apri-miei", "I miei ordini", lista.length ? `${plur(lista.length, "ordine", "ordini")} · l'ultimo il ${dataIt(lista[0].data)}` : "Ancora nessuno")}
+      ${scelta("totale-mese", "Aggiorna il totale del mese", "La cifra dall'ufficio virtuale Amway")}
+    </div>
+    ${precedenteAperto() ? `<p class="small" style="margin:10px 0 0">Fino al ${giornoChiusura()} puoi ancora correggere ${nomeMese(mesePrecedente()).split(" ")[0]}.</p>` : ""}
+    <button class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
+}
 function vSheetMiei(s){
+  if(s === "ordini") return vOrdini();
+  if(s === "bozza") return vBozzaOrdine();
+  if(s === "miei") return vMieiOrdini();
   if(s === "conferma-mio"){
     const b = bozzaMia(); if(!b) return "";
     const righe = righeMie(b.id), t = totaliMiei(righe), m = meseDi(st.dataMio || oggi());
@@ -5227,7 +5254,7 @@ function vSheetMiei(s){
       <label class="field"><span>Data dell'ordine</span><input type="date" name="data" min="${primaDataAperta()}" max="${oggi()}" value="${esc(st.dataMio || oggi())}"></label>
       <p class="small" id="testo-conferma-mio">I ${num2(t.vp)} VP vanno nel tuo mese di ${nomeMese(m).split(" ")[0]}. Li vedi solo tu finché non arriva il report Amway.</p>
       ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
-      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Indietro</button><button class="btn primary grow">Conferma</button></div>
+      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="apri-bozza">Indietro</button><button class="btn primary grow">Conferma</button></div>
     </form>`;
   }
   if(s === "togli-mio"){
@@ -5236,7 +5263,7 @@ function vSheetMiei(s){
     return `<h2>Togli l'ordine del ${esc(dataIt(o.data))}?</h2>
     <p class="small">${prodotti(righe.length)} · ${num2(vp)} VP.${o.attivita_id ? ` I ${num2(vp)} VP escono dal tuo mese di ${nomeMese(meseDi(o.data)).split(" ")[0]}.` : ""}</p>
     ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
-    <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Indietro</button>
+    <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="apri-miei">Indietro</button>
       <button class="btn primary grow" data-act="mio-togli-ok">Togli</button></div>`;
   }
   return "";
@@ -5253,6 +5280,11 @@ async function aggiungiMio(c, quantita){
   st.mieRighe.push(riga);
 }
 Object.assign(AZIONI, {
+  ordini(){ st.errore = null; st.sheet = "ordini"; render(); },
+  "apri-bozza"(){ st.errore = null; st.sheet = "bozza"; render(); },
+  "apri-miei"(){ st.errore = null; st.sheet = "miei"; render(); },
+  "apri-tappa"(){ st.tappaAperta = !st.tappaAperta; render(); },
+  "apri-diario"(){ st.diarioAperto = !st.diarioAperto; render(); },
   async "mio-aggiungi"(el){
     const r = st.listino.find(x => x.codice === el.dataset.codice);
     if(!r) return;
@@ -5286,7 +5318,7 @@ Object.assign(AZIONI, {
       if(o.attivita_id){ await api.deleteActivity(o.attivita_id); st.att = st.att.filter(a => a.id !== o.attivita_id); }
       await api.togliOrdineMio(o.id);
       st.mieiOrdini = st.mieiOrdini.filter(x => x.id !== o.id); st.mieRighe = st.mieRighe.filter(x => x.ordine_id !== o.id);
-      st.sheet = null; render(); toast("Ordine tolto");
+      st.sheet = "miei"; render(); toast("Ordine tolto");
     }catch(e){ st.errore = messaggio(e); render(); }
   }
 });
@@ -5300,7 +5332,7 @@ Object.assign(MODULI, {
       const o = await api.confermaOrdine(b.id, data);
       Object.assign(b, o);
       st.att = await api.activities(st.profilo.id, [settimana(), primoDelMese()].sort()[0]) || st.att;
-      st.sheet = null; render(); toast(`Ordine confermato: ${num2(o.vp)} VP nel mese`);
+      st.sheet = "miei"; render(); toast(`Ordine confermato: ${num2(o.vp)} VP nel mese`);
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   }
 });
@@ -5628,16 +5660,30 @@ function vOggiPerTe(){
     if(a.tipo === "contatto" || a.tipo === "followup" || a.tipo === "cliente"){
       const n = nome(a.id); if(!n) return "";
       testo = `<button class="btn link" style="padding:0;min-height:0" data-act="${a.tipo === "cliente" ? "apri-cliente" : "apri-persona"}" data-id="${esc(a.id)}">${esc(n)}</button>`;
-    } else if(a.tipo === "vp") testo = `Mancano ${num(a.manca)} VP al tuo obiettivo del mese: guarda la Bozza ordine`;
+    } else if(a.tipo === "vp") testo = `Mancano ${num(a.manca)} VP al tuo obiettivo del mese ·
+      <button class="btn link" style="padding:0;min-height:0" data-act="apri-bozza">apri la Bozza ordine</button>`;
     else if(a.tipo === "formazione") testo = "15 minuti: un audio o 10 pagine di un libro";
     else testo = "Una chiamata questa settimana";
     return `<li class="${fatta ? "fatta" : ""}">${segno}<span class="grow"><span class="tipo-oggi">${SEGUIMI_TIPI[a.tipo]}</span><br>${testo}</span></li>`;
   };
   const serie = serieSeguimi(r.fatte);
-  return `<div class="card oggi-per-te">
-    <span class="eyebrow">Oggi per te · ${esc(GIORNI_SETT[new Date(oggi() + "T12:00:00Z").getUTCDay()])} ${esc(dataIt(oggi()))}</span>
+  /* le altre persone da sentire oggi (in ritardo, con la data di oggi, clienti) senza ripetere chi è già nelle azioni */
+  const gia = new Set((g.azioni || []).filter(a => a.id).map(a => a.id)), d = daFare();
+  const anche = d.ritardo.concat(d.oggi).filter(p => !gia.has(p.id)).map(p => ({ p, tipo:"followup", cliente:false,
+      etichetta:p.prossima_data < oggi() ? "Follow-up · in ritardo" : "Follow-up · oggi", motivo:testoProssima(p) }))
+    .concat(clientiDaSentire().filter(x => !gia.has(x.p.id)).map(x => ({ p:x.p, cliente:true, etichetta:"Cliente", motivo:x.motivo })));
+  const altri = d.presto.length + d.corso.length;
+  return `<div class="card oggi-per-te da-fare-oggi">
+    <div class="spread"><span class="eyebrow">Da fare oggi · ${esc(GIORNI_SETT[new Date(oggi() + "T12:00:00Z").getUTCDay()])} ${esc(dataIt(oggi()))}</span>
+      <span class="pill">${r.fatte} su ${g.proposte}</span></div>
     <ul>${(g.azioni || []).map(riga).join("")}</ul>
     <p class="small" style="margin:8px 0 0"><b>Oggi: ${r.fatte} su ${g.proposte} fatte</b>${serie >= 2 ? ` · da ${serie} giorni di fila almeno metà delle azioni` : ""}</p>
+    ${anche.length ? `<div class="blocco-numeri anche"><h3>Anche da sentire</h3>
+      <ul class="persone">${anche.map(x => `<li class="su-io"><button class="persona" data-act="${x.cliente ? "apri-cliente" : "apri-persona"}" data-id="${esc(x.p.id)}">
+        <span class="grow"><span class="tipo-oggi">${esc(x.etichetta)}</span><br><b>${esc(x.p.nome)}</b>${x.motivo ? `<br><span class="small">${esc(x.motivo)}</span>` : ""}</span></button>
+        <button class="x" data-act="togli-da-io" data-id="${esc(x.p.id)}" aria-label="Togli ${esc(x.p.nome)} da Io">×</button></li>`).join("")}</ul></div>` : ""}
+    ${altri ? `<button class="riga-apri" data-act="guida-vai" data-dove="lista"><span class="grow">${altri === 1 ? "Un'altra persona in corso" : `Altri ${altri} in corso`} nella Lista</span>
+      <span class="fr" aria-hidden="true">›</span></button>` : ""}
   </div>`;
 }
 function vGuidaSeguimi(){
