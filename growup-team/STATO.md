@@ -98,6 +98,8 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
+**28 ottobre — «Prossima cosa» con la ×** (Stefano, dopo aver provato l'avviso: arriva giusto e apre la scheda): nella scheda della persona una × accanto alla prossima cosa toglie giorno, ora e nota (e quindi anche l'avviso non ancora suonato). App v52.
+
 **28 ottobre — Notifiche, parte 2** (migrazione 040, già applicata): nel prossimo passo, accanto al giorno, l'**ora
 facoltativa**; con l'ora arriva un avviso **30 minuti prima** («Growup · alle 18:30 — Hai un passo da fare con una persona
 della tua Lista», o «con un tuo cliente»), senza nomi; il tocco apre la sua scheda (`?persona=<id>`). L'ora si vede con il

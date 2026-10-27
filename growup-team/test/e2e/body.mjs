@@ -2629,6 +2629,15 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await sync(page);
   check(String((DB.persone.find(x => x.id === pid) || {}).prossima_ora || "").startsWith("18:30"), "l'ora è salvata");
   check(await page.getByText(/Oggi · .* · 18:30/).first().isVisible(), "l'ora si vede con il giorno");
+  // la × toglie giorno, ora e nota della prossima cosa
+  await page.click(".prossima button[data-act=togli-prossima]");
+  await page.getByText("Prossima cosa tolta").waitFor();
+  await sync(page);
+  const tolta = DB.persone.find(x => x.id === pid) || {};
+  check(await page.locator(".prossima").getByText("Nessuna data").isVisible() && !tolta.prossima_data && !tolta.prossima_ora && !tolta.prossima_nota,
+    "la × toglie la prossima cosa (giorno, ora e nota)");
+  // la riporto per il tocco sull'avviso qui sotto
+  DB.persone.find(x => x.id === pid).prossima_data = oggiG;
   await ctx.close();
   ({ ctx, page } = await apri({}, "?persona=" + pid + "#chiave=" + "a".repeat(32)));
   await page.locator(".testata h1", { hasText:"La mia lista" }).waitFor();

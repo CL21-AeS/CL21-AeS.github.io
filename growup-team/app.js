@@ -3795,7 +3795,8 @@ function vPersona(){
     <ol class="percorso-persona" aria-label="Percorso">${FASI.map((x, k) => `<li class="${k < i ? "fatta" : k === i ? "qui" : ""}"><i></i><span>${x.nome}</span></li>`).join("")}</ol>
     <div class="prossima">
       <span class="small">Prossima cosa</span>
-      <b>${p.prossima_data ? esc(testoProssima(p)) : "Nessuna data"}</b>
+      ${p.prossima_data ? `<span class="row prossima-testo" style="gap:6px;align-items:center"><b class="grow">${esc(testoProssima(p))}</b>
+        <button class="x" data-act="togli-prossima" aria-label="Togli la prossima cosa">×</button></span>` : `<b>Nessuna data</b>`}
       <span class="row" style="gap:6px;margin-top:6px">
         <button class="btn small" data-act="prossima">${p.prossima_data ? "Cambia" : "Fissa una data"}</button>
         ${p.prossima_data ? `<button class="btn small ghost" data-act="persona-calendario">Nel calendario</button>` : ""}</span>
@@ -3995,6 +3996,10 @@ Object.assign(AZIONI, {
       await api.modificaPersona(st.personaId, { nascosta_io:false });
       await dopoPersone("Percorso riaperto");
     }
+    catch(e){ toast(messaggio(e)); }
+  },
+  async "togli-prossima"(){
+    try{ await api.modificaPersona(st.personaId, { prossima_data:null, prossima_ora:null, prossima_nota:null }); await dopoPersone("Prossima cosa tolta"); }
     catch(e){ toast(messaggio(e)); }
   },
   "persona-calendario"(){
