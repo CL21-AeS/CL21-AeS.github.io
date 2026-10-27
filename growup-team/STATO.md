@@ -98,6 +98,11 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
+**28 ottobre — Spiegazioni del «?» più chiare** (richiesta di Stefano dal telefono): riscritti tutti i testi dei «?» (cosa
+vedi, da dove vengono i numeri, cosa puoi fare), per esempio «Il tuo piano» spiega i numeri di base (1 sì ogni 5 piani,
+1 piano ogni 2-3 contatti) e che con 10 piani nella Lista l'app usa i propri; «Le tue abitudini» si apre in alto come gli
+altri, non più in fondo. App v47.
+
 **28 ottobre — Import più veloce: un solo «Importa da Amway»** (scelte di Stefano). Automatizzare del tutto non si può:
 Amway non ha API né invio dei report per email, l'export sul sito è a richiesta (si chiede, si aspetta «Pronto», si
 scarica), una web app non può leggere il sito Amway né la cartella Download del telefono (regole di sicurezza dei browser),

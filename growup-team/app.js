@@ -1407,8 +1407,8 @@ function vPrimiPassi(){
         ${x.fatto ? "" : `<span class="fr" aria-hidden="true">${aperta ? "▴" : "▾"}</span>`}</button>
         ${aperta ? `<div class="passo-aperto">${x.corpo()}</div>` : ""}</li>`; }).join("")}</ul>
     ${attesa ? `<div class="stato-attesa"><span class="grow">In attesa della mappa: i tuoi numeri restano solo tuoi.</span>${aiutoBtn("attesa-io")}</div>
-      ${aiutoTesto("attesa-io", `Non sei ancora in un report mappe importato. Puoi usare l'app (obiettivi, lista, clienti, ordini), ma i tuoi
-        dati restano solo tuoi finché la mappa Amway non ti mostra: al primo import della tua upline entri nella struttura.`)}` : ""}
+      ${aiutoTesto("attesa-io", `Non sei ancora nel report mappe importato dalla tua upline. Puoi già usare tutta l'app, ma i tuoi numeri li
+        vedi solo tu. Quando la tua upline importa una mappa in cui ci sei, entri nella struttura al tuo posto.`)}` : ""}
   </div>`;
 }
 /* ---- Le spiegazioni a richiesta (ottimizzazione 2): un «?» accanto al titolo apre e chiude il testo ---- */
@@ -1944,7 +1944,8 @@ function vStoricoGruppo(){
   const prossima = meseAvanti(meseDi(oggi()), precedenteAperto() ? 0 : 1) + "-" + String(giornoChiusura()).padStart(2, "0");
   return `<div class="card">
     <span class="con-aiuto"><span class="eyebrow">Storico del gruppo</span>${righe.length ? aiutoBtn("storico-gruppo") : ""}</span>
-    ${aiutoTesto("storico-gruppo", "Mesi chiusi, i tuoi totali. Tocca un mese per vedere ogni persona del gruppo.")}
+    ${aiutoTesto("storico-gruppo", `Ogni riga è un mese chiuso (si chiude il ${giornoChiusura()} del mese dopo) con i totali del tuo gruppo.
+      Tocca un mese per vedere i numeri di ogni persona.`)}
     ${righe.length ? `<table class="confronto mesi">
       <thead><tr><th></th><th>VP di gruppo</th><th>Linee</th><th>%</th></tr></thead>
       <tbody>${righe.map(r => `<tr data-act="mese-gruppo" data-mese="${r.mese}"><td><button class="btn link" data-act="mese-gruppo" data-mese="${r.mese}">${nomeMese(r.mese).replace(/^./, c => c.toUpperCase())}</button></td>
@@ -2036,8 +2037,9 @@ function vInAttesa(){
   if(!l.length) return "";
   return `<div class="card in-attesa">
     <span class="con-aiuto"><span class="eyebrow">In attesa della mappa · ${l.length}</span>${aiutoBtn("in-attesa")}</span>
-    ${aiutoTesto("in-attesa", `Usano l'app ma non sono ancora in un report mappe importato: i loro dati restano solo
-      nella loro app e non contano nei numeri. Entrano nella struttura al primo import che li mostra.`)}
+    ${aiutoTesto("in-attesa", `Persone entrate nell'app con un link ma che non sono ancora nel report Amway che hai importato. Finché non ci
+      sono, i loro numeri restano solo nella loro app e non contano nel tuo gruppo. Entrano al loro posto con il primo import
+      che le contiene.`)}
     <ul class="oggi">${l.map(x => `<li><span class="grow"><b>${esc(x.nome)}</b><br>
       <span class="small">${x.mio ? "invitata da te" : `sponsor indicato: ${esc(x.sponsor_nome || "–")}`}</span></span>
       ${x.mio || st.profilo.is_admin ? `<button class="btn small" data-act="togli-attesa" data-id="${esc(x.id)}">Togli</button>` : ""}</li>`).join("")}</ul>
@@ -2077,9 +2079,9 @@ function vStruttura(){
   return `<div class="card">
     <div class="spread"><span class="con-aiuto"><span class="eyebrow">La mia struttura</span>${tutte.length ? aiutoBtn("struttura") : ""}</span>
       ${btnAmway("Importa da Amway", "small")}</div>
-    ${tutte.length ? aiutoTesto("struttura", `Il numero è il livello, come nei report Amway: 1 sei tu, 2 i tuoi frontali, 3 i loro, e così via.
-      ▾ chiude o riapre il gruppo di una persona. Tocca un nome per aprire la sua scheda.${completa ? ` Le nascoste sono in grigio, al loro posto.
-      I gruppi partono chiusi: ▸ apre il gruppo di una persona. Mostra o Nascondi su ogni riga.` : ""}`) : ""}
+    ${tutte.length ? aiutoTesto("struttura", `Il tuo gruppo come nel report Amway. Il numero a sinistra è il livello: 1 sei tu, 2 chi hai sponsorizzato tu,
+      3 chi hanno sponsorizzato loro, e così via. ▾ chiude o apre il gruppo di una persona; tocca un nome per aprire la sua
+      scheda.${completa ? " In grigio le persone nascoste, al loro posto: Mostra o Nascondi su ogni riga." : ""}`) : ""}
     ${righe.length > 1 ? `<input type="search" id="cerca-struttura" class="cerca" placeholder="Cerca un nome nel tuo gruppo…"
         autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Cerca un nome nel tuo gruppo" value="${esc(st.cerca || "")}">
       <p class="small" id="cerca-esito" aria-live="polite" style="margin:6px 0 0"></p>` : ""}
@@ -2192,8 +2194,9 @@ function vPreferiti(){
   }).sort((a, b) => a.ordine - b.ordine || a.p.nome.localeCompare(b.p.nome));
   return `<div class="card">
     <div class="spread"><span class="con-aiuto"><span class="eyebrow">Preferiti</span>${aiutoBtn("preferiti")}</span><span class="small">${l.length === 1 ? "1 persona" : `${l.length} persone`}</span></div>
-    ${aiutoTesto("preferiti", `Contatti e piani delle ultime 4 settimane rispetto al loro obiettivo settimanale × 4; VP del mese rispetto
-      al loro obiettivo del mese. Evidenziata la parte sotto soglia. Per togliere una persona: ★ nella sua scheda.`)}
+    ${aiutoTesto("preferiti", `Le persone che segui da vicino (le aggiungi o togli con ★ nella loro scheda). Per ognuna: contatti e piani delle
+      ultime 4 settimane rispetto al suo obiettivo, e VP del mese rispetto al suo obiettivo del mese. In colore la parte che
+      manca.`)}
     <ul class="preferiti">${schede.map(x => x.html).join("")}</ul>
   </div>`;
 }
@@ -2290,7 +2293,8 @@ function vConfronto(p){
   const cella = (v, rif) => rif != null && v < rif ? `<td class="num sotto">▼ ${num(v)}</td>` : `<td class="num">${num(v)}</td>`;
   return `<div class="card">
     <span class="con-aiuto"><span class="eyebrow">Questo mese e il mese prima</span>${aiutoBtn("confronto")}</span>
-    ${aiutoTesto("confronto", `▼ in rosso: sotto il mese prima allo stesso giorno. ${soloReport(p.id) ? "I VP sono quelli del report Amway; " : ""}VP di gruppo e linee attive del mese prima ci sono solo come totale.`)}
+    ${aiutoTesto("confronto", `Questo mese fino a oggi, confrontato con lo stesso giorno del mese prima. ▼ in rosso: è sotto il mese prima.
+      L'ultima colonna è il totale di tutto il mese prima.${soloReport(p.id) ? " I VP sono quelli del report Amway." : ""}`)}
     <table class="confronto">
       <thead><tr><th></th><th>${breve(c.m)}<br><span>fino a oggi</span></th><th>${breve(c.mp)}<br><span>al ${Number(c.stessoGiorno.slice(8))}</span></th><th>${breve(c.mp)}<br><span>totale</span></th></tr></thead>
       <tbody>${c.righe.map(x => `<tr><td>${x.nome}</td>${cella(x.ora, x.allora)}
@@ -2352,8 +2356,8 @@ function vScheda(){
   ${!azioni ? "" : `<button class="btn wide primary" style="margin:4px 0 12px" data-act="chiamata" data-id="${esc(p.id)}">Fissa una chiamata</button>
   ${gestito ? `<div class="card">
     <span class="con-aiuto"><span class="eyebrow">I suoi numeri · ${nomeMese(m)}</span>${aiutoBtn("gestito")}</span>
-    ${aiutoTesto("gestito", `Se vuole usare l'app, mandale il tuo link d'invito: scrivendo il suo codice Amway ritrova il suo profilo
-      e da lì i suoi numeri li aggiorna lei.`)}
+    ${aiutoTesto("gestito", `Questa persona non usa l'app: i suoi numeri li scrivi tu con i pulsanti qui sotto. Se vuole usarla, mandale il
+      tuo link d'invito: entrando con il suo codice Amway ritrova il suo profilo e da lì i numeri li aggiorna lei.`)}
     <div class="griglia-azioni">
       <button class="btn" data-act="contatto">+ Contatto</button>
       <button class="btn" data-act="piano">+ Piano</button>
@@ -3622,8 +3626,9 @@ function vDaFare(){
   if(!gruppi.length) return "";
   return `<div class="card">
     <span class="con-aiuto"><span class="eyebrow">Il tuo percorso con la lista</span>${aiutoBtn("lista-io")}</span>
-    ${aiutoTesto("lista-io", `× toglie una persona da qui (non dalla lista). Torna da sola quando segni un passo o fissi una data,
-      oppure dalla sua scheda con "Rimetti in Io".`)}
+    ${aiutoTesto("lista-io", `Le persone della tua Lista da risentire: prima chi è in ritardo, poi chi ha la data oggi o nei prossimi giorni.
+      Con × togli una persona solo da qui (resta nella Lista): ricompare quando segni un passo o fissi una nuova data, oppure
+      dalla sua scheda con «Rimetti in Io».`)}
     ${gruppi.map(([t, l]) => `<p class="small da-fare-t">${t}</p>
       <ul class="persone">${l.map(p => rigaPersona(p, true)).join("")}</ul>`).join("")}
   </div>`;
@@ -3654,7 +3659,8 @@ function vPersone(){
     <div class="spread"><span class="con-aiuto"><span class="eyebrow">La mia lista</span>${aiutoBtn("lista")}</span>
       <span class="row" style="gap:6px"><button class="btn small" data-act="persone-tante">Più nomi</button>
       <button class="btn small primary" data-act="persona-nuova">+ Un nome</button></span></div>
-    ${aiutoTesto("lista", "I nomi della tua lista li vedi solo tu. A chi ti segue arrivano soltanto i numeri.")}
+    ${aiutoTesto("lista", `Qui scrivi i nomi delle persone che conosci e segui ogni contatto passo per passo. I nomi li vedi solo tu:
+      alla tua upline arrivano solo i numeri (quanti contatti, quanti piani).`)}
     ${st.persone.length ? `
     <input type="search" id="cerca-lista" class="cerca" placeholder="Cerca un nome…" autocomplete="off" aria-label="Cerca un nome" value="${esc(st.cercaLista || "")}">
     <div class="row wrap scelte-rapide" style="gap:6px;margin-top:8px">${FILTRI_LISTA.map(x => {
@@ -4285,7 +4291,8 @@ function vInvito(){
   if(!x.risposte) return `${indietro}
   <div class="card">
     <div class="spread"><span class="con-aiuto"><h2>${esc(x.nome)}</h2>${aiutoBtn("target-attesa")}</span><span class="pill ${s.cl}">${esc(s.txt)}</span></div>
-    ${aiutoTesto("target-attesa", `Quando risponde ti arriva un messaggio con il link "Apri le risposte": aprilo da qui, oppure usa "Leggi una risposta".`)}
+    ${aiutoTesto("target-attesa", `Hai mandato l'invito: ora aspetti le risposte. Quando risponde ti arriva un messaggio con il link «Apri le
+      risposte»: aprilo da qui, oppure usa «Leggi una risposta».`)}
     <p class="small" style="margin:4px 0 0">Invito del ${dataIt(String(x.creato_il).slice(0, 10))} · ${x.scade ? `il link vale fino al ${dataIt(x.scade)}` : "il link non scade"}</p>
     <div class="row" style="gap:8px;margin-top:12px">
       <a class="btn wa grow" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(messaggioTarget(x))}">WhatsApp</a>
@@ -4311,7 +4318,8 @@ function vInvito(){
   </div>
   <div class="card">
     <span class="con-aiuto"><span class="eyebrow">Le risposte</span>${aiutoBtn("target-punti")}</span>
-    ${aiutoTesto("target-punti", "0 è un no secco, 2 un sì con riserva, 4 un sì pieno. La prima domanda non dà punti.")}
+    ${aiutoTesto("target-punti", `Ogni risposta vale da 0 a 4 punti: 0 è un no secco, 2 un sì con riserva, 4 un sì pieno. La prima domanda serve
+      a conoscere la persona e non dà punti.`)}
     <ul class="risposte-t">${a.map((k, qi) => { const o = DOMANDE[qi].o[k], senza = DOMANDE[qi].senzaPunti;
       return `<li><span class="grow"><b>${esc(DOMANDE[qi].tema)}</b><br><span class="small">${esc(o.t)}</span></span>
         <span class="num${!senza && o.p === 0 ? " zero" : ""}">${senza ? "–" : o.p}</span></li>`; }).join("")}</ul>
@@ -4615,7 +4623,8 @@ function vClienti(){
     <div class="spread"><span class="con-aiuto"><span class="eyebrow">I miei clienti</span>${aiutoBtn("clienti")}</span>
       <span class="row" style="gap:6px">${btnAmway("Da Amway", "small")}
       <button class="btn small primary" data-act="cliente-nuovo">+ Un cliente</button></span></div>
-    ${aiutoTesto("clienti", "I tuoi clienti li vedi solo tu. Gli ordini servono ai riordini: non cambiano i tuoi VP.")}
+    ${aiutoTesto("clienti", `I tuoi clienti e i loro ordini: l'app ti avvisa quando un prodotto sta per finire o è ora di risentirli. Li vedi
+      solo tu. Gli ordini scritti qui servono per i riordini e non cambiano i tuoi VP: i VP arrivano dal report Amway.`)}
     ${tutti.length ? `<div class="row wrap scelte-rapide" style="gap:6px;margin-top:10px">${FILTRI_CLIENTI.map(x =>
       `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-clienti" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${tutti.filter(x.ok).length}</button>`).join("")}</div>
     ${l.length ? `<ul class="persone">${l.map(p => { const s = statoCliente(p);
@@ -5611,8 +5620,9 @@ function vGuidaPiano(){
   return `<div class="card guida-piano">
     <span class="con-aiuto"><span class="eyebrow">Il tuo piano</span>${aiutoBtn("guida-piano")}</span>
     <h2 style="margin-top:2px">Verso ${esc(tp.nome)}</h2>
-    ${aiutoTesto("guida-piano", `Dalla tua Lista: ${plur(r.contatti, "contatto", "contatti")}, ${plur(r.piani, "piano", "piani")}, ${plur(r.si, "sì", "sì")}.
-      ${r.miei ? "" : "Con almeno 10 piani l'app usa i tuoi rapporti."}`)}
+    ${aiutoTesto("guida-piano", `Qui vedi quanto lavoro serve per arrivare alla tua cifra. Una linea nuova nasce da un sì, e per un sì servono in
+      media 5 piani; per un piano, 2-3 contatti. Sono numeri di base. Quando nella tua Lista avrai segnato almeno 10 piani,
+      l'app userà i tuoi numeri veri (oggi: ${plur(r.contatti, "contatto", "contatti")}, ${plur(r.piani, "piano", "piani")}, ${plur(r.si, "sì", "sì")}).`)}
     <p class="small" style="margin:2px 0 0">La tua cifra: ${euro(o.cifra_mese)} al mese ${esc(testoTraguardo(o.entro))}</p>
     ${numeri}
     <p class="small" style="margin:10px 0 0"><b>Cosa vuol dire in attività.</b> Una linea nuova parte da un sì. ${r.miei
@@ -5631,9 +5641,10 @@ function vGuidaStabilita(){
   const tu = r => r.scritto ? `<button class="campo-cl21" data-act="guida-cl21">${val(r) != null ? num(val(r)) : "–"}</button>` : num(Number(val(r)) || 0);
   return `<div class="card guida-stabilita">
     <span class="con-aiuto"><span class="eyebrow">Verifica la tua attività · Stabilità</span>${aiutoBtn("stabilita")}</span>
-    ${aiutoTesto("stabilita", `I tuoi nuovi iscritti sono le persone entrate nell'app con il tuo link questo mese: contano come tue anche
-      se l'import le mette in profondità. Nuovi nel gruppo (dal secondo import) e codici oltre 200 VP vengono dai report
-      importati; le ultime tre righe le scrivi tu: tocca il numero.`)}
+    ${aiutoTesto("stabilita", `È la tabella «Stabilità» di Cum Laude 21: per ogni livello (3%, 6% … 21%) i numeri da fare ogni mese.
+      I tuoi nuovi iscritti sono le persone entrate nell'app con il tuo link questo mese. I nuovi nel gruppo e i codici oltre
+      200 VP arrivano dai report che importi (i nuovi si contano dal secondo import). Le ultime tre righe (app CumLaude21,
+      Training Day, Convention) le scrivi tu: tocca il numero.`)}
     <p class="small" style="margin:2px 0 0">${i >= 0 ? `Questo mese sei al ${LIVELLI_CL21[i]}%` : "Questo mese non hai ancora una percentuale"}${
       i < LIVELLI_CL21.length - 1 ? `: per una qualifica solida al ${LIVELLI_CL21[prossimo]}% servono` : ": i numeri per una qualifica solida al 21%"}</p>
     <div class="tab-consigli"><table class="stabilita">
@@ -5669,6 +5680,10 @@ function vGuidaAbitudini(){
     <div class="spread"><span class="con-aiuto"><span class="eyebrow">Le tue abitudini · ${sp ? `settimana dal ${esc(dataIt(sett[0]))}` : "questa settimana"}</span>${aiutoBtn("abitudini")}</span>
       <span class="row" style="gap:4px">${sp > -SETTIMANE_INDIETRO ? `<button class="btn small ghost" data-act="guida-sett" data-d="-1">‹ Settimana prima</button>` : ""}${
         sp < 0 ? `<button class="btn small ghost" data-act="guida-sett" data-d="1">Dopo ›</button>` : ""}</span></div>
+    ${aiutoTesto("abitudini", `Quante volte hai fatto ogni abitudine questa settimana, rispetto al tuo obiettivo. Contatti, piani e follow-up si
+      contano da soli da quello che segni nella Lista. Formazione e chiamata con lo sponsor le segni tu toccando il giorno.
+      Per cambiare un obiettivo tocca il numero (contatti e piani: «Modifica» in La mia settimana). Meglio un obiettivo
+      piccolo che rispetti. Lo vedi solo tu.`)}
     ${sp ? `<p class="small" style="margin:6px 0 0">Contatti, piani e follow-up si vedono nella settimana in corso. Qui puoi spuntare
       formazione e chiamata con lo sponsor dei giorni che ti eri dimenticato.</p>` : `
     ${riga("Contatti nuovi", fattoSettimana("contatto"), st.goal.obiettivo_contatti, "Dalla tua Lista · consigliato 2 al giorno", "", "contatti")}
@@ -5676,8 +5691,6 @@ function vGuidaAbitudini(){
     ${riga("Follow-up", pp.length, obiettivoAbitudine("followup"), `${ABITUDINI.followup.spiega} · dalla tua Lista · consigliato 1 al giorno`, "", "followup")}`}
     ${riga("Formazione", fatti("formazione"), obiettivoAbitudine("formazione"), ABITUDINI.formazione.spiega, giorni("formazione"), "formazione")}
     ${riga("Chiamata con il tuo sponsor", fatti("sponsor"), obiettivoAbitudine("sponsor"), "Consigliato 1 a settimana", giorni("sponsor"), "sponsor")}
-    ${aiutoTesto("abitudini", `Contatti e piani li cambi in «Modifica» della tua settimana; gli altri obiettivi toccando il numero.
-      Meglio un obiettivo più basso, scelto da te e rispettato. Obiettivi e spunte li vedi solo tu.`)}
   </div>`;
 }
 function vGuida(){ return `${vGuidaPiano()}${vGuidaStabilita()}${vGuidaPassi()}${vGuidaAbitudini()}${vGuidaSeguimi()}`; }

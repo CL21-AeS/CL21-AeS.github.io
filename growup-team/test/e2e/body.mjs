@@ -2478,11 +2478,19 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     "resta nascosto (salvato su questo telefono)");
   // il «?»: si apre e si richiude
   await page.click("button[data-act=vista-gruppo]");
-  check(!(await page.getByText("Il numero è il livello").count()), "Struttura: la spiegazione è chiusa");
+  check(!(await page.getByText("Il numero a sinistra è il livello").count()), "Struttura: la spiegazione è chiusa");
   await page.click("button[data-act=aiuto][data-k=struttura]");
-  check(await page.getByText("Il numero è il livello").isVisible(), "il «?» apre la spiegazione");
+  check(await page.getByText("Il numero a sinistra è il livello").isVisible(), "il «?» apre la spiegazione");
   await page.click("button[data-act=aiuto][data-k=struttura]");
-  check(!(await page.getByText("Il numero è il livello").count()), "toccandolo di nuovo si richiude");
+  check(!(await page.getByText("Il numero a sinistra è il livello").count()), "toccandolo di nuovo si richiude");
+  // le abitudini: il «?» si apre in alto, sotto il titolo, prima delle righe
+  await page.click("button[data-act=vista-io]"); await page.click(".sezioni-io button[data-sez=guida]");
+  await page.click("button[data-act=aiuto][data-k=abitudini]");
+  const sopra = await page.evaluate(() => { const t = document.querySelector(".aiuto-testo"), c = t && t.closest(".card");
+    const righe = c ? [...c.querySelectorAll("*")].filter(x => /Contatti nuovi/.test(x.textContent) && !x.children.length) : [];
+    return !!t && /Quante volte hai fatto ogni abitudine/.test(t.textContent) && righe.length > 0
+      && !!(t.compareDocumentPosition(righe[0]) & Node.DOCUMENT_POSITION_FOLLOWING); });
+  check(sopra, "abitudini: la spiegazione si apre sotto il titolo, sopra le righe");
   await ctx.close();
   // con 30 nomi e tutto fatto, il riquadro non c'è
   DB.persone = DB.persone.filter(x => x.proprietario !== "R").concat(nomi46(30));
