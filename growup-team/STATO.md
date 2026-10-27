@@ -98,6 +98,15 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
+**28 ottobre — Notifiche, parte 1** (migrazioni 039 e 039b, Edge Function `invia-notifiche`; tavola «Notifiche di Growup»;
+costi: zero sul piano gratuito, anche con centinaia di utenti). La domanda «Vuoi un promemoria ogni mattina?» compare una
+volta sola per telefono; nel Profilo l'interruttore «Notifiche su questo telefono» e «Manda una notifica di prova». Ogni
+mattina alle 8:30 (ora italiana) un riepilogo senza nomi, solo se c'è qualcosa: persone da risentire, clienti da sentire,
+azioni del Seguimi, VP mancanti (ultimi 5 giorni del mese), report mappe più vecchio di 7 giorni, chiusura del mese. L'app
+salva per i prossimi 14 giorni solo i numeri; il server invia ogni 15 minuti (pg_cron). Chiavi e segreto generati e custoditi
+da Supabase. iPhone: solo con l'app sulla Home (iOS 16.4+). Prossimo: parte 2, l'ora del prossimo passo e l'avviso 30 minuti
+prima. App v49.
+
 **28 ottobre — «Glossario»**: nel Profilo la voce «Parole dell'app» si chiama ora «Glossario» (Stefano). App v48.
 
 **28 ottobre — Spiegazioni del «?» più chiare** (richiesta di Stefano dal telefono): riscritti tutti i testi dei «?» (cosa

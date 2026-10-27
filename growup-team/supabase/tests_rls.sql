@@ -998,6 +998,42 @@ begin
     delete from public.numeri_mese where mese = m38 and partner_id in (b, x38);
   end;
 
+  -- ---- 039: notifiche (telefoni e numeri solo propri; cosa inviare solo per il server) ----
+  declare
+    oggi39 date := (now() at time zone 'Europe/Rome')::date;
+    alle  timestamptz := (oggi39 + time '08:31') at time zone 'Europe/Rome';
+    corpo39 text; fuori39 int; dopo39 int;
+  begin
+    perform growup_test.come(u3);  -- B
+    insert into public.notifiche_telefoni (endpoint, p256dh, auth) values ('https://push.esempio.test/b1', 'chiaveB', 'authB');
+    insert into public.notifiche_previste (giorno, persone, clienti) values (oggi39, 3, 1);
+    perform growup_test.ok((select count(*) from public.notifiche_telefoni) = 1, '039: B vede il suo telefono');
+    perform growup_test.deve_fallire(format($q$insert into public.notifiche_previste (giorno, persone) values (%L, 1)$q$, oggi39 + 60),
+                                     '039: niente numeri oltre un mese');
+    perform growup_test.deve_fallire($q$select * from public.notifiche_inviate$q$, '039: gli invii non si leggono');
+    perform growup_test.deve_fallire($q$select * from public.notifiche_chiavi$q$, '039: le chiavi non si leggono');
+    perform growup_test.deve_fallire(format('select * from public.notifiche_da_inviare(%L)', alle), '039: cosa inviare: solo il server');
+    perform growup_test.ok(public.chiave_pubblica_notifiche() is null, '039: la chiave pubblica si legge (vuota finché non c''è)');
+    perform growup_test.come(u4);  -- C, altra linea
+    perform growup_test.ok(not exists (select 1 from public.notifiche_telefoni) and not exists (select 1 from public.notifiche_previste),
+                           '039: C non vede telefoni e numeri di B');
+    perform growup_test.deve_fallire(format($q$insert into public.notifiche_telefoni (partner_id, endpoint, p256dh, auth)
+                                     values (%L, 'https://push.esempio.test/x', 'k', 'a')$q$, b), '039: C non iscrive un telefono a nome di B');
+    perform growup_test.come(null);
+    perform growup_test.deve_fallire($q$select * from public.notifiche_telefoni$q$, '039: anon non legge i telefoni');
+    execute 'reset role';
+    execute 'set local role service_role';
+    corpo39 := (select corpo from public.notifiche_da_inviare(alle) where partner_id = b);
+    fuori39 := (select count(*) from public.notifiche_da_inviare(alle + interval '2 hours'));
+    perform public.notifiche_segna(b, 'mattino-' || oggi39);
+    dopo39 := (select count(*) from public.notifiche_da_inviare(alle) where partner_id = b);
+    execute 'reset role';
+    perform growup_test.ok(corpo39 like '3 persone da risentire · 1 cliente da sentire%', '039: alle 8:30 il riepilogo di B, senza nomi');
+    perform growup_test.ok(fuori39 = 0, '039: fuori dalle 8:30 niente riepilogo');
+    perform growup_test.ok(dopo39 = 0, '039: il riepilogo non si manda due volte');
+    delete from public.notifiche_telefoni; delete from public.notifiche_previste; delete from public.notifiche_inviate;
+  end;
+
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');

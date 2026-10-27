@@ -2,7 +2,7 @@
    Tiene in cache solo la "scatola" dell'app, per aprirla in fretta e installarla sulla Home.
    I dati vengono sempre da Supabase, mai dalla cache. Prima la rete, così gli aggiornamenti
    arrivano subito; la cache serve solo quando la rete manca. */
-const CACHE = "growup-team-v48";
+const CACHE = "growup-team-v49";
 const SCATOLA = ["./", "index.html", "app.js", "config.js", "listino.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "favicon-32.png", "icon.svg", "invito-quadrato.png", "invito-stato.png"];
 
 self.addEventListener("install", e => {
@@ -23,4 +23,22 @@ self.addEventListener("fetch", e => {
       .then(r => { if(r.ok){ const copia = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copia)); } return r; })
       .catch(() => caches.match(e.request, { ignoreSearch:true }).then(r => r || caches.match("index.html")))
   );
+});
+
+/* 039: le notifiche. Il contenuto arriva cifrato dal server (mai nomi); il tocco apre Growup sulla pagina giusta. */
+self.addEventListener("push", e => {
+  let d = {};
+  try{ d = e.data ? e.data.json() : {}; }catch(x){ d = { corpo:e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(d.titolo || "Growup", {
+    body:d.corpo || "", icon:"icon-192.png", badge:"icon-192.png", tag:d.tag || "growup", data:{ url:d.url || "./" }
+  }));
+});
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  const dove = new URL((e.notification.data && e.notification.data.url) || "./", self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type:"window", includeUncontrolled:true }).then(l => {
+    const aperta = l.find(c => c.url.startsWith(self.registration.scope));
+    if(aperta){ return aperta.focus().then(c => c && c.navigate ? c.navigate(dove) : c); }
+    return self.clients.openWindow(dove);
+  }));
 });

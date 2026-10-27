@@ -229,6 +229,13 @@
       return { cl21:c ? { app_cl21:c.app_cl21, training_day:c.training_day, convention:c.convention } : null,
         obiettivi:(db.guidaObiettivi || []).filter(x => x.partner_id === pid).map(x => ({ chiave:x.chiave, a_settimana:x.a_settimana })),
         fatti:(db.guidaFatti || []).filter(x => x.partner_id === pid).map(x => ({ chiave:x.chiave, giorno:x.giorno })) }; },
+    /* 039: notifiche (solo numeri, solo propri) */
+    chiaveNotifiche: async () => db.chiaveNotifiche === undefined ? "BAbcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJK" : db.chiaveNotifiche,
+    salvaTelefono: async t => { const io = mio(); db.telefoni = (db.telefoni || []).filter(x => x.endpoint !== t.endpoint).concat([Object.assign({ partner_id:io.id }, t)]); salva(); },
+    togliTelefono: async endpoint => { db.telefoni = (db.telefoni || []).filter(x => x.endpoint !== endpoint); salva(); },
+    salvaPreviste: async righe => { const io = mio(); db.previste = (db.previste || []).filter(x => x.partner_id !== io.id)
+      .concat(righe.map(r => Object.assign({ partner_id:io.id }, r))); salva(); },
+    notificaProva: async () => ({ inviate:(db.telefoni || []).filter(x => x.partner_id === mio().id).length }),
     /* 036: Seguimi giorno per giorno */
     seguimi: async () => (db.seguimi || []).filter(x => x.partner_id === mio().id).map(x => ({ attivo:x.attivo, condividi:x.condividi })),
     salvaSeguimi: async r => { const io = mio(); db.seguimi = (db.seguimi || []).filter(x => x.partner_id !== io.id).concat([Object.assign({ partner_id:io.id }, r)]); salva(); },

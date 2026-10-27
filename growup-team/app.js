@@ -108,6 +108,12 @@ function creaApi(){
     salvaSeguimi: r => q(sb.from("seguimi").upsert(r, { onConflict:"partner_id" })),
     seguimiGiorni: dal => q(sb.from("seguimi_giorni").select("giorno,azioni,proposte,fatte,per_tipo").gte("giorno", dal).order("giorno")),
     salvaSeguimiGiorno: r => q(sb.from("seguimi_giorni").upsert(r, { onConflict:"partner_id,giorno" })),
+    /* 039: notifiche */
+    chiaveNotifiche: () => q(sb.rpc("chiave_pubblica_notifiche")),
+    salvaTelefono: async t => { await q(sb.from("notifiche_telefoni").delete().eq("endpoint", t.endpoint)); return q(sb.from("notifiche_telefoni").insert(t)); },
+    togliTelefono: endpoint => q(sb.from("notifiche_telefoni").delete().eq("endpoint", endpoint)),
+    salvaPreviste: righe => q(sb.from("notifiche_previste").upsert(righe, { onConflict:"partner_id,giorno" })),
+    notificaProva: async () => { const { data, error } = await sb.functions.invoke("invia-notifiche", { body:{ prova:true } }); if(error) throw error; return data; },
     seguimiDi:    pid => q(sb.rpc("seguimi_di", { p_partner:pid })),
     /* 037: l'Analisi della persona (numeri dei report) e i dati che un partner condivide (mai nomi) */
     analisiPersona: pid => q(sb.rpc("analisi_persona", { p_partner:pid })),
@@ -861,6 +867,7 @@ async function vaiHome(profilo){
   /* chi è stato aggiunto a mano, la prima volta che entra, legge e accetta la privacy */
   st.fase = profilo.privacy_accettata_il ? "home" : "privacy_primo";
   if(st.fase === "home") setTimeout(riconosciPlatino, 0);
+  if(st.fase === "home") statoNotifiche().then(() => { render(); aggiornaPreviste(); });
   /* la scorciatoia sull'icona (pressione lunga): «Importa da Amway» */
   if(st.fase === "home" && /[?&]importa=1/.test(location.search)){
     st.sheet = "importa-amway";
@@ -983,6 +990,7 @@ function render(){
   foglio.innerHTML = st.sheet ? `<div class="sheet" data-act="chiudi-fuori"><div class="sheet-box" role="dialog" aria-modal="true">${vSheet()}</div></div>` : "";
   applicaRicerca();
   muoviDopo(prima);
+  aggiornaPreviste();
 }
 
 function vAvvio(){ return `<div class="centro"><p class="muted">Caricamento…</p></div>`; }
@@ -1236,6 +1244,7 @@ function vProfilo(){
       <button class="btn small ghost" data-act="partenza">Modifica</button></div>
   </div>
   <div class="card voci-profilo">
+    ${vNotificheProfilo()}
     ${voce("mia-chiave", "Il mio link personale")}
     ${puoInstallare() && leggiLocale(CHIAVE_INSTALLA_NO) === "1" ? voce("installa-si", "Installa l'app") : ""}
     ${ppNascosti ? voce("primi-passi-si", "Mostra di nuovo i Primi passi") : ""}
@@ -1302,6 +1311,7 @@ function vHome(){
   ${vInAttesa()}
   ${vStoricoGruppo()}
   ${vInvita()}` : st.sezIo === "guida" ? vGuida() : `
+  ${vDomandaNotifiche()}
   ${vPrimiPassi()}
   ${vPromemoriaImport()}
   ${st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : `${vDaFare()}${vClientiDaSentire()}`}
@@ -1389,6 +1399,87 @@ function primiPassi(){
     fatto:[...(st.mioReport || new Map()).values()].some(r => r.importato_da === io),
     corpo:() => btnAmway("Importa da Amway", "primary") });
   return l;
+}
+/* ---- 039. Le notifiche: un riepilogo alle 8:30 (e, con la 040, l'avviso del prossimo passo), mai nomi.
+   La domanda compare una volta sola per telefono; si accendono e spengono dal Profilo. Il telefono salva la sua
+   iscrizione; l'app salva per i prossimi giorni solo dei numeri (notifiche_previste); invia il server. ---- */
+const chiaveNotificheChiesto = () => "growup-team.notifiche-chiesto." + st.profilo.id;
+function pushSupportato(){ return !!window.GROWUP_PUSH || ("serviceWorker" in navigator && "PushManager" in window && "Notification" in window); }
+function permessoNotifiche(){ try{ return window.GROWUP_PUSH ? window.GROWUP_PUSH.permesso() : Notification.permission; }catch(e){ return "default"; } }
+function iosSenzaHome(){ return suIos() && !installata(); }
+async function registrazionePush(){
+  if(window.GROWUP_PUSH) return window.GROWUP_PUSH;
+  return Promise.race([navigator.serviceWorker.ready, new Promise((_, no) => setTimeout(() => no(new Error("sw")), 8000))]);
+}
+async function statoNotifiche(){
+  if(!pushSupportato() || iosSenzaHome()){ st.pushAttivo = false; return; }
+  try{ const r = await registrazionePush(); st.pushAttivo = !!(await r.pushManager.getSubscription()) && permessoNotifiche() === "granted"; }
+  catch(e){ st.pushAttivo = false; }
+}
+function daBase64url(s){ const b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)); return Uint8Array.from(b, c => c.charCodeAt(0)); }
+async function attivaNotifiche(){
+  salvaLocale(chiaveNotificheChiesto(), "1");
+  if(iosSenzaHome()){ toast("Prima installa Growup sulla Home: poi le notifiche si attivano dal Profilo"); render(); return; }
+  try{
+    const permesso = window.GROWUP_PUSH ? await window.GROWUP_PUSH.chiedi() : await Notification.requestPermission();
+    if(permesso !== "granted"){ st.pushAttivo = false; render(); toast("Notifiche non permesse: si cambiano dalle impostazioni del telefono"); return; }
+    const chiave = await api.chiaveNotifiche();
+    if(!chiave){ toast("Le notifiche non sono ancora pronte: riprova tra qualche minuto dal Profilo"); render(); return; }
+    const r = await registrazionePush();
+    const sub = (await r.pushManager.getSubscription()) || await r.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:daBase64url(chiave) });
+    const j = sub.toJSON ? sub.toJSON() : sub;
+    await api.salvaTelefono({ endpoint:j.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth });
+    st.pushAttivo = true; ultimePreviste = ""; aggiornaPreviste(); render(); toast("Notifiche attive: ogni mattina alle 8:30");
+  }catch(e){ st.pushAttivo = false; render(); toast("Non riesco ad attivare le notifiche: riprova dal Profilo"); }
+}
+async function spegniNotifiche(){
+  try{
+    const r = await registrazionePush(), sub = await r.pushManager.getSubscription();
+    if(sub){ const j = sub.toJSON ? sub.toJSON() : sub; await api.togliTelefono(j.endpoint); await sub.unsubscribe(); }
+    st.pushAttivo = false; render(); toast("Notifiche spente su questo telefono");
+  }catch(e){ toast(messaggio(e)); }
+}
+function vDomandaNotifiche(){
+  if(!pushSupportato() || leggiLocale(chiaveNotificheChiesto()) === "1" || permessoNotifiche() !== "default" || st.pushAttivo) return "";
+  return `<div class="card domanda-notifiche">
+    <span class="eyebrow">Notifiche</span>
+    <h3 style="margin-top:4px">Vuoi un promemoria ogni mattina?</h3>
+    <p class="small" style="margin:6px 0 0">${iosSenzaHome()
+      ? "Su iPhone le notifiche arrivano solo con Growup installata sulla Home (e iOS 16.4 o più). Installala, poi attivale dal Profilo."
+      : "Alle 8:30 ti diciamo cosa c'è da fare oggi, e 30 minuti prima di un passo con l'ora ti avvisiamo. Senza nomi. Le spegni quando vuoi dal Profilo."}</p>
+    <div class="row" style="gap:8px;margin-top:10px">${iosSenzaHome()
+      ? `<button class="btn grow" data-act="notifiche-no">Ho capito</button>`
+      : `<button class="btn primary grow" data-act="notifiche-si">Sì, attiva</button><button class="btn grow" data-act="notifiche-no">Non ora</button>`}</div>
+  </div>`;
+}
+function vNotificheProfilo(){
+  if(!pushSupportato()) return "";
+  const negato = permessoNotifiche() === "denied", on = !!st.pushAttivo;
+  return `<button class="interruttore notifiche-interruttore" role="switch" aria-checked="${on}" data-act="${on ? "notifiche-spegni" : "notifiche-si"}"${negato || iosSenzaHome() ? " disabled" : ""}>
+    <span class="grow" style="text-align:left">Notifiche su questo telefono<br><span class="small">${iosSenzaHome() ? "Su iPhone serve Growup installata sulla Home"
+      : negato ? "Bloccate dalle impostazioni del telefono: permettile da lì" : "Ogni mattina alle 8:30 e prima dei passi con l'ora"}</span></span>
+    <span class="toggle${on ? " on" : ""}" aria-hidden="true"></span></button>
+  ${on ? `<button class="voce-profilo" data-act="notifiche-prova"><span class="grow">Manda una notifica di prova</span><span class="fr" aria-hidden="true">›</span></button>` : ""}`;
+}
+/* i numeri dei prossimi 14 giorni per il riepilogo del mattino: solo numeri, mai nomi */
+let ultimePreviste = "", previsteT = null;
+function calcolaPreviste(){
+  const l = st.persone.filter(p => !p.nascosta_io && p.fase !== "lista" && (!p.esito || (p.esito === "non_ora" && p.prossima_data)));
+  const clientiOggi = clientiDaSentire().length, m = meseDi(oggi());
+  const manca = Math.max(0, Math.round(((Number(st.goalMese.obiettivo_vp) || 0) - vpMese(m)) * 100) / 100);
+  return Array.from({ length:14 }, (_, i) => { const g = piuGiorni(oggi(), i);
+    return { giorno:g, persone:l.filter(p => p.prossima_data && p.prossima_data <= g).length, clienti:clientiOggi,
+      seguimi:!!st.seguimi.attivo, vp_mancanti:meseDi(g) === m ? manca : 0 }; });
+}
+function aggiornaPreviste(){
+  if(!st.pushAttivo || st.fase !== "home") return;
+  clearTimeout(previsteT);
+  previsteT = setTimeout(async () => {
+    let righe; try{ righe = calcolaPreviste(); }catch(e){ return; }
+    const j = JSON.stringify(righe);
+    if(j === ultimePreviste) return;
+    try{ await api.salvaPreviste(righe); ultimePreviste = j; }catch(e){}
+  }, 1500);
 }
 function vPrimiPassi(){
   const l = primiPassi(), fatti = l.filter(x => x.fatto).length, linkDaSalvare = l.some(x => x.k === "link" && !x.fatto);
@@ -3335,6 +3426,11 @@ const AZIONI = {
   "installa-no"(){ salvaLocale(CHIAVE_INSTALLA_NO, "1"); render(); },
   "installa-si"(){ salvaLocale(CHIAVE_INSTALLA_NO, null); salvaLocale(chiavePrimiPassiNo(), null); st.passoAperto = "installa";
     st.vista = "io"; st.sezIo = "giorno"; render(); window.scrollTo(0, 0); },
+  "notifiche-si"(){ attivaNotifiche(); },
+  "notifiche-no"(){ salvaLocale(chiaveNotificheChiesto(), "1"); render(); },
+  "notifiche-spegni"(){ spegniNotifiche(); },
+  async "notifiche-prova"(){ try{ const r = await api.notificaProva(); toast(r && r.inviate ? "Notifica di prova inviata" : "Nessun telefono attivo: riattiva le notifiche"); }
+    catch(e){ toast("Non riesco a mandare la prova: riprova tra poco"); } },
   "primi-passi-no"(){ salvaLocale(chiavePrimiPassiNo(), "1"); render(); toast("Primi passi nascosti"); },
   "passo-apri"(el){ st.passoAperto = el.getAttribute("aria-expanded") === "true" ? "nessuno" : el.dataset.k; render(); },
   aiuto(el){ const k = el.dataset.k; if(st.aiuti.has(k)) st.aiuti.delete(k); else st.aiuti.add(k); render(); },
