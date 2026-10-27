@@ -98,6 +98,11 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
+**28 ottobre — Notifiche, parte 2** (migrazione 040, già applicata): nel prossimo passo, accanto al giorno, l'**ora
+facoltativa**; con l'ora arriva un avviso **30 minuti prima** («Growup · alle 18:30 — Hai un passo da fare con una persona
+della tua Lista», o «con un tuo cliente»), senza nomi; il tocco apre la sua scheda (`?persona=<id>`). L'ora si vede con il
+giorno nella scheda, nella Lista e in Io. App v51.
+
 **28 ottobre — Icona delle notifiche**: nella barra in alto di Android la notifica mostrava un quadratino bianco; ora c'è la sagoma del logo (la «G» con la freccia, `badge-96.png`, bianca su trasparente). Notifiche provate da Stefano: funzionano. App v50.
 
 **28 ottobre — Notifiche, parte 1** (migrazioni 039 e 039b, Edge Function `invia-notifiche`; tavola «Notifiche di Growup»;

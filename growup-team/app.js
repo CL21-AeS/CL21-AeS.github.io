@@ -869,6 +869,13 @@ async function vaiHome(profilo){
   if(st.fase === "home") setTimeout(riconosciPlatino, 0);
   if(st.fase === "home") statoNotifiche().then(() => { render(); aggiornaPreviste(); });
   /* la scorciatoia sull'icona (pressione lunga): «Importa da Amway» */
+  /* il tocco sull'avviso del prossimo passo (040): apre la scheda della persona, nella Lista o nei Clienti */
+  const daNotifica = (location.search.match(/[?&]persona=([0-9a-f-]{36})/) || [])[1];
+  if(st.fase === "home" && daNotifica){
+    const p = (st.persone || []).find(x => x.id === daNotifica);
+    if(p){ st.vista = "persone"; st.sezPersone = p.esito === "cliente" ? "clienti" : "lista"; st.invitoId = null; st.personaId = p.id; }
+    try{ history.replaceState(null, "", location.pathname + location.hash); }catch(e){}
+  }
   if(st.fase === "home" && /[?&]importa=1/.test(location.search)){
     st.sheet = "importa-amway";
     try{ history.replaceState(null, "", location.pathname + location.hash); }catch(e){}
@@ -3699,7 +3706,7 @@ function passoProposto(p){
 function testoProssima(p){
   if(!p.prossima_data) return "";
   const g = giorniTra(oggi(), p.prossima_data);
-  return `${g < 0 ? "In ritardo · " : g === 0 ? "Oggi · " : g === 1 ? "Domani · " : ""}${dataIt(p.prossima_data)}${p.prossima_nota ? " · " + p.prossima_nota : ""}`;
+  return `${g < 0 ? "In ritardo · " : g === 0 ? "Oggi · " : g === 1 ? "Domani · " : ""}${dataIt(p.prossima_data)}${p.prossima_ora ? " · " + String(p.prossima_ora).slice(0, 5) : ""}${p.prossima_nota ? " · " + p.prossima_nota : ""}`;
 }
 /* Su Io, come promemoria: tutte le persone con cui è iniziato un percorso (da Contattato in poi), aperte o "Non ora"
    con una data, tranne quelle che ho tolto da Io. Prima chi ha una data (in ritardo, oggi, prossimi giorni), poi le altre. */
@@ -3842,13 +3849,16 @@ function campiProssima(titolo, p){
   return `<fieldset class="field"><legend>${esc(titolo)}</legend>
       <div class="opzioni">${[["", "Nessuna"], ["1", "Domani"], ["3", "Tra 3 giorni"], ["7", "Tra una settimana"]].map(([v, t]) =>
         `<label class="chip"><input type="radio" name="tra" value="${v}"${v === "" && !p ? " checked" : ""}><span>${t}</span></label>`).join("")}</div>
-      <input type="date" name="prossima_data" min="${oggi()}" value="${esc(p && p.prossima_data || "")}" aria-label="Oppure scegli il giorno">
+      <div class="giorno-ora"><input type="date" name="prossima_data" min="${oggi()}" value="${esc(p && p.prossima_data || "")}" aria-label="Oppure scegli il giorno">
+        <label class="ora-facoltativa"><input type="time" name="prossima_ora" value="${esc(p && p.prossima_ora ? String(p.prossima_ora).slice(0, 5) : "")}"
+          aria-label="Ora (facoltativa)"><span class="small">Ora (facoltativa): ti avvisiamo 30 minuti prima</span></label></div>
       <input name="prossima_nota" maxlength="200" placeholder="Cosa (facoltativo)" value="${esc(p && p.prossima_nota || "")}"></fieldset>`;
 }
 function leggiProssima(f){
   const tra = (f.querySelector("input[name=tra]:checked") || {}).value || "";
   const data = f.prossima_data.value || (tra ? piuGiorni(oggi(), Number(tra)) : null);
-  return { prossima_data:data, prossima_nota:data ? f.prossima_nota.value.trim() || null : null };
+  const ora = data && f.prossima_ora && f.prossima_ora.value ? f.prossima_ora.value.slice(0, 5) : null;
+  return { prossima_data:data, prossima_ora:ora, prossima_nota:data ? f.prossima_nota.value.trim() || null : null };
 }
 
 /* per + Piano: le persone ancora in percorso, prima quelle più avanti (invitate), poi per nome */
@@ -4096,13 +4106,13 @@ Object.assign(MODULI, {
     if(tipo === "chiusura" && !esito){ mostraErroreForm(f, "Scegli com'è finita."); return; }
     const data = f.data.value || oggi();
     if(data > oggi()){ mostraErroreForm(f, "Il passo non può essere nel futuro: per quello c'è la prossima cosa."); return; }
-    let pr = { prossima_data:null, prossima_nota:null };
+    let pr = { prossima_data:null, prossima_ora:null, prossima_nota:null };
     if(tipo !== "chiusura" || esito === "partner") pr = leggiProssima(f);
     if(tipo === "chiusura" && esito === "non_ora"){
       const quando = f.risenti_data.value || piuMesi(oggi(), Number(scelto("risenti") || 3));
       if(quando <= oggi()){ mostraErroreForm(f, "Scegli un giorno nel futuro."); return; }
       const ricordo = piuGiorni(quando, -RISENTI_PRIMA);
-      pr = { prossima_data:ricordo > oggi() ? ricordo : oggi(), prossima_nota:`da risentire il ${dataIt(quando)}` };
+      pr = { prossima_data:ricordo > oggi() ? ricordo : oggi(), prossima_ora:null, prossima_nota:`da risentire il ${dataIt(quando)}` };
     }
     try{
       await api.nuoviPassi([{ id:uuid(), persona_id:p.id, tipo, data, come:scelto("come"), reazione:scelto("reazione"),

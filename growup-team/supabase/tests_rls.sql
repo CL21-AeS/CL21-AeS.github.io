@@ -1034,6 +1034,39 @@ begin
     delete from public.notifiche_telefoni; delete from public.notifiche_previste; delete from public.notifiche_inviate;
   end;
 
+  -- ---- 040: l'ora del prossimo passo e l'avviso 30 minuti prima (senza nomi) ----
+  declare
+    oggi40 date := (now() at time zone 'Europe/Rome')::date;
+    alle10 timestamptz := (oggi40 + time '10:00') at time zone 'Europe/Rome';
+    pp uuid; t40 text; c40 text; u40 text; n_prima int; n_dopo int; n_ancora int; c41 text;
+  begin
+    perform growup_test.come(u3);  -- B
+    insert into public.notifiche_telefoni (endpoint, p256dh, auth) values ('https://push.esempio.test/b40', 'chiaveB', 'authB');
+    insert into public.persone (nome, prossima_data, prossima_ora) values ('Nome Segreto', oggi40, time '10:30') returning id into pp;
+    perform growup_test.ok((select prossima_ora from public.persone where id = pp) = time '10:30', '040: B salva l''ora del prossimo passo');
+    perform growup_test.come(u4);  -- C
+    perform growup_test.ok(not exists (select 1 from public.persone where id = pp), '040: C non vede la persona di B');
+    execute 'reset role';
+    execute 'set local role service_role';
+    select titolo, corpo, url into t40, c40, u40 from public.notifiche_da_inviare(alle10) where chiave like 'passo-%';
+    n_prima := (select count(*) from public.notifiche_da_inviare(alle10 - interval '15 minutes') where chiave like 'passo-%');
+    n_dopo := (select count(*) from public.notifiche_da_inviare(alle10 + interval '15 minutes') where chiave like 'passo-%');
+    perform public.notifiche_segna(b, 'passo-' || pp || '-' || oggi40 || '-10:30');
+    n_ancora := (select count(*) from public.notifiche_da_inviare(alle10) where chiave like 'passo-%');
+    execute 'reset role';
+    update public.persone set esito = 'cliente' where id = pp;
+    delete from public.notifiche_inviate where chiave like 'passo-%';
+    execute 'set local role service_role';
+    c41 := (select corpo from public.notifiche_da_inviare(alle10) where chiave like 'passo-%');
+    execute 'reset role';
+    perform growup_test.ok(t40 = 'Growup · alle 10:30' and c40 like 'Hai un passo da fare con una persona della tua Lista%'
+                           and u40 = './?persona=' || pp and position('Segreto' in c40) = 0, '040: alle 10:00 l''avviso delle 10:30, senza nome');
+    perform growup_test.ok(n_prima = 0 and n_dopo = 0, '040: né 45 minuti prima né 15 minuti prima');
+    perform growup_test.ok(n_ancora = 0, '040: l''avviso non si manda due volte');
+    perform growup_test.ok(c41 like 'Hai un passo da fare con un tuo cliente%', '040: per un cliente «con un tuo cliente»');
+    delete from public.persone where id = pp; delete from public.notifiche_telefoni; delete from public.notifiche_inviate;
+  end;
+
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');

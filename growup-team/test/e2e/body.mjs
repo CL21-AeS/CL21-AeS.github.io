@@ -2609,6 +2609,34 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.persone = DB.persone.filter(x => !String(x.id).startsWith("p49"));
 }
 
+// 50. Notifiche, parte 2 (040): l'ora facoltativa del prossimo passo; il tocco sull'avviso apre la scheda (?persona=id)
+{
+  const oggiG = new Date().toISOString().slice(0, 10), pid = "00000000-0000-0000-0000-0000000000c1";
+  DB.persone = (DB.persone || []).filter(x => x.proprietario !== "R").concat([
+    { id:pid, proprietario:"R", nome:"Prova Ora", fase:"contattato", esito:null, prossima_data:null, creato_il:oggiG + "T09:00:00Z" }]);
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.click("button[data-act=vista-persone]");
+  await page.locator("button[data-act=apri-persona]", { hasText:"Prova Ora" }).click();
+  await page.click("button[data-act=prossima]");
+  check(await page.locator(".sheet input[name=prossima_ora]").isVisible() && await page.locator(".sheet").getByText("Ora (facoltativa)").isVisible(),
+    "prossimo passo: c'è l'ora facoltativa accanto al giorno");
+  await page.fill(".sheet input[name=prossima_data]", oggiG);
+  await page.fill(".sheet input[name=prossima_ora]", "18:30");
+  await page.locator(".sheet-box").screenshot({ path: S + "/e2e/50-ora.png" });
+  await page.click(".sheet button.primary");
+  await page.getByText("Prossima cosa salvata").waitFor();
+  await sync(page);
+  check(String((DB.persone.find(x => x.id === pid) || {}).prossima_ora || "").startsWith("18:30"), "l'ora è salvata");
+  check(await page.getByText(/Oggi · .* · 18:30/).first().isVisible(), "l'ora si vede con il giorno");
+  await ctx.close();
+  ({ ctx, page } = await apri({}, "?persona=" + pid + "#chiave=" + "a".repeat(32)));
+  await page.locator(".testata h1", { hasText:"La mia lista" }).waitFor();
+  check(await page.getByText("Prova Ora").first().isVisible() && !/persona=/.test(page.url()), "il tocco sull'avviso apre la scheda della persona");
+  await ctx.close();
+  DB.persone = DB.persone.filter(x => x.id !== pid);
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
