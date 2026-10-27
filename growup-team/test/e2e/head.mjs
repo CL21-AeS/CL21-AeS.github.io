@@ -52,3 +52,8 @@ const apriOrdini = async (pg, scelta) => { await pg.click(".azioni button[data-a
 /* ottimizzazione 3: nella scheda partner chiamata, numeri da aggiornare, accesso, inviti e struttura stanno in «Azioni» */
 const azioniScheda = async pg => { const b = pg.locator("button[data-act=scheda-tab][data-tab=azioni]");
   if(await b.count() && await b.getAttribute("aria-selected") !== "true") await b.click(); };
+/* «Importa da Amway»: il file va nel selettore del foglio aperto, se c'è, altrimenti in quello della pagina */
+const mettiFile = async (pg, files) => {
+  const nelFoglio = pg.locator(".sheet input.file-amway, .sheet #file-report, .sheet #file-ordini");
+  await (await nelFoglio.count() ? nelFoglio.first() : pg.locator("input.file-amway").first()).setInputFiles(files);
+};

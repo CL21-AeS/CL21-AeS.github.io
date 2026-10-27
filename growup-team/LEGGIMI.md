@@ -200,7 +200,10 @@ Nell'app non si inseriscono più persone a mano: la rete rispecchia sempre quell
 - **Chi non usa l'app** arriva solo dall'import, e lo vede **solo chi l'ha importato**.
 
 Ognuno importa il report della **propria** linea, quando vuole (pagina Gruppo → La mia
-struttura → **Importa dal report Amway**).
+struttura → **Importa da Amway**). Lo stesso pulsante è nel promemoria di Io, nel foglio «Ordini» e in Clienti, e
+sull'icona di Growup (Android, pressione lunga → «Importa da Amway»): si scelgono insieme i file CSV scaricati dal sito
+(mappa, ordini, clienti) e l'app riconosce quale è quale; prima la mappa, poi da solo l'import di ordini e clienti.
+Il file si sceglie sempre a mano: una pagina web non può leggere da sola la cartella Download del telefono.
 1. Sul sito Amway: Business Centre → **Linea di Sponsorizzazione (LOS)** → togliere i filtri → pulsante di download →
    **Intera Linea di Sponsorizzazione con tutti i KPI disponibili** → formato **CSV**.
 2. Nell'app scegliere il file. L'anteprima mostra:
