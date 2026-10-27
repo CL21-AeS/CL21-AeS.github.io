@@ -98,6 +98,8 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
+**28 ottobre — Icona delle notifiche**: nella barra in alto di Android la notifica mostrava un quadratino bianco; ora c'è la sagoma del logo (la «G» con la freccia, `badge-96.png`, bianca su trasparente). Notifiche provate da Stefano: funzionano. App v50.
+
 **28 ottobre — Notifiche, parte 1** (migrazioni 039 e 039b, Edge Function `invia-notifiche`; tavola «Notifiche di Growup»;
 costi: zero sul piano gratuito, anche con centinaia di utenti). La domanda «Vuoi un promemoria ogni mattina?» compare una
 volta sola per telefono; nel Profilo l'interruttore «Notifiche su questo telefono» e «Manda una notifica di prova». Ogni
