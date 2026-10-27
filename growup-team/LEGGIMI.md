@@ -105,9 +105,11 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     chiavi VAPID (custodite dal server) e `notifiche_da_inviare` (il riepilogo delle 8:30, solo per il server).
     Su Supabase anche `039b_notifiche_cron.sql` (pg_net, segreto in Vault, chiamata ogni 15 minuti) e la Edge Function
     `supabase/functions/invia-notifiche` (pubblicata con `verify_jwt` spento: controlla da sola il segreto o il token).
-37. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
-19. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
-20. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
+37. `supabase/040_prossima_ora.sql` — l'ora facoltativa del prossimo passo (`persone.prossima_ora`) e, in
+    `notifiche_da_inviare`, l'avviso 30 minuti prima (senza nomi; il tocco apre la scheda con `?persona=<id>`).
+38. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
+21. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
 
 In alternativa ai punti 1-16: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
