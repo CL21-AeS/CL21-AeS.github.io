@@ -1210,7 +1210,7 @@ function omino(){
   return `<button class="omino${st.vista === "profilo" ? " on" : ""}" data-act="vista-profilo" aria-label="Il mio profilo">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></button>`;
 }
-/* Le parole dell'app (glossario, testi approvati da Stefano) */
+/* Il glossario (testi approvati da Stefano) */
 const GLOSSARIO = [
   ["VP personali (VPP)", "I punti volume dei tuoi ordini e di quelli dei tuoi clienti nel mese."],
   ["VP di gruppo (VPG)", "I tuoi VP personali più quelli di tutte le persone sotto di te."],
@@ -1239,7 +1239,7 @@ function vProfilo(){
     ${voce("mia-chiave", "Il mio link personale")}
     ${puoInstallare() && leggiLocale(CHIAVE_INSTALLA_NO) === "1" ? voce("installa-si", "Installa l'app") : ""}
     ${ppNascosti ? voce("primi-passi-si", "Mostra di nuovo i Primi passi") : ""}
-    <button class="voce-profilo" data-act="aiuto" data-k="glossario" aria-expanded="${gloss}"><span class="grow">Parole dell'app</span>
+    <button class="voce-profilo" data-act="aiuto" data-k="glossario" aria-expanded="${gloss}"><span class="grow">Glossario</span>
       <span class="fr" aria-hidden="true">${gloss ? "▴" : "▾"}</span></button>
     ${gloss ? `<dl class="glossario">${GLOSSARIO.map(([t, d]) => `<dt>${esc(t)}</dt><dd>${esc(d)}</dd>`).join("")}</dl>` : ""}
     ${voce("privacy", "Privacy")}
