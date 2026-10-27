@@ -2560,6 +2560,55 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
 }
 
+// 49. Notifiche (039): la domanda una volta per telefono, Sì / Non ora, il telefono salvato, i numeri dei prossimi giorni
+// (senza nomi), il Profilo con l'interruttore e la prova. Push del telefono sostituito da una finta (GROWUP_PUSH).
+{
+  const oggiG = new Date().toISOString().slice(0, 10), domani = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  DB.telefoni = []; DB.previste = [];
+  DB.persone = (DB.persone || []).filter(x => x.proprietario !== "R").concat([
+    { id:"p49a", proprietario:"R", nome:"Risentire Oggi", fase:"piano", esito:null, prossima_data:oggiG, creato_il:oggiG + "T09:00:00Z" },
+    { id:"p49b", proprietario:"R", nome:"Risentire Domani", fase:"invitato", esito:null, prossima_data:domani, creato_il:oggiG + "T09:00:00Z" }]);
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  await page.evaluate(() => { window.GROWUP_PUSH = { perm:"default", sub:null, permesso(){ return this.perm; },
+    async chiedi(){ this.perm = "granted"; return "granted"; },
+    pushManager:{ getSubscription:async () => window.GROWUP_PUSH.sub,
+      subscribe:async () => (window.GROWUP_PUSH.sub = { endpoint:"https://push.esempio.test/telefono1", keys:{ p256dh:"pk", auth:"au" },
+        toJSON(){ return { endpoint:this.endpoint, keys:this.keys }; }, unsubscribe:async () => { window.GROWUP_PUSH.sub = null; } }) } }; });
+  const ridisegna = async () => { await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); };
+  await ridisegna();
+  const dom = page.locator(".domanda-notifiche");
+  check(await dom.isVisible() && await dom.getByText("Vuoi un promemoria ogni mattina?").isVisible(), "la domanda delle notifiche in Io");
+  await page.screenshot({ path: S + "/e2e/49-domanda.png" });
+  await dom.locator("button[data-act=notifiche-no]").click();
+  await ridisegna();
+  check(!(await page.locator(".domanda-notifiche").count()), "«Non ora»: la domanda non ricompare");
+  await page.evaluate(() => localStorage.removeItem("growup-team.notifiche-chiesto.R"));
+  await ridisegna();
+  await page.locator(".domanda-notifiche button[data-act=notifiche-si]").click();
+  await page.getByText("Notifiche attive: ogni mattina alle 8:30").waitFor();
+  check(!(await page.locator(".domanda-notifiche").count()), "«Sì»: notifiche attive, la domanda sparisce");
+  await new Promise(r => setTimeout(r, 2200));
+  await sync(page);
+  const prev = (DB.previste || []).filter(x => x.partner_id === "R");
+  check((DB.telefoni || []).filter(x => x.partner_id === "R").length === 1, "il telefono è salvato");
+  check(prev.length === 14 && prev.find(x => x.giorno === oggiG).persone >= 1 && prev.find(x => x.giorno === domani).persone >= 2
+    && !JSON.stringify(prev).includes("Risentire"), "i numeri dei prossimi 14 giorni, senza nomi");
+  await page.click(".testata button.omino");
+  const sw = page.locator("button.notifiche-interruttore");
+  check(await sw.getAttribute("aria-checked") === "true", "Profilo: notifiche accese su questo telefono");
+  await page.screenshot({ path: S + "/e2e/49-profilo.png" });
+  await page.click("button[data-act=notifiche-prova]");
+  await page.getByText("Notifica di prova inviata").waitFor(); check(true, "Profilo: la notifica di prova");
+  await sw.click();
+  await page.getByText("Notifiche spente su questo telefono").waitFor();
+  await sync(page);
+  check(!(DB.telefoni || []).some(x => x.partner_id === "R") && await page.locator("button.notifiche-interruttore").getAttribute("aria-checked") === "false",
+    "spente: il telefono è tolto");
+  await ctx.close();
+  DB.persone = DB.persone.filter(x => !String(x.id).startsWith("p49"));
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

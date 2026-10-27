@@ -101,9 +101,13 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     con nome, VP e percentuale, conteggi della Stabilità) e i dati condivisi con l'upline (`dati_condivisi`)
 35. `supabase/038_mese_argento.sql` — il mese da Argento con la linea al 21% (`mesi_qualifica`: al 21% conta come mese
     da Argento senza linee al 21%, con 2 o più, o con una e almeno 4.000 VP di gruppo rimanenti fuori da quella linea).
-36. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
-18. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
-19. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
+36. `supabase/039_notifiche.sql` — le notifiche: telefoni iscritti, numeri dei prossimi giorni (senza nomi), invii fatti,
+    chiavi VAPID (custodite dal server) e `notifiche_da_inviare` (il riepilogo delle 8:30, solo per il server).
+    Su Supabase anche `039b_notifiche_cron.sql` (pg_net, segreto in Vault, chiamata ogni 15 minuti) e la Edge Function
+    `supabase/functions/invia-notifiche` (pubblicata con `verify_jwt` spento: controlla da sola il segreto o il token).
+37. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+19. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
+20. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
 
 In alternativa ai punti 1-16: `supabase/installa_tutto.sql` li contiene già tutti, in un solo incolla.
