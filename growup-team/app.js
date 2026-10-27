@@ -861,6 +861,11 @@ async function vaiHome(profilo){
   /* chi è stato aggiunto a mano, la prima volta che entra, legge e accetta la privacy */
   st.fase = profilo.privacy_accettata_il ? "home" : "privacy_primo";
   if(st.fase === "home") setTimeout(riconosciPlatino, 0);
+  /* la scorciatoia sull'icona (pressione lunga): «Importa da Amway» */
+  if(st.fase === "home" && /[?&]importa=1/.test(location.search)){
+    st.sheet = "importa-amway";
+    try{ history.replaceState(null, "", location.pathname + location.hash); }catch(e){}
+  }
 }
 
 async function caricaStruttura(){
@@ -1382,7 +1387,7 @@ function primiPassi(){
       <button class="btn primary" style="margin-top:8px" data-act="guida-vai" data-dove="lista">Apri la Lista</button>` });
   if(figli(io).length) l.push({ k:"import", nome:"Importa il tuo primo report", sotto:"Il report mappe dal sito Amway",
     fatto:[...(st.mioReport || new Map()).values()].some(r => r.importato_da === io),
-    corpo:() => `<button class="btn primary" data-act="importa">Importa dal report Amway</button>` });
+    corpo:() => btnAmway("Importa da Amway", "primary") });
   return l;
 }
 function vPrimiPassi(){
@@ -1829,7 +1834,7 @@ function vPromemoriaImport(){
   if(giorni <= GIORNI_PROMEMORIA_IMPORT) return "";
   return `<div class="card tight promemoria-import"><div class="spread">
     <span>${giorno ? `L'ultimo report è del <b>${dataIt(giorno)}</b>: ${plur(giorni, "giorno", "giorni")} fa.` : "Questo mese non hai ancora importato il report."}</span>
-    <button class="btn small primary" data-act="importa">Importa</button></div></div>`;
+    ${btnAmway("Importa da Amway", "small primary")}</div></div>`;
 }
 
 /* I report mappe da importare per contare i mesi: chi ha dichiarato Argento o Oro dal mese della prima qualifica
@@ -1867,7 +1872,7 @@ function vReportDaImportare(){
     <p class="small" style="margin:6px 0 0">Per contare i tuoi mesi da Argento importa il report mappe di ogni mese
       (sul sito Amway scegli il mese, poi scarica il CSV come sempre).</p>
     <ul class="mesi-report">${elenco.map(x => `<li class="${x.fatto ? "ok" : ""}"><span class="mark">${x.fatto ? "✓" : "○"}</span>${esc(nomeMese(x.mese))}</li>`).join("")}</ul>
-    <button class="btn wide" style="margin-top:10px" data-act="importa">Importa un report</button>
+    ${btnAmway("Importa da Amway", "wide", "margin-top:10px")}
   </div>`;
 }
 
@@ -2071,7 +2076,7 @@ function vStruttura(){
         aria-label="${chiusoIo ? "Mostra" : "Nascondi"} il tuo gruppo">${chiusoIo ? "▸" : "▾"} ${righe.length}</button></li>`;
   return `<div class="card">
     <div class="spread"><span class="con-aiuto"><span class="eyebrow">La mia struttura</span>${tutte.length ? aiutoBtn("struttura") : ""}</span>
-      <button class="btn small" data-act="importa">Importa dal report Amway</button></div>
+      ${btnAmway("Importa da Amway", "small")}</div>
     ${tutte.length ? aiutoTesto("struttura", `Il numero è il livello, come nei report Amway: 1 sei tu, 2 i tuoi frontali, 3 i loro, e così via.
       ▾ chiude o riapre il gruppo di una persona. Tocca un nome per aprire la sua scheda.${completa ? ` Le nascoste sono in grigio, al loro posto.
       I gruppi partono chiusi: ▸ apre il gruppo di una persona. Mostra o Nascondi su ogni riga.` : ""}`) : ""}
@@ -2691,6 +2696,61 @@ function sceltaRapida(el, spunta){
 
 /* Più file insieme: i mesi chiusi si salvano solo come numeri, uno dopo l'altro; il mese in corso (al massimo uno)
    resta l'import completo, con la sua anteprima, dopo i mesi chiusi. */
+/* ---- «Importa da Amway» (un solo pulsante): si scelgono insieme i file scaricati dal sito Amway e l'app riconosce
+   quale è quale. Prima la mappa (Linea di Sponsorizzazione), poi da sola l'import di ordini e clienti. Il file si sceglie
+   sempre a mano: una pagina web non può leggere da sola la cartella Download del telefono. ---- */
+function tipoFileAmway(testo){
+  const righe = righeCsv(testo).slice(0, 40);
+  if(righe.some(r => r.some(x => pulito(x) === "Codice Amway Partner"))) return "mappa";
+  if(righe.some(r => r.some(x => /codice cliente/i.test(x)))) return "ordini";
+  return null;
+}
+async function smistaFileAmway(files){
+  if(!files || !files.length) return;
+  const mappe = [], ordini = [], errori = [];
+  for(const file of files){
+    if(/\.xlsx?$/i.test(file.name)){ errori.push(`${file.name}: è il file Excel, sul sito Amway scegli il formato CSV.`); continue; }
+    let tipo = null;
+    try{ tipo = tipoFileAmway(await file.text()); }catch(e){}
+    if(tipo === "mappa") mappe.push(file);
+    else if(tipo === "ordini") ordini.push(file);
+    else errori.push(`${file.name}: non sembra un export Amway (mappa, ordini o clienti). Sul sito scegli il formato CSV.`);
+  }
+  st.erroriAmway = errori;
+  if(errori.length && (mappe.length || ordini.length)) toast(errori.join(" · "));
+  if(mappe.length){
+    st.ordiniInAttesa = ordini.length ? ordini : null;
+    st.imp = null; st.errore = ""; st.sheet = "importa"; render();
+    return leggiFileReport(mappe);
+  }
+  if(ordini.length){ st.ordiniInAttesa = null; return apriImportOrdini(ordini); }
+  st.sheet = "importa-amway"; render();
+}
+/* il pulsante «Importa da Amway»: il tocco apre subito la scelta dei file del telefono */
+function btnAmway(testo, cls, stile){
+  return `<label class="btn ${cls || ""}"${stile ? ` style="${stile}"` : ""}>${testo}<input type="file" class="file-amway"
+    accept=".csv,text/csv,text/comma-separated-values" multiple hidden></label>`;
+}
+function apriImportOrdini(files, dopoMappa){
+  st.impOrdini = null; st.errore = ""; st.ordiniDopoMappa = !!dopoMappa; st.sheet = "importa-ordini"; render();
+  return leggiFileOrdini(files);
+}
+/* salvata la mappa: se c'erano anche ordini o clienti, si apre il loro import */
+function poiOrdini(){
+  const f = st.ordiniInAttesa;
+  if(!f) return;
+  st.ordiniInAttesa = null;
+  apriImportOrdini(f, true);
+}
+function vImportaAmway(){
+  const e = st.erroriAmway || [];
+  return `<h2>Importa da Amway</h2>
+    <p class="small">Scegli i file CSV che hai scaricato dal sito Amway: la mappa (Intera Linea di Sponsorizzazione con tutti i
+      KPI), gli Ordini e i Clienti. Anche tutti insieme: l'app riconosce quale è quale.</p>
+    ${e.length ? `<div class="avviso">${e.map(x => `<p style="margin:2px 0">${esc(x)}</p>`).join("")}</div>` : ""}
+    ${btnAmway("Scegli i file", "primary wide", "margin-top:12px")}
+    <button type="button" class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>`;
+}
 async function leggiFileReport(files){
   if(!files || !files.length) return;
   if(files.length === 1) return leggiUnReport(files[0]);
@@ -2724,7 +2784,7 @@ async function salvaReportPassati(m, f){
   /* il mese in corso, se c'era, si importa adesso con la sua anteprima */
   if(m.corrente && !m.errori.length){ st.imp = m.corrente; render(); }
   else if(m.errori.length){ st.imp = { multi:true, passati:[], corrente:m.corrente, errori:m.errori }; render(); }
-  else { st.sheet = null; st.imp = null; render(); }
+  else { st.sheet = null; st.imp = null; render(); poiOrdini(); }
   riconosciPlatino();
 }
 async function leggiUnReport(file){
@@ -2782,7 +2842,7 @@ async function salvaReportPassato(a, f){
     await caricaNumeri();
     st.sheet = null; st.imp = null; st.occupato = false; render();
     toast(`Numeri di ${nomeMese(a.mese)} salvati`);
-    riconosciPlatino();
+    riconosciPlatino(); poiOrdini();
   }catch(e){ st.occupato = false; mostraErroreForm(f, messaggio(e)); }
 }
 async function eseguiImport(f){
@@ -2822,6 +2882,7 @@ async function eseguiImport(f){
     st.sheet = null; st.imp = null; st.occupato = false; render();
     riconosciPlatino();
     const n = k => Number(esito[k]) || 0;
+    setTimeout(poiOrdini, 50);
     toast(`Import di ${nomeMese(a.mese).split(" ")[0]}: ${[n("aggiunte") ? plur(n("aggiunte"), "persona aggiunta", "persone aggiunte") : "",
       plur(n("aggiornati"), "persona aggiornata", "persone aggiornate"), n("piu_vecchi") ? plur(n("piu_vecchi"), "già più aggiornata", "già più aggiornate") : "", n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
       n("fuori") ? plur(n("fuori"), "persona non più nel report", "persone non più nel report") : "",
@@ -3770,7 +3831,7 @@ function vSheetPersone(s){
 }
 
 /* chiudendo un foglio aperto dai pulsanti rapidi di Io non resta niente di mezzo */
-function chiudiSheet(){ st.sheet = null; if(st.rapido === "piano"){ st.personaId = null; st.passoTipo = null; } st.rapido = null; }
+function chiudiSheet(){ st.sheet = null; st.ordiniInAttesa = null; st.erroriAmway = []; if(st.rapido === "piano"){ st.personaId = null; st.passoTipo = null; } st.rapido = null; }
 async function dopoPersone(msg){
   /* + Piano da Io: finito il passo si resta su Io, senza una scheda aperta in Persone */
   if(st.rapido === "piano"){ st.rapido = null; st.personaId = null; }
@@ -4552,7 +4613,7 @@ function vClienti(){
     return (sa.primo ? sa.primo.finisce : "9999") < (sb.primo ? sb.primo.finisce : "9999") ? -1 : 1; });
   return `<div class="card">
     <div class="spread"><span class="con-aiuto"><span class="eyebrow">I miei clienti</span>${aiutoBtn("clienti")}</span>
-      <span class="row" style="gap:6px"><button class="btn small" data-act="importa-ordini">Dal sito Amway</button>
+      <span class="row" style="gap:6px">${btnAmway("Da Amway", "small")}
       <button class="btn small primary" data-act="cliente-nuovo">+ Un cliente</button></span></div>
     ${aiutoTesto("clienti", "I tuoi clienti li vedi solo tu. Gli ordini servono ai riordini: non cambiano i tuoi VP.")}
     ${tutti.length ? `<div class="row wrap scelte-rapide" style="gap:6px;margin-top:10px">${FILTRI_CLIENTI.map(x =>
@@ -4996,7 +5057,7 @@ function vSheetOrdiniAmway(s){
   const cambiano = a.trovati.filter(g => g.cambia);
   /* una spunta sola per mettere o togliere tutte le spunte della sezione */
   const tutti = nome => `<label class="check tutti"><input type="checkbox" data-tutti="${nome}" checked> Seleziona tutti</label>`;
-  return `<h2>Dal sito Amway</h2>
+  return `${st.ordiniDopoMappa ? `<p class="avviso" style="margin:0 0 8px">Mappa importata. Ora gli ordini e i clienti.</p>` : ""}<h2>Dal sito Amway</h2>
     <p class="small">${[a.ordini ? plur(a.ordini, "ordine", "ordini") : "", a.clienti ? plur(a.clienti, "cliente", "clienti") : ""].filter(Boolean).join(" e ")} nei file ·
       <b>${plur(a.ordiniNuovi, "ordine nuovo", "ordini nuovi")}</b> da aggiungere allo storico.</p>
     <form data-form="importa-ordini" novalidate>
@@ -5082,7 +5143,7 @@ document.addEventListener("change", e => {
     if(capo){ const n = tutte.filter(i => i.checked).length; capo.checked = n === tutte.length; capo.indeterminate = n > 0 && n < tutte.length; }
   }
 });
-document.addEventListener("change", e => { if(e.target && e.target.id === "file-ordini") leggiFileOrdini(e.target.files && [...e.target.files]); });
+document.addEventListener("change", e => { if(e.target && e.target.id === "file-ordini") smistaFileAmway(e.target.files ? [...e.target.files] : []); });
 
 /* ---- 11f. Il listino Amway (solo admin): prodotti a mano e aggiornamento dal PDF ----
    Il PDF si legge sul telefono con pdf.js (caricato solo qui, con il controllo d'integrità); non si salva.
@@ -5318,12 +5379,15 @@ function vOrdini(){
       ${scelta("apri-bozza", "Bozza ordine", nb ? `${prodotti(nb)} · salvata` : "Prepara l'ordine con i prodotti del listino")}
       ${scelta("apri-miei", "I miei ordini", lista.length ? `${plur(lista.length, "ordine", "ordini")} · l'ultimo il ${dataIt(lista[0].data)}` : "Ancora nessuno")}
       ${scelta("totale-mese", "Aggiorna il totale del mese", "La cifra dall'ufficio virtuale Amway")}
-      ${scelta("importa-ordini", "Ordini dal sito Amway", "I file CSV di ordini e clienti dal sito Amway")}
+      <label class="scelta-ordini"><span class="grow"><b>Importa da Amway</b>
+        <span class="small">Mappa, ordini e clienti: i file CSV scaricati dal sito Amway</span></span><span class="fr" aria-hidden="true">›</span>
+        <input type="file" class="file-amway" accept=".csv,text/csv,text/comma-separated-values" multiple hidden></label>
     </div>
     ${precedenteAperto() ? `<p class="small" style="margin:10px 0 0">Fino al ${giornoChiusura()} puoi ancora correggere ${nomeMese(mesePrecedente()).split(" ")[0]}.</p>` : ""}
     <button class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
 }
 function vSheetMiei(s){
+  if(s === "importa-amway") return vImportaAmway();
   if(s === "ordini") return vOrdini();
   if(s === "bozza") return vBozzaOrdine();
   if(s === "miei") return vMieiOrdini();
@@ -6137,7 +6201,7 @@ document.addEventListener("submit", e => {
 /* Qualifica scelta: mostra mese e pagamenti per Foundation e Builder; la data di iscrizione
    è obbligatoria solo per chi inizia (nel modulo d'ingresso). */
 document.addEventListener("change", e => {
-  if(e.target.id === "file-report"){ leggiFileReport(e.target.files ? [...e.target.files] : []); return; }
+  if(e.target.id === "file-report" || e.target.classList.contains("file-amway")){ smistaFileAmway(e.target.files ? [...e.target.files] : []); return; }
   if(e.target.name === "nascondi" && e.target.closest(".imp-da-scegliere")){ accendiRapida(null); return; }
   if(e.target.name !== "qualifica") return;
   const f = e.target.form;

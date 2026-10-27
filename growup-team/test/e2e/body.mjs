@@ -102,7 +102,7 @@ check(await oggiCard.getByText("Contatto: Paolo Rapido").isVisible() && await og
   "Oggi: contatto e piano con il nome della persona");
 await apriOrdini(page);
 check(await page.locator(".sheet .scelta-ordini").allInnerTexts().then(l => l.map(t => t.split("\n")[0])).then(l => l.join("|"))
-  === "Ordine veloce|Bozza ordine|I miei ordini|Aggiorna il totale del mese|Ordini dal sito Amway", "+ Ordine apre il foglio Ordini con le 5 scelte");
+  === "Ordine veloce|Bozza ordine|I miei ordini|Aggiorna il totale del mese|Importa da Amway", "+ Ordine apre il foglio Ordini con le 5 scelte");
 await page.click(".sheet button[data-act=ordine]");
 check(await page.inputValue(".sheet input[name=vp]") === "" && await page.getAttribute(".sheet input[name=vp]", "placeholder") === "0", "ordine: campo vuoto con lo 0 grigio");
 await page.click(".sheet button:has-text('Salva')");
@@ -150,10 +150,9 @@ const creaCsv = (mese, righe) => "﻿" + [csvRiga(["Amway","CONFIDENZIALE - REPO
   .concat(righe.map(csvRiga)).join("\n");
 const scegliFile = async (pg, nome, testo, daGruppo) => {
   /* l'import sta in Gruppo (e nel promemoria di Io): se la pagina aperta non lo ha, si va in Gruppo */
-  if(!daGruppo && !(await pg.locator("button[data-act=importa]:visible").count())) await pg.click("button[data-act=vista-gruppo]");
-  await pg.locator(daGruppo ? ".card button[data-act=importa]" : "button[data-act=importa]:visible").first().click();
-  await pg.locator(".sheet").getByText("Intera Linea di Sponsorizzazione con tutti i KPI disponibili").waitFor();
-  await pg.setInputFiles("#file-report", { name:nome, mimeType:"text/csv", buffer:Buffer.from(testo) });
+  /* «Importa da Amway» apre subito la scelta dei file: in Gruppo c'è sempre */
+  if(!(await pg.locator(".sheet").count()) && !(await pg.locator("input.file-amway").count())) await pg.click("button[data-act=vista-gruppo]");
+  await mettiFile(pg, { name:nome, mimeType:"text/csv", buffer:Buffer.from(testo) });
 };
 /* 033: chi è appena entrato è "in attesa della mappa" finché un report della upline non lo mostra */
 check(await page.locator(".primi-passi .stato-attesa").isVisible(), "chi è appena entrato è in attesa della mappa (riga in Primi passi)");
@@ -839,9 +838,9 @@ const righeCsv = [persona(1, "7654321", "1234567", "ROSSI, MARIO", "400,00"), pe
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await scegliFile(page, "altro.csv", "nome,cognome\nMario,Rossi\n");
-await page.locator(".sheet .errore").waitFor();
-check(await page.locator(".sheet .errore").getByText("non sembra il report").isVisible(), "import: file sbagliato riconosciuto");
-await page.setInputFiles("#file-report", { name:"altri.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, [persona(1, "1", "1234567", "ROSSI, MARIO", "1"), persona(2, "1234567", "9999999", "ALTRO, ALDO", "1")])) });
+await page.locator(".sheet .avviso").waitFor();
+check(await page.locator(".sheet .avviso").getByText("altro.csv: non sembra un export Amway").isVisible(), "import: file sbagliato riconosciuto, con il nome");
+await mettiFile(page, { name:"altri.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, [persona(1, "1", "1234567", "ROSSI, MARIO", "1"), persona(2, "1234567", "9999999", "ALTRO, ALDO", "1")])) });
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
 await page.click(".sheet button[data-act=chiudi]");
 const meseVecchio = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - 3); return d.toISOString().slice(0, 7).replace("-", ""); })();
@@ -849,9 +848,9 @@ await scegliFile(page, "vecchio.csv", creaCsv(meseVecchio, righeCsv));
 await page.locator(".sheet .errore, .sheet button:has-text('Salva i numeri')").first().waitFor();
 check(await page.getByText("Prima importa il report del mese in corso").isVisible() || await page.getByText("È un mese chiuso: salvo solo i numeri").isVisible(),
   "import: un mese chiuso salva solo i numeri (serve prima il codice dal mese in corso)");
-await page.setInputFiles("#file-report", { name:"report.xlsx", mimeType:"application/octet-stream", buffer:Buffer.from("PK") });
-check(await page.locator(".sheet .errore").getByText("sul sito Amway scegli il formato CSV").isVisible(), "import: il file Excel non va, serve il CSV");
-await page.setInputFiles("#file-report", { name:"los.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, righeCsv)) });
+await mettiFile(page, { name:"report.xlsx", mimeType:"application/octet-stream", buffer:Buffer.from("PK") });
+check(await page.locator(".sheet").getByText("sul sito Amway scegli il formato CSV").isVisible(), "import: il file Excel non va, serve il CSV");
+await mettiFile(page, { name:"los.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, righeCsv)) });
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
 const sez = t => page.locator(".sheet .imp-sezione", { hasText:t });
 check(await sez("Si aggiornano i numeri").locator("li", { hasText:"Stefano e Alessia (tu)" }).getByText("400 VP").isVisible()
@@ -1405,8 +1404,7 @@ const csvOrdini = ['"Amway","CONFIDENZIALE - prova"', '"Mese di competenza","202
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
-await page.click("button[data-act=importa-ordini]");
-await page.setInputFiles("#file-ordini", { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) });
+await mettiFile(page, { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) });
 await page.locator(".sheet form[data-form=importa-ordini]").waitFor();
 check(await page.getByText("4 ordini nei file").isVisible() && await page.getByText("4 ordini nuovi").isVisible(), "anteprima: 4 ordini, tutti nuovi");
 check(await page.locator(".sheet .imp-sezione", { hasText:"Già in Growup" }).getByText("riconosciuto dal nome").isVisible(), "Gina riconosciuta dal nome");
@@ -1424,8 +1422,7 @@ await page.click("button[data-act=vista-io]");
 check(await page.locator(".card", { hasText:"I tuoi clienti da sentire" }).getByText("di solito ordina ogni 40 giorni").isVisible(), "Io: Lia da sentire, ordina ogni 40 giorni");
 // reimport dello stesso file (l'export parte sempre da settembre): niente doppi
 await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
-await page.click("button[data-act=importa-ordini]");
-await page.setInputFiles("#file-ordini", { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) });
+await mettiFile(page, { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) });
 await page.locator(".sheet form[data-form=importa-ordini]").waitFor();
 check(await page.getByText("1 ordine nuovo", { exact:true }).isVisible() && await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).isVisible(),
   "reimport: gli ordini già importati si saltano, resta solo chi non era stato aggiunto");
@@ -1452,8 +1449,7 @@ const csvClienti = ['"Amway","CONFIDENZIALE - prova"', '"Mese di competenza","20
   clienteCsv("Bianchi, Ugo", "7000000005", gg(-300), "+39 333 000 0005", gg(-20)),
   clienteCsv("Neri, Mai", "7000000006", gg(-500), "+39 333 000 0006", "")].join("\n") + "\n";
 await page.click("button[data-act=torna-clienti]");
-await page.click("button[data-act=importa-ordini]");
-await page.setInputFiles("#file-ordini", [{ name:"19102026_Cliente.csv", mimeType:"text/csv", buffer:Buffer.from(csvClienti) },
+await mettiFile(page, [{ name:"19102026_Cliente.csv", mimeType:"text/csv", buffer:Buffer.from(csvClienti) },
   { name:"18102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) }]);
 await page.locator(".sheet form[data-form=importa-ordini]").waitFor();
 check(await page.getByText("4 ordini e 4 clienti nei file").isVisible(), "i due file insieme: riconosciuti da soli");
@@ -1478,8 +1474,7 @@ check(liaC.contatto === "+39 333 000 0001" && liaC.codice_cliente === "700000000
 check(!JSON.stringify(DB.persone).includes("example.com") && !JSON.stringify(DB.persone).includes("Via Finta"), "email e indirizzo non si salvano");
 // l'export ordini con l'ordine di Ugo: si unisce a quello già nello storico
 const csvOrdini2 = csvOrdini.trimEnd() + "\n" + ordineCsv("Bianchi, Ugo", "7000000005", gg(-20), "170000005", "10,00", "22,00") + "\n";
-await page.click("button[data-act=importa-ordini]");
-await page.setInputFiles("#file-ordini", { name:"19102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini2) });
+await mettiFile(page, { name:"19102026_Ordine.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini2) });
 await page.locator(".sheet form[data-form=importa-ordini]").waitFor();
 await page.locator(".sheet .scelte label", { hasText:"Nuovo Verdi" }).locator("input").uncheck();
 await page.click(".sheet button:has-text('Importa')");
@@ -1538,8 +1533,7 @@ const csvGino = ['"Nome","Codice Cliente","Tipo","Nuovo cliente","Data di ingres
   clienteCsv("Somma, Gino", "7000000020", gg(-200), "+39 333 000 0020", gg(-5))].join("\n") + "\n";
 for(const volta of [1, 2]){
   await page.click("button[data-act=torna-clienti]").catch(() => {});
-  await page.click("button[data-act=importa-ordini]");
-  await page.setInputFiles("#file-ordini", { name:"20102026_Cliente.csv", mimeType:"text/csv", buffer:Buffer.from(csvGino) });
+    await mettiFile(page, { name:"20102026_Cliente.csv", mimeType:"text/csv", buffer:Buffer.from(csvGino) });
   await page.locator(".sheet form[data-form=importa-ordini]").waitFor();
   if(volta === 1){
     check(await page.locator(".sheet .imp-sezione", { hasText:"Già in Growup" }).getByText(/Gino Somma · ultimo ordine/).isVisible(), "import: l'ultimo ordine del sito si aggiunge al cliente");
@@ -2008,23 +2002,21 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   ({ ctx, page } = await apri({}, "#chiave=" + "c0".repeat(16)));
   await page.getByText("Ciao Lea").waitFor(); await apriTappa(page);
   if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
-  await page.locator("button[data-act=importa]").first().click();
-  await page.locator(".sheet").getByText("Intera Linea di Sponsorizzazione con tutti i KPI disponibili").waitFor();
-  check(await page.locator("#file-report").getAttribute("multiple") !== null, "si possono scegliere più file");
-  await page.setInputFiles("#file-report", [
+  if(!(await page.locator("input.file-amway").count())) await page.click("button[data-act=vista-gruppo]");
+  check(await page.locator("input.file-amway").first().getAttribute("multiple") !== null, "si possono scegliere più file");
+  await mettiFile(page, [
     { name:"mese-a.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(mm(-3).replace("-", ""), [riga(21)])) },
     { name:"mese-b.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(mm(-2).replace("-", ""), [riga(18)])) },
     { name:"ora.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(mm(0).replace("-", ""), [riga(15)])) },
     { name:"sbagliato.csv", mimeType:"text/csv", buffer:Buffer.from("niente") }]);
   await page.locator(".sheet h2", { hasText:"Report di più mesi" }).waitFor();
   check(await page.locator(".sheet ul.imp li").count() === 2 && await page.getByText("sbagliato.csv:").isVisible()
-    && await page.getByText("(mese in corso): l'import completo").isVisible(), "anteprima: 2 mesi chiusi, il mese in corso dopo, il file sbagliato segnalato");
+    && await page.getByText("(mese in corso): l'import completo").isVisible(), "anteprima: 2 mesi chiusi, il mese in corso dopo, il file sbagliato segnalato con il nome");
   await page.click(".sheet button:has-text('Salva i numeri')");
   await page.getByText(/Numeri salvati: .*, /).waitFor();
   await sync(page);
   check(DB.numeri.filter(x => x.visto_da === "lea" && x.partner_id === "lea" && [mm(-3), mm(-2)].includes(x.mese)).length === 2, "salvati i numeri dei due mesi chiusi");
-  check(await page.locator(".sheet button:has-text('Continua')").isVisible(), "resta il file sbagliato da leggere, poi si continua con il mese in corso");
-  await page.click(".sheet button:has-text('Continua')");
+  // il file sbagliato è segnalato subito e non entra nell'import: dopo i mesi chiusi si passa al mese in corso
   await page.locator(".sheet h2", { hasText:`Report di ` }).filter({ hasNotText:"più mesi" }).waitFor();
   check(await page.locator(".sheet button.primary", { hasText:"Importa" }).isVisible(), "poi l'import completo del mese in corso");
   await ctx.close();
@@ -2051,16 +2043,13 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
 {
   const conFile = async (pg, nome, testo, ms) => pg.evaluate(([n, t, m]) => {
     const f = new File([t], n, { type:"text/csv", lastModified:m }), dt = new DataTransfer(); dt.items.add(f);
-    const i = document.querySelector("#file-report"); i.files = dt.files; i.dispatchEvent(new Event("change", { bubbles:true })); }, [nome, testo, ms]);
+    const i = document.querySelector(".sheet #file-report") || document.querySelector("input.file-amway"); i.files = dt.files; i.dispatchEvent(new Event("change", { bubbles:true })); }, [nome, testo, ms]);
   const codR = DB.partners.find(p => p.id === "R").codice_amway;
   DB.numeri = DB.numeri.filter(x => !(x.partner_id === "R" && x.mese === oggiStr.slice(0, 7)))
     .concat([{ visto_da:"R", partner_id:"R", mese:oggiStr.slice(0, 7), vpp:300, vpg:5000, percentuale:15, linee:[], dati_al:new Date().toISOString() }]);
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
   await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   await page.click("button[data-act=vista-gruppo]");
-  await page.click(".card button[data-act=importa]");
-  await page.locator(".sheet").getByText("Intera Linea di Sponsorizzazione con tutti i KPI disponibili").waitFor();
-  check(await page.locator(".sheet").getByText("Vale il report più aggiornato").isVisible(), "import: si spiega che vale il report più aggiornato");
   await conFile(page, "vecchio.csv", creaCsv(meseFile, [persona(1, "9", codR, "ROSSI, MARIO", "120,00")]), Date.now() - 5 * 86400000);
   await page.locator(".sheet .data-report").waitFor();
   check((await page.locator(".sheet .data-report").innerText()).startsWith("File del ") && await page.locator(".sheet .data-report").getByText("più vecchio dell'ultimo importato").isVisible(),
@@ -2434,8 +2423,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.screenshot({ path: S + "/e2e/45-il-mio-giorno.png", fullPage:true });
   await apriOrdini(page);
   await page.locator(".sheet-box").screenshot({ path: S + "/e2e/45-ordini.png" });
-  await page.click(".sheet button[data-act=importa-ordini]");
-  check(await page.locator(".sheet h2", { hasText:"Clienti e ordini dal sito Amway" }).isVisible(), "dal foglio Ordini: l'import degli ordini dal sito Amway");
+  check(await page.locator(".sheet label.scelta-ordini", { hasText:"Importa da Amway" }).locator("input.file-amway").count() === 1,
+    "dal foglio Ordini: «Importa da Amway» apre subito la scelta dei file");
   await page.click(".sheet [data-act=chiudi]");
   await dfo.locator("button.riga-apri", { hasText:"Altri 3 in corso" }).click();
   check(await page.locator("button[data-act=vista-persone][aria-selected=true]").isVisible(), "la riga apre la Lista");
@@ -2531,6 +2520,35 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.screenshot({ path: S + "/e2e/47-scheda-numeri.png", fullPage:true });
   await azioniScheda(page);
   check(await page.locator("button[data-act=chiamata]").isVisible() && !(await page.locator(".dati-scheda").count()), "«Azioni»: Fissa una chiamata, senza i numeri");
+  await ctx.close();
+}
+
+// 48. «Importa da Amway»: un solo pulsante, l'app riconosce mappa, ordini e clienti; scorciatoia sull'icona (?importa=1)
+{
+  const codR = DB.partners.find(p => p.id === "R").codice_amway;
+  ({ ctx, page } = await apri({}, "?importa=1#chiave=" + "a".repeat(32)));
+  await page.locator(".sheet h2", { hasText:"Importa da Amway" }).waitFor();
+  check(!/importa=1/.test(page.url()), "scorciatoia dall'icona: si apre «Importa da Amway» e l'indirizzo si pulisce");
+  await mettiFile(page, [
+    { name:"ordini.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) },
+    { name:"mappa.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, [persona(1, "9", codR, "ROSSI, MARIO", "120,00")])) }]);
+  await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+  check(true, "mappa e ordini insieme: prima l'anteprima della mappa");
+  if(await page.locator(".sheet input[name=consenso]").count()) await page.check(".sheet input[name=consenso]");
+  await page.click(".sheet button:has-text('Importa')");
+  await page.locator(".sheet form[data-form=importa-ordini]").waitFor();
+  check(await page.locator(".sheet .avviso", { hasText:"Mappa importata. Ora gli ordini e i clienti." }).isVisible(),
+    "salvata la mappa si apre da solo l'import di ordini e clienti");
+  await page.click(".sheet [data-act=chiudi]");
+  // un file degli ordini scelto da Gruppo va all'import degli ordini; un file qualsiasi è segnalato
+  await page.click("button[data-act=vista-gruppo]");
+  await mettiFile(page, { name:"ordini.csv", mimeType:"text/csv", buffer:Buffer.from(csvOrdini) });
+  await page.locator(".sheet form[data-form=importa-ordini]").waitFor();
+  check(!(await page.locator(".sheet .avviso", { hasText:"Mappa importata" }).count()), "solo ordini: dritti all'import degli ordini");
+  await page.click(".sheet [data-act=chiudi]");
+  await mettiFile(page, { name:"foto.csv", mimeType:"text/csv", buffer:Buffer.from("a,b\n1,2\n") });
+  await page.locator(".sheet .avviso").waitFor();
+  check(await page.locator(".sheet .avviso").getByText("foto.csv: non sembra un export Amway").isVisible(), "file non riconosciuto: segnalato con il nome");
   await ctx.close();
 }
 

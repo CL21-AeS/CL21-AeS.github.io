@@ -98,6 +98,16 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
+**28 ottobre — Import più veloce: un solo «Importa da Amway»** (scelte di Stefano). Automatizzare del tutto non si può:
+Amway non ha API né invio dei report per email, l'export sul sito è a richiesta (si chiede, si aspetta «Pronto», si
+scarica), una web app non può leggere il sito Amway né la cartella Download del telefono (regole di sicurezza dei browser),
+e un programma con la password Amway è escluso (sicurezza, regole Amway). Scartati anche «Condividi → Growup» (vantaggio
+minimo) e un'estensione per Firefox su Android (da valutare solo se servirà). Fatto: **un solo pulsante «Importa da
+Amway»** (Gruppo, promemoria in Io, «Report da importare», foglio «Ordini», Clienti, Primi passi) che apre subito la scelta
+dei file; si scelgono insieme mappa, ordini e clienti, l'app riconosce quale è quale (`tipoFileAmway`), importa prima la
+mappa e poi apre da sola l'import di ordini e clienti; i file non riconosciuti sono segnalati con il nome. Scorciatoia
+sull'icona su Android (pressione lunga → «Importa da Amway», `?importa=1`). App v46, E2E 568 controlli.
+
 **Dove siamo arrivati (27 ottobre, sera — si riprende il 28)**: tutte le PR sono unite fino alla **#112**, nessuna aperta;
 il ramo di lavoro è ricreato da main. Migrazioni applicate su Supabase fino alla **038** (`mesi_qualifica`, mese da Argento con
 la linea al 21%). App **v45** (service worker `growup-team-v45`). Fatti oggi, in ordine: PR #107 «Il mio giorno» in tre
