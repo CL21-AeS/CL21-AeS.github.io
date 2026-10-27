@@ -2515,7 +2515,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     && await page.locator(".admin-profilo button[data-act=copia-dati]").isVisible(), "Profilo: link, punto di partenza e (admin) la sezione Admin");
   await page.click("button[data-act=aiuto][data-k=glossario]");
   const gl = await page.locator(".glossario").innerText();
-  check(gl.includes("Mese da Argento") && gl.includes("12 mesi che partono dal primo mese da Argento"), "Parole dell'app: Mese da Argento e Anno fiscale corretti");
+  check(gl.includes("Mese da Argento") && gl.includes("12 mesi che partono dal primo mese da Argento"), "Glossario: Mese da Argento e Anno fiscale corretti");
   await page.screenshot({ path: S + "/e2e/47-profilo.png", fullPage:true });
   await page.click("button[data-act=profilo-indietro]");
   await page.getByText("Ciao Stefano e Alessia").waitFor(); check(true, "‹ Indietro torna alla pagina di prima");
