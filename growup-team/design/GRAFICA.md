@@ -34,6 +34,12 @@ sottile nel tema chiaro, numero scuro). Dal 2 un ciclo di 5 colori, uguale nei d
 petrolio `#19788b`, rosa `#b83d8b`, nocciola `#87684c`; dal 7 si riparte. Niente verde, ambra, rosso né grigio
 (grigio = chi non ha l'app). Numero bianco a 5,1:1; cerchio sul fondo scuro a 3,3:1.
 
+## Numeri e tabella Stabilità (grafica punto 4)
+
+I numeri sono nel carattere del testo (Manrope) con cifre allineate (`tabular-nums`); Cormorant resta per titoli e
+«perché». La Stabilità è una riga per voce: «X su Y» (Y = prossimo livello) con barretta verde; terracotta (`--rame`)
+e «Ne manca N per il X%» solo se sei sotto il livello che hai già; spunta verde quando arrivi alla soglia.
+
 ## Icona
 
 **G Smeraldo** (scelta da Stefano il 16 ottobre 2026): fondo sfumato smeraldo, G avorio la cui stanghetta diventa

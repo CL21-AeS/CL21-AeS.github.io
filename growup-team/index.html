@@ -159,7 +159,7 @@ label.check input{width:22px;min-height:22px;height:22px;margin:1px 0 0;flex:non
 .req li.attesa{color:var(--ink3)}
 .obiettivo+.obiettivo{margin-top:14px}
 .obiettivo .spread{margin-bottom:6px}
-.num{font-family:var(--f-titoli);font-variant-numeric:lining-nums tabular-nums;font-weight:700;font-size:1.15em;line-height:1.1}
+.num{font-family:var(--f-testo);font-variant-numeric:lining-nums tabular-nums;font-weight:700;font-size:1.15em;line-height:1.1}
 .oggi{list-style:none;margin:6px 0 0;padding:0}
 .oggi li{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
 .oggi li:first-child{border-top:0}
@@ -328,9 +328,19 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .numeri-guida span{font-size:11px;color:var(--ink2)}
 .guida-passi ol.passi{margin:8px 0 0;padding-left:20px}
 .guida-passi ol.passi li{margin-top:8px}
-table.stabilita td.ok{color:var(--verde);font-weight:700}
-table.stabilita td.manca{color:var(--rame);font-weight:700}
-table.stabilita tr.personali td{background:var(--traccia)}
+ul.stabilita{list-style:none;margin:12px 0 0;padding:0}
+ul.stabilita li{padding:9px 0;border-top:1px solid var(--line)}
+ul.stabilita li:first-child{border-top:0}
+ul.stabilita .voce{display:flex;align-items:center;gap:10px;font-size:14px}
+ul.stabilita .nome{flex:1;min-width:0}
+ul.stabilita .valore{white-space:nowrap;font-variant-numeric:tabular-nums}
+ul.stabilita .su{color:var(--ink2);font-size:13px}
+ul.stabilita .ok{color:var(--progresso);font-weight:700}
+ul.stabilita .bar{height:6px;margin-top:6px}
+ul.stabilita li.sotto .bar>i{background:var(--rame)}
+ul.stabilita .manca{color:var(--rame);font-weight:600;margin:4px 0 0}
+ul.stabilita li.personali{background:var(--traccia);border-radius:10px;padding:9px 10px;border-top:0}
+ul.stabilita li.personali+li{border-top:0}
 .campo-cl21{min-width:36px;border:1px solid var(--line);border-radius:8px;padding:2px 8px;background:var(--bg);color:inherit;font:inherit;font-weight:700;cursor:pointer}
 .abitudine{border-top:1px solid var(--line);padding:10px 0 2px}
 .abitudine:first-of-type{border-top:0}

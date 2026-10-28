@@ -98,6 +98,10 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
+**28 ottobre — Grafica, punto 4 di 7: tabella Stabilità e numeri**: nella Guida la tabella diventa una riga per voce
+con «X su Y» verso il prossimo livello e una barretta; il colore d'attenzione solo se sei sotto il livello che hai già.
+Tutti i numeri nel carattere del testo, con cifre allineate (GRAFICA.md). App v59.
+
 **28 ottobre — Grafica, punto 3 di 7: colori della profondità** (palette approvata da Stefano): nel Gruppo il livello 1
 (chi guarda) è bianco e non si ripete; dal 2 il ciclo blu, viola, petrolio, rosa, nocciola, poi si riparte. La numerazione
 era già relativa a chi guarda. Il test del foglio «Invita» riscrive i campi se un ridisegno li svuota. App v58.

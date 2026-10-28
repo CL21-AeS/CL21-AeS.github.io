@@ -2253,15 +2253,15 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await page.locator(".guida-piano").innerText()).includes("Per un sì servono circa"), "il piano in attività (piani e contatti per un sì)");
   const stab = page.locator(".guida-stabilita");
   const attesi = DB.partners.filter(p => p.invitato_da === "R" && String(p.invitato_il || "").slice(0, 7) === ora.slice(0, 7)).length;
-  check(attesi >= 1 && (await stab.locator("tr.personali").innerText()).replace(/\s+/g, " ").includes("I tuoi nuovi iscritti del mese entrati con il tuo link " + attesi),
+  check(attesi >= 1 && (await stab.locator("li.personali").innerText()).replace(/\s+/g, " ").includes("I tuoi nuovi iscritti del mese entrati con il tuo link " + attesi),
     "Stabilità: i miei nuovi iscritti (entrati con il mio link)");
-  check((await stab.locator("tr", { hasText:"Nuovi nel gruppo del mese" }).locator("td").nth(1).innerText()).trim() === "1", "Stabilità: i nuovi nel gruppo dagli import");
+  check((await stab.locator("li", { hasText:"Nuovi nel gruppo del mese" }).locator(".valore b").innerText()).trim() === "1", "Stabilità: i nuovi nel gruppo dagli import");
   await stab.locator("button[data-act=guida-cl21]").first().click();
   await page.locator(".sheet h2", { hasText:"I tuoi numeri Cum Laude 21" }).waitFor();
   await page.fill(".sheet input[name=app_cl21]", "9"); await page.fill(".sheet input[name=training_day]", "10"); await page.fill(".sheet input[name=convention]", "40");
   await page.click(".sheet button.primary");
   await page.getByText("Numeri salvati").waitFor();
-  check((await stab.locator("tr", { hasText:"Codici alla Convention" }).innerText()).includes("✓"), "Stabilità: un numero scritto oltre la soglia ha la spunta");
+  check((await stab.locator("li", { hasText:"Codici alla Convention" }).innerText()).includes("✓"), "Stabilità: un numero scritto oltre la soglia ha la spunta");
   check(await page.locator(".guida-passi ol.passi li").count() >= 3, "Cosa fare adesso: i passi della tappa");
   // abitudini: spunto oggi la formazione e cambio l'obiettivo
   const oggiG = new Date().toISOString().slice(0, 10);

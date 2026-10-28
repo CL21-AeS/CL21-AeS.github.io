@@ -5840,9 +5840,15 @@ function vGuidaStabilita(){
   const i = LIVELLI_CL21.reduce((x, l, j) => pct >= l ? j : x, -1), prossimo = Math.min(i + 1, LIVELLI_CL21.length - 1);
   const c = st.guida.conteggi || {}, w = st.guida.cl21 || {};
   const val = r => r.scritto ? w[r.k] : c[r.k];
-  const cella = (r, j) => { const v = Number(val(r)) || 0, s = r.soglie[j];
-    return v >= s ? `<td class="num ok">${num(s)} ✓</td>` : `<td class="num manca">${num(s)} · −${num(s - v)}</td>`; };
-  const tu = r => r.scritto ? `<button class="campo-cl21" data-act="guida-cl21">${val(r) != null ? num(val(r)) : "–"}</button>` : num(Number(val(r)) || 0);
+  const tu = r => r.scritto ? `<button class="campo-cl21" data-act="guida-cl21">${val(r) != null ? num(val(r)) : "–"}</button>` : `<b>${num(Number(val(r)) || 0)}</b>`;
+  /* una riga per voce: «X su Y» verso il prossimo livello, con la barretta; il colore d'attenzione solo se sei sotto
+     il livello che hai già */
+  const riga = r => { const v = Number(val(r)) || 0, s = r.soglie[prossimo], fatto = v >= s;
+    const sotto = i >= 0 && i !== prossimo && v < r.soglie[i];
+    return `<li class="${fatto ? "fatto" : sotto ? "sotto" : ""}"><div class="voce"><span class="nome">${esc(r.nome)}</span>
+      <span class="valore">${tu(r)} <span class="su">su ${num(s)}</span>${fatto ? ' <span class="ok">✓</span>' : ""}</span></div>
+      <div class="bar"><i style="width:${Math.min(100, s ? v / s * 100 : 0)}%"></i></div>
+      ${sotto ? `<p class="small manca">Ne manca${r.soglie[i] - v > 1 ? "no" : ""} ${num(r.soglie[i] - v)} per il ${LIVELLI_CL21[i]}%</p>` : ""}</li>`; };
   return `<div class="card guida-stabilita">
     <span class="con-aiuto"><span class="eyebrow">Verifica la tua attività · Stabilità</span>${aiutoBtn("stabilita")}</span>
     ${aiutoTesto("stabilita", `È la tabella «Stabilità» di Cum Laude 21: per ogni livello (3%, 6% … 21%) i numeri da fare ogni mese.
@@ -5851,15 +5857,11 @@ function vGuidaStabilita(){
       Training Day, Convention) le scrivi tu: tocca il numero.`)}
     <p class="small" style="margin:2px 0 0">${i >= 0 ? `Questo mese sei al ${LIVELLI_CL21[i]}%` : "Questo mese non hai ancora una percentuale"}${
       i < LIVELLI_CL21.length - 1 ? `: per una qualifica solida al ${LIVELLI_CL21[prossimo]}% servono` : ": i numeri per una qualifica solida al 21%"}</p>
-    <div class="tab-consigli"><table class="stabilita">
-      <thead><tr><th></th><th>tu</th>${i >= 0 && i !== prossimo ? `<th>${LIVELLI_CL21[i]}%</th>` : ""}<th>${LIVELLI_CL21[prossimo]}%</th></tr></thead>
-      <tbody>
-        <tr class="personali"><td><b>I tuoi nuovi iscritti del mese</b><br><span class="small">entrati con il tuo link</span></td>
-          <td class="num"><b>${num(Number(c.personali) || 0)}</b></td>${i >= 0 && i !== prossimo ? "<td>–</td>" : ""}<td>–</td></tr>
-        ${STABILITA_CL21.map(r => `<tr><td>${esc(r.nome)}</td><td class="num">${tu(r)}</td>${i >= 0 && i !== prossimo
-          ? `<td class="num">${num(r.soglie[i])}</td>` : ""}${cella(r, prossimo)}</tr>`).join("")}
-      </tbody></table></div>
-
+    <ul class="stabilita">
+      <li class="personali"><div class="voce"><span class="nome"><b>I tuoi nuovi iscritti del mese</b><br><span class="small">entrati con il tuo link</span></span>
+        <span class="valore"><b>${num(Number(c.personali) || 0)}</b></span></div></li>
+      ${STABILITA_CL21.map(riga).join("")}
+    </ul>
   </div>`;
 }
 function vGuidaPassi(){
