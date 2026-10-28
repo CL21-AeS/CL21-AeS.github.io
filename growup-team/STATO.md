@@ -98,6 +98,13 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
+**28 ottobre — Admin nel proprio gruppo e ritocchi** (gruppo D, migrazione **043** e Edge Function `invia-notifiche`
+aggiornata, da applicare/pubblicare dopo l'unione): nuovo link personale, blocco, «Togli» e codici tolti solo nel gruppo
+dell'admin; impostazioni, tappe e livelli solo con un profilo (l'ingresso riceve le qualifiche con l'invito); il punto di
+partenza solo da «Modifica punto di partenza» (punto 6); notifiche solo dai servizi ufficiali e prova al massimo una al
+minuto e 10 al giorno; indici sulle chiavi esterne e regole di accesso più veloci; `inizio_py` con search_path fisso.
+pg_net resta in public (spostarlo è rischioso e non serve). App v55. Resta il gruppo E (grafica, sessione a parte).
+
 **28 ottobre — Copia di sicurezza e «in attesa»** (gruppo C, migrazione **042**, da applicare su Supabase dopo l'unione):
 dalla copia di sicurezza escono il «perché» dell'obiettivo, le email e l'impronta delle chiavi d'accesso; gli ordini e le
 correzioni scritti a mano restano (scelta di Stefano: servono a ripristinare). Di chi è in attesa della mappa l'upline
@@ -125,7 +132,7 @@ non veniva installato) l'ultima riga di `tests_rls.sql` diceva comunque «TUTTI 
 lo dice solo se i controlli sono arrivati in fondo, e lo script controlla che ogni tabella e funzione esista. Il test
 dell'interfaccia conta come errore anche un file dell'app che non arriva (404) e, se si blocca, dice perché.
 Prossimi gruppi, una PR ciascuno: B) entrare solo con un invito personale (fatto, sopra); C) copia di sicurezza e «in attesa» (fatto, sopra);
-D) poteri da admin nel proprio gruppo, tabelle di impostazioni solo con profilo, notifiche di prova, ritocchi tecnici;
+D) poteri da admin nel proprio gruppo, tabelle di impostazioni solo con profilo, notifiche di prova, ritocchi tecnici (fatto, sopra);
 E) grafica, in una sessione a parte.
 
 **28 ottobre — «Prossima cosa» con la ×** (Stefano, dopo aver provato l'avviso: arriva giusto e apre la scheda): nella scheda della persona una × accanto alla prossima cosa toglie giorno, ora e nota (e quindi anche l'avviso non ancora suonato). App v52.

@@ -1015,7 +1015,7 @@ begin
     corpo39 text; fuori39 int; dopo39 int;
   begin
     perform growup_test.come(u3);  -- B
-    insert into public.notifiche_telefoni (endpoint, p256dh, auth) values ('https://push.esempio.test/b1', 'chiaveB', 'authB');
+    insert into public.notifiche_telefoni (endpoint, p256dh, auth) values ('https://fcm.googleapis.com/fcm/send/prova-b1', 'chiaveB', 'authB');
     insert into public.notifiche_previste (giorno, persone, clienti) values (oggi39, 3, 1);
     perform growup_test.ok((select count(*) from public.notifiche_telefoni) = 1, '039: B vede il suo telefono');
     perform growup_test.deve_fallire(format($q$insert into public.notifiche_previste (giorno, persone) values (%L, 1)$q$, oggi39 + 60),
@@ -1028,7 +1028,7 @@ begin
     perform growup_test.ok(not exists (select 1 from public.notifiche_telefoni) and not exists (select 1 from public.notifiche_previste),
                            '039: C non vede telefoni e numeri di B');
     perform growup_test.deve_fallire(format($q$insert into public.notifiche_telefoni (partner_id, endpoint, p256dh, auth)
-                                     values (%L, 'https://push.esempio.test/x', 'k', 'a')$q$, b), '039: C non iscrive un telefono a nome di B');
+                                     values (%L, 'https://fcm.googleapis.com/fcm/send/prova-x', 'k', 'a')$q$, b), '039: C non iscrive un telefono a nome di B');
     perform growup_test.come(null);
     perform growup_test.deve_fallire($q$select * from public.notifiche_telefoni$q$, '039: anon non legge i telefoni');
     execute 'reset role';
@@ -1051,7 +1051,7 @@ begin
     pp uuid; t40 text; c40 text; u40 text; n_prima int; n_dopo int; n_ancora int; c41 text;
   begin
     perform growup_test.come(u3);  -- B
-    insert into public.notifiche_telefoni (endpoint, p256dh, auth) values ('https://push.esempio.test/b40', 'chiaveB', 'authB');
+    insert into public.notifiche_telefoni (endpoint, p256dh, auth) values ('https://fcm.googleapis.com/fcm/send/prova-b40', 'chiaveB', 'authB');
     insert into public.persone (nome, prossima_data, prossima_ora) values ('Nome Segreto', oggi40, time '10:30') returning id into pp;
     perform growup_test.ok((select prossima_ora from public.persone where id = pp) = time '10:30', '040: B salva l''ora del prossimo passo');
     perform growup_test.come(u4);  -- C
@@ -1123,8 +1123,12 @@ begin
 
     -- la pagina d'ingresso: senza accesso vede solo se il link è aperto, e i nomi solo se lo è
     perform growup_test.come(null);
-    perform growup_test.ok(public.invito_aperto(k1) = jsonb_build_object('stato', 'ok', 'nome', 'Paola Prova', 'da', na),
+    perform growup_test.ok(public.invito_aperto(k1) - 'qualifiche' = jsonb_build_object('stato', 'ok', 'nome', 'Paola Prova', 'da', na),
                            '041: il link aperto mostra il nome dell''invitato e di chi invita');
+    perform growup_test.ok(jsonb_array_length(public.invito_aperto(k1)->'qualifiche') = 19,
+                           '043: con l''invito aperto arrivano le qualifiche per la pagina d''ingresso');
+    perform growup_test.ok(not (public.invito_aperto(repeat('0', 32)) ? 'qualifiche'), '043: senza un invito aperto niente qualifiche');
+    perform growup_test.deve_fallire('select chiave from public.stage_requirements', '043: anon non legge le tappe');
     perform growup_test.ok(public.invito_aperto(upper(k1))->>'stato' = 'ok', '041: il codice vale anche in maiuscolo');
     perform growup_test.ok(public.invito_aperto(repeat('0', 32)) = '{"stato":"sconosciuto"}'::jsonb, '041: un codice inventato non mostra niente');
     perform growup_test.deve_fallire('select * from public.inviti', '041: anon non legge gli inviti');
@@ -1161,7 +1165,7 @@ begin
     perform growup_test.ok(exists (select 1 from public.notifiche_eventi where partner_id = a and chiave = 'al-posto-' || id1)
                            and exists (select 1 from public.notifiche_eventi where partner_id = b and chiave = 'al-posto-' || id1),
                            '041: avvisati chi ha invitato e lo sponsor vero');
-    insert into public.notifiche_telefoni (partner_id, endpoint, p256dh, auth) values (a, 'https://push.esempio.test/a41', 'k', 'a');
+    insert into public.notifiche_telefoni (partner_id, endpoint, p256dh, auth) values (a, 'https://fcm.googleapis.com/fcm/send/prova-a41', 'k', 'a');
     execute 'set local role service_role';
     n_prima := (select count(*) from public.notifiche_da_inviare(now()) where partner_id = a and chiave in ('evento-entrato-' || id1, 'evento-al-posto-' || id1));
     perform public.notifiche_segna(a, 'evento-entrato-' || id1);
@@ -1268,6 +1272,71 @@ begin
     perform growup_test.ok(not exists (select 1 from public.attesa_nel_report(array['9200001'])), '042: chi è di lato non lo riconosce');
     perform growup_test.come(null);
     perform growup_test.deve_fallire($q$select * from public.attesa_nel_report(array['9200001'])$q$, '042: anon non chiede niente');
+  end;
+
+  -- ---- 043: admin nel proprio gruppo, impostazioni con un profilo, punto di partenza, notifiche ----
+  declare
+    ra uuid; rx uuid; ua uuid; ur uuid; u9 constant uuid := '00000000-0000-0000-0000-0000000009c1';
+    ok1 boolean; ok2 boolean; ok_n int := 0;
+  begin
+    execute 'reset role';
+    insert into auth.users (id, aud, role) values (u9, 'authenticated', 'authenticated');
+    ua := (select user_id from public.accessi where partner_id = a limit 1);
+    ur := (select user_id from public.accessi where partner_id = r limit 1);
+    -- un secondo admin dentro la linea di A, e una persona con l'app fuori dal suo gruppo (sotto R, di lato ad A)
+    update public.partners set is_admin = true where id = a;
+    insert into public.partners (nome, sponsor_id, stato, codice_amway, confermato_il, chiave_hash)
+    values ('Fuori Gruppo', r, 'attivo', '9300001', now(), public.impronta('22222222222222222222222222222222')) returning id into rx;
+    insert into public.accessi (user_id, partner_id) values (u9, rx);
+    perform growup_test.come(ua);   -- A, admin: solo nel suo gruppo
+    perform growup_test.deve_fallire(format('select public.nuova_chiave_per(%L)', rx), '043: un admin non crea link per chi è fuori dal suo gruppo');
+    perform growup_test.deve_fallire(format('select public.blocca_app(%L, true)', rx), '043: un admin non blocca chi è fuori dal suo gruppo');
+    perform growup_test.ok(length(public.nuova_chiave_per(b)) = 32, '043: un admin crea il link per chi è nel suo gruppo');
+    perform growup_test.come(ur);   -- R, admin in cima: tutto il suo gruppo
+    perform public.blocca_app(rx, true);
+    perform public.blocca_app(rx, false);
+    perform growup_test.ok(true, '043: l''admin in cima blocca e sblocca chi è nel suo gruppo');
+    execute 'reset role';
+    update public.partners set is_admin = false where id = a;
+    delete from public.accessi where partner_id = rx; delete from public.partners where id = rx;
+
+    -- impostazioni, tappe e livelli: solo con un profilo
+    perform growup_test.come(u9);   -- telefono senza profilo (il suo profilo è stato tolto)
+    perform growup_test.ok((select count(*) from public.settings) = 0 and (select count(*) from public.stage_requirements) = 0
+                           and (select count(*) from public.percent_levels) = 0, '043: senza profilo non si leggono impostazioni, tappe e livelli');
+    perform growup_test.come(ua);
+    perform growup_test.ok((select count(*) from public.stage_requirements) = 19 and (select count(*) from public.settings) > 0,
+                           '043: con un profilo sì');
+
+    -- il punto di partenza solo da modifica_partenza
+    perform growup_test.deve_fallire($q$update public.partners set qualifica_iniziale = 'argento', pagamenti_iniziali = 3
+                                     where id = public.my_partner_id()$q$, '043: il punto di partenza non si scrive direttamente');
+    perform growup_test.ok(public.modifica_partenza('foundation_9', null, current_date, 2)->>'qualifica_iniziale' = 'foundation_9',
+                           '043: con modifica_partenza sì');
+    perform public.modifica_partenza(null, null, null, 0);
+
+    -- notifiche: solo servizi ufficiali, e la prova con un limite
+    perform growup_test.deve_fallire($q$insert into public.notifiche_telefoni (endpoint, p256dh, auth)
+                                     values ('https://sito-qualsiasi.example/push', 'k', 'a')$q$, '043: un indirizzo che non è un servizio di notifiche è rifiutato');
+    perform growup_test.deve_fallire(format('select public.notifiche_prova_ok(%L)', a), '043: notifiche_prova_ok solo per il server');
+    execute 'reset role';
+  end;
+  declare
+    ok1 boolean; ok2 boolean;
+  begin
+    execute 'set local role service_role';
+    ok1 := public.notifiche_prova_ok(a);
+    ok2 := public.notifiche_prova_ok(a);
+    execute 'reset role';
+    perform growup_test.ok(ok1 and not ok2, '043: la notifica di prova al massimo una volta al minuto');
+    update public.notifiche_inviate set inviata_il = now() - interval '2 hours' where partner_id = a and chiave like 'prova-%';
+    insert into public.notifiche_inviate (partner_id, chiave, inviata_il)
+    select a, 'prova-x' || q9, now() - interval '2 hours' from generate_series(1, 9) q9;
+    execute 'set local role service_role';
+    ok1 := public.notifiche_prova_ok(a);
+    execute 'reset role';
+    perform growup_test.ok(not ok1, '043: al massimo 10 prove al giorno');
+    delete from public.notifiche_inviate where partner_id = a and chiave like 'prova-%';
   end;
 
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----

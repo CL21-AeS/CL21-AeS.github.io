@@ -4,6 +4,8 @@
 //    (notifiche_da_inviare), segna gli invii (notifiche_segna) e toglie i telefoni non più validi;
 //  * dall'app, «Manda una notifica di prova», con il token di chi è entrato: solo ai suoi telefoni (letti con i suoi
 //    permessi, RLS).
+// 043: si manda solo ai servizi di notifica ufficiali (Google, Apple, Mozilla, Microsoft) e la prova al massimo una volta
+// al minuto e 10 volte al giorno (notifiche_prova_ok, nel database).
 // Le chiavi VAPID le genera questa funzione la prima volta e le custodisce nel database (notifiche_chiavi, nessun
 // permesso per gli utenti). La chiave service_role la dà Supabase all'ambiente della funzione: non sta nel codice.
 import webpush from "npm:web-push@3.6.7";
@@ -39,6 +41,8 @@ async function chiavi(sb: ReturnType<typeof createClient>) {
   return nuove;
 }
 
+const SERVIZI = /^https:\/\/(fcm\.googleapis\.com|android\.googleapis\.com|updates\.push\.services\.mozilla\.com|web\.push\.apple\.com|[a-z0-9-]+\.notify\.windows\.com)\//;
+
 type Riga = { telefono_id: string; partner_id: string; chiave: string; endpoint: string; p256dh: string; auth: string;
   titolo: string; corpo: string; url: string };
 
@@ -48,6 +52,7 @@ async function invia(sb: ReturnType<typeof createClient>, righe: Riga[], segna: 
   let ok = 0;
   const fatte = new Set<string>();
   for (const r of righe) {
+    if (!SERVIZI.test(r.endpoint)) continue;   // mai richieste verso indirizzi che non sono servizi di notifica
     try {
       await webpush.sendNotification({ endpoint: r.endpoint, keys: { p256dh: r.p256dh, auth: r.auth } },
         JSON.stringify({ titolo: r.titolo, corpo: r.corpo, url: r.url, tag: r.chiave }), { TTL: 6 * 3600, urgency: "normal" });
@@ -90,6 +95,8 @@ Deno.serve(async (req) => {
   const { data: telefoni, error } = await utente.from("notifiche_telefoni").select("id, partner_id, endpoint, p256dh, auth");
   if (error) return risposta({ errore: "non autorizzato" }, 401);
   if (!telefoni || !telefoni.length) return risposta({ inviate: 0 });
+  const { data: puoi } = await servizio.rpc("notifiche_prova_ok", { p_partner: telefoni[0].partner_id });
+  if (!puoi) return risposta({ inviate: 0, troppe: true });
   const righe = telefoni.map(t => ({ telefono_id: t.id, partner_id: t.partner_id, chiave: "prova", endpoint: t.endpoint,
     p256dh: t.p256dh, auth: t.auth, titolo: "Growup", corpo: "Le notifiche funzionano: ogni mattina alle 8:30 ti diciamo cosa c'è da fare.", url: "./" }));
   return risposta({ inviate: await invia(servizio, righe, false) });
