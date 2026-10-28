@@ -1,9 +1,38 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 28 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 28 ottobre 2026 (sera). Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
-## Ripartire da qui (fermi la sera del 21 ottobre 2026)
+## Ripartire da qui (fermi la sera del 28 ottobre 2026)
+
+**Dove siamo**: migrazioni applicate su Supabase fino alla **044** (verificata sul database il 28 ottobre); funzione
+`invia-notifiche` v2 pubblicata. PR unite fino alla **#131**, nessuna aperta; il ramo di lavoro va ricreato da main.
+Gruppi A–D del controllo di sicurezza fatti e uniti. **Grafica** (skill frontend-design, una PR per punto, schermate
+prima/dopo a 360 px chiaro e scuro nella pagina privata «Growup · grafica prima e dopo» di Stefano): punti **1–5 fatti**
+(sotto-linguette scure, colori con significato fisso, colori della profondità, Stabilità della tua rete, filtri di Persone).
+
+**Prossimi passi, in quest'ordine** (tutti già decisi con Stefano):
+1. **Grafica 6 · Gruppo**: togliere il pulsante/chip «senza app» ripetuto; pallino grigio = senza app, pallino verde = usa
+   l'app; spiegarlo nel «?» di «La mia struttura» insieme al significato dei colori della profondità (1 = tu, bianco; dal 2
+   blu, viola, petrolio, rosa, nocciola e si riparte).
+2. **Grafica 7 · contrasto e a capo**: testi grigi almeno WCAG AA nei due temi (oggi `--ink3` chiaro `#7a8781` non basta:
+   3,74 sulla scheda, 3,38 sul fondo); nessun pulsante va a capo a 360 px, compresa la barra in basso e «Importa da Amway»
+   nel Gruppo (e «‹ Settimana prima» nelle abitudini della Guida); il × di «Primi passi» arrotondato come gli altri; ricontrollare
+   anche l'ambra delle caselle della Stabilità.
+3. **«Da riprendere»** (piano approvato, con le correzioni di Stefano): un contatto già avviato (in corso: fase oltre
+   «lista», senza esito) senza passi da 14 giorni, contati dall'ultimo passo, va da solo in «Da riprendere» con la riga ambra;
+   i nomi in Lista mai contattati non ci vanno mai e non diventano mai ambra. Toccando la riga ferma compaiono due azioni:
+   «Ricordamelo più avanti» (toglie l'avviso, torna dopo 30 giorni) e «Chiudi contatto» (va in Chiusi con l'esito nuovo
+   «Chiuso senza risposta», separato dai «No» veri). Quando si chiude un contatto l'app chiede «Vuoi che te lo ricordi tra
+   6 mesi?»: se sì, dopo 6 mesi torna in «Da riprendere». Dati: colonna nuova su `persone` (data «ricordamelo dal») e il
+   nuovo valore di esito; calcolo nell'app dai passi; all'upline solo i numeri; il riepilogo del mattino può contare i
+   contatti fermi senza nomi. Migrazione 045 con i controlli in `tests_rls.sql` e i test e2e.
+4. A parte, per Stefano: il compito suggerito sui campi dei fogli che si svuotano quando l'app ridisegna (render).
+
+**Come si lavora alla grafica**: prima/dopo con la stessa API finta dei test, a 360 px; spiegare in due righe cosa cambia
+per i partner prima di ogni PR; `sw.js` va alzato a ogni consegna (ora v60).
+
+## Fermi la sera del 21 ottobre 2026
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
 dell'app da admin e listino Amway nel database. Migrazioni applicate su Supabase fino alla **037** (027 e la parte 2 della 033 — `togli_dalla_struttura` e `importa_mappa` —
