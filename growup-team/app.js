@@ -3853,14 +3853,14 @@ function vPersone(){
     .sort((a, b) => (a.prossima_data || "9999") < (b.prossima_data || "9999") ? -1 : (a.prossima_data || "9999") > (b.prossima_data || "9999") ? 1
       : a.nome.localeCompare(b.nome, "it"));
   return `<div class="card">
-    <div class="spread"><span class="con-aiuto"><span class="eyebrow">La mia lista</span>${aiutoBtn("lista")}</span>
-      <span class="row" style="gap:6px"><button class="btn small" data-act="persone-tante">Più nomi</button>
+    <div class="spread testa-sezione"><span class="con-aiuto"><span class="eyebrow">La mia lista</span>${aiutoBtn("lista")}</span>
+      <span class="pulsanti"><button class="btn small" data-act="persone-tante">Più nomi</button>
       <button class="btn small primary" data-act="persona-nuova">+ Un nome</button></span></div>
     ${aiutoTesto("lista", `Qui scrivi i nomi delle persone che conosci e segui ogni contatto passo per passo. I nomi li vedi solo tu:
       alla tua upline arrivano solo i numeri (quanti contatti, quanti piani).`)}
     ${st.persone.length ? `
     <input type="search" id="cerca-lista" class="cerca" placeholder="Cerca un nome…" autocomplete="off" aria-label="Cerca un nome" value="${esc(st.cercaLista || "")}">
-    <div class="row wrap scelte-rapide" style="gap:6px;margin-top:8px">${FILTRI_LISTA.map(x => {
+    <div class="row filtri scelte-rapide" style="gap:6px;margin-top:8px">${FILTRI_LISTA.map(x => {
       const n = nellaLista.filter(x.ok).length;
       return `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-lista" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${n}</button>`; }).join("")}</div>
     ${l.length ? `<ul class="persone">${l.map(p => rigaPersona(p)).join("")}</ul>` : `<p class="muted" style="margin:10px 0 0">Nessun nome qui.</p>`}`
@@ -4824,12 +4824,12 @@ function vClienti(){
     const sa = statoCliente(a), sb = statoCliente(b);
     return (sa.primo ? sa.primo.finisce : "9999") < (sb.primo ? sb.primo.finisce : "9999") ? -1 : 1; });
   return `<div class="card">
-    <div class="spread"><span class="con-aiuto"><span class="eyebrow">I miei clienti</span>${aiutoBtn("clienti")}</span>
-      <span class="row" style="gap:6px">${btnAmway("Da Amway", "small")}
+    <div class="spread testa-sezione"><span class="con-aiuto"><span class="eyebrow">I miei clienti</span>${aiutoBtn("clienti")}</span>
+      <span class="pulsanti">${btnAmway("Da Amway", "small")}
       <button class="btn small primary" data-act="cliente-nuovo">+ Un cliente</button></span></div>
     ${aiutoTesto("clienti", `I tuoi clienti e i loro ordini: l'app ti avvisa quando un prodotto sta per finire o è ora di risentirli. Li vedi
       solo tu. Gli ordini scritti qui servono per i riordini e non cambiano i tuoi VP: i VP arrivano dal report Amway.`)}
-    ${tutti.length ? `<div class="row wrap scelte-rapide" style="gap:6px;margin-top:10px">${FILTRI_CLIENTI.map(x =>
+    ${tutti.length ? `<div class="row filtri scelte-rapide" style="gap:6px;margin-top:10px">${FILTRI_CLIENTI.map(x =>
       `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-clienti" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${tutti.filter(x.ok).length}</button>`).join("")}</div>
     ${l.length ? `<ul class="persone">${l.map(p => { const s = statoCliente(p);
       return `<li><button class="persona" data-act="apri-cliente" data-id="${esc(p.id)}">
