@@ -43,6 +43,11 @@ i livelli già raggiunti con il fatturato ma non sostenuti, neutra sopra (con un
 colonna del livello raggiunto ha il contorno pesca (`--scelta`). Segni e colori insieme: si legge anche senza i colori.
 Il mese di riferimento sta in una pillola pesca chiara. Niente barre: i numeri non sono un traguardo verso la percentuale.
 
+## Filtri e titoli di sezione (grafica punto 5)
+
+I filtri (`.filtri`) stanno su una riga sola che scorre di lato da bordo a bordo della scheda, senza barra di scorrimento.
+Nei titoli di sezione (`.testa-sezione`) i pulsanti non vanno mai a capo: se non c'è posto scendono sotto, a destra.
+
 ## Icona
 
 **G Smeraldo** (scelta da Stefano il 16 ottobre 2026): fondo sfumato smeraldo, G avorio la cui stanghetta diventa

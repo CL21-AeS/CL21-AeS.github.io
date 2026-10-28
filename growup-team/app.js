@@ -3854,8 +3854,8 @@ function vPersone(){
       : a.nome.localeCompare(b.nome, "it"));
   return `<div class="card">
     <div class="spread testa-sezione"><span class="con-aiuto"><span class="eyebrow">La mia lista</span>${aiutoBtn("lista")}</span>
-      <span class="pulsanti"><button class="btn small" data-act="persone-tante">Più nomi</button>
-      <button class="btn small primary" data-act="persona-nuova">+ Un nome</button></span></div>
+      <span class="pulsanti"><button class="btn small" data-act="persone-tante">Importa</button>
+      <button class="btn small primary" data-act="persona-nuova">+ Nome</button></span></div>
     ${aiutoTesto("lista", `Qui scrivi i nomi delle persone che conosci e segui ogni contatto passo per passo. I nomi li vedi solo tu:
       alla tua upline arrivano solo i numeri (quanti contatti, quanti piani).`)}
     ${st.persone.length ? `
@@ -4825,8 +4825,8 @@ function vClienti(){
     return (sa.primo ? sa.primo.finisce : "9999") < (sb.primo ? sb.primo.finisce : "9999") ? -1 : 1; });
   return `<div class="card">
     <div class="spread testa-sezione"><span class="con-aiuto"><span class="eyebrow">I miei clienti</span>${aiutoBtn("clienti")}</span>
-      <span class="pulsanti">${btnAmway("Da Amway", "small")}
-      <button class="btn small primary" data-act="cliente-nuovo">+ Un cliente</button></span></div>
+      <span class="pulsanti">${btnAmway("Importa", "small")}
+      <button class="btn small primary" data-act="cliente-nuovo">+ Cliente</button></span></div>
     ${aiutoTesto("clienti", `I tuoi clienti e i loro ordini: l'app ti avvisa quando un prodotto sta per finire o è ora di risentirli. Li vedi
       solo tu. Gli ordini scritti qui servono per i riordini e non cambiano i tuoi VP: i VP arrivano dal report Amway.`)}
     ${tutti.length ? `<div class="row filtri scelte-rapide" style="gap:6px;margin-top:10px">${FILTRI_CLIENTI.map(x =>
@@ -4836,7 +4836,7 @@ function vClienti(){
         <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${s.primo && s.key !== "fermo" ? (s.primo.codice ? `${esc(s.primo.nome)} · finisce il ${dataIt(s.primo.finisce)}` : `prossimo ordine atteso il ${dataIt(s.primo.finisce)}`) : esc(abitudine(p) || "nessun ordine")}</span></span>
         <span class="etichette">${etichetteOrdini(p)}<span class="pill ${s.cl}">${esc(s.txt)}</span></span></button></li>`; }).join("")}</ul>`
       : `<p class="muted" style="margin:10px 0 0">${filtro.id === "sentire" ? "Nessuno da sentire adesso." : "Nessun cliente qui."}</p>`}`
-    : `<p class="muted" style="margin:8px 0 0">Ancora nessun cliente. Entrano da qui con "+ Un cliente", oppure dalla Lista quando chiudi una persona come Cliente.</p>`}
+    : `<p class="muted" style="margin:8px 0 0">Ancora nessun cliente. Entrano da qui con "+ Cliente", oppure dalla Lista quando chiudi una persona come Cliente.</p>`}
   </div>`;
 }
 

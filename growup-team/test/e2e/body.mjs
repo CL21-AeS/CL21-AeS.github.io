@@ -1180,6 +1180,11 @@ await page.click(".sheet button[data-act=chiudi]");
 check(await page.locator(".card", { hasText:"I passi" }).getByText("preferisce essere chiamata la sera").isVisible(), "la nota compare anche tra i passi della scheda");
 await page.click("button[data-act=torna-lista]");
 check(!await page.locator("button[data-act=apri-persona]", { hasText:"Nina Nonora" }).count(), "Non ora: non è tra gli Aperti");
+/* grafica 5: i filtri stanno su una riga sola che scorre; i pulsanti in alto su una riga */
+{ const f = await page.locator(".filtri button[data-act=filtro-lista]").evaluateAll(l => l.map(b => [b.offsetTop, b.offsetHeight]));
+  check(f.length === 5 && f.every(x => x[0] === f[0][0]) && f.every(x => x[1] <= 40), "Lista: i filtri su una riga sola, nessuno va a capo");
+  const t = await page.locator(".testa-sezione .pulsanti .btn").evaluateAll(l => l.map(b => b.offsetHeight));
+  check(t.length === 2 && t.every(h => h <= 40), "Lista: «Importa» e «+ Nome» senza andare a capo"); }
 await page.click("button[data-filtro=riprendere]");
 check(await page.locator("button[data-act=apri-persona]", { hasText:"Nina Nonora" }).isVisible(), "Non ora: è in Da riprendere");
 await page.click("button[data-filtro=aperti]");
