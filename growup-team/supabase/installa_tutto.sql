@@ -6703,6 +6703,40 @@ insert into public.settings (chiave, valore, nota) values
    'Tabella «Verifica la tua attività - Stabilità» di Cum Laude 21: per ogni livello (colonne) i numeri che sostengono la qualifica')
 on conflict (chiave) do update set valore = excluded.valore, nota = excluded.nota;
 
+-- i conteggi della Stabilità: «con_mappa» dice se per quel mese c'è almeno una mappa importata nella mia rete
+-- (senza mappa i codici oltre 200 VP non si contano: l'app scrive «disponibile dopo l'import della mappa»).
+-- I codici oltre 200 VP: il mio più quelli della mia rete, ciascuno con più di 200 VP nel mese, solo dalle mappe.
+create or replace function public.guida_conteggi(p_mese date)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  io uuid := public.my_partner_id();
+  m  date := date_trunc('month', p_mese)::date;
+  f  timestamptz;
+  t  timestamptz;
+begin
+  if io is null then
+    raise exception 'non_autenticato';
+  end if;
+  f := m::timestamp at time zone 'Europe/Rome';
+  t := (m + interval '1 month')::timestamp at time zone 'Europe/Rome';
+  return jsonb_build_object(
+    'personali', (select count(*) from public.partners p where p.invitato_da = io and p.invitato_il >= f and p.invitato_il < t),
+    'nuovi_gruppo', (select count(*) from public.partners p where p.in_mappa_dal >= f and p.in_mappa_dal < t
+                       and p.id <> io and public.vedo(p.id)),
+    'oltre_200', (select count(*) from public.numeri_mese n where n.mese = m and n.vpp > 200 and public.vedo(n.partner_id)),
+    'con_mappa', exists (select 1 from public.numeri_mese n where n.mese = m and public.vedo(n.partner_id))
+  );
+end;
+$$;
+
+revoke execute on function public.guida_conteggi(date) from public, anon, authenticated;
+grant execute on function public.guida_conteggi(date) to authenticated;
+
 -- ============================================================
 -- Growup Team — dati iniziali (Fase 1)
 -- Requisiti delle tappe e guadagni come da brief (ottobre 2026).

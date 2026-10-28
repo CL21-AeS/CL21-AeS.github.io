@@ -908,6 +908,9 @@ begin
     '[{"codice":"8100002","nome":"Secondo Import","sponsor":"2000001","vpp":300,"vpg":300}]', '{}', '{}');
   perform growup_test.ok((public.guida_conteggi(current_date)->>'nuovi_gruppo')::int = 1, '035: dal secondo import il codice nuovo conta nel gruppo');
   perform growup_test.ok((public.guida_conteggi(current_date)->>'oltre_200')::int = att_prima + 1, '035: i codici del gruppo oltre 200 VP');
+  perform growup_test.ok((public.guida_conteggi(current_date)->>'con_mappa')::boolean
+                         and not (public.guida_conteggi((current_date - interval '5 years')::date)->>'con_mappa')::boolean,
+                         '044: i conteggi dicono se per il mese c''è una mappa importata');
   perform growup_test.come(u4);  -- C, altra linea
   perform growup_test.ok((public.guida_conteggi(current_date)->>'nuovi_gruppo')::int = 0, '035: un''altra linea non vede i nuovi codici di R');
   perform growup_test.come(null);

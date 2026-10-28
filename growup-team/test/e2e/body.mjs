@@ -2289,12 +2289,16 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await stab2.locator(".stab-mese").innerText()).trim() === prec.nome + " · mese chiuso", "Stabilità: con un mese chiuso si guarda quello, scritto in evidenza");
   check(await stab2.locator(".stab-avviso").count() === 0, "Stabilità: mappa del mese scorso importata, nessun avviso");
   const dati = (await stab2.locator(".stab-dati").innerText()).replace(/\s+/g, " ");
-  check(dati.includes("Livello raggiunto 9%") && dati.includes("Rete solida fino al –"), "Stabilità: livello raggiunto dal fatturato e rete solida (" + dati + ")");
+  check(dati.includes("Livello raggiunto 9%") && dati.includes("La tua rete reale in costruzione"), "Stabilità: livello raggiunto dal fatturato e rete reale (" + dati + ")");
   const classi = async k => stab2.locator(`li[data-k=${k}] .cella`).evaluateAll(l => l.map(e => e.className.replace("cella", "").trim()));
   const cn = await classi("nuovi_gruppo"), cc = await classi("convention");
   check(cn.slice(0, 3).every(x => x.startsWith("att")) && cn.slice(3).every(x => x === "") && cn[2].includes("liv"),
     "Stabilità: ambra fino al livello raggiunto se non sostenuto, neutro sopra, bordo sul livello raggiunto (" + cn.join("|") + ")");
-  check(cc.slice(0, 3).every(x => x.startsWith("ok")) && cc.slice(3).every(x => x === ""), "Stabilità: verde dove la rete sostiene (" + cc.join("|") + ")");
+  check(cc.slice(0, 3).every(x => x.startsWith("ok")) && cc.slice(3).every(x => x === "sopra"),
+    "Stabilità: verde dove la rete sostiene; sopra il livello raggiunto neutro con la spunta se il numero c'è (" + cc.join("|") + ")");
+  const testi = async k => stab2.locator(`li[data-k=${k}] .cella`).allInnerTexts();
+  check((await testi("convention")).every(x => x.includes("✓")) && (await testi("nuovi_gruppo")).slice(0, 3).every(x => x.includes("!"))
+    && !(await testi("nuovi_gruppo")).slice(3).some(x => /[✓!]/.test(x)), "Stabilità: ✓ nelle caselle verdi, ! in quelle ambra");
   check((await stab2.locator("li[data-k=nuovi_gruppo] .tuo").innerText()).trim() === "0"
     && (await stab2.locator("li[data-k=nuovi_gruppo] .finora").innerText()).trim() === "Questo mese finora: 1",
     "Stabilità: il numero del mese chiuso e, sotto, quello del mese in corso");
@@ -2329,6 +2333,14 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.locator(".card", { hasText:"Il mio mese" }).waitFor(); check(true, "si torna a «Il mio giorno»");
   await ctx.close();
   DB.partners = DB.partners.filter(p => !["g41a", "g41b"].includes(p.id));
+  /* senza nessuna mappa: i codici oltre 200 VP non si contano */
+  DB.numeri = [];
+  await aGuida();
+  const r200 = (await page.locator(".guida-stabilita li[data-k=oltre_200]").innerText()).replace(/\s+/g, " ");
+  check(r200.includes("disponibile dopo l'import della mappa") && (await page.locator(".guida-stabilita li[data-k=oltre_200] .cella.att, .guida-stabilita li[data-k=oltre_200] .cella.ok").count()) === 0,
+    "Stabilità: senza mappa i codici oltre 200 VP sono «disponibile dopo l'import della mappa», non 0");
+  check(await page.locator(".guida-stabilita .stab-lavoro li", { hasText:"200 VP" }).count() === 0, "Su cosa lavorare: senza mappa niente codici oltre 200 VP");
+  await ctx.close();
   DB.numeri = numeriR;
 }
 

@@ -38,8 +38,9 @@ petrolio `#19788b`, rosa `#b83d8b`, nocciola `#87684c`; dal 7 si riparte. Niente
 
 I numeri sono nel carattere del testo (Manrope) con cifre allineate (`tabular-nums`); Cormorant resta per titoli e
 «perché». La Stabilità riproduce la tabella «Verifica la tua attività - Stabilità» di Cum Laude 21: sette caselle per riga
-(una per livello), verde (`--progresso`) dove la rete sostiene il livello, ambra (`--giallo`) per i livelli già raggiunti
-con il fatturato ma non sostenuti, neutro sopra; la colonna del livello raggiunto ha il bordo pesca (`--scelta`).
+(una per livello): piena verde con ✓ (`--stab-ok`) dove la rete sostiene il livello, piena ambra con ! (`--stab-att`) per
+i livelli già raggiunti con il fatturato ma non sostenuti, neutra sopra (con una piccola ✓ se il numero c'è già); la
+colonna del livello raggiunto ha il contorno pesca (`--scelta`). Segni e colori insieme: si legge anche senza i colori.
 Il mese di riferimento sta in una pillola pesca chiara. Niente barre: i numeri non sono un traguardo verso la percentuale.
 
 ## Icona

@@ -5853,7 +5853,8 @@ function vGuidaStabilita(){
       definitivi della mappa; chi non ha ancora un mese chiuso vede il mese in corso. Verde: il livello è sostenuto. Ambra: il livello
       l'hai raggiunto con il fatturato, ma la rete non lo sostiene ancora. Neutro: i livelli sopra quello raggiunto. Nuovi iscritti e
       codici oltre 200 VP vengono dalle mappe importate; app CumLaude21, Training Day e Convention li scrivi tu (tocca il numero):
-      per Training Day e Convention vale l'ultimo evento.`)}
+      per Training Day e Convention vale l'ultimo evento. Il tuo livello l'hai conquistato con il fatturato. La rete reale ti dice
+      quanto è solido e su cosa lavorare per tenerlo.`)}
     <h2 style="margin:4px 0 0">Stabilità della tua rete</h2>
     <p class="small" style="margin:4px 0 0">La percentuale la raggiungi con il fatturato. Questi numeri, frutto di 40 anni di esperienza
       CL21, indicano cosa serve per mantenerla nel tempo.</p>`;
@@ -5862,24 +5863,33 @@ function vGuidaStabilita(){
   const pct = rif.chiuso ? Number(rif.pct) || 0 : Number(numeriMese(rif.mese).percentuale) || 0;
   const raggiunto = L.reduce((x, l, j) => pct >= l ? j : x, -1);
   const val = r => Number(r.scritto ? w[r.k] : c[r.k]) || 0;
+  /* i codici oltre 200 VP vengono solo dalle mappe: senza una mappa del mese non si contano */
+  const senzaMappa = (r, x) => r.k === "oltre_200" && x.con_mappa === false;
+  const ATTESA_MAPPA = "disponibile dopo l'import della mappa";
   /* la rete è solida fino al livello più alto sostenuto in tutte le righe (e in tutti i livelli sotto) */
   const solida = L.reduce((x, l, j) => x === j - 1 && t.righe.every(r => val(r) >= r.soglie[j]) ? j : x, -1);
   const nomeMese = m => { const s = MESI[Number(m.slice(5)) - 1]; return s[0].toUpperCase() + s.slice(1) + " " + m.slice(0, 4); };
-  const stato = (r, j) => j > raggiunto ? "" : val(r) >= r.soglie[j] ? "ok" : "att";
-  const tuo = r => r.scritto ? `<button class="campo-cl21" data-act="guida-cl21">${w[r.k] != null ? num(w[r.k]) : "–"}</button>` : `<b>${num(val(r))}</b>`;
+  /* verde ✓ sostenuto, ambra ! raggiunto col fatturato ma non sostenuto; sopra il livello raggiunto neutro (✓ se il numero c'è già) */
+  const stato = (r, j) => senzaMappa(r, c) ? "" : j > raggiunto ? (val(r) >= r.soglie[j] ? "sopra" : "") : val(r) >= r.soglie[j] ? "ok" : "att";
+  const segno = { ok:"✓", att:"!", sopra:"✓" };
+  const tuo = r => r.scritto ? `<button class="campo-cl21" data-act="guida-cl21">${w[r.k] != null ? num(w[r.k]) : "–"}</button>`
+    : senzaMappa(r, c) ? "<b>–</b>" : `<b>${num(val(r))}</b>`;
   const sotto = { training_day:"ultimo evento", convention:"ultimo evento" };
   const riga = r => `<li data-k="${esc(r.k)}"><div class="voce"><span class="nome">${esc(r.nome)}${sotto[r.k] ? `<small>${sotto[r.k]}</small>` : ""}</span>
       <span class="tuo">${tuo(r)}</span></div>
-      <div class="celle">${L.map((l, j) => `<span class="cella ${stato(r, j)}${j === raggiunto ? " liv" : ""}">${num(r.soglie[j])}</span>`).join("")}</div>
-      ${rif.chiuso && (r.k === "nuovi_gruppo" || r.k === "oltre_200") ? `<p class="small finora">Questo mese finora: ${num(Number(ora[r.k]) || 0)}</p>` : ""}</li>`;
-  const lavoro = raggiunto < 0 ? [] : t.righe.filter(r => val(r) < r.soglie[raggiunto]);
+      <div class="celle">${L.map((l, j) => `<span class="cella ${stato(r, j)}${j === raggiunto ? " liv" : ""}">${num(r.soglie[j])}${
+        segno[stato(r, j)] ? `<i aria-hidden="true">${segno[stato(r, j)]}</i>` : ""}</span>`).join("")}</div>
+      ${senzaMappa(r, c) ? `<p class="small finora">${ATTESA_MAPPA}</p>` : ""}
+      ${rif.chiuso && (r.k === "nuovi_gruppo" || r.k === "oltre_200") ? `<p class="small finora">Questo mese finora: ${
+        senzaMappa(r, ora) ? ATTESA_MAPPA : num(Number(ora[r.k]) || 0)}</p>` : ""}</li>`;
+  const lavoro = raggiunto < 0 ? [] : t.righe.filter(r => !senzaMappa(r, c) && val(r) < r.soglie[raggiunto]);
   const atteso = mesePrecedente();
   return `<div class="card guida-stabilita">${testa}
     <p class="stab-mese"><b>${nomeMese(rif.mese)}</b> · ${rif.chiuso ? "mese chiuso" : "mese in corso"}</p>
     ${rif.chiuso && rif.mese < atteso ? `<p class="small stab-avviso">Importa la mappa di ${MESI[Number(atteso.slice(5)) - 1]} ${atteso.slice(0, 4)} per aggiornare</p>` : ""}
     <div class="stab-dati">
       <div><span>Livello raggiunto</span><b class="num">${raggiunto >= 0 ? L[raggiunto] + "%" : "–"}</b></div>
-      <div><span>Rete solida fino al</span><b class="num">${solida >= 0 ? L[solida] + "%" : "–"}</b></div>
+      <div><span>La tua rete reale</span><b class="num${solida >= 0 ? "" : " costruzione"}">${solida >= 0 ? L[solida] + "%" : "in costruzione"}</b></div>
     </div>
     <div class="stab-personali"><span><b>I tuoi nuovi iscritti del mese</b><small>entrati con il tuo link</small></span><b class="num">${num(Number(ora.personali) || 0)}</b></div>
     <div class="celle livelli">${L.map((l, j) => `<span class="cella${j === raggiunto ? " liv" : ""}">${l}%</span>`).join("")}</div>
