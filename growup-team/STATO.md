@@ -103,7 +103,8 @@ dalla copia di sicurezza escono il «perché» dell'obiettivo, le email e l'impr
 correzioni scritti a mano restano (scelta di Stefano: servono a ripristinare). Di chi è in attesa della mappa l'upline
 riceve solo il nome; l'anteprima dell'import lo riconosce chiedendo al database (`attesa_nel_report`) chi è nel report
 che si sta importando. La 041 è stata applicata per intero al secondo tentativo (al primo si era fermata dopo la tabella).
-App v54.
+App v54. 042 applicata su Supabase. Poi **042b** (da applicare): al massimo 30 richieste e 20.000 codici al giorno
+per `attesa_nel_report`, una alla volta, perché senza limite si potevano provare codici a caso (revisione automatica).
 
 **28 ottobre — Si entra solo su invito** (gruppo B, migrazione **041**, decisioni di Stefano; **da applicare su Supabase
 subito dopo l'unione della PR**): niente più link d'invito generico. In Gruppo la voce **«Invita»**: chi è già nella mappa

@@ -31,7 +31,7 @@ al database e prima del lancio a tutto il gruppo.
 | **GitHub, storia** | 17 ottobre 2026: la storia del repository è stata riscritta per togliere ogni dato reale (nomi, codici Amway, numeri, codice d'invito, email dell'autore dei commit). |
 | **Tabelle nuove** | Da ottobre 2026 Supabase non dà più permessi automatici alle tabelle nuove: in Growup ogni tabella nasce con `revoke all` e i `grant` espliciti nella stessa migrazione, più la RLS. |
 | **Copia di sicurezza** | La scarica solo un admin; contiene i dati per ripristinare tutto (compresi gli ordini e le correzioni scritti a mano), ma **non** il «perché» dell'obiettivo, le email né l'impronta delle chiavi d'accesso (042); mai le liste, il Target, i clienti, la Guida, il Seguimi e gli ordini della bozza. Va tenuta in una cartella privata di Google Drive. |
-| **Chi è in attesa (042)** | Di chi usa l'app ma non è ancora nella mappa, l'upline riceve solo il nome (`in_attesa`), non il codice Amway. L'anteprima dell'import lo riconosce con `attesa_nel_report`: l'app manda i codici del report che si sta importando e il database risponde solo per le persone in attesa del proprio gruppo che sono in quel report. |
+| **Chi è in attesa (042)** | Di chi usa l'app ma non è ancora nella mappa, l'upline riceve solo il nome (`in_attesa`), non il codice Amway. L'anteprima dell'import lo riconosce con `attesa_nel_report`: l'app manda i codici del report che si sta importando e il database risponde solo per le persone in attesa del proprio gruppo che sono in quel report; al massimo 30 richieste e 20.000 codici al giorno per partner, una richiesta alla volta (`attesa_richieste`, solo per il server), così i codici non si possono provare a caso. |
 
 ## Controlli fatti
 
