@@ -2238,7 +2238,7 @@ function vStruttura(){
       const piegato = path.some(id => st.chiusi.has(id)), nascosta = st.nascosti.has(p.id);
       return `<li class="liv${piegato ? " piegato" : ""}${nascosta ? " nascosta" : ""}" style="--rientro:${Math.min(path.length, 4) * 10}px"
         data-id="${esc(p.id)}" data-path="${esc(path.join(" "))}" data-nome="${esc(senzaAccenti(p.nome))}">
-      <span class="livello l${(livello + 1) % 4}" title="Livello ${livello + 2}">${livello + 2}</span>
+      <span class="livello l${livello % 5 + 1}" title="Livello ${livello + 2}">${livello + 2}</span>
       <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}">
         <span>${esc(p.nome)}</span>
         <span class="small">${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${r.linee_attive ? ` · ${r.linee_attive} ${r.linee_attive === 1 ? "linea" : "linee"}` : ""}</span>

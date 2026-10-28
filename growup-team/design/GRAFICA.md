@@ -27,6 +27,13 @@ I colori stanno tutti nelle variabili su `:root` di `index.html` (chiaro) e nei 
 I tre pulsanti in basso sono tutti pesca (scelta A di Stefano), con un'icona ciascuno: persona, calendario, carrello.
 `--accent` resta per link e testi evidenziati (smeraldo nel chiaro, pesca nello scuro).
 
+## Profondità nella struttura (grafica punto 3)
+
+Il numero nel cerchietto è il livello visto da chi guarda (1 = tu). Livello 1: bianco, solo per chi guarda (bordo
+sottile nel tema chiaro, numero scuro). Dal 2 un ciclo di 5 colori, uguale nei due temi: blu `#396cc4`, viola `#7f59c0`,
+petrolio `#19788b`, rosa `#b83d8b`, nocciola `#87684c`; dal 7 si riparte. Niente verde, ambra, rosso né grigio
+(grigio = chi non ha l'app). Numero bianco a 5,1:1; cerchio sul fondo scuro a 3,3:1.
+
 ## Icona
 
 **G Smeraldo** (scelta da Stefano il 16 ottobre 2026): fondo sfumato smeraldo, G avorio la cui stanghetta diventa
