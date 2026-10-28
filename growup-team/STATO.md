@@ -1,6 +1,6 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 27 ottobre 2026 (sera). Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 28 ottobre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
 ## Ripartire da qui (fermi la sera del 21 ottobre 2026)
@@ -97,6 +97,16 @@ sezione **Admin** (copia dei dati, listino, codici Amway tolti, Correggi). Il fo
 partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arrivarci, confronto, Analisi come pulsante,
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
+
+**28 ottobre — Controllo completo e test affidabili** (gruppo A di 4, richiesta di Stefano dopo il controllo di sicurezza,
+RLS e interfaccia): i test del database si lanciano con `sh test/db.sh` e **si fermano al primo errore**. Prima, se
+l'installazione si fermava a metà (a `stub_supabase.sql` mancava il ruolo `service_role`, quindi tutto dalla 039 in poi
+non veniva installato) l'ultima riga di `tests_rls.sql` diceva comunque «TUTTI I CONTROLLI SUPERATI». Ora quella riga
+lo dice solo se i controlli sono arrivati in fondo, e lo script controlla che ogni tabella e funzione esista. Il test
+dell'interfaccia conta come errore anche un file dell'app che non arriva (404) e, se si blocca, dice perché.
+Prossimi gruppi, una PR ciascuno: B) entrare solo con un invito personale; C) copia di sicurezza e «in attesa»;
+D) poteri da admin nel proprio gruppo, tabelle di impostazioni solo con profilo, notifiche di prova, ritocchi tecnici;
+E) grafica, in una sessione a parte.
 
 **28 ottobre — «Prossima cosa» con la ×** (Stefano, dopo aver provato l'avviso: arriva giusto e apre la scheda): nella scheda della persona una × accanto alla prossima cosa toglie giorno, ora e nota (e quindi anche l'avviso non ancora suonato). App v52.
 

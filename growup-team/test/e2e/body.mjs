@@ -1210,7 +1210,7 @@ const ctxC = await browser.newContext({ viewport:{width:390,height:844}, locale:
 await ctxC.route(/cdn\.jsdelivr\.net/, r => r.abort());
 await ctxC.route(/challenges\.cloudflare\.com/, r => r.abort());
 const pc = await ctxC.newPage();
-pc.on("pageerror", e => errori.push(String(e)));
+pc.on("pageerror", e => errori.push(String(e))); fileMancanti(pc);
 await pc.addInitScript(([db, m]) => { window.__DB = db; eval(m); }, [DB, mock]);
 await pc.goto(BASE + linkT.slice(linkT.indexOf("#")));
 await pc.getByText("Ciao Carla").waitFor();
@@ -1281,7 +1281,7 @@ await sync(page); await ctx.close();
 // il link già usato non si riapre
 const ctxC2 = await browser.newContext({ viewport:{width:390,height:844}, locale:"it-IT", bypassCSP:true });
 await ctxC2.route(/cdn\.jsdelivr\.net/, r => r.abort());
-const pc2 = await ctxC2.newPage();
+const pc2 = await ctxC2.newPage(); fileMancanti(pc2);
 await pc2.addInitScript(([db, m]) => { window.__DB = db; eval(m); }, [DB, mock]);
 await pc2.goto(BASE + linkT.slice(linkT.indexOf("#")));
 await pc2.getByText("Hai già risposto").waitFor(); check(true, "il link usato si chiude");
