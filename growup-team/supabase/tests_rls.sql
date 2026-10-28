@@ -908,6 +908,9 @@ begin
     '[{"codice":"8100002","nome":"Secondo Import","sponsor":"2000001","vpp":300,"vpg":300}]', '{}', '{}');
   perform growup_test.ok((public.guida_conteggi(current_date)->>'nuovi_gruppo')::int = 1, '035: dal secondo import il codice nuovo conta nel gruppo');
   perform growup_test.ok((public.guida_conteggi(current_date)->>'oltre_200')::int = att_prima + 1, '035: i codici del gruppo oltre 200 VP');
+  perform growup_test.ok((public.guida_conteggi(current_date)->>'con_mappa')::boolean
+                         and not (public.guida_conteggi((current_date - interval '5 years')::date)->>'con_mappa')::boolean,
+                         '044: i conteggi dicono se per il mese c''è una mappa importata');
   perform growup_test.come(u4);  -- C, altra linea
   perform growup_test.ok((public.guida_conteggi(current_date)->>'nuovi_gruppo')::int = 0, '035: un''altra linea non vede i nuovi codici di R');
   perform growup_test.come(null);
@@ -1307,6 +1310,12 @@ begin
     perform growup_test.come(ua);
     perform growup_test.ok((select count(*) from public.stage_requirements) = 19 and (select count(*) from public.settings) > 0,
                            '043: con un profilo sì');
+    perform growup_test.ok(jsonb_array_length((select valore->'livelli' from public.settings where chiave = 'stabilita_cl21')) = 7
+                           and (select bool_and(jsonb_array_length(rg->'soglie') = 7) from public.settings s,
+                                jsonb_array_elements(s.valore->'righe') rg where s.chiave = 'stabilita_cl21'),
+                           '044: i riferimenti della Stabilità (7 livelli, una soglia per livello) si leggono con un profilo');
+    perform growup_test.ok(growup_test.righe($q$update public.settings set valore = '{}' where chiave = 'stabilita_cl21'$q$) = 0,
+                           '044: un partner non cambia i riferimenti della Stabilità');
 
     -- il punto di partenza solo da modifica_partenza
     perform growup_test.deve_fallire($q$update public.partners set qualifica_iniziale = 'argento', pagamenti_iniziali = 3

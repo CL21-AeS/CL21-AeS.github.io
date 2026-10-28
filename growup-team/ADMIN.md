@@ -33,7 +33,7 @@ in attesa della mappa solo per nome.
 | Cosa | Dove |
 |---|---|
 | Requisiti delle tappe, guadagni, soglie delle percentuali | tabelle `stage_requirements`, `percent_levels` (le policy permettono di scrivere solo agli admin) |
-| Impostazioni (giorno di chiusura del mese, soglie delle etichette, obiettivi proposti) | tabella `settings` |
+| Impostazioni (giorno di chiusura del mese, soglie delle etichette, obiettivi proposti, riferimenti della tabella Stabilità di Cum Laude 21 `stabilita_cl21`) | tabella `settings` |
 | Migrazioni nuove (`supabase/0NN_*.sql`) | SQL Editor: quelle con cancellazioni il connettore di Claude non riesce ad applicarle, si incollano a mano |
 | Captcha (Cloudflare Turnstile) | Authentication → Attack Protection: acceso con la Secret Key del widget "Growup Team" (account Cloudflare di Stefano). Se un giorno nessuno riesce a entrare per colpa del captcha, si spegne da qui e l'app continua a funzionare |
 | Link personale perso dell'admin stesso | `select public.nuova_chiave_per(id) from public.partners where is_admin;` (SQL Editor) |

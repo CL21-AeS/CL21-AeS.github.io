@@ -38,6 +38,7 @@
   --line:#e7e0d2; --accent:#0a3a2c; --accent-ink:#f7f0e3; --accent-wash:#e6efe9;
   --verde:#13795b; --giallo:#9a6a00; --rosso:#b42318; --stella:#a8742a;
   --rame:#c26a3d; --rame2:#d98b4f; --eb:#a8552b; --traccia:#efe8da;
+  --stab-ok:#13795b; --stab-ok-ink:#ffffff; --stab-att:#f2c75c; --stab-att-ink:#4a3000;
   --head:linear-gradient(145deg,#0a3a2c 0%,#13604a 100%); --head-ink:#f7f0e3; --head-ink2:#d9c3a0; --oro:#e2a46f;
   --visione:linear-gradient(135deg,#0a3a2c,#164d3b);
   --b1:#0a3a2c; --b2:#c26a3d; --b3:#13795b;
@@ -58,6 +59,7 @@
     --line:#1f3329; --accent:#e2a46f; --accent-ink:#07130e; --accent-wash:#16291f;
     --verde:#34c08f; --giallo:#e2b45a; --rosso:#ff7b6b; --stella:#e2b45a;
     --rame:#e08a5a; --rame2:#f0a76f; --eb:#e2a46f; --traccia:#1c2e25;
+    --stab-ok:#2fae82; --stab-ok-ink:#04140d; --stab-att:#f0c45a; --stab-att-ink:#2b1c00;
     --head:linear-gradient(145deg,#04100b 0%,#0b2c21 100%); --visione:linear-gradient(135deg,#123528,#0c2219);
     --b1:#13604a; --b2:#b8602f; --b3:#1f8a68;
     --linguetta:#f7f0e3; --linguetta-ink:#0a3a2c;
@@ -71,6 +73,7 @@
   --line:#1f3329; --accent:#e2a46f; --accent-ink:#07130e; --accent-wash:#16291f;
   --verde:#34c08f; --giallo:#e2b45a; --rosso:#ff7b6b; --stella:#e2b45a;
   --rame:#e08a5a; --rame2:#f0a76f; --eb:#e2a46f; --traccia:#1c2e25;
+    --stab-ok:#2fae82; --stab-ok-ink:#04140d; --stab-att:#f0c45a; --stab-att-ink:#2b1c00;
   --head:linear-gradient(145deg,#04100b 0%,#0b2c21 100%); --visione:linear-gradient(135deg,#123528,#0c2219);
   --b1:#13604a; --b2:#b8602f; --b3:#1f8a68;
   --linguetta:#f7f0e3; --linguetta-ink:#0a3a2c;
@@ -159,7 +162,7 @@ label.check input{width:22px;min-height:22px;height:22px;margin:1px 0 0;flex:non
 .req li.attesa{color:var(--ink3)}
 .obiettivo+.obiettivo{margin-top:14px}
 .obiettivo .spread{margin-bottom:6px}
-.num{font-family:var(--f-titoli);font-variant-numeric:lining-nums tabular-nums;font-weight:700;font-size:1.15em;line-height:1.1}
+.num{font-family:var(--f-testo);font-variant-numeric:lining-nums tabular-nums;font-weight:700;font-size:1.15em;line-height:1.1}
 .oggi{list-style:none;margin:6px 0 0;padding:0}
 .oggi li{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
 .oggi li:first-child{border-top:0}
@@ -328,9 +331,37 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .numeri-guida span{font-size:11px;color:var(--ink2)}
 .guida-passi ol.passi{margin:8px 0 0;padding-left:20px}
 .guida-passi ol.passi li{margin-top:8px}
-table.stabilita td.ok{color:var(--verde);font-weight:700}
-table.stabilita td.manca{color:var(--rame);font-weight:700}
-table.stabilita tr.personali td{background:var(--traccia)}
+.guida-stabilita .stab-mese{display:inline-block;margin:12px 0 0;padding:4px 10px;border-radius:99px;background:var(--scelta-wash);font-size:13px}
+.guida-stabilita .stab-avviso{margin:6px 0 0;color:var(--giallo);font-weight:600}
+.stab-dati{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.stab-dati>div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:12px;background:var(--traccia)}
+.stab-dati span{font-size:12px;color:var(--ink2)}
+.stab-dati b{font-size:22px}
+.stab-personali{display:flex;align-items:center;gap:10px;margin-top:8px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;font-size:14px}
+.stab-personali>span{flex:1;min-width:0}
+.stab-personali small,ul.stabilita .nome small{display:block;font-size:12px;color:var(--ink2)}
+.guida-stabilita .celle{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.guida-stabilita .celle.livelli{margin-top:14px}
+.guida-stabilita .cella{display:flex;align-items:center;justify-content:center;gap:1px;padding:5px 0;border-radius:7px;font-size:13px;
+  font-variant-numeric:tabular-nums;color:var(--ink2);background:var(--traccia);white-space:nowrap}
+.guida-stabilita .cella i{font-style:normal;font-size:10px;font-weight:800;line-height:1}
+.guida-stabilita .celle.livelli .cella{background:none;font-size:11px;font-weight:700;padding:2px 0}
+.guida-stabilita .cella.ok{background:var(--stab-ok);color:var(--stab-ok-ink);font-weight:700}
+.guida-stabilita .cella.att{background:var(--stab-att);color:var(--stab-att-ink);font-weight:700}
+.guida-stabilita .cella.sopra i{color:var(--progresso)}
+.guida-stabilita .cella.liv{outline:2px solid var(--scelta);outline-offset:1px}
+.guida-stabilita .celle.livelli .cella.liv{color:var(--ink)}
+.stab-dati b.costruzione{font-size:17px;padding-top:4px}
+ul.stabilita{list-style:none;margin:4px 0 0;padding:0}
+ul.stabilita li{padding:9px 0 10px;border-top:1px solid var(--line)}
+ul.stabilita li:first-child{border-top:0}
+ul.stabilita .voce{display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:6px}
+ul.stabilita .nome{flex:1;min-width:0}
+ul.stabilita .tuo{white-space:nowrap;font-variant-numeric:tabular-nums}
+ul.stabilita .finora{margin:5px 0 0;color:var(--ink2)}
+.stab-lavoro{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.stab-lavoro ul{margin:6px 0 0;padding-left:18px;font-size:14px}
+.stab-lavoro li{margin:3px 0}
 .campo-cl21{min-width:36px;border:1px solid var(--line);border-radius:8px;padding:2px 8px;background:var(--bg);color:inherit;font:inherit;font-weight:700;cursor:pointer}
 .abitudine{border-top:1px solid var(--line);padding:10px 0 2px}
 .abitudine:first-of-type{border-top:0}

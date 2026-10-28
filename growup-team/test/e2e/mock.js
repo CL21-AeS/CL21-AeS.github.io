@@ -282,7 +282,8 @@
       return { personali:db.partners.filter(p => p.invitato_da === io.id && String(p.invitato_il || "").slice(0, 7) === m).length,
         nuovi_gruppo:db.partners.filter(p => p.id !== io.id && String(p.in_mappa_dal || "").slice(0, 7) === m && vedo(io, p)).length,
         oltre_200:(db.numeri || []).filter(x => x.mese === m && x === numeroDi(x.partner_id, m) && Number(x.vpp) > 200
-          && vedo(io, db.partners.find(p => p.id === x.partner_id) || {})).length }; },
+          && vedo(io, db.partners.find(p => p.id === x.partner_id) || {})).length,
+        con_mappa:(db.numeri || []).some(x => x.mese === m && vedo(io, db.partners.find(p => p.id === x.partner_id) || {})) }; },
     numeriCl21: async () => (db.numeriCl21 || []).filter(x => x.partner_id === mio().id).map(x => Object.assign({}, x)),
     salvaNumeriCl21: async r => { const io = mio(); db.numeriCl21 = (db.numeriCl21 || []).filter(x => x.partner_id !== io.id)
       .concat([Object.assign({ partner_id:io.id }, r)]); salva(); },

@@ -2238,6 +2238,9 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
 {
   const ora = new Date().toISOString();
   DB.guidaFatti = []; DB.guidaObiettivi = []; DB.numeriCl21 = [];
+  /* per la Stabilità: R parte senza mesi chiusi (si rimettono alla fine) */
+  const numeriR = DB.numeri || [];
+  DB.numeri = numeriR.filter(x => !(x.partner_id === "R" && x.mese < ora.slice(0, 7)));
   DB.partners.push({ id:"g41a", nome:"Entrato Col Link", sponsor_id:"R", stato:"attivo", codice_invito:"G41AAA", codice_amway:"8800001",
     invitato_da:"R", invitato_il:ora, confermato_il:ora, creato_il:ora });
   DB.partners.push({ id:"g41b", nome:"Nuovo Nella Mappa", sponsor_id:"R", stato:"gestito", gestore_id:"R", codice_invito:"G41BBB", codice_amway:"8800002",
@@ -2251,17 +2254,71 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(await page.locator(".card", { hasText:"Il mio mese" }).count() === 0, "in «Guida» solo la Guida");
   check((await page.locator(".guida-piano h2").innerText()).startsWith("Verso "), "il piano parte dalla cifra dell'obiettivo");
   check((await page.locator(".guida-piano").innerText()).includes("Per un sì servono circa"), "il piano in attività (piani e contatti per un sì)");
+  /* Stabilità (044): chi non ha mesi chiusi guarda il mese in corso; poi l'ultimo mese chiuso delle mappe */
   const stab = page.locator(".guida-stabilita");
+  const MESI_T = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
+  const meseT = (k, maiusc) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + k);
+    const n = MESI_T[d.getMonth()]; return { m:d.toISOString().slice(0, 7), nome:(maiusc ? n[0].toUpperCase() + n.slice(1) : n) + " " + d.getFullYear() }; };
+  check((await stab.locator("h2").innerText()).trim() === "Stabilità della tua rete", "Stabilità: il titolo");
+  check((await stab.innerText()).includes("La percentuale la raggiungi con il fatturato"), "Stabilità: dice che la percentuale viene dal fatturato");
   const attesi = DB.partners.filter(p => p.invitato_da === "R" && String(p.invitato_il || "").slice(0, 7) === ora.slice(0, 7)).length;
-  check(attesi >= 1 && (await stab.locator("tr.personali").innerText()).replace(/\s+/g, " ").includes("I tuoi nuovi iscritti del mese entrati con il tuo link " + attesi),
-    "Stabilità: i miei nuovi iscritti (entrati con il mio link)");
-  check((await stab.locator("tr", { hasText:"Nuovi nel gruppo del mese" }).locator("td").nth(1).innerText()).trim() === "1", "Stabilità: i nuovi nel gruppo dagli import");
+  check(attesi >= 1 && (await stab.locator(".stab-personali").innerText()).replace(/\s+/g, " ").includes("I tuoi nuovi iscritti · " + meseT(0, false).nome.split(" ")[0] + " entrati con il tuo link " + attesi),
+    "Stabilità: i miei nuovi iscritti (entrati con il mio link), a parte sopra la tabella");
+  check(await stab.locator(".celle.livelli .cella").count() === 7 && await stab.locator("ul.stabilita li").count() === 5
+    && await stab.locator("ul.stabilita li .cella").count() === 35, "Stabilità: 7 livelli e 5 righe con le 7 caselle di riferimento");
+  check(!(await stab.innerText()).includes("Ne manca"), "Stabilità: nessuna frase «Ne manca…»");
+  check((await stab.locator(".stab-mese").innerText()).trim() === meseT(0, true).nome + " · mese in corso", "Stabilità: senza mesi chiusi il mese in corso, scritto in evidenza");
+  check((await stab.locator("li[data-k=nuovi_gruppo] .tuo").innerText()).trim() === "1", "Stabilità: i nuovi nel gruppo dagli import (mese in corso)");
+  check(await stab.locator(".finora", { hasText:"Questo mese finora" }).count() === 0, "Stabilità: nel mese in corso niente «Questo mese finora»");
+  check((await stab.locator("li[data-k=app_cl21]").innerText()).includes("da inserire") && await stab.locator("li[data-k=app_cl21] .cella.att").count() === 0
+    && await stab.locator(".stab-lavoro li", { hasText:"CumLaude21" }).count() === 0, "Stabilità: un numero non ancora scritto resta neutro, «da inserire», fuori da «Su cosa lavorare»");
   await stab.locator("button[data-act=guida-cl21]").first().click();
   await page.locator(".sheet h2", { hasText:"I tuoi numeri Cum Laude 21" }).waitFor();
   await page.fill(".sheet input[name=app_cl21]", "9"); await page.fill(".sheet input[name=training_day]", "10"); await page.fill(".sheet input[name=convention]", "40");
   await page.click(".sheet button.primary");
   await page.getByText("Numeri salvati").waitFor();
-  check((await stab.locator("tr", { hasText:"Codici alla Convention" }).innerText()).includes("✓"), "Stabilità: un numero scritto oltre la soglia ha la spunta");
+  check((await stab.locator("li[data-k=convention] .tuo").innerText()).trim() === "40", "Stabilità: il numero scritto a mano compare nella sua riga");
+  check((await stab.locator("li[data-k=training_day]").innerText()).includes("ultimo evento"), "Stabilità: per il Training Day vale l'ultimo evento");
+  await sync(page); await ctx.close();
+  /* con un mese chiuso: livello e numeri del mese chiuso (qui il mese scorso al 9%) */
+  const prec = meseT(-1, true), prec2 = meseT(-2, false);
+  DB.numeri = numeriR.filter(x => !(x.partner_id === "R" && x.mese < ora.slice(0, 7)))
+    .concat([{ visto_da:"R", partner_id:"R", mese:prec.m, vpp:300, vpg:4000, percentuale:9, linee:[], nascoste:false, dati_al:prec.m + "-28T10:00:00Z" }]);
+  const aGuida = async () => { ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+    await page.getByText("Ciao Stefano e Alessia").waitFor(); await page.click(".sezioni-io button[data-sez=guida]"); await page.locator(".guida-stabilita").waitFor(); };
+  await aGuida();
+  const stab2 = page.locator(".guida-stabilita");
+  check((await stab2.locator(".stab-mese").innerText()).trim() === prec.nome + " · mese chiuso", "Stabilità: con un mese chiuso si guarda quello, scritto in evidenza");
+  check((await stab2.locator(".stab-personali").innerText()).replace(/\s+/g, " ").includes("I tuoi nuovi iscritti · " + prec.nome.split(" ")[0].toLowerCase()),
+    "Stabilità: i nuovi iscritti dicono a quale mese si riferiscono");
+  check(await stab2.locator(".stab-avviso").count() === 0, "Stabilità: mappa del mese scorso importata, nessun avviso");
+  const dati = (await stab2.locator(".stab-dati").innerText()).replace(/\s+/g, " ");
+  check(dati.includes("Livello raggiunto 9%") && dati.includes("La tua rete reale in costruzione"), "Stabilità: livello raggiunto dal fatturato e rete reale (" + dati + ")");
+  const classi = async k => stab2.locator(`li[data-k=${k}] .cella`).evaluateAll(l => l.map(e => e.className.replace("cella", "").trim()));
+  const cn = await classi("nuovi_gruppo"), cc = await classi("convention");
+  check(cn.slice(0, 3).every(x => x.startsWith("att")) && cn.slice(3).every(x => x === "") && cn[2].includes("liv"),
+    "Stabilità: ambra fino al livello raggiunto se non sostenuto, neutro sopra, bordo sul livello raggiunto (" + cn.join("|") + ")");
+  check(cc.slice(0, 3).every(x => x.startsWith("ok")) && cc.slice(3).every(x => x === "sopra"),
+    "Stabilità: verde dove la rete sostiene; sopra il livello raggiunto neutro con la spunta se il numero c'è (" + cc.join("|") + ")");
+  const testi = async k => stab2.locator(`li[data-k=${k}] .cella`).allInnerTexts();
+  check((await testi("convention")).every(x => x.includes("✓")) && (await testi("nuovi_gruppo")).slice(0, 3).every(x => x.includes("!"))
+    && !(await testi("nuovi_gruppo")).slice(3).some(x => /[✓!]/.test(x)), "Stabilità: ✓ nelle caselle verdi, ! in quelle ambra");
+  check((await stab2.locator("li[data-k=nuovi_gruppo] .tuo").innerText()).trim() === "0"
+    && (await stab2.locator("li[data-k=nuovi_gruppo] .finora").innerText()).trim() === "Questo mese finora: 1",
+    "Stabilità: il numero del mese chiuso e, sotto, quello del mese in corso");
+  check(await stab2.locator("li[data-k=oltre_200] .finora").count() === 1 && await stab2.locator("li[data-k=convention] .finora").count() === 0,
+    "Stabilità: «Questo mese finora» solo per nuovi iscritti e codici oltre 200 VP");
+  const lav = (await stab2.locator(".stab-lavoro li").allInnerTexts()).map(x => x.replace(/\s+/g, " "));
+  check(lav.length === 2 && lav[0] === "Nuovi iscritti nel gruppo del mese: hai 0, ne servono 5 per sostenere il 9%"
+    && lav[1] === "Codici che fatturano più di 200 VP: hai 1, ne servono 5 per sostenere il 9%", "Su cosa lavorare: le righe in ambra, in ordine (" + lav.join(" / ") + ")");
+  await sync(page); await ctx.close();
+  /* la mappa del mese appena chiuso non c'è ancora: l'ultimo mese disponibile, con l'avviso */
+  DB.numeri = DB.numeri.filter(x => !(x.partner_id === "R" && x.mese === prec.m))
+    .concat([{ visto_da:"R", partner_id:"R", mese:prec2.m, vpp:300, vpg:4000, percentuale:9, linee:[], nascoste:false, dati_al:prec2.m + "-28T10:00:00Z" }]);
+  await aGuida();
+  check((await page.locator(".guida-stabilita .stab-mese").innerText()).includes("mese chiuso")
+    && (await page.locator(".guida-stabilita .stab-avviso").innerText()).trim() === "Importa la mappa di " + meseT(-1, false).nome + " per aggiornare",
+    "Stabilità: senza la mappa del mese appena chiuso, l'ultimo mese disponibile e l'avviso");
   check(await page.locator(".guida-passi ol.passi li").count() >= 3, "Cosa fare adesso: i passi della tappa");
   // abitudini: spunto oggi la formazione e cambio l'obiettivo
   const oggiG = new Date().toISOString().slice(0, 10);
@@ -2280,6 +2337,15 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.locator(".card", { hasText:"Il mio mese" }).waitFor(); check(true, "si torna a «Il mio giorno»");
   await ctx.close();
   DB.partners = DB.partners.filter(p => !["g41a", "g41b"].includes(p.id));
+  /* senza nessuna mappa: i codici oltre 200 VP non si contano */
+  DB.numeri = [];
+  await aGuida();
+  const r200 = (await page.locator(".guida-stabilita li[data-k=oltre_200]").innerText()).replace(/\s+/g, " ");
+  check(r200.includes("disponibile dopo l'import della mappa") && (await page.locator(".guida-stabilita li[data-k=oltre_200] .cella.att, .guida-stabilita li[data-k=oltre_200] .cella.ok").count()) === 0,
+    "Stabilità: senza mappa i codici oltre 200 VP sono «disponibile dopo l'import della mappa», non 0");
+  check(await page.locator(".guida-stabilita .stab-lavoro li", { hasText:"200 VP" }).count() === 0, "Su cosa lavorare: senza mappa niente codici oltre 200 VP");
+  await ctx.close();
+  DB.numeri = numeriR;
 }
 
 // 42. Seguimi giorno per giorno (036): «Oggi per te» e i numeri all'upline solo se il partner lo sceglie

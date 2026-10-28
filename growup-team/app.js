@@ -5707,13 +5707,15 @@ document.addEventListener("input", e => {
 /* ---- 11i. La Guida per l'azione (035): il piano dall'obiettivo, la tabella «Stabilità» di Cum Laude 21, i passi
    della tappa e le abitudini. Sta in «Guida», in cima a Io: la pagina di tutti i giorni resta senza consigli.
    I numeri vengono da quello che il partner compila nell'app; obiettivi delle abitudini e spunte sono solo suoi. */
-const LIVELLI_CL21 = [3, 6, 9, 12, 15, 18, 21];
-const STABILITA_CL21 = [
-  { k:"nuovi_gruppo", nome:"Nuovi nel gruppo del mese", soglie:[1, 3, 5, 8, 10, 15, 20] },
-  { k:"oltre_200", nome:"Codici oltre 200 VP", soglie:[1, 3, 5, 10, 17, 30, 42] },
-  { k:"app_cl21", nome:"Codici nell'app CumLaude21", soglie:[1, 2, 3, 7, 12, 21, 30], scritto:true },
-  { k:"training_day", nome:"Codici al Training Day", soglie:[1, 3, 5, 10, 17, 30, 42], scritto:true },
-  { k:"convention", nome:"Codici alla Convention", soglie:[1, 2, 3, 7, 12, 21, 30], scritto:true }];
+/* la tabella «Verifica la tua attività - Stabilità» di Cum Laude 21 (044): livelli e soglie stanno nelle impostazioni
+   (chiave stabilita_cl21), così si aggiornano se Cum Laude 21 li cambia. Le ultime tre righe le scrive il partner. */
+const STABILITA_SCRITTI = ["app_cl21", "training_day", "convention"];
+function stabilitaCl21(){
+  const v = cfg("stabilita_cl21");
+  if(!v || !Array.isArray(v.livelli) || !Array.isArray(v.righe) || !v.livelli.length) return null;
+  return { livelli:v.livelli.map(Number), righe:v.righe.map(r => ({ k:r.k, nome:r.nome, soglie:(r.soglie || []).map(Number),
+    scritto:STABILITA_SCRITTI.includes(r.k) })) };
+}
 /* i rapporti di base (Stefano): 1 piano ogni 2-3 contatti, 1 sì ogni 5 piani; con 10 piani nella Lista si usano i suoi */
 const RAPPORTI_BASE = { contatti_per_piano:2.5, piani_per_si:5 };
 const ABITUDINI = {
@@ -5773,8 +5775,15 @@ function gruppoGuida(chiave){
 async function caricaGuida(){
   st.guida = st.guida || { conteggi:{}, cl21:{}, obiettivi:new Map(), fatti:[] };
   try{
-    const [c, n, o, f] = await Promise.all([api.guidaConteggi(primoDelMese()), api.numeriCl21(), api.guidaObiettivi(), api.guidaFatti(piuGiorni(settimana(), -7 * SETTIMANE_INDIETRO))]);
-    st.guida = { conteggi:c || {}, cl21:(n || [])[0] || {}, obiettivi:new Map((o || []).map(x => [x.chiave, Number(x.a_settimana)])), fatti:f || [] };
+    const [c, n, o, f, mesi] = await Promise.all([api.guidaConteggi(primoDelMese()), api.numeriCl21(), api.guidaObiettivi(),
+      api.guidaFatti(piuGiorni(settimana(), -7 * SETTIMANE_INDIETRO)), api.mioReport(st.profilo.id, piuMesi(primoDelMese(), -24))]);
+    /* il mese di riferimento della Stabilità: l'ultimo mese chiuso con la mappa importata; chi non ne ha guarda il mese in corso */
+    const chiuso = (mesi || []).filter(r => meseDi(r.mese) < meseDi(oggi())).sort((x, y) => x.mese < y.mese ? 1 : -1)[0];
+    const rif = chiuso ? { mese:meseDi(chiuso.mese), chiuso:true,
+      pct:chiuso.percentuale != null ? Number(chiuso.percentuale) : percentualeDa(Number(chiuso.vpg) || 0) } : { mese:meseDi(oggi()), chiuso:false };
+    const cRif = chiuso ? await api.guidaConteggi(rif.mese + "-01") : c;
+    st.guida = { conteggi:c || {}, conteggiRif:cRif || {}, rif, cl21:(n || [])[0] || {},
+      obiettivi:new Map((o || []).map(x => [x.chiave, Number(x.a_settimana)])), fatti:f || [] };
   }catch(e){}
   try{
     const [sg, gg] = await Promise.all([api.seguimi(), api.seguimiGiorni(piuGiorni(oggi(), -30))]);
@@ -5836,30 +5845,61 @@ function vGuidaPiano(){
   </div>`;
 }
 function vGuidaStabilita(){
-  const n = numeriMese(meseDi(oggi())), pct = Number(n.percentuale) || 0;
-  const i = LIVELLI_CL21.reduce((x, l, j) => pct >= l ? j : x, -1), prossimo = Math.min(i + 1, LIVELLI_CL21.length - 1);
-  const c = st.guida.conteggi || {}, w = st.guida.cl21 || {};
-  const val = r => r.scritto ? w[r.k] : c[r.k];
-  const cella = (r, j) => { const v = Number(val(r)) || 0, s = r.soglie[j];
-    return v >= s ? `<td class="num ok">${num(s)} ✓</td>` : `<td class="num manca">${num(s)} · −${num(s - v)}</td>`; };
-  const tu = r => r.scritto ? `<button class="campo-cl21" data-act="guida-cl21">${val(r) != null ? num(val(r)) : "–"}</button>` : num(Number(val(r)) || 0);
-  return `<div class="card guida-stabilita">
-    <span class="con-aiuto"><span class="eyebrow">Verifica la tua attività · Stabilità</span>${aiutoBtn("stabilita")}</span>
-    ${aiutoTesto("stabilita", `È la tabella «Stabilità» di Cum Laude 21: per ogni livello (3%, 6% … 21%) i numeri da fare ogni mese.
-      I tuoi nuovi iscritti sono le persone entrate nell'app con il tuo link questo mese. I nuovi nel gruppo e i codici oltre
-      200 VP arrivano dai report che importi (i nuovi si contano dal secondo import). Le ultime tre righe (app CumLaude21,
-      Training Day, Convention) le scrivi tu: tocca il numero.`)}
-    <p class="small" style="margin:2px 0 0">${i >= 0 ? `Questo mese sei al ${LIVELLI_CL21[i]}%` : "Questo mese non hai ancora una percentuale"}${
-      i < LIVELLI_CL21.length - 1 ? `: per una qualifica solida al ${LIVELLI_CL21[prossimo]}% servono` : ": i numeri per una qualifica solida al 21%"}</p>
-    <div class="tab-consigli"><table class="stabilita">
-      <thead><tr><th></th><th>tu</th>${i >= 0 && i !== prossimo ? `<th>${LIVELLI_CL21[i]}%</th>` : ""}<th>${LIVELLI_CL21[prossimo]}%</th></tr></thead>
-      <tbody>
-        <tr class="personali"><td><b>I tuoi nuovi iscritti del mese</b><br><span class="small">entrati con il tuo link</span></td>
-          <td class="num"><b>${num(Number(c.personali) || 0)}</b></td>${i >= 0 && i !== prossimo ? "<td>–</td>" : ""}<td>–</td></tr>
-        ${STABILITA_CL21.map(r => `<tr><td>${esc(r.nome)}</td><td class="num">${tu(r)}</td>${i >= 0 && i !== prossimo
-          ? `<td class="num">${num(r.soglie[i])}</td>` : ""}${cella(r, prossimo)}</tr>`).join("")}
-      </tbody></table></div>
-
+  const t = stabilitaCl21(), g = st.guida, rif = g.rif || { mese:meseDi(oggi()), chiuso:false };
+  const testa = `<span class="con-aiuto"><span class="eyebrow">Verifica la tua attività</span>${aiutoBtn("stabilita")}</span>
+    ${aiutoTesto("stabilita", `La percentuale si raggiunge solo con il fatturato (i VP). Questa è la tabella «Verifica la tua attività -
+      Stabilità» di Cum Laude 21: per ogni livello dice i numeri che servono per sostenere nel tempo la qualifica raggiunta. Non fanno
+      arrivare alla percentuale: dicono se la rete la regge. Si guarda l'ultimo mese chiuso, perché è un mese completo con i numeri
+      definitivi della mappa; chi non ha ancora un mese chiuso vede il mese in corso. Verde: il livello è sostenuto. Ambra: il livello
+      l'hai raggiunto con il fatturato, ma la rete non lo sostiene ancora. Neutro: i livelli sopra quello raggiunto. Nuovi iscritti e
+      codici oltre 200 VP vengono dalle mappe importate; app CumLaude21, Training Day e Convention li scrivi tu (tocca il numero):
+      per Training Day e Convention vale l'ultimo evento. Il tuo livello l'hai conquistato con il fatturato. La rete reale ti dice
+      quanto è solido e su cosa lavorare per tenerlo.`)}
+    <h2 style="margin:4px 0 0">Stabilità della tua rete</h2>
+    <p class="small" style="margin:4px 0 0">La percentuale la raggiungi con il fatturato. Questi numeri, frutto di 40 anni di esperienza
+      CL21, indicano cosa serve per mantenerla nel tempo.</p>`;
+  if(!t) return `<div class="card guida-stabilita">${testa}<p class="small muted" style="margin:10px 0 0">I riferimenti della tabella non sono ancora caricati.</p></div>`;
+  const L = t.livelli, c = g.conteggiRif || g.conteggi || {}, ora = g.conteggi || {}, w = g.cl21 || {};
+  const pct = rif.chiuso ? Number(rif.pct) || 0 : Number(numeriMese(rif.mese).percentuale) || 0;
+  const raggiunto = L.reduce((x, l, j) => pct >= l ? j : x, -1);
+  const val = r => Number(r.scritto ? w[r.k] : c[r.k]) || 0;
+  /* i codici oltre 200 VP vengono solo dalle mappe: senza una mappa del mese non si contano */
+  const senzaMappa = (r, x) => r.k === "oltre_200" && x.con_mappa === false;
+  const ATTESA_MAPPA = "disponibile dopo l'import della mappa";
+  /* un numero che manca (mappa non ancora importata, o da scrivere a mano) resta neutro e non entra in «Su cosa lavorare» */
+  const daInserire = r => r.scritto && w[r.k] == null;
+  const ignoto = r => senzaMappa(r, c) || daInserire(r);
+  /* la rete è solida fino al livello più alto sostenuto in tutte le righe (e in tutti i livelli sotto) */
+  const solida = L.reduce((x, l, j) => x === j - 1 && t.righe.every(r => val(r) >= r.soglie[j]) ? j : x, -1);
+  const nomeMese = m => { const s = MESI[Number(m.slice(5)) - 1]; return s[0].toUpperCase() + s.slice(1) + " " + m.slice(0, 4); };
+  /* verde ✓ sostenuto, ambra ! raggiunto col fatturato ma non sostenuto; sopra il livello raggiunto neutro (✓ se il numero c'è già) */
+  const stato = (r, j) => ignoto(r) ? "" : j > raggiunto ? (val(r) >= r.soglie[j] ? "sopra" : "") : val(r) >= r.soglie[j] ? "ok" : "att";
+  const segno = { ok:"✓", att:"!", sopra:"✓" };
+  const tuo = r => r.scritto ? `<button class="campo-cl21" data-act="guida-cl21">${w[r.k] != null ? num(w[r.k]) : "–"}</button>`
+    : senzaMappa(r, c) ? "<b>–</b>" : `<b>${num(val(r))}</b>`;
+  const sotto = { training_day:"ultimo evento", convention:"ultimo evento" };
+  const riga = r => `<li data-k="${esc(r.k)}"><div class="voce"><span class="nome">${esc(r.nome)}${sotto[r.k] ? `<small>${sotto[r.k]}</small>` : ""}</span>
+      <span class="tuo">${tuo(r)}</span></div>
+      <div class="celle">${L.map((l, j) => `<span class="cella ${stato(r, j)}${j === raggiunto ? " liv" : ""}">${num(r.soglie[j])}${
+        segno[stato(r, j)] ? `<i aria-hidden="true">${segno[stato(r, j)]}</i>` : ""}</span>`).join("")}</div>
+      ${senzaMappa(r, c) ? `<p class="small finora">${ATTESA_MAPPA}</p>` : daInserire(r) ? `<p class="small finora">da inserire</p>` : ""}
+      ${rif.chiuso && (r.k === "nuovi_gruppo" || r.k === "oltre_200") ? `<p class="small finora">Questo mese finora: ${
+        senzaMappa(r, ora) ? ATTESA_MAPPA : num(Number(ora[r.k]) || 0)}</p>` : ""}</li>`;
+  const lavoro = raggiunto < 0 ? [] : t.righe.filter(r => !ignoto(r) && val(r) < r.soglie[raggiunto]);
+  const atteso = mesePrecedente();
+  return `<div class="card guida-stabilita">${testa}
+    <p class="stab-mese"><b>${nomeMese(rif.mese)}</b> · ${rif.chiuso ? "mese chiuso" : "mese in corso"}</p>
+    ${rif.chiuso && rif.mese < atteso ? `<p class="small stab-avviso">Importa la mappa di ${MESI[Number(atteso.slice(5)) - 1]} ${atteso.slice(0, 4)} per aggiornare</p>` : ""}
+    <div class="stab-dati">
+      <div><span>Livello raggiunto</span><b class="num">${raggiunto >= 0 ? L[raggiunto] + "%" : "–"}</b></div>
+      <div><span>La tua rete reale</span><b class="num${solida >= 0 ? "" : " costruzione"}">${solida >= 0 ? L[solida] + "%" : "in costruzione"}</b></div>
+    </div>
+    <div class="stab-personali"><span><b>I tuoi nuovi iscritti · ${MESI[Number(rif.mese.slice(5)) - 1]}</b><small>entrati con il tuo link${
+      rif.chiuso ? ` · questo mese finora: ${num(Number(ora.personali) || 0)}` : ""}</small></span><b class="num">${num(Number(c.personali) || 0)}</b></div>
+    <div class="celle livelli">${L.map((l, j) => `<span class="cella${j === raggiunto ? " liv" : ""}">${l}%</span>`).join("")}</div>
+    <ul class="stabilita">${t.righe.map(riga).join("")}</ul>
+    ${lavoro.length ? `<div class="stab-lavoro"><span class="eyebrow">Su cosa lavorare</span><ul>${lavoro.map(r =>
+      `<li><b>${esc(r.nome)}</b>: hai ${num(val(r))}, ne servono ${num(r.soglie[raggiunto])} per sostenere il ${L[raggiunto]}%</li>`).join("")}</ul></div>` : ""}
   </div>`;
 }
 function vGuidaPassi(){
@@ -6118,7 +6158,7 @@ function tendenzaDi(valori){
   return a > b * 1.1 ? "in crescita" : a < b * 0.9 ? "in calo" : "stabile";
 }
 const INIZIO_STABILITA = "2026-10";
-function sogliaCl21(r, pct){ const i = LIVELLI_CL21.reduce((x, l, j) => (Number(pct) || 0) >= l ? j : x, 0); return r.soglie[i]; }
+function sogliaCl21(r, pct, livelli){ const i = livelli.reduce((x, l, j) => (Number(pct) || 0) >= l ? j : x, 0); return r.soglie[i]; }
 function vAnalisi(){
   const pid = st.analisiId, mio = pid === st.profilo.id, righe = st.analisi[pid];
   const indietro = `<button class="btn link" data-act="analisi-indietro" style="padding:0">‹ Indietro</button>`;
@@ -6153,19 +6193,20 @@ function vAnalisi(){
           ? { vp:Number(r.vpg) || 0, pct:r.percentuale != null ? Number(r.percentuale) : percentualeDa(Number(r.vpg) || 0) } : null)).join("")}
           <td class="num">100%</td><td class="num">${mesi21}</td>${tend(tendenzaDi(righe.map(r => r.vpg != null ? Number(r.vpg) : null)))}</tr></tbody>
     </table></div>`;
+  const tabCl21 = stabilitaCl21() || { livelli:[], righe:[] };
   const stab = [{ k:"personali", nome:mio ? "I tuoi nuovi iscritti (con il tuo link)" : "Nuovi iscritti con il suo link" }]
-    .concat(STABILITA_CL21.filter(r => !r.scritto));
+    .concat(tabCl21.righe.filter(r => !r.scritto));
   const tabStab = `<div class="tab-consigli"><table class="analisi">
       <thead>${testa}</tr></thead>
       <tbody>${stab.map(r => `<tr><td class="nome">${esc(r.nome)}</td>${righe.map(x => { const v = Number(x[r.k]) || 0;
         /* i conteggi ci sono da quando c'è la Guida (fine ottobre 2026); senza report del mese niente soglia */
         if(meseDi(x.mese) < INIZIO_STABILITA || (r.soglie && x.vpg == null)) return `<td class="num faint">–</td>`;
         if(!r.soglie) return `<td class="num">${num(v)}</td>`;
-        const s = sogliaCl21(r, x.percentuale);
+        const s = sogliaCl21(r, x.percentuale, tabCl21.livelli);
         return `<td class="num ${v >= s ? "ok" : "manca"}">${num(v)}<br><span>su ${num(s)}</span></td>`; }).join("")}</tr>`).join("")}</tbody>
     </table></div>`;
   const cond = mio ? { cl21:st.guida.cl21, obiettivi:[...st.guida.obiettivi].map(([chiave, a_settimana]) => ({ chiave, a_settimana })), fatti:st.guida.fatti } : st.condivisi[pid];
-  const scritti = STABILITA_CL21.filter(r => r.scritto);
+  const scritti = tabCl21.righe.filter(r => r.scritto);
   const blocco = cond ? `<ul class="req">${scritti.map(r => `<li><span class="grow">${esc(r.nome)}</span><span class="num">${
       cond.cl21 && cond.cl21[r.k] != null ? num(cond.cl21[r.k]) : "–"}</span></li>`).join("")}</ul>
     ${mio ? "" : `<p class="small" style="margin:8px 0 0"><b>Abitudini di questa settimana</b>: ${["formazione", "sponsor"].map(k => {
