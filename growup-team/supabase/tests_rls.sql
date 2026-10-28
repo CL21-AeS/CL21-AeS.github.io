@@ -1251,6 +1251,12 @@ begin
     perform growup_test.ok((select codice from public.attesa_nel_report(array['9200001', '9999998']) where id = w) = '9200001',
                            '042: l''anteprima dell''import riconosce Walter se il suo codice è nel report');
     perform growup_test.ok(not exists (select 1 from public.attesa_nel_report(array['9999998'])), '042: senza il suo codice nel report, niente');
+    execute 'reset role';   -- 30 richieste al giorno: la trentunesima è rifiutata (niente codici provati a caso)
+    insert into public.attesa_richieste (partner_id, codici) select a, 1 from generate_series(1, 30 - (select count(*)::int
+      from public.attesa_richieste where partner_id = a));
+    perform growup_test.come(ua);
+    perform growup_test.deve_fallire($q$select * from public.attesa_nel_report(array['9200001'])$q$, '042: oltre 30 richieste al giorno, rifiutato');
+    perform growup_test.deve_fallire('select * from public.attesa_richieste', '042: le richieste non si leggono dall''app');
     perform growup_test.come(ub);  -- B è di lato rispetto a Walter (sotto A)
     perform growup_test.ok(not exists (select 1 from public.attesa_nel_report(array['9200001'])), '042: chi è di lato non lo riconosce');
     perform growup_test.come(null);

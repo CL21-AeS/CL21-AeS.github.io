@@ -6149,7 +6149,7 @@ grant execute on function public.notifiche_da_inviare(timestamptz) to service_ro
 --   le correzioni del totale scritti a mano restano (servono a ripristinare tutto);
 -- * di chi è «in attesa della mappa» l'upline riceve solo il nome (non più il codice Amway). L'anteprima dell'import lo
 --   riconosce chiedendo al database quali persone in attesa sono nel report che si sta importando (`attesa_nel_report`):
---   il codice torna all'app solo se era già nel file di chi importa.
+--   il codice torna all'app solo se era già nel file di chi importa; al massimo 30 richieste al giorno per partner.
 
 -- ---- La copia di sicurezza ----
 create or replace function public.copia_dati()
@@ -6205,11 +6205,21 @@ as $$
    order by p.creato_il
 $$;
 
--- per l'anteprima dell'import: quali persone in attesa del mio gruppo sono nel report che sto importando
+-- per l'anteprima dell'import: quali persone in attesa del mio gruppo sono nel report che sto importando.
+-- Il codice torna solo se l'ho mandato io (era nel mio file). Per non poter «provare» codici a caso, le richieste sono
+-- contate: al massimo 30 al giorno per partner (un import ne usa una per file), registrate in attesa_richieste.
+create table if not exists public.attesa_richieste (
+  partner_id  uuid not null references public.partners(id) on delete cascade,
+  il          timestamptz not null default now(),
+  codici      int not null
+);
+create index if not exists attesa_richieste_partner on public.attesa_richieste (partner_id, il);
+alter table public.attesa_richieste enable row level security;
+revoke all on public.attesa_richieste from anon, authenticated;
+
 create or replace function public.attesa_nel_report(p_codici text[])
 returns table (id uuid, nome text, codice text)
 language plpgsql
-stable
 security definer
 set search_path = public
 as $$
@@ -6222,6 +6232,10 @@ begin
   if cardinality(coalesce(p_codici, '{}')) > 5000 then
     raise exception 'import_non_valido';
   end if;
+  if (select count(*) from public.attesa_richieste r where r.partner_id = io and r.il > now() - interval '1 day') >= 30 then
+    raise exception 'troppe_richieste';
+  end if;
+  insert into public.attesa_richieste (partner_id, codici) values (io, cardinality(coalesce(p_codici, '{}')));
   return query
     select p.id, p.nome, p.codice_amway
       from public.partners p

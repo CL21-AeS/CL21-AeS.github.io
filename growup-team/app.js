@@ -314,6 +314,7 @@ const MESSAGGI_ERRORE = {
   invito_annullato: "Questo invito è stato annullato. Chiedi a chi ti ha invitato di mandartene uno nuovo.",
   invito_scaduto: "Questo invito è scaduto (vale 7 giorni). Chiedi a chi ti ha invitato di mandartene uno nuovo.",
   troppi_inviti: "Hai già 50 inviti aperti: annulla quelli che non servono e riprova.",
+  troppe_richieste: "Troppi import oggi: riprova domani.",
   mai_entrato: "Questa persona non è mai entrata in Growup: invitala con «Invita».",
   codice_amway_attivo: "Con questo codice Amway c'è già qualcuno che usa l'app: entra con il tuo link personale (quello che ti eri salvato).",
   codice_amway_altra_linea: "Questo codice Amway è nella struttura di un altro gruppo: chiedi un invito a chi ti sta sopra.",
