@@ -2262,14 +2262,16 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await stab.locator("h2").innerText()).trim() === "Stabilità della tua rete", "Stabilità: il titolo");
   check((await stab.innerText()).includes("La percentuale la raggiungi con il fatturato"), "Stabilità: dice che la percentuale viene dal fatturato");
   const attesi = DB.partners.filter(p => p.invitato_da === "R" && String(p.invitato_il || "").slice(0, 7) === ora.slice(0, 7)).length;
-  check(attesi >= 1 && (await stab.locator(".stab-personali").innerText()).replace(/\s+/g, " ").includes("I tuoi nuovi iscritti del mese entrati con il tuo link " + attesi),
+  check(attesi >= 1 && (await stab.locator(".stab-personali").innerText()).replace(/\s+/g, " ").includes("I tuoi nuovi iscritti · " + meseT(0, false).nome.split(" ")[0] + " entrati con il tuo link " + attesi),
     "Stabilità: i miei nuovi iscritti (entrati con il mio link), a parte sopra la tabella");
   check(await stab.locator(".celle.livelli .cella").count() === 7 && await stab.locator("ul.stabilita li").count() === 5
     && await stab.locator("ul.stabilita li .cella").count() === 35, "Stabilità: 7 livelli e 5 righe con le 7 caselle di riferimento");
   check(!(await stab.innerText()).includes("Ne manca"), "Stabilità: nessuna frase «Ne manca…»");
   check((await stab.locator(".stab-mese").innerText()).trim() === meseT(0, true).nome + " · mese in corso", "Stabilità: senza mesi chiusi il mese in corso, scritto in evidenza");
   check((await stab.locator("li[data-k=nuovi_gruppo] .tuo").innerText()).trim() === "1", "Stabilità: i nuovi nel gruppo dagli import (mese in corso)");
-  check(await stab.locator(".finora").count() === 0, "Stabilità: nel mese in corso niente «Questo mese finora»");
+  check(await stab.locator(".finora", { hasText:"Questo mese finora" }).count() === 0, "Stabilità: nel mese in corso niente «Questo mese finora»");
+  check((await stab.locator("li[data-k=app_cl21]").innerText()).includes("da inserire") && await stab.locator("li[data-k=app_cl21] .cella.att").count() === 0
+    && await stab.locator(".stab-lavoro li", { hasText:"CumLaude21" }).count() === 0, "Stabilità: un numero non ancora scritto resta neutro, «da inserire», fuori da «Su cosa lavorare»");
   await stab.locator("button[data-act=guida-cl21]").first().click();
   await page.locator(".sheet h2", { hasText:"I tuoi numeri Cum Laude 21" }).waitFor();
   await page.fill(".sheet input[name=app_cl21]", "9"); await page.fill(".sheet input[name=training_day]", "10"); await page.fill(".sheet input[name=convention]", "40");
@@ -2287,6 +2289,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await aGuida();
   const stab2 = page.locator(".guida-stabilita");
   check((await stab2.locator(".stab-mese").innerText()).trim() === prec.nome + " · mese chiuso", "Stabilità: con un mese chiuso si guarda quello, scritto in evidenza");
+  check((await stab2.locator(".stab-personali").innerText()).replace(/\s+/g, " ").includes("I tuoi nuovi iscritti · " + prec.nome.split(" ")[0].toLowerCase()),
+    "Stabilità: i nuovi iscritti dicono a quale mese si riferiscono");
   check(await stab2.locator(".stab-avviso").count() === 0, "Stabilità: mappa del mese scorso importata, nessun avviso");
   const dati = (await stab2.locator(".stab-dati").innerText()).replace(/\s+/g, " ");
   check(dati.includes("Livello raggiunto 9%") && dati.includes("La tua rete reale in costruzione"), "Stabilità: livello raggiunto dal fatturato e rete reale (" + dati + ")");
@@ -2305,8 +2309,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(await stab2.locator("li[data-k=oltre_200] .finora").count() === 1 && await stab2.locator("li[data-k=convention] .finora").count() === 0,
     "Stabilità: «Questo mese finora» solo per nuovi iscritti e codici oltre 200 VP");
   const lav = (await stab2.locator(".stab-lavoro li").allInnerTexts()).map(x => x.replace(/\s+/g, " "));
-  check(lav.length === 2 && lav[0] === "Nuovi iscritti nel gruppo del mese: hai 0, ne servono 5 per il 9%"
-    && lav[1] === "Codici che fatturano più di 200 VP: hai 1, ne servono 5 per il 9%", "Su cosa lavorare: le righe in ambra, in ordine (" + lav.join(" / ") + ")");
+  check(lav.length === 2 && lav[0] === "Nuovi iscritti nel gruppo del mese: hai 0, ne servono 5 per sostenere il 9%"
+    && lav[1] === "Codici che fatturano più di 200 VP: hai 1, ne servono 5 per sostenere il 9%", "Su cosa lavorare: le righe in ambra, in ordine (" + lav.join(" / ") + ")");
   await sync(page); await ctx.close();
   /* la mappa del mese appena chiuso non c'è ancora: l'ultimo mese disponibile, con l'avviso */
   DB.numeri = DB.numeri.filter(x => !(x.partner_id === "R" && x.mese === prec.m))

@@ -5866,11 +5866,14 @@ function vGuidaStabilita(){
   /* i codici oltre 200 VP vengono solo dalle mappe: senza una mappa del mese non si contano */
   const senzaMappa = (r, x) => r.k === "oltre_200" && x.con_mappa === false;
   const ATTESA_MAPPA = "disponibile dopo l'import della mappa";
+  /* un numero che manca (mappa non ancora importata, o da scrivere a mano) resta neutro e non entra in «Su cosa lavorare» */
+  const daInserire = r => r.scritto && w[r.k] == null;
+  const ignoto = r => senzaMappa(r, c) || daInserire(r);
   /* la rete è solida fino al livello più alto sostenuto in tutte le righe (e in tutti i livelli sotto) */
   const solida = L.reduce((x, l, j) => x === j - 1 && t.righe.every(r => val(r) >= r.soglie[j]) ? j : x, -1);
   const nomeMese = m => { const s = MESI[Number(m.slice(5)) - 1]; return s[0].toUpperCase() + s.slice(1) + " " + m.slice(0, 4); };
   /* verde ✓ sostenuto, ambra ! raggiunto col fatturato ma non sostenuto; sopra il livello raggiunto neutro (✓ se il numero c'è già) */
-  const stato = (r, j) => senzaMappa(r, c) ? "" : j > raggiunto ? (val(r) >= r.soglie[j] ? "sopra" : "") : val(r) >= r.soglie[j] ? "ok" : "att";
+  const stato = (r, j) => ignoto(r) ? "" : j > raggiunto ? (val(r) >= r.soglie[j] ? "sopra" : "") : val(r) >= r.soglie[j] ? "ok" : "att";
   const segno = { ok:"✓", att:"!", sopra:"✓" };
   const tuo = r => r.scritto ? `<button class="campo-cl21" data-act="guida-cl21">${w[r.k] != null ? num(w[r.k]) : "–"}</button>`
     : senzaMappa(r, c) ? "<b>–</b>" : `<b>${num(val(r))}</b>`;
@@ -5879,10 +5882,10 @@ function vGuidaStabilita(){
       <span class="tuo">${tuo(r)}</span></div>
       <div class="celle">${L.map((l, j) => `<span class="cella ${stato(r, j)}${j === raggiunto ? " liv" : ""}">${num(r.soglie[j])}${
         segno[stato(r, j)] ? `<i aria-hidden="true">${segno[stato(r, j)]}</i>` : ""}</span>`).join("")}</div>
-      ${senzaMappa(r, c) ? `<p class="small finora">${ATTESA_MAPPA}</p>` : ""}
+      ${senzaMappa(r, c) ? `<p class="small finora">${ATTESA_MAPPA}</p>` : daInserire(r) ? `<p class="small finora">da inserire</p>` : ""}
       ${rif.chiuso && (r.k === "nuovi_gruppo" || r.k === "oltre_200") ? `<p class="small finora">Questo mese finora: ${
         senzaMappa(r, ora) ? ATTESA_MAPPA : num(Number(ora[r.k]) || 0)}</p>` : ""}</li>`;
-  const lavoro = raggiunto < 0 ? [] : t.righe.filter(r => !senzaMappa(r, c) && val(r) < r.soglie[raggiunto]);
+  const lavoro = raggiunto < 0 ? [] : t.righe.filter(r => !ignoto(r) && val(r) < r.soglie[raggiunto]);
   const atteso = mesePrecedente();
   return `<div class="card guida-stabilita">${testa}
     <p class="stab-mese"><b>${nomeMese(rif.mese)}</b> · ${rif.chiuso ? "mese chiuso" : "mese in corso"}</p>
@@ -5891,11 +5894,12 @@ function vGuidaStabilita(){
       <div><span>Livello raggiunto</span><b class="num">${raggiunto >= 0 ? L[raggiunto] + "%" : "–"}</b></div>
       <div><span>La tua rete reale</span><b class="num${solida >= 0 ? "" : " costruzione"}">${solida >= 0 ? L[solida] + "%" : "in costruzione"}</b></div>
     </div>
-    <div class="stab-personali"><span><b>I tuoi nuovi iscritti del mese</b><small>entrati con il tuo link</small></span><b class="num">${num(Number(ora.personali) || 0)}</b></div>
+    <div class="stab-personali"><span><b>I tuoi nuovi iscritti · ${MESI[Number(rif.mese.slice(5)) - 1]}</b><small>entrati con il tuo link${
+      rif.chiuso ? ` · questo mese finora: ${num(Number(ora.personali) || 0)}` : ""}</small></span><b class="num">${num(Number(c.personali) || 0)}</b></div>
     <div class="celle livelli">${L.map((l, j) => `<span class="cella${j === raggiunto ? " liv" : ""}">${l}%</span>`).join("")}</div>
     <ul class="stabilita">${t.righe.map(riga).join("")}</ul>
     ${lavoro.length ? `<div class="stab-lavoro"><span class="eyebrow">Su cosa lavorare</span><ul>${lavoro.map(r =>
-      `<li><b>${esc(r.nome)}</b>: hai ${num(val(r))}, ne servono ${num(r.soglie[raggiunto])} per il ${L[raggiunto]}%</li>`).join("")}</ul></div>` : ""}
+      `<li><b>${esc(r.nome)}</b>: hai ${num(val(r))}, ne servono ${num(r.soglie[raggiunto])} per sostenere il ${L[raggiunto]}%</li>`).join("")}</ul></div>` : ""}
   </div>`;
 }
 function vGuidaPassi(){

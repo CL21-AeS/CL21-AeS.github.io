@@ -103,7 +103,8 @@ la tabella «Verifica la tua attività - Stabilità» di Cum Laude 21. La percen
 della tabella servono a sostenerla nel tempo. I riferimenti stanno nelle impostazioni (`stabilita_cl21`). Mese di riferimento:
 l'ultimo mese chiuso con la mappa importata (chi non ne ha guarda il mese in corso), scritto in evidenza; se manca la mappa del
 mese appena chiuso, l'avviso «Importa la mappa di … per aggiornare». In cima «Livello raggiunto» (dal fatturato del mese) e
-«La tua rete reale» (il livello più alto sostenuto in tutte le righe, altrimenti «in costruzione»); per riga il numero e
+«La tua rete reale» (il livello più alto sostenuto in tutte le righe, altrimenti «in costruzione»); un numero non ancora inserito resta
+neutro con «da inserire» e fuori da «Su cosa lavorare» («ne servono M per sostenere il X%»); per riga il numero e
 le sette caselle (verde ✓ sostenuto, ambra ! raggiunto ma non sostenuto, neutro sopra, con ✓ se il numero c'è già),
 «Questo mese finora» per nuovi iscritti e codici oltre 200 VP (il partner più la sua rete, solo dalle mappe: senza una mappa
 del mese «disponibile dopo l'import della mappa», con `con_mappa` in `guida_conteggi`);
