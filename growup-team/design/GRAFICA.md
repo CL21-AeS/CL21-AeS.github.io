@@ -15,6 +15,18 @@ I colori stanno tutti nelle variabili su `:root` di `index.html` (chiaro) e nei 
 | + Contatto / + Piano / + Ordine | `#0a3a2c` / `#c26a3d` / `#13795b` | `#13604a` / `#b8602f` / `#1f8a68` |
 | stato: ok · sotto soglia · ▼ | `#13795b` · `#9a6a00` · `#b42318` | `#34c08f` · `#e2b45a` · `#ff7b6b` |
 
+## Colori con significato fisso (28 ottobre 2026, grafica punto 2)
+
+| Significato | Variabili | Chiaro | Scuro |
+|---|---|---|---|
+| selezione e azione principale (pulsanti principali, scelte, i tre pulsanti in basso) | `--scelta` / `--scelta-ink` | pesca `#e2a46f` / `#0a3a2c` | `#e2a46f` / `#07130e` |
+| fatto e progresso (barre, puntini, tappa attuale, Primi passi) | `--progresso` → `--progresso2` | `#13795b` → `#1f9a73` | `#2fae82` → `#4fd1a3` |
+| solo attenzione | `--giallo`, `--rame` | come sopra | come sopra |
+| etichette di sezione | `--ink2` | `#4f5f58` | `#a7b8ae` |
+
+I tre pulsanti in basso sono tutti pesca (scelta A di Stefano), con un'icona ciascuno: persona, calendario, carrello.
+`--accent` resta per link e testi evidenziati (smeraldo nel chiaro, pesca nello scuro).
+
 ## Icona
 
 **G Smeraldo** (scelta da Stefano il 16 ottobre 2026): fondo sfumato smeraldo, G avorio la cui stanghetta diventa

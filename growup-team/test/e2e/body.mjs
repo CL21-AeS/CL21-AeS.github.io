@@ -133,7 +133,7 @@ check(await page.inputValue(".sheet input[name=vp]") === "" && await page.getAtt
 await page.fill(".sheet input[name=vp]", "100");
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("aggiornato: 100 VP").waitFor();
-check(await page.locator("button[data-act=ordini] b").first().innerText() === "100 VP nel mese", "totale del mese a 100");
+check(await page.locator("button[data-act=ordini] b").first().innerText() === "100 VP · mese", "totale del mese a 100");
 await apriOrdini(page, "totale-mese");
 await page.fill(".sheet input[name=vp]", "80");
 await page.click(".sheet button:has-text('Salva')");

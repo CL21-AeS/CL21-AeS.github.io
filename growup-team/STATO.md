@@ -98,6 +98,12 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
+**28 ottobre — Grafica, punto 2 di 7: colori con significato fisso** (scelte di Stefano): pesca = selezione e azione
+principale (pulsanti principali, scelte, filtri; i tre pulsanti in basso tutti pesca con icona persona/calendario/carrello,
+«416,83 VP · mese» su una riga); verde = fatto e progresso (barre anche di Primi passi, puntini della Lista, tappa attuale,
+mesi importati); ambra/terracotta solo per l'attenzione; etichette di sezione in grigio. Variabili `--scelta`, `--progresso`
+(GRAFICA.md). App v57.
+
 **28 ottobre — Grafica, punto 1 di 7: sotto-linguette nel tema scuro** (richiesta di Stefano, con la skill frontend-design,
 stessa identità e colori): la sotto-linguetta scelta (Il mio giorno/Guida, Target/Lista/Clienti) nel tema scuro è chiara e
 piena (avorio, testo smeraldo) come nel chiaro, non più scura delle altre. Variabili `--linguetta` e `--linguetta-ink`.
