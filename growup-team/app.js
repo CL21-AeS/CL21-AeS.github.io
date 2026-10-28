@@ -39,7 +39,12 @@ function creaApi(){
     session:      async () => (await sb.auth.getSession()).data.session,
     signInAnon:   captchaToken => q(sb.auth.signInAnonymously(captchaToken ? { options:{ captchaToken } } : undefined)),
     signOut:      () => sb.auth.signOut(),
-    sponsorName:  codice => q(sb.rpc("sponsor_da_codice", { p_codice:codice })),
+    /* 041: l'invito personale. Senza accesso si chiede solo se il link è aperto (e i nomi, solo se lo è) */
+    invitoAperto: codice => q(sb.rpc("invito_aperto", { p_codice:codice })),
+    inviti:       () => q(sb.from("inviti").select("id,nome,codice_amway,creato_il,scade_il,annullato_il,usato_il,usato_da").order("creato_il", { ascending:false })),
+    creaInvito:   (nome, codice) => q(sb.rpc("crea_invito", { p_nome:nome, p_codice_amway:codice })),
+    annullaInvito: id => q(sb.rpc("annulla_invito", { p_invito:id })),
+    rigeneraInvito: id => q(sb.rpc("rigenera_invito", { p_invito:id })),
     collega:      () => q(sb.rpc("collega_profilo")),
     entra:        chiave => q(sb.rpc("entra_con_chiave", { p_chiave:chiave })),
     join:         args => q(sb.rpc("entra_con_invito", args)),
@@ -55,7 +60,6 @@ function creaApi(){
     bloccaApp:    (pid, blocca) => q(sb.rpc("blocca_app", { p_partner:pid, p_blocca:blocca })),
     codiciTolti:  () => q(sb.rpc("codici_tolti_elenco")),
     sbloccaCodice: codice => q(sb.rpc("sblocca_codice", { p_codice:codice })),
-    creaInvitoSopra: (pid, altri) => q(sb.rpc("crea_invito_sopra", { p_partner:pid, p_altri:altri })),
     modificaPartenza: args => q(sb.rpc("modifica_partenza", args)),
     impostaProssima: chiave => q(sb.rpc("imposta_prossima_qualifica", { p_chiave:chiave })),
     prossime:     () => q(sb.rpc("prossime_qualifiche")),
@@ -185,7 +189,11 @@ const st = {
   att: [],
   goal: null,             // settimana: { obiettivo_contatti, obiettivo_piani, salvato }
   goalMese: null,         // mese: { obiettivo_vp, salvato }
-  invito: null,           // codice dello sponsor dal link d'invito
+  invito: null,           // il codice dell'invito personale dal link (041)
+  invitoInfo: null,       // com'è quell'invito: { stato, nome, da }
+  invitiMiei: [],         // gli inviti personali che ho creato (041)
+  invitoFatto: null,      // { nome, codice, scade_il }: il link appena creato o rigenerato (si vede solo adesso)
+  invitaNome: "",         // il nome già scritto nel foglio «Invita» (dalla Lista)
   invitoRiserva: null,    // l'invito lasciato per "entra con il tuo link": si può tornare indietro
   struttura: [],          // io e la mia downline
   accessi: new Map(),     // chi è da confermare o bloccato, tra chi vedo
@@ -298,12 +306,27 @@ const MESSAGGI_ERRORE = {
   codice_amway_mancante: "Scrivi il codice Amway Partner della persona.",
   import_non_valido: "Il file non è stato letto bene: scaricalo di nuovo dal sito Amway e riprova.",
   import_di_altri: "Questo report non è il tuo: ognuno importa il report scaricato dal proprio accesso al sito Amway.",
+  invito_non_valido: "Questo link d'invito non è valido. Chiedi a chi ti ha invitato di mandartene uno nuovo.",
+  invito_usato: "Questo invito è già stato usato. Se sei tu, entra con il tuo link personale.",
+  invito_annullato: "Questo invito è stato annullato. Chiedi a chi ti ha invitato di mandartene uno nuovo.",
+  invito_scaduto: "Questo invito è scaduto (vale 7 giorni). Chiedi a chi ti ha invitato di mandartene uno nuovo.",
+  troppi_inviti: "Hai già 50 inviti aperti: annulla quelli che non servono e riprova.",
+  mai_entrato: "Questa persona non è mai entrata in Growup: invitala con «Invita».",
   codice_amway_attivo: "Con questo codice Amway c'è già qualcuno che usa l'app: entra con il tuo link personale (quello che ti eri salvato).",
-  codice_amway_altra_linea: "Questo codice Amway è nella struttura di un altro gruppo: chiedi il link d'invito al tuo sponsor.",
+  codice_amway_altra_linea: "Questo codice Amway è nella struttura di un altro gruppo: chiedi un invito a chi ti sta sopra.",
   codice_tolto: "Questo codice Amway è stato tolto dalla struttura: per rientrare chiedi a Stefano e Alessia di sbloccarlo.",
   gia_confermato: "È già confermata dal report Amway: non si può più togliere dalla struttura.",
   non_autenticato: "Sessione scaduta: apri di nuovo il tuo link personale."
 };
+/* 041: gli errori di «Invita» detti dal punto di vista di chi invita */
+function messaggioInvita(e){
+  const m = (e && (e.message || e.error_description || e.msg)) || String(e || "");
+  if(m.includes("codice_amway_attivo")) return "Con questo codice Amway c'è già qualcuno che usa l'app.";
+  if(m.includes("codice_amway_altra_linea")) return "Questa persona è già nella mappa, in un altro gruppo: la può invitare solo chi le sta sopra.";
+  if(m.includes("in_attesa")) return "Potrai invitare quando una mappa importata ti avrà messo al tuo posto nella struttura.";
+  if(m.includes("codice_tolto")) return "Questo codice Amway è stato tolto dalla struttura: lo può sbloccare solo Stefano e Alessia.";
+  return messaggio(e);
+}
 function messaggio(e){
   const m = (e && (e.message || e.error_description || e.msg)) || String(e || "");
   for(const k in MESSAGGI_ERRORE) if(m.includes(k)) return MESSAGGI_ERRORE[k];
@@ -317,15 +340,19 @@ function messaggio(e){
 /* ---- 5. Link: invito, chiave personale ---- */
 function base(){ return location.origin + location.pathname; }
 function linkPersonale(){ return st.chiave ? base() + "#chiave=" + st.chiave : ""; }
-function linkInvito(){ return base() + "#" + st.profilo.codice_invito; }
+/* 041: il link dell'invito personale: solo un codice casuale (nome e codice Amway restano nel database) */
+function linkInvitoPersonale(codice){ return base() + "#invito=" + codice; }
 
 /* Legge un link (o il solo codice) incollato o arrivato nell'indirizzo. */
 function leggiLink(testo){
   const t = String(testo || "").trim();
   const k = t.match(/chiave=([0-9a-fA-F]{32})/) || t.match(/^([0-9a-fA-F]{32})$/);
   if(k) return { chiave:k[1].toLowerCase() };
+  const i = t.match(/invito=([0-9a-fA-F]{32})/);
+  if(i) return { invito:i[1].toLowerCase() };
+  /* il vecchio link d'invito generico (6 lettere): non fa più entrare */
   const c = t.replace(/^.*#/, "").trim().toUpperCase();
-  if(FORMA_CODICE.test(c)) return { invito:c };
+  if(FORMA_CODICE.test(c)) return { vecchioInvito:true };
   return null;
 }
 function ricordaChiave(k){ st.chiave = k; salvaLocale(CHIAVE_LOCALE, k); }
@@ -889,6 +916,7 @@ async function caricaStruttura(){
   try{ st.nascosti = new Set((await api.nascosti() || []).map(r => r.nascosto_id)); }catch(e){}
   try{ st.prossime = new Map((await api.prossime() || []).map(r => [r.partner_id, r.prossima_qualifica])); }catch(e){ st.prossime = new Map(); }
   try{ st.inAttesa = await api.inAttesa() || []; }catch(e){ st.inAttesa = []; }
+  try{ st.invitiMiei = await api.inviti() || []; }catch(e){ st.invitiMiei = []; }
 }
 
 async function entraConChiave(k){
@@ -909,8 +937,10 @@ async function entraConChiave(k){
 
 async function apriInvito(codice){
   st.invito = codice; salvaLocale(CHIAVE_INVITO, codice);
-  st.sponsorNome = "";
-  api.sponsorName(codice).then(n => { st.sponsorNome = n || ""; render(); }).catch(() => {});
+  st.sponsorNome = ""; st.invitoInfo = null;
+  try{ st.invitoInfo = await api.invitoAperto(codice) || { stato:"sconosciuto" }; }catch(e){ st.invitoInfo = null; }
+  if(st.invitoInfo) st.sponsorNome = st.invitoInfo.da || "";
+  if(st.invitoInfo && st.invitoInfo.stato !== "ok"){ salvaLocale(CHIAVE_INVITO, null); st.fase = "invito_chiuso"; return; }
   if(!st.stages.length){
     try{ await sessione(); st.stages = await api.stages() || []; }catch(e){}
   }
@@ -938,7 +968,10 @@ async function avvio(){
       /* tolto dalla struttura o bloccato da un admin: il telefono non entra più */
       if(await accessoNegato()) return;
     }
-    const invito = (dalLink && dalLink.invito) || leggiLocale(CHIAVE_INVITO);
+    if(dalLink && dalLink.vecchioInvito){ st.invitoInfo = { stato:"vecchio" }; st.fase = "invito_chiuso"; render(); return; }
+    /* l'invito aperto prima di chiudere la pagina; un vecchio codice di 6 lettere rimasto salvato si dimentica */
+    const salvato = leggiLocale(CHIAVE_INVITO), invito = (dalLink && dalLink.invito) || (/^[0-9a-f]{32}$/.test(salvato || "") ? salvato : null);
+    if(salvato && !invito) salvaLocale(CHIAVE_INVITO, null);
     if(invito) await apriInvito(invito);
     else st.fase = "benvenuto";
   }catch(e){
@@ -983,7 +1016,7 @@ function etichettePiega(inRicerca){
 function render(){
   const app = document.getElementById("app");
   const viste = { avvio:vAvvio, config:vConfig, benvenuto:vBenvenuto, chiave_errata:vChiaveErrata,
-                  ingresso:vIngresso, privacy_primo:vPrivacyPrimo, obiettivo_primo:vObiettivoPrimo, home:vHome, errore:vErrore,
+                  ingresso:vIngresso, invito_chiuso:vInvitoChiuso, privacy_primo:vPrivacyPrimo, obiettivo_primo:vObiettivoPrimo, home:vHome, errore:vErrore,
                   contatto:vContatto, bloccato:vAccessoNegato, tolto:vAccessoNegato };
   const html = (viste[st.fase] || vAvvio)();
   const prima = fotoMovimento();
@@ -1032,7 +1065,7 @@ function vBenvenuto(){
       quando sei entrato la prima volta. Toccalo da lì, oppure copialo e incollalo qui sotto.</p>`}
     ${formIncolla()}
     ${st.invitoRiserva ? `<button class="btn ghost wide" data-act="torna-invito">‹ Torna all'invito${st.sponsorNome ? " di " + esc(st.sponsorNome) : ""}</button>`
-      : `<p class="small"><b>Sei nuovo?</b> Chiedi al tuo sponsor il suo link d'invito.</p>`}
+      : `<p class="small"><b>Sei nuovo?</b> In Growup si entra solo su invito: chiedi a chi ti invita il tuo invito personale.</p>`}
     <p class="small"><b>Hai perso il link?</b> Chiedi a Stefano e Alessia: te ne mandano uno nuovo.</p>
   </div>`;
 }
@@ -1138,16 +1171,10 @@ function vIngresso(){
   return `<div>
     ${marchio()}
     <h1 style="margin-top:6px">Benvenuto in Growup</h1>
-    <p class="muted">${st.sponsorNome ? `Ti ha invitato <b>${esc(st.sponsorNome)}</b>. ` : ""}Due informazioni e iniziamo: servono per partire dal punto giusto del percorso.</p>
+    <p class="muted">${st.invitoInfo && st.invitoInfo.nome ? `Ciao <b>${esc(nomeSaluto(st.invitoInfo.nome))}</b>! ` : ""}${st.sponsorNome ? `Ti ha invitato <b>${esc(st.sponsorNome)}</b>. ` : ""}Due informazioni e iniziamo: servono per partire dal punto giusto del percorso.</p>
     <form data-form="ingresso" class="card" novalidate>
-      <label class="field" style="margin-top:0"><span>Nome e cognome</span>
-        <input name="nome" autocomplete="name" required maxlength="80"></label>
-      ${campoCodice(true)}
-      <label class="field"><span>Riscrivi il codice</span>
-        <input name="codice_amway2" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="es. 1234567"></label>
-      <p class="avviso-interno avviso-codice"><b>Controlla bene il tuo codice Amway Partner.</b> Lo trovi sul sito o nell'app
-        Amway, toccando l'icona del profilo (l'omino) in alto a destra; se non lo trovi, chiedilo al tuo sponsor. L'app lo usa per metterti al posto giusto nel gruppo: se è sbagliato resti «in attesa della mappa» e i tuoi
-        numeri non arrivano a chi ti segue.</p>
+      <p class="small" style="margin-top:0">Il tuo nome e il tuo codice Amway Partner li ha già scritti chi ti ha invitato: l'app li usa
+        per metterti al posto giusto nel gruppo.</p>
       ${campiQualifica(true)}
       <p class="nota">Dichiara il punto giusto: è una tua responsabilità e lo potrai correggere tu dalla pagina Io.</p>
 
@@ -1158,6 +1185,23 @@ function vIngresso(){
       <button class="btn primary wide" style="margin-top:16px" ${st.occupato ? "disabled" : ""}>Inizia</button>
       ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
     </form>
+    <p class="small">Hai già un profilo? <button class="btn link" data-act="ho-gia">Entra con il tuo link personale</button></p>
+  </div>`;
+}
+
+/* 041: il link d'invito non si può usare (già usato, scaduto, annullato, sconosciuto o il vecchio link generico) */
+function vInvitoChiuso(){
+  const s = (st.invitoInfo && st.invitoInfo.stato) || "sconosciuto";
+  const [titolo, testo] = {
+    usato:["Invito già usato", "Questo invito è già stato usato. Se sei tu, entra con il tuo link personale, quello che ti sei salvato su WhatsApp o Telegram."],
+    scaduto:["Invito scaduto", "L'invito vale 7 giorni ed è scaduto. Chiedi a chi ti ha invitato di mandartene uno nuovo."],
+    annullato:["Invito annullato", "Chi ti ha invitato ha annullato questo link. Chiedigli di mandartene uno nuovo."],
+    vecchio:["Ora si entra solo su invito", "Questo link d'invito non vale più: in Growup ora si entra solo con un invito personale. Chiedi a chi ti invita di crearne uno per te."]
+  }[s] || ["Link non valido", "Questo link d'invito non è valido. Chiedi a chi ti ha invitato di mandartene uno nuovo."];
+  return `<div class="centro">
+    ${marchio()}
+    <h1 style="margin-top:6px">${titolo}</h1>
+    <p class="muted">${testo}</p>
     <p class="small">Hai già un profilo? <button class="btn link" data-act="ho-gia">Entra con il tuo link personale</button></p>
   </div>`;
 }
@@ -1244,7 +1288,6 @@ function vProfilo(){
   return `<button class="btn link" data-act="profilo-indietro" style="padding:0">‹ Indietro</button>
   <div class="card profilo">
     <h2>${esc(p.nome)}</h2>
-    <div class="riga-profilo"><span>Codice d'invito</span><b>${esc(p.codice_invito)}</b></div>
     <div class="riga-profilo"><span>Codice Amway Partner</span><span>${p.codice_amway ? `<b>${esc(p.codice_amway)}</b>` : "non ancora scritto"}
       ${adm ? soloAdmin(`<button class="btn link small" data-act="codice" data-id="${esc(p.id)}" style="min-height:0;padding:0 4px">Correggi</button>`) : ""}</span></div>
     <div class="riga-profilo"><span>Punto di partenza <b>${esc(testoPartenza(p))}</b></span>
@@ -2473,7 +2516,6 @@ function vScheda(){
     ${st.profilo.is_admin ? `<div style="margin-top:12px">${soloAdmin(`<button class="btn wide" data-act="nuovo-link" data-id="${esc(p.id)}">Nuovo link personale</button>`, true)}</div>
       <p class="nota">Solo per chi ha perso il suo link: quello vecchio smette di funzionare e i suoi telefoni vanno ricollegati.</p>` : ""}
   </div>`}
-  ${st.profilo.is_admin ? vInvitiAdmin(p) : ""}
   ${vAccessoScheda(p)}
   <div class="card">
     <span class="eyebrow">Struttura</span>
@@ -2506,47 +2548,54 @@ function vAccessoScheda(p){
   </div>`;
 }
 
-/* Solo admin: far entrare qualcuno sotto una persona precisa (anche nei gruppi dei Platino, che il report non mostra)
-   o tra lo sponsor e la persona (link speciale, valido una volta) */
-function bottoniLink(link){
+/* I pulsanti per mandare un link: WhatsApp, Telegram e Copia */
+function bottoniLink(link, testo){
   return `<div class="condividi">
-      <a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(testoInvito() + "\n\n" + link)}">WhatsApp</a>
-      <a class="btn tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(testoInvito())}">Telegram</a>
+      <a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(testo + "\n\n" + link)}">WhatsApp</a>
+      <a class="btn tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(testo)}">Telegram</a>
       <button class="btn" data-act="copia-link" data-link="${esc(link)}">Copia link</button>
+      ${navigator.share ? `<button class="btn" data-act="condividi">Altro…</button>` : ""}
     </div>
     <div class="linkbox">${esc(link)}</div>`;
 }
-function vInvitiAdmin(p){
-  return `<div class="card">
-    <span class="eyebrow">Inviti · solo admin</span>
-    <p class="small" style="margin:4px 0 0"><b>Invita sotto ${esc(nomeSaluto(p.nome))}</b>: chi entra con questo link va nel suo gruppo, sotto di lei.</p>
-    ${p.codice_invito ? soloAdmin(bottoniLink(base() + "#" + p.codice_invito), true) : ""}
-    <div style="margin-top:12px">${soloAdmin(`<button class="btn wide" data-act="invito-sopra" data-id="${esc(p.id)}">Invita chi manca sopra di ${esc(nomeSaluto(p.nome))}</button>`, true)}</div>
-    <p class="nota">Un link valido una volta sola: chi lo apre entra tra ${esc(p.sponsor_id === st.profilo.id ? "voi" : nomeDi(p.sponsor_id) || "il suo sponsor")}
-      e ${esc(nomeSaluto(p.nome))}, che passa sotto di lui con il suo gruppo.</p>
-  </div>`;
-}
 
 /* Il messaggio d'invito: con il nome di chi invita e i tre passi per entrare, salvare il link e installare l'app */
-function testoInvito(){
+function testoInvito(perChi){
   const n = nomeSaluto(st.profilo && st.profilo.nome), noi = / e /i.test(n);
-  return `Ciao! ${n ? `${noi ? "Siamo" : "Sono"} ${n}: ` : ""}${noi ? "ti mandiamo" : "ti mando"} Growup, l'app del nostro gruppo A&S `
+  return `Ciao${perChi ? " " + nomeSaluto(perChi) : ""}! ${n ? `${noi ? "Siamo" : "Sono"} ${n}: ` : ""}${noi ? "ti mandiamo" : "ti mando"} Growup, l'app del nostro gruppo A&S `
        + `per pianificare la settimana e seguire il percorso fino ad Argento.\n\n`
-       + `1. Apri il link qui sotto e scrivi nome, codice Amway e qualifica: in un minuto sei dentro, senza registrazione.\n`
+       + `1. Apri il link qui sotto: è solo per te e vale 7 giorni. Scegli la tua qualifica: in un minuto sei dentro, senza registrazione.\n`
        + `2. L'app ti dà il tuo link personale: mandalo a te stesso su WhatsApp e tienilo, è la tua chiave.\n`
        + `3. Installa l'app: su Android menu ⋮ → Installa app; su iPhone Condividi → Aggiungi alla schermata Home.`;
 }
+/* 041: invita chi è nella mappa (o un admin); chi è ancora in attesa no */
+function possoInvitare(){
+  const p = st.profilo, a = p && st.accessi ? st.accessi.get(p.id) : null;   // la conferma può arrivare dopo l'ingresso (import)
+  return !!(p && (p.is_admin || p.confermato_il || (a && a.confermato_il)));
+}
+function giornoDi(iso){ return fmtGiorno.format(new Date(iso)); }
+function statoInvitoPersonale(x){
+  if(x.usato_il) return st.struttura.some(p => p.id === x.usato_da) ? "Entrato · al suo posto nella mappa"
+    : (st.inAttesa || []).some(p => p.id === x.usato_da) ? "Entrato · in attesa della mappa" : "Entrato";
+  if(x.annullato_il) return "Annullato";
+  if(Date.parse(x.scade_il) <= Date.now()) return "Scaduto";
+  return `Aperto fino al ${dataIt(giornoDi(x.scade_il))}`;
+}
+function rigaInvito(x){
+  const aperto = !x.usato_il && !x.annullato_il && Date.parse(x.scade_il) > Date.now();
+  return `<li><span class="grow"><b>${esc(x.nome)}</b><br><span class="small">${esc(x.codice_amway)} · ${esc(statoInvitoPersonale(x))}</span></span>
+    ${x.usato_il ? "" : `<button class="btn small" data-act="rigenera-invito" data-id="${esc(x.id)}">Nuovo link</button>`}
+    ${aperto ? `<button class="btn small ghost" data-act="annulla-invito" data-id="${esc(x.id)}">Annulla</button>` : ""}</li>`;
+}
 function vInvita(){
-  return `<div class="card">
+  const miei = st.invitiMiei || [];
+  return `<div class="card invita">
     <span class="eyebrow">Invita un nuovo partner</span>
-    <p class="small" style="margin:4px 0 0">Chi entra con questo link entra nel tuo gruppo, con te come sponsor. Non è il tuo link personale: questo si può girare.</p>
-    <div class="condividi">
-      <a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(testoInvito() + "\n\n" + linkInvito())}">WhatsApp</a>
-      <a class="btn tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(linkInvito())}&text=${encodeURIComponent(testoInvito())}">Telegram</a>
-      <button class="btn" data-act="copia">Copia link</button>
-      ${navigator.share ? `<button class="btn" data-act="condividi">Altro…</button>` : ""}
-    </div>
-    <div class="linkbox">${esc(linkInvito())}</div>
+    ${possoInvitare() ? `<p class="small" style="margin:4px 0 0">In Growup si entra solo su invito. Scrivi nome e codice Amway Partner della
+      persona: l'app ti dà un link solo per lei, che vale una volta e per 7 giorni.</p>
+    <button class="btn primary wide" style="margin-top:10px" data-act="invita">Invita</button>`
+      : `<p class="small" style="margin:4px 0 0">Potrai invitare quando una mappa importata ti avrà messo al tuo posto nella struttura.</p>`}
+    ${miei.length ? `<h3 style="margin:16px 0 4px">I tuoi inviti</h3><ul class="oggi inviti">${miei.slice(0, 30).map(rigaInvito).join("")}</ul>` : ""}
     <p class="small" style="margin:14px 0 0"><b>Immagini da inviare</b>: mandale prima del link quando presenti l'app,
       o mettile nello stato di WhatsApp.</p>
     <div class="immagini-invito">
@@ -3045,24 +3094,26 @@ function vSheet(){
   }
   if(s === "storico") return vStorico();
   if(s === "importa") return vImporta();
-  if(s === "invito-sopra"){
-    const x = st.struttura.find(y => y.id === st.invitoSopra.id);
-    if(!x) return "";
-    if(st.invitoSopra.codice) return `<h2>Link per chi manca sopra di ${esc(nomeSaluto(x.nome))}</h2>
-      <p class="small">Mandalo alla persona che deve entrare tra ${esc(x.sponsor_id === st.profilo.id ? "voi" : nomeDi(x.sponsor_id))} e
-        ${esc(x.nome)}. Vale una volta sola.</p>
-      ${bottoniLink(base() + "#" + st.invitoSopra.codice)}
-      <button class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
-    const fratelli = st.struttura.filter(y => y.sponsor_id === x.sponsor_id && y.id !== x.id);
-    return `<h2>Chi manca sopra di ${esc(nomeSaluto(x.nome))}?</h2>
-    <p class="small">L'app crea un link valido una volta sola: chi lo apre entra tra ${esc(x.sponsor_id === st.profilo.id ? "voi" : nomeDi(x.sponsor_id))}
-      e ${esc(x.nome)}, che passa sotto di lui con tutto il suo gruppo.</p>
-    <form data-form="invito-sopra" novalidate>
-      ${fratelli.length ? `<div class="field" style="margin-top:14px"><span class="small">Facoltativo: anche altri sono in realtà suoi? Spunta solo se è così.</span>
-        <div class="scelte">${fratelli.map(y => `<label><input type="checkbox" name="altri" value="${esc(y.id)}"> ${esc(y.nome)}</label>`).join("")}</div></div>` : ""}
+  if(s === "invita") return `<h2>Invita un nuovo partner</h2>
+    <p class="small">Scrivi nome e codice Amway Partner della persona: restano nel database, nel link non si vedono e non si
+      possono cambiare. Se il codice è sbagliato, la persona resta «in attesa della mappa».</p>
+    <form data-form="invita" novalidate>
+      <label class="field"><span>Nome e cognome</span>
+        <input name="nome" autocomplete="off" maxlength="80" value="${esc(st.invitaNome || "")}"></label>
+      ${campoCodice(true)}
+      <label class="field"><span>Riscrivi il codice</span>
+        <input name="codice_amway2" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="es. 1234567"></label>
       <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
         <button class="btn primary grow">Crea il link</button></div>${err}
     </form>`;
+  if(s === "invito-link"){
+    const x = st.invitoFatto;
+    if(!x) return "";
+    return `<h2>Il link per ${esc(x.nome)}</h2>
+    <p class="small">Mandalo <b>solo a ${esc(nomeSaluto(x.nome))}</b>: vale una volta, fino al ${esc(dataIt(giornoDi(x.scade_il)))}.
+      Il link si vede solo adesso; se lo perdi, crea un nuovo link dai tuoi inviti. Quando entra ti arriva una notifica.</p>
+    ${bottoniLink(linkInvitoPersonale(x.codice), testoInvito(x.nome))}
+    <button class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
   }
   if(s === "nascoste"){
     /* tutta la mia struttura in ordine di report, con dove sta ognuno: si nasconde o si rimette da qui */
@@ -3251,7 +3302,22 @@ const AZIONI = {
   "totale-mese"(){ st.errore = ""; st.meseTotale = meseDi(oggi()); st.sheet = "totale-mese"; render(); focusSheet(); },
   "scegli-mese"(el){ st.meseTotale = el.value; render(); },
   importa(){ st.imp = null; st.errore = ""; st.sheet = "importa"; render(); },
-  "invito-sopra"(el){ st.invitoSopra = { id:el.dataset.id, codice:null }; st.errore = ""; st.sheet = "invito-sopra"; render(); },
+  invita(el){ st.invitaNome = (el && el.dataset.nome) || ""; st.errore = ""; st.sheet = "invita"; render(); focusSheet(); },
+  async "annulla-invito"(el){
+    const x = (st.invitiMiei || []).find(y => y.id === el.dataset.id);
+    if(!x || !confirm(`Annullare l'invito di ${x.nome}? Il suo link smette di funzionare.`)) return;
+    try{ await api.annullaInvito(x.id); st.invitiMiei = await api.inviti() || []; render(); toast("Invito annullato"); }
+    catch(e){ toast(messaggio(e)); }
+  },
+  async "rigenera-invito"(el){
+    const x = (st.invitiMiei || []).find(y => y.id === el.dataset.id);
+    if(!x || !confirm(`Creare un link nuovo per ${x.nome}? Quello vecchio smette di funzionare; il nuovo vale 7 giorni.`)) return;
+    try{
+      const r = await api.rigeneraInvito(x.id);
+      st.invitoFatto = { nome:x.nome, codice:r.codice, scade_il:r.scade_il }; st.sheet = "invito-link";
+      st.invitiMiei = await api.inviti() || []; render();
+    }catch(e){ toast(messaggioInvita(e)); }
+  },
   "copia-link"(el){ copiaTesto(el.dataset.link, "Link copiato"); },
   /* pulsanti rapidi dell'import: agiscono sulle caselle "Non ancora nell'app" senza ridisegnare il foglio;
      il pulsante usato resta acceso finché non si cambia una casella a mano */
@@ -3414,14 +3480,14 @@ const AZIONI = {
     try{ st.codiciTolti = await api.codiciTolti() || []; st.sheet = "codici-tolti"; render(); }catch(e){ toast(messaggio(e)); }
   },
   async "sblocca-codice"(el){
-    if(!confirm(`Sbloccare il codice ${el.dataset.codice}? Con questo codice si potrà di nuovo entrare con un link d'invito.`)) return;
+    if(!confirm(`Sbloccare il codice ${el.dataset.codice}? Con questo codice si potrà di nuovo entrare con un invito.`)) return;
     try{ await api.sbloccaCodice(el.dataset.codice); st.codiciTolti = await api.codiciTolti() || []; render(); toast("Codice sbloccato"); }
     catch(e){ toast(messaggio(e)); }
   },
   "mia-chiave"(){ st.sheet = "mia-chiave"; render(); },
   privacy(){ st.sheet = "privacy"; render(); },
   chiudi(){ chiudiSheet(); render(); },
-  "ho-gia"(){ st.invitoRiserva = st.invito; st.invito = null; st.fase = "benvenuto"; render(); },
+  "ho-gia"(){ st.invitoRiserva = st.fase === "ingresso" ? st.invito : null; st.invito = null; st.fase = "benvenuto"; render(); },
   "torna-invito"(){ st.invito = st.invitoRiserva; st.invitoRiserva = null; st.fase = "ingresso"; render(); },
   "copia-gestito"(){ copiaTesto(base() + "#chiave=" + st.linkGestito.chiave, "Link copiato"); },
   async installa(){
@@ -3472,7 +3538,6 @@ const AZIONI = {
     }
     catch(e){ toast(messaggio(e)); }
   },
-  copia(){ copiaTesto(linkInvito(), "Link d'invito copiato"); },
   "copia-chiave"(){ copiaTesto(linkPersonale(), "Link personale copiato"); },
   /* l'immagine va nella condivisione del telefono (WhatsApp, Telegram…); se non si può, si apre per salvarla */
   async "condividi-immagine"(el){
@@ -3485,7 +3550,10 @@ const AZIONI = {
     window.open(nome, "_blank", "noopener");
     toast("Tieni premuto sull'immagine per salvarla");
   },
-  async condividi(){ try{ await navigator.share({ title:"Growup", text:testoInvito(), url:linkInvito() }); }catch(e){} },
+  async condividi(){
+    const x = st.invitoFatto; if(!x) return;
+    try{ await navigator.share({ title:"Growup", text:testoInvito(x.nome), url:linkInvitoPersonale(x.codice) }); }catch(e){}
+  },
   async "condividi-chiave"(){ try{ await navigator.share({ title:"La mia chiave Growup", text:testoChiave(), url:linkPersonale() }); }catch(e){} },
   async "cambia-chiave"(){
     if(!confirm("Creare un link personale nuovo? Quello vecchio smetterà di funzionare e gli altri telefoni dovranno rientrare con il nuovo.")) return;
@@ -3512,10 +3580,19 @@ const AZIONI = {
 function focusSheet(){ const i = document.querySelector(".sheet input"); if(i) setTimeout(() => i.focus(), 30); }
 
 const MODULI = {
-  async "invito-sopra"(f){
-    const altri = [...f.querySelectorAll("input[name=altri]:checked")].map(i => i.value);
-    try{ st.invitoSopra.codice = await api.creaInvitoSopra(st.invitoSopra.id, altri); render(); }
-    catch(e){ mostraErroreForm(f, messaggio(e)); }
+  async invita(f){
+    const nome = f.nome.value.trim(), codice = soloCifre(f.codice_amway.value);
+    let err = "";
+    if(!nome) err = "Scrivi nome e cognome della persona.";
+    else if(!codice) err = "Scrivi il codice Amway Partner della persona.";
+    else if(!codiceValido(codice)) err = MESSAGGI_ERRORE.codice_amway_non_valido;
+    else if(soloCifre(f.codice_amway2.value) !== codice) err = "I due codici non sono uguali: controllali.";
+    if(err){ mostraErroreForm(f, err); return; }
+    try{
+      const r = await api.creaInvito(nome, codice);
+      st.invitoFatto = { nome, codice:r.codice, scade_il:r.scade_il }; st.invitaNome = ""; st.errore = ""; st.sheet = "invito-link";
+      st.invitiMiei = await api.inviti() || []; render();
+    }catch(e){ mostraErroreForm(f, messaggioInvita(e)); }
   },
   importa(f){ return eseguiImport(f); },
   async codice(f){
@@ -3588,16 +3665,10 @@ const MODULI = {
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
   async ingresso(f){
-    const nome = f.nome.value.trim();
     const q = leggiQualifica(f);
     const data = q.data, qual = q.qualifica, t = q.tappa;
     let err = "";
-    const codice = soloCifre(f.codice_amway.value);
-    if(!nome) err = "Scrivi il tuo nome.";
-    else if(!codice) err = "Scrivi il tuo codice Amway Partner.";
-    else if(!codiceValido(codice)) err = MESSAGGI_ERRORE.codice_amway_non_valido;
-    else if(soloCifre(f.codice_amway2.value) !== codice) err = "I due codici non sono uguali: controllali.";
-    else if(!qual && !q.percentuale && !data) err = "Se stai iniziando serve la data di iscrizione: fa partire il conto alla rovescia del primo ordine.";
+    if(!qual && !q.percentuale && !data) err = "Se stai iniziando serve la data di iscrizione: fa partire il conto alla rovescia del primo ordine.";
     else if(data && data > oggi()) err = "La data di iscrizione non può essere nel futuro.";
     else if(q.mancaMese) err = `Indica il ${etichettaMese(q.qualifica).toLowerCase()}.`;
     else if(!f.privacy.checked) err = "Per iniziare serve accettare l'informativa privacy.";
@@ -3606,7 +3677,7 @@ const MODULI = {
     try{
       await sessione();
       const r = await api.join({
-        p_codice: st.invito, p_nome: nome, p_codice_amway: codice, p_data_iscrizione: data, p_qualifica: qual,
+        p_codice: st.invito, p_data_iscrizione: data, p_qualifica: qual,
         p_qualifica_mese: q.mese, p_pagamenti: q.pagamenti, p_percentuale: q.percentuale
       });
       ricordaChiave(r.chiave);
@@ -3802,8 +3873,7 @@ function vPersona(){
         ${p.prossima_data ? `<button class="btn small ghost" data-act="persona-calendario">Nel calendario</button>` : ""}</span>
     </div>
     <button class="btn primary wide" style="margin-top:12px" data-act="passo">Segna un passo · ${TIPI_PASSO[passoProposto(p)].nome}</button>
-    ${p.esito === "partner" ? `<a class="btn wa wide" style="margin-top:8px" target="_blank" rel="noopener"
-        href="https://wa.me/?text=${encodeURIComponent(testoInvito() + "\n\n" + linkInvito())}">Mandagli il tuo link d'invito</a>` : ""}
+    ${p.esito === "partner" && possoInvitare() ? `<button class="btn wa wide" style="margin-top:8px" data-act="invita" data-nome="${esc(p.nome)}">Invitalo in Growup</button>` : ""}
     ${p.esito === "cliente" ? `<button class="btn wide" style="margin-top:8px" data-act="apri-cliente" data-id="${esc(p.id)}">Apri nei Clienti</button>` : ""}
     ${p.esito ? `<button class="btn ghost wide" style="margin-top:8px" data-act="riapri-persona">Riapri il percorso</button>` : ""}
     ${p.note ? `<p class="small" style="margin:10px 0 0;white-space:pre-wrap">${esc(p.note)}</p>` : ""}

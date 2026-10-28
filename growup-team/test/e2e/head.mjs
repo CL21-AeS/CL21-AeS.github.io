@@ -22,9 +22,18 @@ const DB = { partners:[{id:"R",nome:"Stefano e Alessia",codice_invito:"RRRR22",c
     {codice:"900003",nome:"Vecchio Prova",formato:"1 pz",categoria:"Casa",prezzo_cliente:5,prezzo_partner:4,vp:1.5,attivo:false}],
   accessi:[], aggiunti:[], anon:0, activities:[], goals:[], mgoals:[], joins:[], stages,
   settings:[{chiave:"obiettivi_proposti",valore:{contatti:10,piani:3,vp_mese:100}},{chiave:"fonte_guadagni",valore:"Simulatore di reddito ufficiale Amway, ottobre 2026"},{chiave:"avviso_guadagni",valore:"Cifre indicative."}]};
+/* 041: un invito personale pronto, come se l'avesse creato «da»: restituisce l'indirizzo da aprire */
+const invitoPer = (da, nome, codice, extra) => {
+  const c = Array.from({ length:32 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
+  DB.invitiP = (DB.invitiP || []).concat([Object.assign({ id:"inv" + Math.random().toString(36).slice(2, 8), codice:c, creato_da:da, nome,
+    codice_amway:codice, creato_il:new Date().toISOString(), scade_il:new Date(Date.now() + 7 * 864e5).toISOString(),
+    annullato_il:null, usato_il:null, usato_da:null }, extra || {})]);
+  return "#invito=" + c;
+};
 const errori = [];
 /* se un passo si blocca (per esempio un file dell'app che non arriva), si vede perché e il test esce con errore */
-process.on("uncaughtException", e => { console.log("FAIL: test interrotto:", String(e).split("\n")[0]);
+process.on("uncaughtException", e => { console.log("FAIL: test interrotto:", String(e).split("\n")[0],
+    ((e && e.stack || "").split("\n").find(r => r.includes("test.mjs")) || "").trim());
   if(errori.length) console.log("ERRORI CONSOLE:", errori); process.exit(1); });
 let ok = 0; const check = (c, m) => { if(!c){ console.log("FAIL:", m); process.exitCode = 1; } else { ok++; } };
 const browser = await chromium.launch();

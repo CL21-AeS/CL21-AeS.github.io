@@ -22,7 +22,11 @@ mancano=""
 for t in $(grep -ioE 'create table (if not exists )?public\.[a-z0-9_]+' supabase/installa_tutto.sql | sed 's/.*public\.//' | sort -u); do
   [ "$($PSQL -At -c "select to_regclass('public.$t') is not null")" = t ] || mancano="$mancano tabella:$t"
 done
-for f in $(grep -ioE 'create (or replace )?function public\.[a-z0-9_]+' supabase/installa_tutto.sql | sed 's/.*public\.//' | sort -u); do
+# (una funzione tolta più avanti con «drop function» e non ricreata dopo non deve esserci)
+for f in $(awk '{ l = tolower($0) }
+    match(l, /create (or replace )?function public\.[a-z0-9_]+/) { n = substr(l, RSTART, RLENGTH); sub(/.*public\./, "", n); c[n] = NR }
+    match(l, /drop function (if exists )?public\.[a-z0-9_]+/) { n = substr(l, RSTART, RLENGTH); sub(/.*public\./, "", n); d[n] = NR }
+    END { for (n in c) if (!(n in d) || c[n] > d[n]) print n }' supabase/installa_tutto.sql | sort); do
   [ "$($PSQL -At -c "select exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = '$f')")" = t ] || mancano="$mancano funzione:$f"
 done
 [ "$($PSQL -At -c "select count(*) from public.partners where is_admin")" = 1 ] || mancano="$mancano radice(Stefano e Alessia)"
