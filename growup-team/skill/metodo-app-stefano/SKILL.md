@@ -51,7 +51,8 @@ approfondimento e le idee da esperto del settore (network marketing), ma le deci
   Unica libreria: `@supabase/supabase-js` da jsDelivr con versione fissa e SRI.
 - **Supabase in UE (Francoforte)**, gestito con il connettore Supabase: tabelle, RLS su tutto, funzioni
   `security definer` per le operazioni delicate, migrazioni numerate + `installa_tutto.sql`.
-- **Accesso senza email**: link d'invito dello sponsor + link personale con chiave (accessi anonimi Supabase).
+- **Accesso senza email, solo su invito**: invito personale creato da chi invita (nome e codice fissati da lui, monouso,
+  7 giorni) + link personale con chiave (accessi anonimi Supabase).
 - **Controlli prima di ogni PR**: test dei permessi in SQL e test dell'interfaccia con Playwright e un finto
   Supabase; screenshot guardati prima di consegnare.
 

@@ -41,7 +41,8 @@ dice diversamente. Gli esempi concreti stanno nei file di `growup-team/` citati 
 | Caratteri | Google Fonts (oggi Cormorant Garamond + Manrope) | `growup-team/index.html` |
 
 ### Accesso senza email
-- Si entra dal **link d'invito** dello sponsor (`…/#CODICE`) e poi dal **link personale** (`…/#chiave=…`) che
+- Si entra solo con un **invito personale** (`…/#invito=…`, 041: nome e codice Amway li scrive chi invita, una volta
+  sola, 7 giorni) e poi dal **link personale** (`…/#chiave=…`) che
   ognuno si manda su WhatsApp o Telegram. Supabase con **accessi anonimi** + tabella `accessi` che collega il
   telefono al profilo. Nel database solo l'**impronta** (sha256) della chiave, mai la chiave.
 - Su iPhone l'app sulla Home ha memoria separata da Safari: serve "Incolla il link personale" al primo avvio.

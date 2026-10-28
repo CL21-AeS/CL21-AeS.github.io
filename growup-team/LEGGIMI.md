@@ -41,10 +41,9 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 1. `supabase/001_schema.sql` — tabelle e funzioni
 2. `supabase/002_rls.sql` — le regole di sicurezza
 3. `supabase/003_seed.sql` — requisiti delle tappe, guadagni e il vostro profilo **"Stefano e Alessia"**
-   (un solo profilo e un solo codice d'invito per tutti e due). Alla fine stampa **due link**:
-   - `link_personale`: la vostra chiave. Apritelo su entrambi i telefoni e salvatelo nei vostri
-     "Messaggi salvati". **Si vede solo adesso**: copiatelo subito.
-   - `link_invito`: da mandare ai vostri partner diretti.
+   (un solo profilo per tutti e due). Alla fine stampa il **link personale**: la vostra chiave. Apritelo su entrambi
+   i telefoni e salvatelo nei vostri "Messaggi salvati". **Si vede solo adesso**: copiatelo subito.
+   I partner si invitano poi dall'app, con «Invita» (041).
 4. `supabase/006_fase2_calcoli.sql` — i calcoli del mese (VP di gruppo, linee, percentuali, storico)
 5. `supabase/007_fase2_gestiti.sql` — numeri inseriti dall'upline per chi non usa l'app, conferma del punto di partenza
 6. `supabase/008_inserisci_in_mezzo.sql` — inserire una persona mancante in mezzo alla linea
@@ -107,7 +106,10 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     `supabase/functions/invia-notifiche` (pubblicata con `verify_jwt` spento: controlla da sola il segreto o il token).
 37. `supabase/040_prossima_ora.sql` — l'ora facoltativa del prossimo passo (`persone.prossima_ora`) e, in
     `notifiche_da_inviare`, l'avviso 30 minuti prima (senza nomi; il tocco apre la scheda con `?persona=<id>`).
-38. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+38. `supabase/041_invita.sql` — si entra solo con un invito personale (`inviti`): nome e codice Amway scritti da chi
+    invita, link con un codice casuale, una volta sola, 7 giorni; avvisi a chi invita e allo sponsor vero
+    (`notifiche_eventi`); via il link d'invito generico, l'«invito sopra» e il link personale per chi non è mai entrato
+39. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 21. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.
@@ -149,8 +151,9 @@ e mettile in `growup-team/config.js` (oppure mandale a Claude Code e lo fa lui).
 ## 6. Collaudo (criterio della Fase 1)
 
 1. Stefano apre il `link_personale` dal telefono: entra come "Stefano e Alessia". Alessia fa lo stesso dal suo.
-2. Nel riquadro **Invita un nuovo partner** mandate il link d'invito su WhatsApp o Telegram a un secondo telefono di prova.
-3. Il secondo telefono apre il link, scrive nome, qualifica e data: inizia.
+2. Nella pagina Gruppo toccate **Invita**, scrivete nome e codice Amway di prova e mandate il link a un secondo telefono
+   su WhatsApp o Telegram (vale una volta e 7 giorni).
+3. Il secondo telefono apre il link, sceglie qualifica e data: inizia.
    L'app gli chiede di salvare il suo link personale: lo manda a sé stesso.
 4. Registra un contatto: **un tocco** su *+ Contatto*.
 5. Apre il suo link personale da un altro dispositivo (o dal computer): ritrova il contatto e gli obiettivi.
@@ -200,9 +203,10 @@ perché nella copia c'è l'impronta delle chiavi.
 ## La rete dal report Amway
 
 Nell'app non si inseriscono più persone a mano: la rete rispecchia sempre quella di Amway.
-- **Chi usa l'app** entra dal link d'invito scrivendo nome, **codice Amway** (obbligatorio) e qualifica. Lo vede tutta
-  la sua upline. Se il suo codice era già stato importato da qualcuno sopra di lui, entra nel suo profilo (posizione
-  del report e VPP già inseriti). Se il link è di qualcuno di un'altra linea, l'app gli dice di chiederlo al suo sponsor.
+- **Chi usa l'app** entra solo con un **invito personale** (041): chi lo invita scrive nome e **codice Amway**, lui
+  sceglie la qualifica. Se il suo codice era già stato importato, l'invito lo può creare solo chi gli sta sopra e lui
+  entra nel suo profilo (posizione del report e VPP già inseriti); altrimenti resta «in attesa della mappa» finché un
+  import di chi l'ha invitato o della sua upline non lo mette al suo posto.
 - **Chi non usa l'app** arriva solo dall'import, e lo vede **solo chi l'ha importato**.
 
 Ognuno importa il report della **propria** linea, quando vuole (pagina Gruppo → La mia

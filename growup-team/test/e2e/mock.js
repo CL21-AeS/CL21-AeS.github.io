@@ -49,8 +49,35 @@
       db.captcha = token;
       session = { user:{ id:"anon-" + uid() } }; localStorage.setItem("mock.session", JSON.stringify(session)); db.anon++; salva(); },
     signOut: async () => { session = null; localStorage.removeItem("mock.session"); },
-    sponsorName: async c => { const i = (db.invitiAdmin || []).find(x => x.codice === c && !x.usato);
-      const p = db.partners.find(p => p.codice_invito === c) || (i && db.partners.find(p => p.id === i.sponsor_id)); return p ? p.nome : null; },
+    /* 041: gli inviti personali (db.invitiP). Senza accesso: solo com'è il link e, se è aperto, i nomi */
+    invitoAperto: async c => { const i = (db.invitiP || []).find(x => x.codice === String(c || "").toLowerCase());
+      const da = i && db.partners.find(p => p.id === i.creato_da && !p.bloccato_il);
+      if(!i || !da) return { stato:"sconosciuto" };
+      if(i.usato_il) return { stato:"usato" }; if(i.annullato_il) return { stato:"annullato" };
+      if(Date.parse(i.scade_il) <= Date.now()) return { stato:"scaduto" };
+      return { stato:"ok", nome:i.nome, da:da.nome.trim() }; },
+    inviti: async () => { const io = mio(); if(!io) return [];
+      return (db.invitiP || []).filter(x => x.creato_da === io.id).sort((x, y) => x.creato_il < y.creato_il ? 1 : -1)
+        .map(x => { const c = Object.assign({}, x); delete c.codice; return c; }); },
+    creaInvito: async (nome, codice) => { const io = mio(); if(!io) throw new Error("non_autenticato");
+      if(!io.confermato_il && !io.is_admin) throw new Error("in_attesa");
+      if(!String(nome || "").trim()) throw new Error("nome_mancante");
+      if(!/^\d{4,12}$/.test(codice || "")) throw new Error("codice_amway_non_valido");
+      if((db.codiciTolti || []).some(c => c.codice_amway === codice)) throw new Error("codice_tolto");
+      if(db.partners.some(p => p.codice_amway === codice && p.stato !== "gestito")) throw new Error("codice_amway_attivo");
+      const copie = db.partners.filter(p => p.codice_amway === codice && p.stato === "gestito");
+      if(copie.length && !copie.some(c => sotto(io.id).some(x => x.id === c.id))) throw new Error("codice_amway_altra_linea");
+      const ora = new Date(), i = { id:uid(), codice:hex(), creato_da:io.id, nome:String(nome).trim(), codice_amway:codice,
+        creato_il:ora.toISOString(), scade_il:new Date(ora.getTime() + 7 * 864e5).toISOString(), annullato_il:null, usato_il:null, usato_da:null };
+      db.invitiP = (db.invitiP || []).concat([i]); salva(); return { id:i.id, codice:i.codice, scade_il:i.scade_il }; },
+    annullaInvito: async id => { const io = mio(), i = (db.invitiP || []).find(x => x.id === id);
+      if(!io || !i || i.creato_da !== io.id || i.usato_il) throw new Error("non_autorizzato");
+      i.annullato_il = i.annullato_il || new Date().toISOString(); salva(); },
+    rigeneraInvito: async id => { const io = mio(), i = (db.invitiP || []).find(x => x.id === id);
+      if(!io || !i || i.creato_da !== io.id) throw new Error("non_autorizzato");
+      if(i.usato_il) throw new Error("invito_usato");
+      i.codice = hex(); i.annullato_il = null; i.scade_il = new Date(Date.now() + 7 * 864e5).toISOString(); salva();
+      return { id:i.id, codice:i.codice, scade_il:i.scade_il }; },
     collega: async () => pub(mio()),
     accessiStruttura: async () => { const io = mio(); if(!io) return [];
       return db.partners.filter(p => p.stato !== "gestito" && vedo(io, p)).map(p => ({ id:p.id, confermato_il:p.confermato_il || null, bloccato_il:p.bloccato_il || null, is_admin:!!p.is_admin })); },
@@ -76,23 +103,27 @@
       db.codiciTolti = (db.codiciTolti || []).filter(x => x.codice_amway !== c); salva(); },
     entra: async k => {
       if(!session) throw new Error("non_autenticato");
-      const p = db.partners.find(p => p.chiave === k); if(!p) throw new Error("chiave_non_valida");
+      const p = db.partners.find(p => p.chiave === k); if(!p || (p.stato === "gestito" && !p.is_admin)) throw new Error("chiave_non_valida");
       db.accessi = db.accessi.filter(a => a.user_id !== session.user.id); db.accessi.push({ user_id:session.user.id, partner_id:p.id });
       p.stato = "attivo"; salva(); return pub(p);
     },
     join: async a => {
       if(!session) throw new Error("non_autenticato");
-      const invito = (db.invitiAdmin || []).find(x => x.codice === a.p_codice && !x.usato);
-      const sp = db.partners.find(p => p.codice_invito === a.p_codice) || (invito && db.partners.find(p => p.id === invito.sponsor_id));
-      if(!sp) throw new Error("codice_non_valido");
-      if(!a.p_codice_amway) throw new Error("codice_amway_mancante");
-      if(db.partners.some(p => p.codice_amway === a.p_codice_amway && p.stato !== "gestito")) throw new Error("codice_amway_attivo");
-      if((db.codiciTolti || []).some(c => c.codice_amway === a.p_codice_amway)) throw new Error("codice_tolto");
-      const dati = { nome:a.p_nome, chiave:hex(), stato:"attivo", data_iscrizione:a.p_data_iscrizione,
+      if(db.accessi.some(x => x.user_id === session.user.id)) throw new Error("profilo_esistente");
+      const invito = (db.invitiP || []).find(x => x.codice === String(a.p_codice || "").toLowerCase());
+      const sp = invito && db.partners.find(p => p.id === invito.creato_da && !p.bloccato_il);
+      if(!invito || !sp) throw new Error("invito_non_valido");
+      if(invito.usato_il) throw new Error("invito_usato");
+      if(invito.annullato_il) throw new Error("invito_annullato");
+      if(Date.parse(invito.scade_il) <= Date.now()) throw new Error("invito_scaduto");
+      const codiceA = invito.codice_amway;
+      if(db.partners.some(p => p.codice_amway === codiceA && p.stato !== "gestito")) throw new Error("codice_amway_attivo");
+      if((db.codiciTolti || []).some(c => c.codice_amway === codiceA)) throw new Error("codice_tolto");
+      const dati = { nome:invito.nome, chiave:hex(), stato:"attivo", data_iscrizione:a.p_data_iscrizione,
         qualifica_iniziale:a.p_qualifica, qualifica_iniziale_mese:a.p_qualifica_mese, pagamenti_iniziali:a.p_pagamenti,
         percentuale_iniziale:a.p_percentuale, privacy_accettata_il:new Date().toISOString(),
         partenza_confermata_il:(a.p_qualifica || a.p_percentuale) ? null : new Date().toISOString() };
-      const copie = db.partners.filter(p => p.codice_amway === a.p_codice_amway && p.stato === "gestito");
+      const copie = db.partners.filter(p => p.codice_amway === codiceA && p.stato === "gestito");
       let p;
       if(copie.length){
         const sotto = copie.filter(c => { for(let x = db.partners.find(y => y.id === c.sponsor_id); x; x = db.partners.find(y => y.id === x.sponsor_id)) if(x.id === sp.id) return true; return false; });
@@ -101,13 +132,13 @@
         for(const c of copie) if(c !== p){ db.partners.filter(x => x.sponsor_id === c.id).forEach(x => { x.sponsor_id = p.id; }); db.partners = db.partners.filter(x => x !== c); }
         Object.assign(p, dati, { gestore_id:null, sponsor_id:antenatoConApp(p), confermato_il:new Date().toISOString() });
       }else{
-        p = Object.assign({ id:uid(), sponsor_id:sp.id, codice_amway:a.p_codice_amway, confermato_il:null,
+        p = Object.assign({ id:uid(), sponsor_id:sp.id, codice_amway:codiceA, confermato_il:null,
           invitato_da:sp.id, invitato_il:new Date().toISOString(),
           codice_invito:"N" + Math.random().toString(36).slice(2,7).toUpperCase() }, dati);
         db.partners.push(p);
       }
-      if(invito){ for(const x of db.partners) if(invito.sopra_di.includes(x.id) && x.sponsor_id === invito.sponsor_id && x.id !== p.id) x.sponsor_id = p.id;
-        invito.usato = true; }
+      invito.usato_il = new Date().toISOString(); invito.usato_da = p.id;
+      for(const x of db.invitiP) if(x !== invito && x.codice_amway === codiceA && !x.usato_il && !x.annullato_il) x.annullato_il = invito.usato_il;
       db.accessi.push({ user_id:session.user.id, partner_id:p.id }); db.joins.push(a); salva();
       return { profilo:pub(p), chiave:p.chiave };
     },
@@ -124,9 +155,6 @@
     aggiungiPreferito: async (io, pid) => { db.preferiti = (db.preferiti || []).concat([{ partner_id:io, preferito_id:pid }]); salva(); },
     togliPreferito: async (io, pid) => { db.preferiti = (db.preferiti || []).filter(x => !(x.partner_id === io && x.preferito_id === pid)); salva(); },
     struttura: async () => { const io = mio(); if(!io) return []; return visibiliRicuciti(io).map(pub); },
-    creaInvitoSopra: async (pid, altri) => { const io = mio(); if(!io.is_admin) throw new Error("non_autorizzato");
-      const t = db.partners.find(x => x.id === pid); const codice = "S" + codiceInvito().slice(1);
-      db.invitiAdmin = (db.invitiAdmin || []).concat([{ codice, sponsor_id:t.sponsor_id, sopra_di:[pid].concat(altri || []) }]); salva(); return codice; },
     esclusi: async () => (db.esclusi || []).filter(x => x.partner_id === mio().id),
     nascosti: async () => (db.nascosti || []).filter(x => x.partner_id === mio().id),
     nascondi: async (io, pid) => { db.nascosti = (db.nascosti || []).concat([{ partner_id:io, nascosto_id:pid }]); salva(); },
@@ -308,7 +336,8 @@
       return { aggiunte, spostate, fuori, aggiornati:numeri, piu_vecchi:vecchi }; },
     prossime: async () => { const io = mio(); if(!io) return [];
       return visibiliRicuciti(io).filter(p => p.prossima_qualifica).map(p => ({ partner_id:p.id, prossima_qualifica:p.prossima_qualifica })); },
-    nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid); p.chiave = hex();
+    nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid);
+      if(p && p.stato === "gestito" && !p.is_admin) throw new Error("mai_entrato"); p.chiave = hex();
       db.accessi = db.accessi.filter(a => a.partner_id !== pid); salva(); return p.chiave; },
     /* come nel database: il mio codice o quello di una persona che ho importato; unico tra chi usa l'app, e tra le mie importate */
     impostaCodice: async (pid, codice) => { const io = mio();

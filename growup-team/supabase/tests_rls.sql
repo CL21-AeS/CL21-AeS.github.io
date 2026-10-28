@@ -53,6 +53,16 @@ begin
   execute q; get diagnostics n = row_count; return n;
 end $$;
 
+-- 041: un invito personale creato direttamente, per preparare le prove (le regole di crea_invito hanno i loro controlli)
+create or replace function growup_test.invito(da uuid, nome text, codice text) returns text
+language plpgsql security definer set search_path = public as $$
+declare c text := public.nuova_chiave_segreta();
+begin
+  insert into public.inviti (codice_hash, creato_da, nome, codice_amway, scade_il)
+  values (public.impronta(c), da, nome, codice, now() + interval '7 days');
+  return c;
+end $$;
+
 grant execute on all functions in schema growup_test to anon, authenticated;
 
 do $test$
@@ -84,7 +94,8 @@ begin
 
   -- ---- Prima di entrare ----
   perform growup_test.come(null);
-  perform growup_test.ok(public.sponsor_da_codice('rrrr22') = 'Radice Test', 'il link d''invito mostra il nome dello sponsor');
+  perform growup_test.ok(to_regprocedure('public.sponsor_da_codice(text)') is null, '041: il link d''invito generico non esiste più');
+  perform growup_test.ok(public.invito_aperto('RRRR22')->>'stato' = 'sconosciuto', '041: un vecchio codice d''invito non apre niente');
   perform growup_test.deve_fallire('select id from public.partners', 'anon non legge i partner');
   perform growup_test.deve_fallire('select id from public.activities', 'anon non legge le attività');
   perform growup_test.deve_fallire($q$select public.entra_con_chiave('x')$q$, 'anon non entra senza sessione');
@@ -105,20 +116,25 @@ begin
 
   -- ---- Iscrizioni dai link d'invito ----
   perform growup_test.come(u2);
-  perform growup_test.deve_fallire($q$select public.entra_con_invito('ZZZZ99','A','2000009')$q$, 'codice inesistente');
-  perform growup_test.deve_fallire($q$select public.entra_con_invito('RRRR22','A','2000009', current_date + 5)$q$, 'data di iscrizione nel futuro');
-  k_a := public.entra_con_invito('RRRR22', 'Anna Test', '2000001', date '2026-07-01')->>'chiave';
+  perform growup_test.deve_fallire($q$select public.entra_con_invito('RRRR22')$q$, '041: il vecchio link generico non fa entrare');
+  perform growup_test.deve_fallire($q$select public.entra_con_invito('00000000000000000000000000000000')$q$, 'invito inesistente');
+  k_e := growup_test.invito(r, 'Anna Test', '2000001');
+  perform growup_test.deve_fallire(format('select public.entra_con_invito(%L, current_date + 5)', k_e), 'data di iscrizione nel futuro');
+  k_a := public.entra_con_invito(k_e, date '2026-07-01')->>'chiave';
   a := (public.collega_profilo()->>'id')::uuid;
   perform growup_test.ok((public.collega_profilo()->>'sponsor_id')::uuid = r, 'A agganciata a R');
-  perform growup_test.deve_fallire($q$select public.entra_con_invito('RRRR22','A','2000009')$q$, 'secondo profilo dallo stesso telefono');
+  perform growup_test.ok(public.collega_profilo()->>'nome' = 'Anna Test' and public.collega_profilo()->>'codice_amway' = '2000001',
+                         '041: nome e codice Amway sono quelli scritti da chi invita');
+  perform growup_test.deve_fallire(format('select public.entra_con_invito(%L)', growup_test.invito(r, 'A', '2000009')),
+                                   'secondo profilo dallo stesso telefono');
   execute 'reset role';
-  update public.partners set codice_invito = 'AAAA22' where id = a;
 
   perform growup_test.come(u3);
-  b := (public.entra_con_invito('aaaa22', 'Bruno Test', '2000002', null, 'path_to_bronze')->'profilo'->>'id')::uuid;
+  b := (public.entra_con_invito(growup_test.invito(a, 'Bruno Test', '2000002'), null, 'path_to_bronze')->'profilo'->>'id')::uuid;
   perform growup_test.come(u4);
-  perform growup_test.deve_fallire($q$select public.entra_con_invito('RRRR22','C','2000003',null,null,null,0,7)$q$, 'pin inesistente');
-  c := (public.entra_con_invito('RRRR22', 'Carla Test', '2000003', null, null, null, 0, 9)->'profilo'->>'id')::uuid;
+  perform growup_test.deve_fallire(format('select public.entra_con_invito(%L, null, null, null, 0, 7)', growup_test.invito(r, 'C', '2000003')),
+                                   'pin inesistente');
+  c := (public.entra_con_invito(growup_test.invito(r, 'Carla Test', '2000003'), null, null, null, 0, 9)->'profilo'->>'id')::uuid;
   perform growup_test.ok((public.collega_profilo()->>'percentuale_iniziale')::int = 9, 'pin 9% registrato senza qualifica Bronze');
   execute 'reset role';
   perform growup_test.ok((select sponsor_id from public.partners where id = b) = a, 'B agganciato ad A');
@@ -235,19 +251,22 @@ begin
 
   -- ---- Prendere possesso di un profilo creato da altri, con la sua chiave ----
   execute 'reset role';
-  insert into public.partners (nome, sponsor_id, stato, creato_da) values ('Dario Test', a, 'gestito', a) returning id into d;
-  k_d := public.nuova_chiave_per(d);
+  insert into public.partners (nome, sponsor_id, stato, creato_da, codice_amway) values ('Dario Test', a, 'gestito', a, '2000004')
+  returning id into d;
+  perform growup_test.deve_fallire(format('select public.nuova_chiave_per(%L)', d), '041: niente link personale per chi non è mai entrato');
+  update public.partners set chiave_hash = public.impronta('11111111111111111111111111111111') where id = d;
   insert into public.activities (partner_id, tipo, inserito_da) values (d, 'contatto', a);
   perform growup_test.come(u7);
-  perform growup_test.ok(public.entra_con_chiave(k_d)->>'stato' = 'attivo', 'D prende possesso e diventa attivo');
+  perform growup_test.deve_fallire($q$select public.entra_con_chiave('11111111111111111111111111111111')$q$,
+                                   '041: chi non è mai entrato non entra con una chiave, solo con un invito');
+  perform growup_test.ok(public.entra_con_invito(growup_test.invito(a, 'Dario Test', '2000004'))->'profilo'->>'stato' = 'attivo',
+                         '041: D entra con l''invito di A, prende il suo profilo e diventa attivo');
   perform growup_test.ok((select count(*) from public.activities) = 1, 'D ritrova il suo storico');
   perform growup_test.ok((select count(*) from public.partners) = 1, 'nessun duplicato');
 
   -- ---- I codici Amway di chi usa l'app (dati all'ingresso; D li riceve qui) ----
   execute 'reset role';
   update public.partners set codice_amway = '2000004' where id = d;
-  update public.partners set codice_invito = 'BBBB22' where id = b;
-  update public.partners set codice_invito = 'CCCC22' where id = c;
   perform growup_test.ok((select codice_amway from public.partners where id = a) = '2000001'
                          and (select codice_amway from public.partners where id = b) = '2000002', 'il codice dato all''ingresso è salvato');
   insert into public.activities (partner_id, tipo, vp) values (r, 'ordine', 120), (b, 'ordine', 150), (c, 'ordine', 100);
@@ -258,8 +277,10 @@ begin
   perform growup_test.deve_fallire(format($q$select public.aggiungi_con_codice('X', %L, '5555555')$q$, a), 'niente più inserimenti a mano con codice');
   perform growup_test.deve_fallire(format('select public.inserisci_in_mezzo(%L, array[%L]::uuid[])', 'X', b), 'niente più "manca qualcuno sopra"');
   perform growup_test.deve_fallire(format('select public.cambia_sponsor(%L, %L)', d, c), 'niente più "cambia sponsor", neanche per l''admin');
-  perform growup_test.deve_fallire(format('select public.link_per_gestito(%L)', d), 'niente più link per le persone senza app');
-  perform growup_test.deve_fallire($q$select public.iscrivi_con_codice('RRRR22', 'X', null)$q$, 'niente più ingresso senza codice Amway');
+  perform growup_test.ok(to_regprocedure('public.link_per_gestito(uuid)') is null
+                         and to_regprocedure('public.iscrivi_con_codice(text,text,date,text,date,integer,integer)') is null
+                         and to_regprocedure('public.entra_con_invito(text,text,text,date,text,date,integer,integer)') is null,
+                         '041: niente più link per le persone senza app né ingressi senza invito personale');
 
   -- ---- Import della rete (033: le persone importate le vede tutta la upline) ----
   perform growup_test.come(u5);  -- A
@@ -316,10 +337,11 @@ begin
   insert into auth.users (id, aud, role) select ('00000000-0000-0000-0000-0000000000b' || i)::uuid, 'authenticated', 'authenticated'
   from generate_series(1, 4) i;
   perform growup_test.come('00000000-0000-0000-0000-0000000000b1');
-  perform growup_test.deve_fallire($q$select public.entra_con_invito('BBBB22', 'Elena', '')$q$, 'il codice Amway è obbligatorio');
-  perform growup_test.deve_fallire($q$select public.entra_con_invito('RRRR22', 'Anna bis', '2000001')$q$, 'codice di chi usa già l''app: rifiutato');
-  perform growup_test.deve_fallire($q$select public.entra_con_invito('CCCC22', 'Fabio', '3000002')$q$, 'codice importato in un''altra linea: rifiutato');
-  perform growup_test.ok(public.entra_con_invito('BBBB22', 'Elena Vera', '3000001')->'profilo'->>'id' = e::text,
+  perform growup_test.deve_fallire(format('select public.entra_con_invito(%L)', growup_test.invito(r, 'Anna bis', '2000001')),
+                                   'codice di chi usa già l''app: rifiutato');
+  perform growup_test.deve_fallire(format('select public.entra_con_invito(%L)', growup_test.invito(c, 'Fabio', '3000002')),
+                                   'codice importato in un''altra linea: rifiutato');
+  perform growup_test.ok(public.entra_con_invito(growup_test.invito(b, 'Elena Vera', '3000001'))->'profilo'->>'id' = e::text,
                          'E entra dal link di B con il suo codice e prende il profilo importato da A');
   execute 'reset role';
   perform growup_test.ok((select stato = 'attivo' and sponsor_id = b and gestore_id is null and nome = 'Elena Vera' from public.partners where id = e),
@@ -335,7 +357,8 @@ begin
                                    'E usa l''app: A non scrive più per lei');
   -- un codice nuovo: profilo nuovo sotto chi invita
   perform growup_test.come('00000000-0000-0000-0000-0000000000b2');
-  perform growup_test.ok((public.entra_con_invito('CCCC22', 'Gino Test', '3000005')->'profilo'->>'sponsor_id')::uuid = c, 'codice nuovo: sotto chi invita');
+  perform growup_test.ok((public.entra_con_invito(growup_test.invito(c, 'Gino Test', '3000005'))->'profilo'->>'sponsor_id')::uuid = c,
+                         'codice nuovo: sotto chi invita');
   g := public.my_partner_id();
 
   -- ---- L'import mette chi usa l'app sotto il suo sponsor del report ----
@@ -452,35 +475,22 @@ begin
   perform growup_test.come(u4);  -- C, altra linea
   perform growup_test.ok(not exists (select 1 from public.numeri_mese where partner_id in (a, r)), '033: un''altra linea non legge i numeri');
 
-  -- ---- Inviti degli admin: sotto una persona importata, e "chi manca sopra" ----
-  perform growup_test.come(u1);
-  k_e := (select codice_invito from public.partners where id = h);
+  -- ---- Chi entra in attesa va al suo posto con la mappa: sotto una persona importata ----
   execute 'reset role';
   insert into auth.users (id, aud, role) select ('00000000-0000-0000-0000-0000000000c' || i)::uuid, 'authenticated', 'authenticated'
   from generate_series(1, 3) i;
   perform growup_test.come('00000000-0000-0000-0000-0000000000c1');
-  f := (public.entra_con_invito(k_e, 'Nora Sotto', '4000002')->'profilo'->>'id')::uuid;
+  f := (public.entra_con_invito(growup_test.invito(r, 'Nora Sotto', '4000002'))->'profilo'->>'id')::uuid;
   execute 'reset role';
-  perform growup_test.ok((select sponsor_id from public.partners where id = f) = h, 'N entra sotto il Platino importato da R');
-  update public.partners set confermato_il = now() where id = f;  -- come dopo un import della mappa
+  perform growup_test.ok((select sponsor_id = r and confermato_il is null from public.partners where id = f), '041: N entra in attesa sotto chi l''ha invitata');
+  update public.partners set sponsor_id = h, confermato_il = now() where id = f;  -- come dopo un import della mappa
   perform growup_test.come(u1);
   perform growup_test.ok((select sponsor_id from public.struttura_visibile() where id = f) = h, 'R vede N sotto il Platino');
   perform growup_test.come(u5);  -- 033: A vede anche il Platino importato da R, e N sotto di lui
   perform growup_test.ok((select sponsor_id from public.struttura_visibile() where id = f) = h
                          and exists (select 1 from public.struttura_visibile() where id = h), '033: A vede il Platino e N sotto di lui, come R');
   perform growup_test.ok(exists (select 1 from public.riepilogo_mese(current_date) where partner_id = f and sponsor_id = h), 'i numeri di A contano N');
-  perform growup_test.deve_fallire(format('select public.crea_invito_sopra(%L)', f), 'A non crea inviti speciali (non è admin)');
-  perform growup_test.come(u1);
-  k_e := public.crea_invito_sopra(f);
-  perform growup_test.come(null);
-  perform growup_test.ok(public.sponsor_da_codice(k_e) = 'Bianca Platini', 'il link speciale mostra lo sponsor');
-  perform growup_test.come('00000000-0000-0000-0000-0000000000c2');
-  g := (public.entra_con_invito(k_e, 'Mirco Mezzo', '4000003')->'profilo'->>'id')::uuid;
-  execute 'reset role';
-  perform growup_test.ok((select sponsor_id from public.partners where id = g) = h and (select sponsor_id from public.partners where id = f) = g,
-                         'M entra tra il Platino e N');
-  perform growup_test.come('00000000-0000-0000-0000-0000000000c3');
-  perform growup_test.deve_fallire(format($q$select public.entra_con_invito(%L, 'Altro', '4000004')$q$, k_e), 'il link speciale vale una volta sola');
+  perform growup_test.ok(to_regprocedure('public.crea_invito_sopra(uuid,uuid[])') is null, '041: niente più «invito sopra»');
 
   -- ---- Il codice Amway lo corregge solo un admin ----
   perform growup_test.come(u5);  -- A
@@ -638,12 +648,11 @@ begin
   insert into auth.users (id, aud, role) values ('00000000-0000-0000-0000-0000000000d1', 'authenticated', 'authenticated'),
     ('00000000-0000-0000-0000-0000000000d2', 'authenticated', 'authenticated');
   perform growup_test.come('00000000-0000-0000-0000-0000000000d1');
-  g := (public.entra_con_invito('AAAA22', 'Zeta Test', '2000077')->'profilo'->>'id')::uuid;
+  g := (public.entra_con_invito(growup_test.invito(a, 'Zeta Test', '2000077'))->'profilo'->>'id')::uuid;
   perform growup_test.ok(public.stato_accesso() is null, 'chi è appena entrato ha l''accesso');
   execute 'reset role';
-  update public.partners set codice_invito = 'ZZZZ77' where id = g;
   perform growup_test.come('00000000-0000-0000-0000-0000000000d2');
-  h := (public.entra_con_invito('ZZZZ77', 'Ypsilon Test', '2000078')->'profilo'->>'id')::uuid;
+  h := (public.entra_con_invito(growup_test.invito(g, 'Ypsilon Test', '2000078'))->'profilo'->>'id')::uuid;
   perform growup_test.come(u2);  -- A, sponsor di Z
   perform growup_test.ok(exists (select 1 from public.in_attesa() where id = g and mio) and not exists (select 1 from public.accessi_struttura() where id = g),
                          '033: Z è in attesa della mappa (solo il nome per lo sponsor)');
@@ -660,7 +669,8 @@ begin
                          'lo sponsor toglie Z: chi aveva invitato passa sotto lo sponsor');
   perform growup_test.come('00000000-0000-0000-0000-0000000000d1');
   perform growup_test.ok(public.collega_profilo() is null and public.stato_accesso() = 'tolto', 'il telefono di Z: accesso tolto');
-  perform growup_test.deve_fallire($q$select public.entra_con_invito('AAAA22', 'Zeta Test', '2000077')$q$, 'il codice tolto non rientra');
+  perform growup_test.deve_fallire(format('select public.entra_con_invito(%L)', growup_test.invito(a, 'Zeta Test', '2000077')),
+                                   'il codice tolto non rientra');
   perform growup_test.come(u2);
   perform growup_test.deve_fallire('select * from public.codici_tolti_elenco()', 'solo l''admin vede i codici tolti');
   perform growup_test.deve_fallire('select public.sblocca_codice(''2000077'')', 'solo l''admin sblocca un codice');
@@ -668,7 +678,7 @@ begin
   perform growup_test.ok(exists (select 1 from public.codici_tolti_elenco() where codice_amway = '2000077'), 'l''admin vede il codice tolto');
   perform public.sblocca_codice('2000077');
   perform growup_test.come('00000000-0000-0000-0000-0000000000d1');
-  g := (public.entra_con_invito('AAAA22', 'Zeta Test', '2000077')->'profilo'->>'id')::uuid;
+  g := (public.entra_con_invito(growup_test.invito(a, 'Zeta Test', '2000077'))->'profilo'->>'id')::uuid;
   perform growup_test.ok(g is not null, 'sbloccato il codice, Z rientra');
   -- confermato dal report: non si toglie più
   execute 'reset role';
@@ -869,9 +879,9 @@ begin
   insert into auth.users (id, aud, role) values ('00000000-0000-0000-0000-0000000000f7', 'authenticated', 'authenticated');
   perform growup_test.come(u5);  -- A: i suoi nuovi iscritti prima
   att_prima := (public.guida_conteggi(current_date)->>'personali')::int;
-  k_a2 := (select codice_invito from public.partners where id = a);
+  k_a2 := growup_test.invito(a, 'Nuovo Guida', '8000001');
   perform growup_test.come('00000000-0000-0000-0000-0000000000f7');
-  perform public.entra_con_invito(k_a2, 'Nuovo Guida', '8000001');
+  perform public.entra_con_invito(k_a2);
   perform growup_test.come(u5);
   perform growup_test.ok((public.guida_conteggi(current_date)->>'personali')::int = att_prima + 1, '035: chi entra con il link di A conta tra i suoi nuovi iscritti');
   execute 'reset role';
@@ -1023,10 +1033,10 @@ begin
     perform growup_test.deve_fallire($q$select * from public.notifiche_telefoni$q$, '039: anon non legge i telefoni');
     execute 'reset role';
     execute 'set local role service_role';
-    corpo39 := (select corpo from public.notifiche_da_inviare(alle) where partner_id = b);
-    fuori39 := (select count(*) from public.notifiche_da_inviare(alle + interval '2 hours'));
+    corpo39 := (select corpo from public.notifiche_da_inviare(alle) where partner_id = b and chiave like 'mattino-%');
+    fuori39 := (select count(*) from public.notifiche_da_inviare(alle + interval '2 hours') where chiave like 'mattino-%');
     perform public.notifiche_segna(b, 'mattino-' || oggi39);
-    dopo39 := (select count(*) from public.notifiche_da_inviare(alle) where partner_id = b);
+    dopo39 := (select count(*) from public.notifiche_da_inviare(alle) where partner_id = b and chiave like 'mattino-%');
     execute 'reset role';
     perform growup_test.ok(corpo39 like '3 persone da risentire · 1 cliente da sentire%', '039: alle 8:30 il riepilogo di B, senza nomi');
     perform growup_test.ok(fuori39 = 0, '039: fuori dalle 8:30 niente riepilogo');
@@ -1065,6 +1075,162 @@ begin
     perform growup_test.ok(n_ancora = 0, '040: l''avviso non si manda due volte');
     perform growup_test.ok(c41 like 'Hai un passo da fare con un tuo cliente%', '040: per un cliente «con un tuo cliente»');
     delete from public.persone where id = pp; delete from public.notifiche_telefoni; delete from public.notifiche_inviate;
+  end;
+
+  -- ---- 041: si entra solo con un invito personale ----
+  declare
+    ua uuid; ub uuid; ur uuid;
+    n1 constant uuid := '00000000-0000-0000-0000-0000000009a1';  -- entra con l'invito di A, in attesa
+    n2 constant uuid := '00000000-0000-0000-0000-0000000009a2';  -- prova a riusare lo stesso invito
+    n3 constant uuid := '00000000-0000-0000-0000-0000000009a3';  -- prende il posto di una persona già nella mappa
+    n4 constant uuid := '00000000-0000-0000-0000-0000000009a4';  -- inviti scaduti, annullati, rigenerati
+    inv jsonb; inv2 jsonb; na text; n_prima int; n_dopo int; k1 text; k_vecchio text; id1 uuid; id_inv uuid; mappa uuid; z uuid;
+  begin
+    execute 'reset role';
+    insert into auth.users (id, aud, role) values (n1, 'authenticated', 'authenticated'), (n2, 'authenticated', 'authenticated'),
+      (n3, 'authenticated', 'authenticated'), (n4, 'authenticated', 'authenticated');
+    ua := (select user_id from public.accessi where partner_id = a limit 1);
+    ub := (select user_id from public.accessi where partner_id = b limit 1);
+    ur := (select user_id from public.accessi where partner_id = r limit 1);
+    na := (select btrim(nome) from public.partners where id = a);
+    insert into public.partners (nome, sponsor_id, stato, creato_da, codice_amway) values ('Mappa Prova', a, 'gestito', a, '9100009')
+    returning id into mappa;
+    perform growup_test.ok((select confermato_il is not null from public.partners where id = a)
+                           and (select confermato_il is not null from public.partners where id = b), '041: A e B sono nella mappa');
+
+    -- crea l'invito chi è nella mappa: nome e codice restano nel database, nel link solo un codice casuale
+    perform growup_test.come(ua);
+    inv := public.crea_invito('  Paola Prova ', '91-00001');
+    k1 := inv->>'codice';
+    perform growup_test.ok(k1 ~ '^[0-9a-f]{32}$', '041: il link ha solo un codice casuale di 32 caratteri');
+    perform growup_test.ok((select nome = 'Paola Prova' and codice_amway = '9100001' and scade_il = now() + interval '7 days'
+                              from public.inviti where id = (inv->>'id')::uuid), '041: nome e codice salvati, scade dopo 7 giorni');
+    perform growup_test.deve_fallire('select codice_hash from public.inviti', '041: l''impronta del link non si legge');
+    perform growup_test.deve_fallire($q$insert into public.inviti (codice_hash, creato_da, nome, codice_amway, scade_il)
+                                     values ('x', public.my_partner_id(), 'X', '9100099', now() + interval '1 year')$q$,
+                                     '041: gli inviti si creano solo con crea_invito');
+    perform growup_test.deve_fallire(format($q$update public.inviti set nome = 'Altro', codice_amway = '9100098' where id = %L$q$, inv->>'id'),
+                                     '041: nome e codice dell''invito non si cambiano');
+    perform growup_test.deve_fallire($q$select public.crea_invito('', '9100003')$q$, '041: serve il nome');
+    perform growup_test.deve_fallire($q$select public.crea_invito('X', '12')$q$, '041: serve un codice Amway valido');
+    perform growup_test.deve_fallire($q$select public.crea_invito('X', '2000002')$q$, '041: non si invita chi usa già l''app');
+    perform growup_test.come(ub);  -- B: «Mappa Prova» è nella mappa ma non sotto B (è sotto A)
+    perform growup_test.deve_fallire($q$select public.crea_invito('Mappa Prova', '9100009')$q$,
+                                     '041: chi è già nella mappa lo invita solo chi gli sta sopra');
+    perform growup_test.ok(not exists (select 1 from public.inviti where id = (inv->>'id')::uuid), '041: B non vede gli inviti di A');
+    perform growup_test.deve_fallire(format('select public.annulla_invito(%L)', inv->>'id'), '041: B non annulla l''invito di A');
+    perform growup_test.deve_fallire(format('select public.rigenera_invito(%L)', inv->>'id'), '041: B non rigenera l''invito di A');
+
+    -- la pagina d'ingresso: senza accesso vede solo se il link è aperto, e i nomi solo se lo è
+    perform growup_test.come(null);
+    perform growup_test.ok(public.invito_aperto(k1) = jsonb_build_object('stato', 'ok', 'nome', 'Paola Prova', 'da', na),
+                           '041: il link aperto mostra il nome dell''invitato e di chi invita');
+    perform growup_test.ok(public.invito_aperto(upper(k1))->>'stato' = 'ok', '041: il codice vale anche in maiuscolo');
+    perform growup_test.ok(public.invito_aperto(repeat('0', 32)) = '{"stato":"sconosciuto"}'::jsonb, '041: un codice inventato non mostra niente');
+    perform growup_test.deve_fallire('select * from public.inviti', '041: anon non legge gli inviti');
+    perform growup_test.deve_fallire($q$select public.crea_invito('X', '9100004')$q$, '041: anon non crea inviti');
+    perform growup_test.deve_fallire(format('select public.entra_con_invito(%L)', k1), '041: senza sessione non si entra');
+
+    -- entra: in attesa sotto chi ha invitato, vede solo sé stesso; chi ha invitato riceve l'avviso
+    perform growup_test.come(n1);
+    id1 := (public.entra_con_invito(k1, date '2026-10-01')->'profilo'->>'id')::uuid;
+    perform growup_test.ok((select count(*) from public.partners) = 1 and public.collega_profilo()->>'nome' = 'Paola Prova',
+                           '041: chi entra vede solo sé stesso');
+    perform growup_test.deve_fallire($q$select public.crea_invito('X', '9100005')$q$, '041: chi è in attesa non invita');
+    perform growup_test.come(n2);
+    perform growup_test.deve_fallire(format('select public.entra_con_invito(%L)', k1), '041: l''invito vale una volta sola');
+    execute 'reset role';
+    perform growup_test.ok((select sponsor_id = a and confermato_il is null and codice_amway = '9100001' from public.partners where id = id1),
+                           '041: in attesa sotto chi ha invitato, con il codice scritto nell''invito');
+    perform growup_test.ok((select usato_il is not null and usato_da = id1 from public.inviti where id = (inv->>'id')::uuid), '041: l''invito è segnato come usato');
+    perform growup_test.ok(exists (select 1 from public.notifiche_eventi where partner_id = a and chiave = 'entrato-' || id1
+                                     and position('Paola' in corpo) = 0), '041: chi ha invitato riceve l''avviso, senza nomi');
+    perform growup_test.come(ua);
+    perform growup_test.ok(exists (select 1 from public.in_attesa() where id = id1) and not exists (select 1 from public.partners where id = id1),
+                           '041: chi ha invitato la vede in attesa, non nella struttura');
+    perform growup_test.deve_fallire('select * from public.notifiche_eventi', '041: gli avvisi li legge solo il server');
+    perform growup_test.deve_fallire(format('select public.annulla_invito(%L)', inv->>'id'), '041: un invito usato non si annulla');
+
+    -- la mappa la mette al suo posto, sotto il suo sponsor vero (B): avvisi a chi ha invitato e a B
+    perform growup_test.come(ur);
+    perform public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":470}',
+      '[{"codice":"9100001","nome":"Paola dalla mappa","sponsor":"2000002","vpp":10}]', '{}', '{}');
+    execute 'reset role';
+    perform growup_test.ok((select sponsor_id = b and confermato_il is not null from public.partners where id = id1),
+                           '041: la mappa la mette sotto il suo sponsor vero e la conferma');
+    perform growup_test.ok(exists (select 1 from public.notifiche_eventi where partner_id = a and chiave = 'al-posto-' || id1)
+                           and exists (select 1 from public.notifiche_eventi where partner_id = b and chiave = 'al-posto-' || id1),
+                           '041: avvisati chi ha invitato e lo sponsor vero');
+    insert into public.notifiche_telefoni (partner_id, endpoint, p256dh, auth) values (a, 'https://push.esempio.test/a41', 'k', 'a');
+    execute 'set local role service_role';
+    n_prima := (select count(*) from public.notifiche_da_inviare(now()) where partner_id = a and chiave in ('evento-entrato-' || id1, 'evento-al-posto-' || id1));
+    perform public.notifiche_segna(a, 'evento-entrato-' || id1);
+    n_dopo := (select count(*) from public.notifiche_da_inviare(now()) where partner_id = a and chiave in ('evento-entrato-' || id1, 'evento-al-posto-' || id1));
+    execute 'reset role';
+    perform growup_test.ok(n_prima = 2, '041: i due avvisi di A partono al primo giro (' || n_prima || ')');
+    perform growup_test.ok(n_dopo = 1, '041: un avviso mandato non si ripete');
+    delete from public.notifiche_telefoni where partner_id = a; delete from public.notifiche_inviate where partner_id = a;
+
+    -- già nella mappa: lo invita chi gli sta sopra e chi entra prende subito il suo posto, confermato
+    perform growup_test.come(ua);
+    inv := public.crea_invito('Mappa Prova', '9100009');
+    perform growup_test.come(ur);
+    inv2 := public.crea_invito('Mappa Prova bis', '9100009');  -- anche R, che sta sopra
+    perform growup_test.come(n3);
+    perform growup_test.ok((public.entra_con_invito(inv->>'codice')->'profilo'->>'id')::uuid = mappa, '041: prende il profilo già nella mappa');
+    execute 'reset role';
+    perform growup_test.ok((select stato = 'attivo' and confermato_il is not null and sponsor_id = a from public.partners where id = mappa),
+                           '041: subito confermato, al suo posto');
+    perform growup_test.ok((select annullato_il is not null from public.inviti where id = (inv2->>'id')::uuid),
+                           '041: gli altri inviti con lo stesso codice si chiudono');
+    perform growup_test.ok(exists (select 1 from public.notifiche_eventi where partner_id = a and chiave = 'al-posto-' || mappa),
+                           '041: chi ha invitato riceve l''avviso');
+    perform growup_test.ok((select count(*) from public.notifiche_eventi where chiave = 'al-posto-' || mappa) = 1,
+                           '041: un solo avviso se lo sponsor vero è chi ha invitato');
+
+    -- scaduto, annullato, rigenerato
+    perform growup_test.come(ua);
+    inv := public.crea_invito('Scade Prova', '9100006');
+    execute 'reset role';
+    update public.inviti set scade_il = now() - interval '1 minute' where id = (inv->>'id')::uuid;
+    perform growup_test.come(n4);
+    perform growup_test.ok(public.invito_aperto(inv->>'codice')->>'stato' = 'scaduto', '041: dopo 7 giorni il link è scaduto');
+    perform growup_test.deve_fallire(format('select public.entra_con_invito(%L)', inv->>'codice'), '041: con un link scaduto non si entra');
+    perform growup_test.come(ua);
+    perform public.annulla_invito((inv->>'id')::uuid);
+    k_vecchio := inv->>'codice';
+    inv := public.rigenera_invito((inv->>'id')::uuid);
+    perform growup_test.ok(inv->>'codice' <> k_vecchio and (select annullato_il is null and scade_il > now() from public.inviti
+                             where id = (inv->>'id')::uuid), '041: rigenerato: link nuovo, di nuovo aperto per 7 giorni');
+    perform growup_test.come(n4);
+    perform growup_test.ok(public.invito_aperto(k_vecchio)->>'stato' = 'sconosciuto', '041: il link vecchio non vale più');
+    perform growup_test.come(ua);
+    perform public.annulla_invito((inv->>'id')::uuid);
+    perform growup_test.come(n4);
+    perform growup_test.ok(public.invito_aperto(inv->>'codice')->>'stato' = 'annullato', '041: annullato da chi l''ha creato');
+    perform growup_test.deve_fallire(format('select public.entra_con_invito(%L)', inv->>'codice'), '041: con un link annullato non si entra');
+    perform growup_test.come(ua);
+    inv := public.rigenera_invito((inv->>'id')::uuid);
+    perform growup_test.come(n4);
+    z := (public.entra_con_invito(inv->>'codice')->'profilo'->>'id')::uuid;
+    perform growup_test.ok(z is not null, '041: con il link rigenerato si entra');
+
+    -- chi invita viene bloccato: i suoi link non valgono più
+    perform growup_test.come(ua);
+    inv := public.crea_invito('Blocco Prova', '9100007');
+    execute 'reset role';
+    update public.partners set bloccato_il = now() where id = a;
+    perform growup_test.come(null);
+    perform growup_test.ok(public.invito_aperto(inv->>'codice')->>'stato' = 'sconosciuto', '041: chi è bloccato non fa entrare nessuno');
+    execute 'reset role';
+    update public.partners set bloccato_il = null where id = a;
+
+    -- i permessi: senza accesso solo invito_aperto
+    perform growup_test.ok(has_function_privilege('anon', 'public.invito_aperto(text)', 'execute')
+                           and not has_function_privilege('anon', 'public.crea_invito(text,text)', 'execute')
+                           and not has_function_privilege('anon', 'public.entra_con_invito(text,date,text,date,integer,integer)', 'execute')
+                           and not has_function_privilege('authenticated', 'public.avvisa(uuid,text,text)', 'execute'),
+                           '041: permessi delle funzioni degli inviti');
   end;
 
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----

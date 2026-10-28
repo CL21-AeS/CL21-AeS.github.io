@@ -1,6 +1,26 @@
-// 1. Ingresso dal link d'invito
-let { ctx, page } = await apri({}, "#rrrr22");
+// 0. 041: il vecchio link d'invito generico non fa più entrare
+let { ctx, page } = await apri({}, "#RRRR22");
+await page.getByText("Ora si entra solo su invito").waitFor();
+check(!(await page.locator("form[data-form=ingresso]").count()), "041: il vecchio link generico non apre l'ingresso");
+await ctx.close();
+// un invito già usato, scaduto o annullato non apre l'ingresso
+for(const [extra, testo] of [[{ usato_il:new Date().toISOString() }, "Invito già usato"], [{ scade_il:new Date(Date.now() - 6e4).toISOString() }, "Invito scaduto"],
+    [{ annullato_il:new Date().toISOString() }, "Invito annullato"]]){
+  ({ ctx, page } = await apri({}, invitoPer("R", "Prova Chiusa", "2999999", extra)));
+  await page.getByText(testo).waitFor(); check(true, "041: " + testo.toLowerCase());
+  await ctx.close();
+}
+({ ctx, page } = await apri({}, "#invito=" + "0".repeat(32)));
+await page.getByText("Link non valido").waitFor(); check(true, "041: un invito inventato non apre l'ingresso");
+await ctx.close();
+
+// 1. Ingresso dall'invito personale
+({ ctx, page } = await apri({}, invitoPer("R", "Anna Bianchi", "2000001")));
 await page.getByText("Ti ha invitato Stefano e Alessia").waitFor();
+check(await page.getByText("Ciao Anna!").isVisible(), "041: l'ingresso saluta per nome chi è stato invitato");
+check(!(await page.locator("form[data-form=ingresso] input[name=nome], form[data-form=ingresso] input[name=codice_amway]").count()),
+  "041: nome e codice Amway non si scrivono all'ingresso (li ha scritti chi invita)");
+check(!(await page.evaluate(() => location.hash)), "041: il codice dell'invito non resta nella barra degli indirizzi");
 check(await page.getByText("A&S · Growup Team").first().isVisible(), "marchio A&S");
 check(!(await page.content()).includes("CumLaude21"), "niente CumLaude21");
 check(await page.getByText("Due informazioni e iniziamo").isVisible(), "nuovo testo d'ingresso");
@@ -16,14 +36,6 @@ await page.click("button[data-act=ho-gia]");
 await page.getByText("Entra in Growup").waitFor();
 await page.click("button[data-act=torna-invito]");
 await page.getByText("Due informazioni e iniziamo").waitFor(); check(true, "si torna all'invito");
-await page.fill("input[name=nome]", "Anna Bianchi");
-check(await page.getByText("Codice Amway Partner", { exact:true }).isVisible() && !(await page.getByText("Codice Amway Partner (facoltativo)").count()),
-  "ingresso: codice Amway obbligatorio");
-await page.fill("input[name=codice_amway]", "2000001"); await page.fill("input[name=codice_amway2]", "2000010");
-check(await page.locator(".avviso-codice").getByText("Controlla bene il tuo codice Amway Partner.").isVisible(), "ingresso: l'avviso sul codice");
-await page.click("form button.primary");
-check(await page.locator(".errore").innerText() === "I due codici non sono uguali: controllali.", "ingresso: i due codici devono essere uguali");
-await page.fill("input[name=codice_amway]", "2000001"); await page.fill("input[name=codice_amway2]", "2000001");
 await page.click("form button.primary");
 check(await page.getByText("serve la data di iscrizione").isVisible(), "data obbligatoria per chi inizia");
 await page.fill("input[name=data]", "2026-10-01");
@@ -215,21 +227,40 @@ check(await page.locator(".oggi li", { hasText:"Contatto" }).getByText("inserito
 await sync(page);
 check(DB.activities.filter(a => a.partner_id === marco.id).length === 2, "i dati sono di Marco, non miei");
 await page.screenshot({ path: S + "/e2e/11-scheda-gestito.png", fullPage:true });
-const invitoAnna = DB.partners.find(p => p.id === anna.id).codice_invito = "ANNA22";
+// 041: Anna (nella mappa) invita Marco dalla voce «Invita» della pagina Gruppo
+await page.locator("button[data-act=vista-gruppo]").first().click();
+await page.waitForTimeout(1500);   // finiti i salvataggi in corso: un ridisegno svuoterebbe i campi del foglio
+await page.locator(".card.invita button[data-act=invita]").click();
+await page.locator(".sheet h2", { hasText:"Invita un nuovo partner" }).waitFor();
+await page.click(".sheet button.primary");
+check(await page.locator(".sheet .errore").innerText() === "Scrivi nome e cognome della persona.", "Invita: serve il nome");
+await page.fill(".sheet input[name=nome]", "Marco Rossi");
+await page.fill(".sheet input[name=codice_amway]", "1000001"); await page.fill(".sheet input[name=codice_amway2]", "1000010");
+await page.click(".sheet button.primary");
+check(await page.locator(".sheet .errore").innerText() === "I due codici non sono uguali: controllali.", "Invita: i due codici devono essere uguali");
+await page.fill(".sheet input[name=codice_amway]", "2000001"); await page.fill(".sheet input[name=codice_amway2]", "2000001");
+await page.click(".sheet button.primary");
+check(await page.locator(".sheet .errore").innerText() === "Con questo codice Amway c'è già qualcuno che usa l'app.", "Invita: non si invita chi usa già l'app");
+await page.fill(".sheet input[name=codice_amway]", "1000001"); await page.fill(".sheet input[name=codice_amway2]", "1000001");
+await page.click(".sheet button.primary");
+await page.locator(".sheet h2", { hasText:"Il link per Marco Rossi" }).waitFor();
+const linkMarco = await page.locator(".sheet .linkbox").innerText();
+check(/#invito=[0-9a-f]{32}$/.test(linkMarco) && !linkMarco.includes("1000001") && !/marco/i.test(linkMarco),
+  "041: nel link solo un codice casuale, né nome né codice Amway");
+const waMarco = decodeURIComponent((await page.locator(".sheet a.btn.wa").getAttribute("href")).replace("https://wa.me/?text=", ""));
+check(waMarco.startsWith("Ciao Marco! Sono Anna: ti mando Growup") && waMarco.includes("vale 7 giorni") && waMarco.endsWith("\n\n" + linkMarco),
+  "Invita: il messaggio per WhatsApp con il nome, i tre passi e il link");
+await page.screenshot({ path: S + "/e2e/21b-invito-link.png" });
+await page.click(".sheet button[data-act=chiudi]");
+const rigaMarco = await page.locator(".card.invita li", { hasText:"Marco Rossi" }).innerText(); check(rigaMarco.includes("Aperto fino al"), "Invita: l'invito è nella lista, aperto " + JSON.stringify(rigaMarco));
+await sync(page);
 await ctx.close();
 
-// 4. Marco entra dal link d'invito di Anna con il suo codice: ritrova il suo profilo
-({ ctx, page } = await apri({}, "#" + invitoAnna));
+// 4. Marco entra con il suo invito: ritrova il suo profilo (era già nella mappa di Anna)
+({ ctx, page } = await apri({}, linkMarco.slice(linkMarco.indexOf("#"))));
 await page.getByText("Ti ha invitato Anna Bianchi").waitFor();
-await page.fill("input[name=nome]", "Marco Rossi");
 await page.selectOption("select[name=qualifica]", "pin:6");
 await page.check("input[name=privacy]");
-await page.click("form button.primary");
-check(await page.locator(".errore").innerText() === "Scrivi il tuo codice Amway Partner.", "ingresso: il codice Amway è obbligatorio");
-await page.fill("input[name=codice_amway]", "2000001"); await page.fill("input[name=codice_amway2]", "2000001");
-await page.click("form button.primary");
-check((await page.locator(".errore").innerText()).startsWith("Con questo codice Amway c'è già qualcuno che usa l'app"), "ingresso: codice di chi usa già l'app");
-await page.fill("input[name=codice_amway]", "1000001"); await page.fill("input[name=codice_amway2]", "1000001");
 await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor();
 await page.click("button[data-act=obiettivo-dopo]");
@@ -248,10 +279,8 @@ check(DB.partners.find(p => p.nome === "Marco Rossi").id === marco.id && DB.part
   && DB.partners.filter(p => p.nome === "Marco Rossi").length === 1, "Marco ha preso il suo profilo: ora usa l'app, nessun doppione");
 
 // 5. Partner già avviato con pin 12%: niente data obbligatoria
-({ ctx, page } = await apri({}, "#RRRR22"));
+({ ctx, page } = await apri({}, invitoPer("R", "Bea Verdi", "2000005")));
 await page.getByText("Benvenuto in Growup").waitFor();
-await page.fill("input[name=nome]", "Bea Verdi");
-await page.fill("input[name=codice_amway]", "2000005"); await page.fill("input[name=codice_amway2]", "2000005");
 await page.selectOption("select[name=qualifica]", "pin:12");
 check(await page.getByText("(facoltativa)").isVisible(), "data facoltativa per chi ha già un pin");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
@@ -261,9 +290,8 @@ check(await page.getByText("12% raggiunto").isVisible(), "pin 12% mostrato");
 await sync(page); await ctx.close();
 
 // 6. Bronze Foundation con pagamenti (regressione)
-({ ctx, page } = await apri({}, "#RRRR22"));
-await page.fill("input[name=nome]", "Ciro Neri");
-await page.fill("input[name=codice_amway]", "2000006"); await page.fill("input[name=codice_amway2]", "2000006");
+({ ctx, page } = await apri({}, invitoPer("R", "Ciro Neri", "2000006")));
+await page.getByText("Benvenuto in Growup").waitFor();
 await page.selectOption("select[name=qualifica]", "foundation_9");
 check(await page.locator("input[name=mese]").isVisible(), "campi pagamenti visibili");
 await page.fill("input[name=mese]", "2026-07"); await page.fill("input[name=pagamenti]", "3");
@@ -767,9 +795,33 @@ await ctx.close();
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 check(await page.locator('meta[property="og:image"]').getAttribute("content") === "https://cl21-aes.github.io/growup-team/anteprima.png", "anteprima del link: immagine");
 await page.click("button[data-act=vista-gruppo]");
-const waInvito = decodeURIComponent((await page.locator(".card", { hasText:"Invita un nuovo partner" }).locator("a.wa").getAttribute("href")).split("text=")[1]);
-check(waInvito.startsWith("Ciao! Siamo Stefano e Alessia: ti mandiamo Growup") && waInvito.includes("3. Installa l'app") && waInvito.endsWith("\n\nhttp://127.0.0.1:8765/growup-team/#RRRR22"),
-  "invito: nome, tre passi e link (" + waInvito.slice(0, 60) + "…)");
+const cardInvita = page.locator(".card.invita");
+check(await cardInvita.locator("button[data-act=invita]").isVisible() && !(await cardInvita.locator(".linkbox, a.wa").count()),
+  "041: nella pagina Gruppo il pulsante «Invita», nessun link d'invito generico");
+// un invito si annulla e si rigenera
+await page.waitForTimeout(1000);
+await cardInvita.locator("button[data-act=invita]").click();
+await page.fill(".sheet input[name=nome]", "Prova Annulla");
+await page.fill(".sheet input[name=codice_amway]", "2111111"); await page.fill(".sheet input[name=codice_amway2]", "2111111");
+await page.click(".sheet button.primary");
+await page.locator(".sheet h2", { hasText:"Il link per Prova Annulla" }).waitFor();
+const linkAnnulla = await page.locator(".sheet .linkbox").innerText();
+const waR = decodeURIComponent((await page.locator(".sheet a.btn.wa").getAttribute("href")).replace("https://wa.me/?text=", ""));
+check(waR.startsWith("Ciao Prova! Siamo Stefano e Alessia: ti mandiamo Growup") && waR.includes("3. Installa l'app"), "invito: nome, tre passi e link");
+await page.click(".sheet button[data-act=chiudi]");
+await cardInvita.locator("li", { hasText:"Prova Annulla" }).locator("button[data-act=annulla-invito]").click();
+await page.getByText("Invito annullato").waitFor();
+check((await cardInvita.locator("li", { hasText:"Prova Annulla" }).innerText()).includes("Annullato"), "041: l'invito annullato resta nella lista come «Annullato»");
+await cardInvita.locator("li", { hasText:"Prova Annulla" }).locator("button[data-act=rigenera-invito]").click();
+await page.locator(".sheet h2", { hasText:"Il link per Prova Annulla" }).waitFor();
+const linkNuovo = await page.locator(".sheet .linkbox").innerText();
+check(linkNuovo !== linkAnnulla && /#invito=[0-9a-f]{32}$/.test(linkNuovo), "041: «Nuovo link» crea un link diverso");
+await page.click(".sheet button[data-act=chiudi]");
+check((await cardInvita.locator("li", { hasText:"Prova Annulla" }).innerText()).includes("Aperto fino al"), "041: rigenerato, l'invito è di nuovo aperto");
+await sync(page);
+const ctxVecchio = await apri({}, linkAnnulla.slice(linkAnnulla.indexOf("#")));
+await ctxVecchio.page.getByText("Link non valido").waitFor(); check(true, "041: il link vecchio non vale più");
+await ctxVecchio.ctx.close();
 check(await page.locator("button[data-act=condividi-immagine]").count() === 2, "invito: due immagini da inviare");
 check((await page.evaluate(async () => (await fetch("invito-stato.png")).status)) === 200, "immagine per lo stato pubblicata");
 await page.locator(".card", { hasText:"Invita un nuovo partner" }).screenshot({ path: S + "/e2e/21-invito.png" });
@@ -942,47 +994,29 @@ check(await page.locator(".albero.struttura li", { hasText:"Bianca Platini" }).g
 await page.locator(".albero.struttura li", { hasText:"Bianca Platini" }).locator("button[data-act=apri-scheda]").click();
 check(await page.getByText("Linee non visibili nel report").isVisible() && await page.locator(".dati-scheda").getByText("15%").isVisible(), "scheda del Platino: 15%, linee non visibili");
 await azioniScheda(page);
-check(await page.locator(".card", { hasText:"Inviti · solo admin" }).isVisible(), "admin: inviti nella scheda");
+check(!(await page.locator(".card", { hasText:"Inviti · solo admin" }).count()) && !(await page.locator("button[data-act=invito-sopra]").count()),
+  "041: niente più inviti degli admin nella scheda (né sotto una persona né «chi manca sopra»)");
 await sync(page);
 const bianca = DB.partners.find(p => p.codice_amway === "4100001");
-check((await page.locator(".card", { hasText:"Inviti · solo admin" }).locator(".linkbox").innerText()).endsWith("#" + bianca.codice_invito), "link d'invito sotto Bianca");
 await page.screenshot({ path: S + "/e2e/28-platino.png", fullPage:true });
 await page.click("button[data-act=vista-io]");
 check(await page.getByText("dal report Amway").first().isVisible() && await page.getByText("18% questo mese").isVisible(), "pagina Io: percentuale ufficiale dal report");
 await ctx.close();
-// Nora entra con il link sotto Bianca
-({ ctx, page } = await apri({}, "#" + bianca.codice_invito));
-await page.getByText("Ti ha invitato Bianca Platini").waitFor();
-await page.fill("input[name=nome]", "Nora Sotto"); await page.fill("input[name=codice_amway]", "4000002"); await page.fill("input[name=codice_amway2]", "4000002");
+// Nora entra con l'invito della radice: resta in attesa finché la mappa non la mette sotto Bianca
+({ ctx, page } = await apri({}, invitoPer("R", "Nora Sotto", "4000002")));
+await page.getByText("Ti ha invitato Stefano e Alessia").waitFor();
 await page.fill("input[name=data]", oggiStr); await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor();
 await sync(page); await ctx.close();
 const nora = DB.partners.find(p => p.nome === "Nora Sotto");
-check(nora.sponsor_id === bianca.id && nora.stato === "attivo", "Nora sotto Bianca, usa l'app");
-nora.confermato_il = new Date().toISOString();   // 033: come dopo un import della mappa che la mostra
-// la radice crea il link per chi manca tra Bianca e Nora
+check(nora.sponsor_id === "R" && nora.stato === "attivo" && !nora.confermato_il, "041: Nora entra in attesa sotto chi l'ha invitata");
+nora.sponsor_id = bianca.id; nora.confermato_il = new Date().toISOString();   // 033: come dopo un import della mappa che la mostra
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 check(await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator(".livello").innerText() === "3", "Nora sotto Bianca nella struttura della radice");
-await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator("button[data-act=apri-scheda]").click();
-await azioniScheda(page);
-await page.click("button[data-act=invito-sopra]");
-await page.click(".sheet button:has-text('Crea il link')");
-const linkSopra = await page.locator(".sheet .linkbox").innerText();
-check(/#S[A-Z0-9]{5}$/.test(linkSopra), "link speciale creato");
-await sync(page); await ctx.close();
-({ ctx, page } = await apri({}, "#" + linkSopra.split("#")[1]));
-await page.getByText("Ti ha invitato Bianca Platini").waitFor();
-await page.fill("input[name=nome]", "Mirco Mezzo"); await page.fill("input[name=codice_amway]", "4000003"); await page.fill("input[name=codice_amway2]", "4000003");
-await page.fill("input[name=data]", oggiStr); await page.check("input[name=privacy]"); await page.click("form button.primary");
-await page.getByText("Il tuo primo obiettivo").waitFor();
-await sync(page); await ctx.close();
-const mirco = DB.partners.find(p => p.nome === "Mirco Mezzo");
-check(mirco.sponsor_id === bianca.id && DB.partners.find(p => p.nome === "Nora Sotto").sponsor_id === mirco.id, "Mirco entra tra Bianca e Nora");
-({ ctx, page } = await apri({}, "#" + linkSopra.split("#")[1]));
-await page.getByText(/link d'invito non è valido|Entra in Growup|Benvenuto/).first().waitFor();
-check(!(await page.getByText("Ti ha invitato Bianca Platini").count()), "il link speciale vale una volta sola");
+check((await page.locator(".card.invita li", { hasText:"Nora Sotto" }).innerText()).includes("al suo posto nella mappa"),
+  "041: nei miei inviti Nora risulta al suo posto nella mappa");
 await ctx.close();
 
 // 20. Sicurezza: un nome malevolo non diventa codice; la pagina ha la Content Security Policy
@@ -1079,7 +1113,9 @@ await page.click(".sheet label.chip:has-text('Partner')");
 check(await page.locator(".sheet [data-per-esito=partner]").isVisible(), "Partner: c'è la prossima cosa");
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("Chiusura · Partner segnato").waitFor();
-check(await page.getByText("Mandagli il tuo link d'invito").isVisible(), "Partner: si manda il link d'invito di Growup");
+await page.click("button[data-act=invita]:has-text('Invitalo in Growup')");
+check(await page.locator(".sheet input[name=nome]").inputValue() === "Luigi Verdi", "041: Partner: «Invitalo in Growup» apre Invita con il nome già scritto");
+await page.click(".sheet button[data-act=chiudi]");
 await sync(page);
 const pianiDopo = DB.activities.filter(a => a.partner_id === "R" && a.tipo === "piano").length;
 await page.locator(".card", { hasText:"I passi" }).locator("li", { hasText:"Piano" }).locator("button[data-act=togli-passo]").click();
@@ -1551,10 +1587,8 @@ check(ordGino.length === 2 && ordGino.some(o => o.modo === "io" && o.data === og
 await ctx.close();
 
 // 28. Da confermare: si toglie dalla struttura; l'admin blocca l'app (dati inventati)
-({ ctx, page } = await apri({}, "#RRRR22"));
+({ ctx, page } = await apri({}, invitoPer("R", "Dino Prova", "2000099")));
 await page.getByText("Benvenuto in Growup").waitFor();
-await page.fill("input[name=nome]", "Dino Prova");
-await page.fill("input[name=codice_amway]", "2000099"); await page.fill("input[name=codice_amway2]", "2000099");
 await page.selectOption("select[name=qualifica]", "pin:6");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
@@ -1750,9 +1784,8 @@ await ctx.close();
 }
 
 // 32. Qualifiche oltre Argento: Platino all'ingresso, prossima qualifica, Volume Rubino dal report (dati inventati)
-({ ctx, page } = await apri({}, "#RRRR22"));
+({ ctx, page } = await apri({}, invitoPer("R", "Pia Prova", "7100001")));
 await page.getByText("Benvenuto in Growup").waitFor();
-await page.fill("input[name=nome]", "Pia Prova"); await page.fill("input[name=codice_amway]", "7100001"); await page.fill("input[name=codice_amway2]", "7100001");
 check(await page.locator("select[name=qualifica] option").count() >= 1 + 7 + 6 + 11
   && await page.locator("select[name=qualifica] option", { hasText:"Diamante Fondatore" }).count() === 1, "nel menu le 11 qualifiche oltre Argento");
 await page.selectOption("select[name=qualifica]", "oro");
@@ -1810,9 +1843,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
 // 33. Il percorso oltre Argento: Argento → Oro (3 mesi al 21%) → Platino (6 mesi, 3 di fila), report dei mesi passati
 {
   const mm = n => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7); };
-  ({ ctx, page } = await apri({}, "#RRRR22"));
+  ({ ctx, page } = await apri({}, invitoPer("R", "Gaia Prova", "7200001")));
   await page.getByText("Benvenuto in Growup").waitFor();
-  await page.fill("input[name=nome]", "Gaia Prova"); await page.fill("input[name=codice_amway]", "7200001"); await page.fill("input[name=codice_amway2]", "7200001");
   await page.selectOption("select[name=qualifica]", "argento");
   check(await page.locator("[data-etichetta-mese]").innerText() === "Mese della prima qualifica Argento" && await page.locator("[data-mostra=pagamenti]").isHidden(),
     "Argento: si chiede il mese della prima qualifica Argento (senza pagamenti)");
@@ -2059,9 +2091,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await sync(page); await ctx.close();
   check((DB.numeri.filter(x => x.partner_id === "R" && x.mese === oggiStr.slice(0, 7)).pop() || {}).vpp === 300, "un file più vecchio non cambia i miei numeri");
   // chi è appena entrato (in attesa) non può importare
-  ({ ctx, page } = await apri({}, "#RRRR22"));
+  ({ ctx, page } = await apri({}, invitoPer("R", "Quinto Prova", "7500001")));
   await page.getByText("Benvenuto in Growup").waitFor();
-  await page.fill("input[name=nome]", "Quinto Prova"); await page.fill("input[name=codice_amway]", "7500001"); await page.fill("input[name=codice_amway2]", "7500001");
   await page.selectOption("select[name=qualifica]", "pin:3");
   await page.check("input[name=privacy]"); await page.click("form button.primary");
   await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");

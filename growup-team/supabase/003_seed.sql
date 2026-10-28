@@ -47,11 +47,9 @@ insert into public.settings (chiave, valore, nota) values
    'Mostrato sotto ogni cifra');
 
 -- ------------------------------------------------------------
--- LA RADICE: Stefano e Alessia, un solo profilo e un solo codice d'invito.
--- Questo blocco stampa due link:
---   link_personale  → la vostra chiave: apritelo su entrambi i telefoni e tenetelo
---                     per voi (per esempio nei "Messaggi salvati" di Telegram)
---   link_invito     → da mandare ai vostri partner diretti
+-- LA RADICE: Stefano e Alessia, un solo profilo.
+-- Questo blocco stampa il link personale: la vostra chiave. Apritelo su entrambi i telefoni e tenetelo
+-- per voi (per esempio nei "Messaggi salvati" di Telegram). I partner si invitano dall'app, con «Invita» (041).
 -- La chiave si vede SOLO adesso: nel database resta solo la sua impronta.
 -- Se la perdete: select public.nuova_chiave_per(id) from public.partners where is_admin;
 -- ------------------------------------------------------------
@@ -60,8 +58,7 @@ with nuova as (
 ), radice as (
   insert into public.partners (nome, is_admin, stato, chiave_hash)
   select 'Stefano e Alessia', true, 'gestito', public.impronta(k) from nuova
-  returning codice_invito
+  returning id
 )
-select 'https://cl21-aes.github.io/growup-team/#chiave=' || nuova.k as link_personale,
-       'https://cl21-aes.github.io/growup-team/#' || radice.codice_invito as link_invito
+select 'https://cl21-aes.github.io/growup-team/#chiave=' || nuova.k as link_personale
 from nuova, radice;

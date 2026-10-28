@@ -39,12 +39,14 @@ File di riferimento nel repository `CL21-AeS/CL21-AeS.github.io`, cartella `grow
   nell'app che scarica un JSON da tenere su Google Drive ogni mese.
 
 ## Accesso senza email
-- **Link d'invito** `…/#CODICE` (codice dello sponsor): la persona scrive nome e qualifica ed entra sotto lo sponsor.
+- **Invito personale** `…/#invito=<32 esadecimali>` (Growup 041): chi invita scrive nome e codice Amway della persona
+  (restano nel database, nel link solo un codice casuale, di cui si salva l'impronta); vale una volta e 7 giorni, si
+  annulla o si rigenera. Mai un link d'invito generico: chi lo riceve potrebbe girarlo o usarlo al posto di un altro.
 - **Link personale** `…/#chiave=<32 esadecimali>`: la chiave del profilo; ognuno se la manda su WhatsApp
   (chat con sé stesso) o Telegram (Messaggi salvati). Nel database solo l'impronta sha256.
 - Ogni telefono entra con un **accesso anonimo** Supabase; la tabella `accessi` collega l'utente anonimo al
   profilo. Più telefoni sullo stesso profilo (es. Stefano e Alessia) è normale.
-- Il link d'invito e il link personale si tolgono dalla barra degli indirizzi appena letti.
+- L'invito e il link personale si tolgono dalla barra degli indirizzi appena letti.
 - Prima del lancio pubblico: captcha (Cloudflare Turnstile) e limite "anonymous sign-ins" più alto.
 
 ## Telefoni (collaudo)

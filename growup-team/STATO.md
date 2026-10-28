@@ -98,13 +98,25 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
+**28 ottobre — Si entra solo su invito** (gruppo B, migrazione **041**, decisioni di Stefano; **da applicare su Supabase
+subito dopo l'unione della PR**): niente più link d'invito generico. In Gruppo la voce **«Invita»**: chi è già nella mappa
+(o un admin) scrive nome e codice Amway del nuovo partner e ottiene un link con solo un codice casuale, che vale una volta
+e 7 giorni; nella lista «I tuoi inviti» lo annulla o crea un nuovo link. Chi entra sceglie solo qualifica e data (nome e
+codice li ha scritti chi invita). Se il codice è già nella mappa l'invito lo crea solo chi sta sopra quella persona, e chi
+entra prende subito il suo posto; altrimenti resta «in attesa» sotto chi l'ha invitato finché un import di chi l'ha
+invitato o della sua upline non lo mette sotto il suo sponsor vero (`importa_mappa` non cambia). Notifiche senza nomi
+(`notifiche_eventi`, al giro dei 15 minuti): a chi ha invitato quando il nuovo entra e quando va al suo posto; allo
+sponsor vero, se è un altro e usa l'app. Spariscono l'«invito sopra» e il link personale per chi non è mai entrato.
+Dalla Lista, chi ha detto sì come partner ha «Invitalo in Growup» (apre Invita con il nome). Test: permessi (anche sul
+riuso, la scadenza, l'annullo, la rigenerazione, gli avvisi) e interfaccia (593 controlli). App v53.
+
 **28 ottobre — Controllo completo e test affidabili** (gruppo A di 4, richiesta di Stefano dopo il controllo di sicurezza,
 RLS e interfaccia): i test del database si lanciano con `sh test/db.sh` e **si fermano al primo errore**. Prima, se
 l'installazione si fermava a metà (a `stub_supabase.sql` mancava il ruolo `service_role`, quindi tutto dalla 039 in poi
 non veniva installato) l'ultima riga di `tests_rls.sql` diceva comunque «TUTTI I CONTROLLI SUPERATI». Ora quella riga
 lo dice solo se i controlli sono arrivati in fondo, e lo script controlla che ogni tabella e funzione esista. Il test
 dell'interfaccia conta come errore anche un file dell'app che non arriva (404) e, se si blocca, dice perché.
-Prossimi gruppi, una PR ciascuno: B) entrare solo con un invito personale; C) copia di sicurezza e «in attesa»;
+Prossimi gruppi, una PR ciascuno: B) entrare solo con un invito personale (fatto, sopra); C) copia di sicurezza e «in attesa»;
 D) poteri da admin nel proprio gruppo, tabelle di impostazioni solo con profilo, notifiche di prova, ritocchi tecnici;
 E) grafica, in una sessione a parte.
 
