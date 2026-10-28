@@ -98,9 +98,15 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
-**28 ottobre — Grafica, punto 4 di 7: tabella Stabilità e numeri**: nella Guida la tabella diventa una riga per voce
-con «X su Y» verso il prossimo livello e una barretta; il colore d'attenzione solo se sei sotto il livello che hai già.
-Tutti i numeri nel carattere del testo, con cifre allineate (GRAFICA.md). App v59.
+**28 ottobre — Grafica, punto 4 di 7: Stabilità della tua rete** (migrazione 044, decisioni di Stefano): la scheda riproduce
+la tabella «Verifica la tua attività - Stabilità» di Cum Laude 21. La percentuale si raggiunge solo con il fatturato; i numeri
+della tabella servono a sostenerla nel tempo. I riferimenti stanno nelle impostazioni (`stabilita_cl21`). Mese di riferimento:
+l'ultimo mese chiuso con la mappa importata (chi non ne ha guarda il mese in corso), scritto in evidenza; se manca la mappa del
+mese appena chiuso, l'avviso «Importa la mappa di … per aggiornare». In cima «Livello raggiunto» (dal fatturato del mese) e
+«Rete solida fino al» (il livello più alto sostenuto in tutte le righe); per riga il numero e le sette caselle (verde
+sostenuto, ambra raggiunto ma non sostenuto, neutro sopra), «Questo mese finora» per nuovi iscritti e codici oltre 200 VP;
+in fondo «Su cosa lavorare». Training Day e Convention: l'ultimo evento, scritto a mano. Tutti i numeri nel carattere del
+testo. App v59.
 
 **28 ottobre — Grafica, punto 3 di 7: colori della profondità** (palette approvata da Stefano): nel Gruppo il livello 1
 (chi guarda) è bianco e non si ripete; dal 2 il ciclo blu, viola, petrolio, rosa, nocciola, poi si riparte. La numerazione

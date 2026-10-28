@@ -37,8 +37,10 @@ petrolio `#19788b`, rosa `#b83d8b`, nocciola `#87684c`; dal 7 si riparte. Niente
 ## Numeri e tabella Stabilità (grafica punto 4)
 
 I numeri sono nel carattere del testo (Manrope) con cifre allineate (`tabular-nums`); Cormorant resta per titoli e
-«perché». La Stabilità è una riga per voce: «X su Y» (Y = prossimo livello) con barretta verde; terracotta (`--rame`)
-e «Ne manca N per il X%» solo se sei sotto il livello che hai già; spunta verde quando arrivi alla soglia.
+«perché». La Stabilità riproduce la tabella «Verifica la tua attività - Stabilità» di Cum Laude 21: sette caselle per riga
+(una per livello), verde (`--progresso`) dove la rete sostiene il livello, ambra (`--giallo`) per i livelli già raggiunti
+con il fatturato ma non sostenuti, neutro sopra; la colonna del livello raggiunto ha il bordo pesca (`--scelta`).
+Il mese di riferimento sta in una pillola pesca chiara. Niente barre: i numeri non sono un traguardo verso la percentuale.
 
 ## Icona
 

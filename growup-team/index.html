@@ -328,19 +328,34 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .numeri-guida span{font-size:11px;color:var(--ink2)}
 .guida-passi ol.passi{margin:8px 0 0;padding-left:20px}
 .guida-passi ol.passi li{margin-top:8px}
-ul.stabilita{list-style:none;margin:12px 0 0;padding:0}
-ul.stabilita li{padding:9px 0;border-top:1px solid var(--line)}
+.guida-stabilita .stab-mese{display:inline-block;margin:12px 0 0;padding:4px 10px;border-radius:99px;background:var(--scelta-wash);font-size:13px}
+.guida-stabilita .stab-avviso{margin:6px 0 0;color:var(--giallo);font-weight:600}
+.stab-dati{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.stab-dati>div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:12px;background:var(--traccia)}
+.stab-dati span{font-size:12px;color:var(--ink2)}
+.stab-dati b{font-size:22px}
+.stab-personali{display:flex;align-items:center;gap:10px;margin-top:8px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;font-size:14px}
+.stab-personali>span{flex:1;min-width:0}
+.stab-personali small,ul.stabilita .nome small{display:block;font-size:12px;color:var(--ink2)}
+.guida-stabilita .celle{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.guida-stabilita .celle.livelli{margin-top:14px}
+.guida-stabilita .cella{display:block;text-align:center;padding:4px 0;border-radius:7px;font-size:13px;font-variant-numeric:tabular-nums;
+  color:var(--ink2);background:color-mix(in srgb,var(--traccia) 60%,transparent)}
+.guida-stabilita .celle.livelli .cella{background:none;font-size:11px;font-weight:700;padding:2px 0}
+.guida-stabilita .cella.ok{background:color-mix(in srgb,var(--progresso) 16%,transparent);color:var(--progresso);font-weight:700}
+.guida-stabilita .cella.att{background:color-mix(in srgb,var(--giallo) 24%,transparent);color:var(--giallo);font-weight:700}
+.guida-stabilita .cella.liv{box-shadow:inset 0 0 0 2px var(--scelta)}
+.guida-stabilita .celle.livelli .cella.liv{color:var(--ink)}
+ul.stabilita{list-style:none;margin:4px 0 0;padding:0}
+ul.stabilita li{padding:9px 0 10px;border-top:1px solid var(--line)}
 ul.stabilita li:first-child{border-top:0}
-ul.stabilita .voce{display:flex;align-items:center;gap:10px;font-size:14px}
+ul.stabilita .voce{display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:6px}
 ul.stabilita .nome{flex:1;min-width:0}
-ul.stabilita .valore{white-space:nowrap;font-variant-numeric:tabular-nums}
-ul.stabilita .su{color:var(--ink2);font-size:13px}
-ul.stabilita .ok{color:var(--progresso);font-weight:700}
-ul.stabilita .bar{height:6px;margin-top:6px}
-ul.stabilita li.sotto .bar>i{background:var(--rame)}
-ul.stabilita .manca{color:var(--rame);font-weight:600;margin:4px 0 0}
-ul.stabilita li.personali{background:var(--traccia);border-radius:10px;padding:9px 10px;border-top:0}
-ul.stabilita li.personali+li{border-top:0}
+ul.stabilita .tuo{white-space:nowrap;font-variant-numeric:tabular-nums}
+ul.stabilita .finora{margin:5px 0 0;color:var(--ink2)}
+.stab-lavoro{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.stab-lavoro ul{margin:6px 0 0;padding-left:18px;font-size:14px}
+.stab-lavoro li{margin:3px 0}
 .campo-cl21{min-width:36px;border:1px solid var(--line);border-radius:8px;padding:2px 8px;background:var(--bg);color:inherit;font:inherit;font-weight:700;cursor:pointer}
 .abitudine{border-top:1px solid var(--line);padding:10px 0 2px}
 .abitudine:first-of-type{border-top:0}

@@ -1307,6 +1307,12 @@ begin
     perform growup_test.come(ua);
     perform growup_test.ok((select count(*) from public.stage_requirements) = 19 and (select count(*) from public.settings) > 0,
                            '043: con un profilo sì');
+    perform growup_test.ok(jsonb_array_length((select valore->'livelli' from public.settings where chiave = 'stabilita_cl21')) = 7
+                           and (select bool_and(jsonb_array_length(rg->'soglie') = 7) from public.settings s,
+                                jsonb_array_elements(s.valore->'righe') rg where s.chiave = 'stabilita_cl21'),
+                           '044: i riferimenti della Stabilità (7 livelli, una soglia per livello) si leggono con un profilo');
+    perform growup_test.ok(growup_test.righe($q$update public.settings set valore = '{}' where chiave = 'stabilita_cl21'$q$) = 0,
+                           '044: un partner non cambia i riferimenti della Stabilità');
 
     -- il punto di partenza solo da modifica_partenza
     perform growup_test.deve_fallire($q$update public.partners set qualifica_iniziale = 'argento', pagamenti_iniziali = 3

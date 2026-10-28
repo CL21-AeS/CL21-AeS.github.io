@@ -21,7 +21,14 @@ const DB = { partners:[{id:"R",nome:"Stefano e Alessia",codice_invito:"RRRR22",c
     {codice:"900002",nome:"Shampoo Prova",formato:"250 ml",categoria:"Capelli",prezzo_cliente:12.4,prezzo_partner:10.3,vp:4.1,attivo:true},
     {codice:"900003",nome:"Vecchio Prova",formato:"1 pz",categoria:"Casa",prezzo_cliente:5,prezzo_partner:4,vp:1.5,attivo:false}],
   accessi:[], aggiunti:[], anon:0, activities:[], goals:[], mgoals:[], joins:[], stages,
-  settings:[{chiave:"obiettivi_proposti",valore:{contatti:10,piani:3,vp_mese:100}},{chiave:"fonte_guadagni",valore:"Simulatore di reddito ufficiale Amway, ottobre 2026"},{chiave:"avviso_guadagni",valore:"Cifre indicative."}]};
+  settings:[{chiave:"obiettivi_proposti",valore:{contatti:10,piani:3,vp_mese:100}},{chiave:"fonte_guadagni",valore:"Simulatore di reddito ufficiale Amway, ottobre 2026"},{chiave:"avviso_guadagni",valore:"Cifre indicative."},
+    /* 044: la tabella «Verifica la tua attività - Stabilità» di Cum Laude 21 */
+    {chiave:"stabilita_cl21",valore:{livelli:[3,6,9,12,15,18,21],righe:[
+      {k:"nuovi_gruppo",nome:"Nuovi iscritti nel gruppo del mese",soglie:[1,3,5,8,10,15,20]},
+      {k:"oltre_200",nome:"Codici che fatturano più di 200 VP",soglie:[1,3,5,10,17,30,42]},
+      {k:"app_cl21",nome:"Codici iscritti all'app CumLaude21",soglie:[1,2,3,7,12,21,30]},
+      {k:"training_day",nome:"Codici al Training Day",soglie:[1,3,5,10,17,30,42]},
+      {k:"convention",nome:"Codici alla Convention",soglie:[1,2,3,7,12,21,30]}]}}]};
 /* 041: un invito personale pronto, come se l'avesse creato «da»: restituisce l'indirizzo da aprire */
 const invitoPer = (da, nome, codice, extra) => {
   const c = Array.from({ length:32 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
