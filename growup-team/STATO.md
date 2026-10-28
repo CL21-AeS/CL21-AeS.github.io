@@ -98,6 +98,12 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
+**28 ottobre — Grafica, punto 1 di 7: sotto-linguette nel tema scuro** (richiesta di Stefano, con la skill frontend-design,
+stessa identità e colori): la sotto-linguetta scelta (Il mio giorno/Guida, Target/Lista/Clienti) nel tema scuro è chiara e
+piena (avorio, testo smeraldo) come nel chiaro, non più scura delle altre. Variabili `--linguetta` e `--linguetta-ink`.
+Schermate prima/dopo nella pagina privata «Growup · grafica prima e dopo». Seguono i punti 2-7 (colori con significato,
+profondità, Stabilità, Persone, Gruppo, contrasto e a capo), una PR ciascuno. App v56.
+
 **28 ottobre — Admin nel proprio gruppo e ritocchi** (gruppo D, migrazione **043** e Edge Function `invia-notifiche`
 aggiornata, da applicare/pubblicare dopo l'unione): nuovo link personale, blocco, «Togli» e codici tolti solo nel gruppo
 dell'admin; impostazioni, tappe e livelli solo con un profilo (l'ingresso riceve le qualifiche con l'invito); il punto di

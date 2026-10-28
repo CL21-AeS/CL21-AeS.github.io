@@ -11,6 +11,7 @@ I colori stanno tutti nelle variabili su `:root` di `index.html` (chiaro) e nei 
 | testata | sfumatura `#0a3a2c` → `#13604a` | `#04100b` → `#0b2c21` |
 | accento (pulsanti principali) | smeraldo `#0a3a2c` | ambra `#e2a46f` |
 | barre di avanzamento | rame `#c26a3d` → `#d98b4f` | `#e08a5a` → `#f0a76f` |
+| sotto-linguetta scelta (Il mio giorno/Guida, Target/Lista/Clienti) | bianca `#ffffff`, testo `#10231c` | avorio `#f7f0e3`, testo `#0a3a2c` |
 | + Contatto / + Piano / + Ordine | `#0a3a2c` / `#c26a3d` / `#13795b` | `#13604a` / `#b8602f` / `#1f8a68` |
 | stato: ok · sotto soglia · ▼ | `#13795b` · `#9a6a00` · `#b42318` | `#34c08f` · `#e2b45a` · `#ff7b6b` |
 
