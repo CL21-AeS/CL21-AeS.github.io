@@ -107,7 +107,17 @@ small,.small{font-size:13px;color:var(--ink2)}
 .card.visione .small,.card.visione .nota{color:var(--head-ink2)}
 .card.visione .num{color:var(--oro);font-size:24px}
 .row{display:flex;gap:10px;align-items:center}
-.row.wrap{flex-wrap:wrap}
+.row.wrap{flex-wrap:wrap;max-width:none;margin:0;padding:0}
+/* filtri su una riga sola che scorre di lato, da bordo a bordo della scheda */
+.filtri{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  margin-left:calc(var(--pad) * -1);margin-right:calc(var(--pad) * -1);padding:2px var(--pad);scroll-padding:0 var(--pad)}
+.filtri::-webkit-scrollbar{display:none}
+.filtri .btn{flex:none;white-space:nowrap}
+/* titolo della sezione e pulsanti: i pulsanti non vanno mai a capo; se non c'è posto scendono sotto, a destra */
+.testa-sezione{flex-wrap:wrap;row-gap:8px}
+.testa-sezione .eyebrow{white-space:nowrap}
+.testa-sezione .pulsanti{display:flex;gap:6px;margin-left:auto;flex:none}
+.testa-sezione .pulsanti .btn{white-space:nowrap}
 .spread{display:flex;gap:10px;align-items:center;justify-content:space-between}
 .grow{flex:1;min-width:0}
 .stack>*+*{margin-top:10px}

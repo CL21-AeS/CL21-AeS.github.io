@@ -98,6 +98,11 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
+**28 ottobre — Grafica, punto 5 di 7: Persone** (scelte di Stefano): i filtri di Lista e Clienti stanno su una riga sola
+che scorre di lato; i pulsanti in alto non vanno mai a capo e si accorciano in «Importa» e «+ Nome» (Lista), «Importa» e
+«+ Cliente» (Clienti). Tolto anche il margine in più che spostava le righe di pulsanti con la classe `wrap` (anche nei
+filtri dell'import). App v60.
+
 **28 ottobre — Grafica, punto 4 di 7: Stabilità della tua rete** (migrazione 044, decisioni di Stefano): la scheda riproduce
 la tabella «Verifica la tua attività - Stabilità» di Cum Laude 21. La percentuale si raggiunge solo con il fatturato; i numeri
 della tabella servono a sostenerla nel tempo. I riferimenti stanno nelle impostazioni (`stabilita_cl21`). Mese di riferimento:
