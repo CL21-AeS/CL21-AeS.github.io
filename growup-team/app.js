@@ -2611,11 +2611,17 @@ function vInvita(){
   </div>`;
 }
 
+/* le icone dei tre pulsanti in basso (tratto, colore del testo): persona, calendario, carrello */
+const ICONE_AZIONI = {
+  contatto:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>`,
+  piano:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
+  ordine:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20.5" r="1.2"/><circle cx="17" cy="20.5" r="1.2"/></svg>`
+};
 function vAzioni(){
   return `<div class="azioni"><div class="in">
-    <button class="btn primary c1" data-act="contatto-rapido">+ Contatto<b>${num(fattoSettimana("contatto"))} questa sett.</b></button>
-    <button class="btn primary c2" data-act="piano-rapido">+ Piano<b>${num(fattoSettimana("piano"))} questa sett.</b></button>
-    <button class="btn primary c3" data-act="${st.target ? "ordine" : "ordini"}">+ Ordine<b>${num(vpMese(meseDi(oggi())))} VP nel mese</b></button>
+    <button class="btn primary c1" data-act="contatto-rapido"><span class="ico">${ICONE_AZIONI.contatto}+ Contatto</span><b>${num(fattoSettimana("contatto"))} questa sett.</b></button>
+    <button class="btn primary c2" data-act="piano-rapido"><span class="ico">${ICONE_AZIONI.piano}+ Piano</span><b>${num(fattoSettimana("piano"))} questa sett.</b></button>
+    <button class="btn primary c3" data-act="${st.target ? "ordine" : "ordini"}"><span class="ico">${ICONE_AZIONI.ordine}+ Ordine</span><b>${num(vpMese(meseDi(oggi())))} VP · mese</b></button>
   </div></div>`;
 }
 
