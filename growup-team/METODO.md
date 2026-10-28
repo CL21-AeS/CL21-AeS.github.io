@@ -66,7 +66,8 @@ dice diversamente. Gli esempi concreti stanno nei file di `growup-team/` citati 
 
 ### Controlli prima di ogni PR
 - **Permessi**: `tests_rls.sql` è un unico blocco che crea dati di prova, controlla tutto e annulla alla fine
-  ("TUTTI I CONTROLLI SUPERATI"); si prova su Postgres locale con `test/stub_supabase.sql` e sul progetto.
+  ("TUTTI I CONTROLLI SUPERATI"); si prova su Postgres locale con `sh test/db.sh` (si ferma al primo errore
+  dell'installazione o dei controlli) e sul progetto.
 - **Interfaccia**: test con Playwright e un finto Supabase (`test/e2e/mock.js`), istruzioni in `test/LEGGIMI.md`;
   screenshot di ogni schermata nuova, in chiaro e in scuro, guardati prima di consegnare.
 - La PR spiega cosa cambia in parole semplici e cosa è stato verificato.

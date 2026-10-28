@@ -23,8 +23,13 @@ const DB = { partners:[{id:"R",nome:"Stefano e Alessia",codice_invito:"RRRR22",c
   accessi:[], aggiunti:[], anon:0, activities:[], goals:[], mgoals:[], joins:[], stages,
   settings:[{chiave:"obiettivi_proposti",valore:{contatti:10,piani:3,vp_mese:100}},{chiave:"fonte_guadagni",valore:"Simulatore di reddito ufficiale Amway, ottobre 2026"},{chiave:"avviso_guadagni",valore:"Cifre indicative."}]};
 const errori = [];
+/* se un passo si blocca (per esempio un file dell'app che non arriva), si vede perché e il test esce con errore */
+process.on("uncaughtException", e => { console.log("FAIL: test interrotto:", String(e).split("\n")[0]);
+  if(errori.length) console.log("ERRORI CONSOLE:", errori); process.exit(1); });
 let ok = 0; const check = (c, m) => { if(!c){ console.log("FAIL:", m); process.exitCode = 1; } else { ok++; } };
 const browser = await chromium.launch();
+/* i file dell'app devono arrivare tutti: un 404 sul nostro sito è un errore (la console dice solo "Failed to load resource") */
+const fileMancanti = pg => pg.on("response", r => { if(r.status() >= 400 && r.url().startsWith(BASE)) errori.push(`HTTP ${r.status()} ${r.url()}`); });
 async function apri(ctxOpts, hash){
   /* di base "riduci animazioni": i controlli non aspettano i movimenti; il movimento ha il suo test */
   const ctx = await browser.newContext(Object.assign({ viewport:{width:390,height:844}, locale:"it-IT", timezoneId:"Europe/Rome", bypassCSP:true, reducedMotion:"reduce" }, ctxOpts));
@@ -35,6 +40,7 @@ async function apri(ctxOpts, hash){
   const page = await ctx.newPage();
   page.on("console", m => { if(m.type() === "error" && !/jsdelivr|ERR_FAILED|Failed to load resource/.test(m.text())) errori.push(m.text()); });
   page.on("pageerror", e => errori.push(String(e)));
+  fileMancanti(page);
   page.on("dialog", d => d.accept());
   await page.addInitScript(([db, m]) => { window.__DB = db; eval(m); }, [DB, mock]);
   await page.goto(BASE + (hash || ""));

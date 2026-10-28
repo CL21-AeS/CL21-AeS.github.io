@@ -1085,8 +1085,11 @@ begin
     if sqlerrm <> 'FINE_CONTROLLI' then raise; end if;
   end;
   raise notice 'TUTTI I CONTROLLI SUPERATI';
+  perform set_config('growup_test.esito', 'superati', false);  -- solo se si arriva qui senza errori
 end $test$;
 
 drop schema growup_test cascade;
 
-select 'TUTTI I CONTROLLI SUPERATI' as esito;
+-- l'esito si legge dal blocco qui sopra: se un controllo è fallito (o non è partito), qui non c'è scritto «superati»
+select case when current_setting('growup_test.esito', true) = 'superati' then 'TUTTI I CONTROLLI SUPERATI'
+            else 'CONTROLLI NON COMPLETATI: guarda il primo errore qui sopra' end as esito;
