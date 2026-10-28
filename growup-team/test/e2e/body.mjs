@@ -230,18 +230,20 @@ await page.screenshot({ path: S + "/e2e/11-scheda-gestito.png", fullPage:true })
 // 041: Anna (nella mappa) invita Marco dalla voce «Invita» della pagina Gruppo
 await page.locator("button[data-act=vista-gruppo]").first().click();
 await page.waitForTimeout(1500);   // finiti i salvataggi in corso: un ridisegno svuoterebbe i campi del foglio
+/* scrive nei campi del foglio e controlla che ci siano ancora (un ridisegno in arrivo li svuoterebbe: si riscrivono) */
+const compila = async campi => { for(let t = 0; t < 4; t++){ for(const [sel, v] of campi) await page.fill(sel, v); await page.waitForTimeout(200);
+  const ok = await Promise.all(campi.map(([sel, v]) => page.inputValue(sel).then(x => x === v))); if(ok.every(Boolean)) return; } };
 await page.locator(".card.invita button[data-act=invita]").click();
 await page.locator(".sheet h2", { hasText:"Invita un nuovo partner" }).waitFor();
 await page.click(".sheet button.primary");
 check(await page.locator(".sheet .errore").innerText() === "Scrivi nome e cognome della persona.", "Invita: serve il nome");
-await page.fill(".sheet input[name=nome]", "Marco Rossi");
-await page.fill(".sheet input[name=codice_amway]", "1000001"); await page.fill(".sheet input[name=codice_amway2]", "1000010");
+await compila([[".sheet input[name=nome]", "Marco Rossi"], [".sheet input[name=codice_amway]", "1000001"], [".sheet input[name=codice_amway2]", "1000010"]]);
 await page.click(".sheet button.primary");
 check(await page.locator(".sheet .errore").innerText() === "I due codici non sono uguali: controllali.", "Invita: i due codici devono essere uguali");
-await page.fill(".sheet input[name=codice_amway]", "2000001"); await page.fill(".sheet input[name=codice_amway2]", "2000001");
+await compila([[".sheet input[name=nome]", "Marco Rossi"], [".sheet input[name=codice_amway]", "2000001"], [".sheet input[name=codice_amway2]", "2000001"]]);
 await page.click(".sheet button.primary");
 check(await page.locator(".sheet .errore").innerText() === "Con questo codice Amway c'è già qualcuno che usa l'app.", "Invita: non si invita chi usa già l'app");
-await page.fill(".sheet input[name=codice_amway]", "1000001"); await page.fill(".sheet input[name=codice_amway2]", "1000001");
+await compila([[".sheet input[name=nome]", "Marco Rossi"], [".sheet input[name=codice_amway]", "1000001"], [".sheet input[name=codice_amway2]", "1000001"]]);
 await page.click(".sheet button.primary");
 await page.locator(".sheet h2", { hasText:"Il link per Marco Rossi" }).waitFor();
 const linkMarco = await page.locator(".sheet .linkbox").innerText();
@@ -1015,6 +1017,9 @@ nora.sponsor_id = bianca.id; nora.confermato_il = new Date().toISOString();   //
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 check(await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator(".livello").innerText() === "3", "Nora sotto Bianca nella struttura della radice");
+check(await page.locator(".albero.struttura li.io .livello").getAttribute("class") === "livello l0"
+  && await page.locator(".albero.struttura li", { hasText:"Nora Sotto" }).locator(".livello").getAttribute("class") === "livello l2",
+  "grafica 3: il livello 1 (chi guarda) è bianco, il 3 è il secondo colore del ciclo");
 check((await page.locator(".card.invita li", { hasText:"Nora Sotto" }).innerText()).includes("al suo posto nella mappa"),
   "041: nei miei inviti Nora risulta al suo posto nella mappa");
 await ctx.close();

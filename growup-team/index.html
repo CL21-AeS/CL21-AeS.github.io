@@ -260,9 +260,13 @@ ul.imp li:first-child{border-top:0}
 .cerca{margin-top:12px}
 .livello{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;
   font-variant-numeric:tabular-nums;color:#fff;background:var(--lv)}
-.livello.l0{--lv:#0a3a2c} .livello.l1{--lv:#c26a3d} .livello.l2{--lv:#13795b} .livello.l3{--lv:#8a6414}
-:root[data-theme="dark"] .livello.l0{--lv:#1f7a5c}
-@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .livello.l0{--lv:#1f7a5c} }
+/* profondità (grafica punto 3): il livello 1 è bianco ed è solo di chi guarda; poi un ciclo di 5 colori
+   (blu, viola, petrolio, rosa, nocciola), senza verde, ambra, rosso né grigio (il grigio è di chi non ha l'app).
+   Numero bianco a 5,1:1 sui colori; il cerchio si vede anche sul fondo scuro (3,3:1) */
+.livello.l0{--lv:#ffffff;color:#10231c;box-shadow:inset 0 0 0 1.5px var(--ink3)}
+.livello.l1{--lv:#396cc4} .livello.l2{--lv:#7f59c0} .livello.l3{--lv:#19788b} .livello.l4{--lv:#b83d8b} .livello.l5{--lv:#87684c}
+:root[data-theme="dark"] .livello.l0{box-shadow:none}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .livello.l0{box-shadow:none} }
 .piega{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:99px;
   font:inherit;font-size:12px;font-weight:700;padding:3px 9px;min-height:30px;cursor:pointer;white-space:nowrap}
 .azioni{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);border-top:1px solid var(--line);
