@@ -211,7 +211,11 @@
     inAttesa: async () => { const io = mio(); if(!io) return [];
       return sotto(io.id).filter(p => p.stato !== "gestito" && p.confermato_il === null && !p.is_admin)
         .map(p => ({ id:p.id, nome:p.nome, sponsor_id:p.sponsor_id, sponsor_nome:(db.partners.find(x => x.id === p.sponsor_id) || {}).nome || null,
-          creato_il:p.creato_il || null, mio:p.sponsor_id === io.id, codice_amway:p.codice_amway || null })); },
+          creato_il:p.creato_il || null, mio:p.sponsor_id === io.id })); },
+    /* 042: chi è in attesa nel mio gruppo ed è tra i codici del report */
+    attesaNelReport: async codici => { const io = mio(); if(!io) throw new Error("non_autenticato");
+      return sotto(io.id).filter(p => p.stato !== "gestito" && p.confermato_il === null && !p.is_admin && (codici || []).includes(p.codice_amway))
+        .map(p => ({ id:p.id, nome:p.nome, codice:p.codice_amway })); },
     mioReport: async (pid, dal) => (db.numeri || []).filter(x => x.partner_id === pid && x === numeroDi(pid, x.mese) && x.mese + "-01" >= dal)
       .map(x => ({ mese:x.mese + "-01", vpp:x.vpp, vpg:x.vpg, percentuale:x.percentuale, dati_al:x.dati_al || "9999-12-31T00:00:00Z", importato_da:x.visto_da })),
     /* 034: la bozza d'ordine e lo storico, solo miei */

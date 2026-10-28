@@ -86,6 +86,8 @@ function creaApi(){
     importaMappa: a => q(sb.rpc("importa_mappa", a)),
     salvaMesePassato: a => q(sb.rpc("salva_mese_passato", a)),
     inAttesa:     () => q(sb.rpc("in_attesa")),
+    /* 042: chi è in attesa ed è nel report che sto importando (il codice torna solo se era già nel file) */
+    attesaNelReport: codici => q(sb.rpc("attesa_nel_report", { p_codici:codici })),
     datiAl:       (pid, mese) => q(sb.from("numeri_mese").select("dati_al").eq("partner_id", pid).eq("mese", mese)),
     /* 034: i miei numeri ufficiali (per sommare i miei ordini scritti dopo il report) */
     mioReport:    (pid, dal) => q(sb.from("numeri_mese").select("mese,vpp,vpg,percentuale,dati_al,importato_da").eq("partner_id", pid).gte("mese", dal)),
@@ -208,7 +210,8 @@ const st = {
   mesiReport: [],          // i miei numeri dei report degli ultimi 13 mesi (percentuale per i mesi da Argento)
   mesiScheda: {},          // gli stessi, per le schede del gruppo
   mesiLinee: new Map(),
-  inAttesa: [],            // chi usa l'app nella mia downline ma non è ancora nella mappa (solo il nome)    // da Platino in su: i mesi dei report delle mie linee frontali (per Smeraldo, Diamante, Zaffiro)  // "Come arrivarci" aperto (per persona), così resta aperto quando la pagina si ridisegna
+  inAttesa: [],            // chi usa l'app nella mia downline ma non è ancora nella mappa (solo il nome)
+  attesaReport: [],        // 042: di quelli, chi è nel report che sto importando: { id, nome, codice }    // da Platino in su: i mesi dei report delle mie linee frontali (per Smeraldo, Diamante, Zaffiro)  // "Come arrivarci" aperto (per persona), così resta aperto quando la pagina si ridisegna
   inviti: [], sezPersone: "lista", invitoId: null, archiviatiT: false,  // il Target (solo miei)
   ct: null,               // la pagina del contatto (le otto domande)
   listino: [],            // il listino Amway (dal database; una copia sul telefono)
@@ -2679,6 +2682,12 @@ function leggiReport(testo){
 
 /* Confronta il report con la struttura dell'app e prepara l'anteprima.
    Nell'app: io, chi usa l'app nel mio gruppo, le persone che ho importato io. */
+/* 042: prima dell'anteprima, chi è in attesa ed è nel report (se nel mio gruppo c'è qualcuno in attesa) */
+async function attesaNelReport(rep){
+  st.attesaReport = [];
+  if(!rep || rep.errore || !(st.inAttesa || []).length) return;
+  try{ st.attesaReport = await api.attesaNelReport(rep.righe.map(r => r.codice)) || []; }catch(e){ st.attesaReport = []; }
+}
 function analizzaReport(rep){
   const io = st.profilo, m = rep.mese;
   const passato = m < meseDi(oggi()) && !(m === mesePrecedente() && precedenteAperto());
@@ -2695,9 +2704,11 @@ function analizzaReport(rep){
     if(!io.codice_amway) return { errore:MESSAGGI_ERRORE.codice_mancante };
     return { passato:true, mese:m, prima, perCodice, totale:rep.righe.length };
   }
-  /* 033: anche chi è in attesa della mappa (usa l'app ma non è nella struttura): l'import lo trova e lo conferma */
+  /* 033: anche chi è in attesa della mappa (usa l'app ma non è nella struttura): l'import lo trova e lo conferma.
+     042: il suo codice non arriva all'app; il database dice chi di loro è nel report (attesaNelReport, prima dell'anteprima) */
   const altri = alberoSotto(io.id, 0).map(x => x.p)
-    .concat((st.inAttesa || []).filter(x => x.codice_amway).map(x => ({ id:x.id, nome:x.nome, sponsor_id:x.sponsor_id, stato:"attivo", codice_amway:x.codice_amway })));
+    .concat((st.attesaReport || []).map(x => ({ id:x.id, nome:x.nome, stato:"attivo", codice_amway:x.codice,
+      sponsor_id:((st.inAttesa || []).find(y => y.id === x.id) || {}).sponsor_id || null })));
   const attivi = new Map(altri.filter(p => p.stato !== "gestito" && p.codice_amway).map(p => [p.codice_amway, p]));
   const mie = altri.filter(p => p.stato === "gestito");
   const a = { mese:m, prima, codiceMio:!io.codice_amway, perCodice, aggiorna:[], mancanti:[], usanoApp:[], usanoAppMancanti:[],
@@ -2910,7 +2921,7 @@ async function leggiFileReport(files){
   for(const file of files){
     let a;
     if(/\.xlsx?$/i.test(file.name)) a = { errore:"è il file Excel: sul sito Amway scegli il formato CSV." };
-    else try{ const rep = leggiReport(await file.text()); a = rep.errore ? rep : await conData(analizzaReport(rep), file); }
+    else try{ const rep = leggiReport(await file.text()); await attesaNelReport(rep); a = rep.errore ? rep : await conData(analizzaReport(rep), file); }
     catch(e){ a = { errore:"non riesco a leggerlo: scaricalo di nuovo dal sito Amway." }; }
     if(a.errore) m.errori.push(`${file.name}: ${a.errore}`);
     else if(a.passato){ if(!m.passati.some(x => x.mese === a.mese)) m.passati.push(a); }
@@ -2946,6 +2957,7 @@ async function leggiUnReport(file){
     try{
       const rep = leggiReport(await file.text());
       if(!rep.errore) try{ st.esclusi = new Set((await api.esclusi() || []).map(x => x.codice)); }catch(e){}
+      await attesaNelReport(rep);
       a = rep.errore ? rep : await conData(analizzaReport(rep), file);
     }catch(e){ a = { errore:"Non riesco a leggere il file: scaricalo di nuovo dal sito Amway." }; }
   }
