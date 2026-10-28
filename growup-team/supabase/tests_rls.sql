@@ -1233,12 +1233,43 @@ begin
                            '041: permessi delle funzioni degli inviti');
   end;
 
+  -- ---- 042: di chi è in attesa l'upline riceve solo il nome ----
+  declare
+    ua uuid; ub uuid; n5 constant uuid := '00000000-0000-0000-0000-0000000009b1'; w uuid;
+  begin
+    execute 'reset role';
+    insert into auth.users (id, aud, role) values (n5, 'authenticated', 'authenticated');
+    ua := (select user_id from public.accessi where partner_id = a limit 1);
+    ub := (select user_id from public.accessi where partner_id = b limit 1);
+    perform growup_test.come(n5);
+    w := (public.entra_con_invito(growup_test.invito(a, 'Walter Attesa', '9200001'))->'profilo'->>'id')::uuid;
+    perform growup_test.come(ua);
+    perform growup_test.ok(exists (select 1 from public.in_attesa() where id = w and nome = 'Walter Attesa'), '042: A vede Walter in attesa, con il nome');
+    perform growup_test.ok((select count(*) from jsonb_object_keys((select to_jsonb(q42) from public.in_attesa() q42 where q42.id = w))) = 6
+                           and not ((select to_jsonb(q42) from public.in_attesa() q42 where q42.id = w) ? 'codice_amway'),
+                           '042: in_attesa non dà il codice Amway');
+    perform growup_test.ok((select codice from public.attesa_nel_report(array['9200001', '9999998']) where id = w) = '9200001',
+                           '042: l''anteprima dell''import riconosce Walter se il suo codice è nel report');
+    perform growup_test.ok(not exists (select 1 from public.attesa_nel_report(array['9999998'])), '042: senza il suo codice nel report, niente');
+    perform growup_test.come(ub);  -- B è di lato rispetto a Walter (sotto A)
+    perform growup_test.ok(not exists (select 1 from public.attesa_nel_report(array['9200001'])), '042: chi è di lato non lo riconosce');
+    perform growup_test.come(null);
+    perform growup_test.deve_fallire($q$select * from public.attesa_nel_report(array['9200001'])$q$, '042: anon non chiede niente');
+  end;
+
   -- ---- Copia dei dati: solo admin, con tutte le tabelle ----
   perform growup_test.come(u5);  -- A
   perform growup_test.deve_fallire('select public.copia_dati()', 'A non scarica la copia dei dati (non è admin)');
   perform growup_test.come(u1);  -- R admin
   perform growup_test.ok((select count(*) from jsonb_object_keys(public.copia_dati()->'tabelle')) = 15
                          and jsonb_array_length(public.copia_dati()->'tabelle'->'partners') >= 3, 'l''admin scarica la copia con tutte le tabelle');
+  perform growup_test.ok(not exists (select 1 from jsonb_array_elements(public.copia_dati()->'tabelle'->'partners') j
+                                      where j ? 'chiave_hash' or j ? 'email'), '042: nella copia né l''impronta delle chiavi né le email');
+  perform growup_test.ok(jsonb_array_length(public.copia_dati()->'tabelle'->'obiettivi') >= 1
+                         and not exists (select 1 from jsonb_array_elements(public.copia_dati()->'tabelle'->'obiettivi') j where j ? 'perche'),
+                         '042: nella copia gli obiettivi senza il «perché»');
+  perform growup_test.ok(exists (select 1 from jsonb_array_elements(public.copia_dati()->'tabelle'->'activities') j where j->>'tipo' = 'ordine'),
+                         '042: gli ordini restano nella copia (servono a ripristinare)');
   execute 'reset role';
 
   -- ---- Nessuna tabella senza RLS ----

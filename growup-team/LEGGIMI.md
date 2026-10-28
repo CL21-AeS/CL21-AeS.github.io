@@ -109,7 +109,10 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 38. `supabase/041_invita.sql` — si entra solo con un invito personale (`inviti`): nome e codice Amway scritti da chi
     invita, link con un codice casuale, una volta sola, 7 giorni; avvisi a chi invita e allo sponsor vero
     (`notifiche_eventi`); via il link d'invito generico, l'«invito sopra» e il link personale per chi non è mai entrato
-39. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+39. `supabase/042_copia_e_attesa.sql` — la copia di sicurezza senza il «perché» dell'obiettivo, le email e l'impronta
+    delle chiavi; di chi è in attesa l'upline riceve solo il nome, e l'anteprima dell'import lo riconosce con
+    `attesa_nel_report`
+40. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 21. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.

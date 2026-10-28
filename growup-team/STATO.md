@@ -98,6 +98,13 @@ partner** ha due schede: **Numeri** (si apre sempre qui: numeri, linee, Come arr
 Seguimi) e **Azioni** (chiamata, numeri da aggiornare, accesso, inviti, struttura, blocco). «VP fatturati» → **«VP
 personali»**.
 
+**28 ottobre — Copia di sicurezza e «in attesa»** (gruppo C, migrazione **042**, da applicare su Supabase dopo l'unione):
+dalla copia di sicurezza escono il «perché» dell'obiettivo, le email e l'impronta delle chiavi d'accesso; gli ordini e le
+correzioni scritti a mano restano (scelta di Stefano: servono a ripristinare). Di chi è in attesa della mappa l'upline
+riceve solo il nome; l'anteprima dell'import lo riconosce chiedendo al database (`attesa_nel_report`) chi è nel report
+che si sta importando. La 041 è stata applicata per intero al secondo tentativo (al primo si era fermata dopo la tabella).
+App v54.
+
 **28 ottobre — Si entra solo su invito** (gruppo B, migrazione **041**, decisioni di Stefano; **da applicare su Supabase
 subito dopo l'unione della PR**): niente più link d'invito generico. In Gruppo la voce **«Invita»**: chi è già nella mappa
 (o un admin) scrive nome e codice Amway del nuovo partner e ottiene un link con solo un codice casuale, che vale una volta
@@ -116,7 +123,7 @@ l'installazione si fermava a metà (a `stub_supabase.sql` mancava il ruolo `serv
 non veniva installato) l'ultima riga di `tests_rls.sql` diceva comunque «TUTTI I CONTROLLI SUPERATI». Ora quella riga
 lo dice solo se i controlli sono arrivati in fondo, e lo script controlla che ogni tabella e funzione esista. Il test
 dell'interfaccia conta come errore anche un file dell'app che non arriva (404) e, se si blocca, dice perché.
-Prossimi gruppi, una PR ciascuno: B) entrare solo con un invito personale (fatto, sopra); C) copia di sicurezza e «in attesa»;
+Prossimi gruppi, una PR ciascuno: B) entrare solo con un invito personale (fatto, sopra); C) copia di sicurezza e «in attesa» (fatto, sopra);
 D) poteri da admin nel proprio gruppo, tabelle di impostazioni solo con profilo, notifiche di prova, ritocchi tecnici;
 E) grafica, in una sessione a parte.
 
