@@ -113,7 +113,11 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     delle chiavi; di chi è in attesa l'upline riceve solo il nome, e l'anteprima dell'import lo riconosce con
     `attesa_nel_report`
 40. `supabase/042b_limite_attesa.sql` — al massimo 30 richieste e 20.000 codici al giorno per `attesa_nel_report`
-41. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
+41. `supabase/043_admin_e_ritocchi.sql` — i poteri da admin solo nel proprio gruppo; impostazioni, tappe e livelli solo
+    con un profilo (l'ingresso riceve le qualifiche con l'invito); il punto di partenza solo da `modifica_partenza`;
+    notifiche solo dai servizi ufficiali e prova limitata (`notifiche_prova_ok`, con la Edge Function aggiornata);
+    indici e regole di accesso più veloci
+42. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 21. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
    e non lascia dati di prova.

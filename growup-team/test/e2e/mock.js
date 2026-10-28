@@ -55,7 +55,7 @@
       if(!i || !da) return { stato:"sconosciuto" };
       if(i.usato_il) return { stato:"usato" }; if(i.annullato_il) return { stato:"annullato" };
       if(Date.parse(i.scade_il) <= Date.now()) return { stato:"scaduto" };
-      return { stato:"ok", nome:i.nome, da:da.nome.trim() }; },
+      return { stato:"ok", nome:i.nome, da:da.nome.trim(), qualifiche:(db.stages || []).slice() }; },
     inviti: async () => { const io = mio(); if(!io) return [];
       return (db.invitiP || []).filter(x => x.creato_da === io.id).sort((x, y) => x.creato_il < y.creato_il ? 1 : -1)
         .map(x => { const c = Object.assign({}, x); delete c.codice; return c; }); },
@@ -412,8 +412,9 @@
     obiettiviMeseGruppo: async () => db.mgoals,
     cambiaChiave: async () => { const p = mio(); p.chiave = hex();
       db.accessi = db.accessi.filter(a => a.partner_id !== p.id || a.user_id === session.user.id); salva(); return p.chiave; },
-    stages: async () => db.stages,
-    settings: async () => db.settings,
+    /* 043: come la RLS, senza un profilo tappe e impostazioni non si leggono (l'ingresso le riceve con l'invito) */
+    stages: async () => mio() ? db.stages : [],
+    settings: async () => mio() ? db.settings : [],
     activities: async (pid, dal) => db.activities.filter(a => a.partner_id === pid && (a.data >= dal || ["ordine","rettifica","cliente"].includes(a.tipo))
       && leggoAtt(mio(), a)),
     /* la Lista: solo mia; i passi contano le attività e aggiornano fase ed esito, come i trigger del database */

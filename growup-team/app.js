@@ -945,7 +945,9 @@ async function apriInvito(codice){
   try{ st.invitoInfo = await api.invitoAperto(codice) || { stato:"sconosciuto" }; }catch(e){ st.invitoInfo = null; }
   if(st.invitoInfo) st.sponsorNome = st.invitoInfo.da || "";
   if(st.invitoInfo && st.invitoInfo.stato !== "ok"){ salvaLocale(CHIAVE_INVITO, null); st.fase = "invito_chiuso"; return; }
-  if(!st.stages.length){
+  /* 043: senza profilo le tappe non si leggono; arrivano con l'invito aperto */
+  if(st.invitoInfo && Array.isArray(st.invitoInfo.qualifiche) && st.invitoInfo.qualifiche.length) st.stages = st.invitoInfo.qualifiche;
+  else if(!st.stages.length){
     try{ await sessione(); st.stages = await api.stages() || []; }catch(e){}
   }
   st.fase = "ingresso";
@@ -3515,7 +3517,9 @@ const AZIONI = {
   "notifiche-si"(){ attivaNotifiche(); },
   "notifiche-no"(){ salvaLocale(chiaveNotificheChiesto(), "1"); render(); },
   "notifiche-spegni"(){ spegniNotifiche(); },
-  async "notifiche-prova"(){ try{ const r = await api.notificaProva(); toast(r && r.inviate ? "Notifica di prova inviata" : "Nessun telefono attivo: riattiva le notifiche"); }
+  async "notifiche-prova"(){ try{ const r = await api.notificaProva();
+      toast(r && r.troppe ? "Hai appena mandato una prova: riprova tra un minuto (al massimo 10 al giorno)"
+        : r && r.inviate ? "Notifica di prova inviata" : "Nessun telefono attivo: riattiva le notifiche"); }
     catch(e){ toast("Non riesco a mandare la prova: riprova tra poco"); } },
   "primi-passi-no"(){ salvaLocale(chiavePrimiPassiNo(), "1"); render(); toast("Primi passi nascosti"); },
   "passo-apri"(el){ st.passoAperto = el.getAttribute("aria-expanded") === "true" ? "nessuno" : el.dataset.k; render(); },
