@@ -117,6 +117,7 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     con un profilo (l'ingresso riceve le qualifiche con l'invito); il punto di partenza solo da `modifica_partenza`;
     notifiche solo dai servizi ufficiali e prova limitata (`notifiche_prova_ok`, con la Edge Function aggiornata);
     indici e regole di accesso più veloci
+41a. `supabase/044b_data_ingresso.sql` — la «Data di ingresso» della mappa va nella data di iscrizione (la mappa fa fede)
 42. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 21. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
