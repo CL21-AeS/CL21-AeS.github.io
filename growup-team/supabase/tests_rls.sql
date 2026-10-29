@@ -1363,6 +1363,24 @@ begin
                          '042: gli ordini restano nella copia (servono a ripristinare)');
   execute 'reset role';
 
+  -- ---- 044b: la data di ingresso dalla mappa fa fede; una data non valida si ignora ----
+  perform growup_test.come(u1);
+  perform public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":470,"ingresso":"2015-03-04"}',
+    '[{"codice":"8400001","nome":"Data Prova","sponsor":"2000001","vpp":1,"vpg":1,"ingresso":"2020-01-02"},
+      {"codice":"8400002","nome":"Data Sbagliata","sponsor":"2000001","vpp":1,"vpg":1,"ingresso":"2020-02-31"},
+      {"codice":"2000001","nome":"Anna","sponsor":"1000000","ingresso":"2019-05-06"}]', '{}', '{}');
+  execute 'reset role';
+  perform growup_test.ok((select data_iscrizione from public.partners where codice_amway = '8400001') = date '2020-01-02'
+                         and (select data_iscrizione from public.partners where codice_amway = '8400002') is null,
+                         '044b: la data di ingresso si salva, una data impossibile si ignora senza fermare l''import');
+  perform growup_test.ok((select data_iscrizione from public.partners where id = r) = date '2015-03-04'
+                         and (select data_iscrizione from public.partners where id = a) = date '2019-05-06',
+                         '044b: la mappa fa fede anche per chi importa e per chi usa l''app');
+  perform growup_test.come(u1);
+  perform growup_test.deve_fallire($q$select public.data_ingresso('{"ingresso":"2020-01-01"}')$q$, '044b: la funzione interna non si chiama da fuori');
+  execute 'reset role';
+  delete from public.numeri_mese where partner_id in (select id from public.partners where codice_amway like '84000%');
+  delete from public.partners where codice_amway like '84000%';
   -- ---- 045: solo Italia. I codici esteri già importati si cancellano con i loro dati ----
   declare
     est uuid; est_c uuid; it uuid;

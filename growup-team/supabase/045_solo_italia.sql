@@ -85,6 +85,8 @@ begin
     end if;
   end loop;
 
+  -- 044b: la data di ingresso della mappa fa fede, anche per chi importa
+  update public.partners set data_iscrizione = coalesce(public.data_ingresso(p_io), data_iscrizione) where id = io;
   if public.salva_numero(io, io, m, p_io, al) then numeri := numeri + 1; else vecchi := vecchi + 1; end if;
 
   -- copie di persone che ora usano l'app (stesso codice): spariscono, chi sta sotto passa a chi usa l'app
@@ -121,8 +123,9 @@ begin
       if length(btrim(coalesce(r->>'nome', ''))) = 0 then
         raise exception 'import_non_valido';
       end if;
-      insert into public.partners (nome, sponsor_id, stato, gestore_id, codice_amway, consenso_confermato_il, creato_da, posizione_al)
-      values (left(btrim(r->>'nome'), 80), sp, 'gestito', io, cod, now(), io, al)
+      insert into public.partners (nome, sponsor_id, stato, gestore_id, codice_amway, consenso_confermato_il, creato_da, posizione_al,
+                                   data_iscrizione)
+      values (left(btrim(r->>'nome'), 80), sp, 'gestito', io, cod, now(), io, al, public.data_ingresso(r))
       returning * into x;
       aggiunte := aggiunte + 1;
       if cod = any(coalesce(p_nascondi, '{}'))
@@ -139,6 +142,7 @@ begin
         spostate := spostate + 1;
       end if;
       update public.partners set posizione_al = al, fuori_report_dal = null,
+             data_iscrizione = coalesce(public.data_ingresso(r), data_iscrizione),
              gestore_id = case when stato = 'gestito' then io else gestore_id end
        where id = x.id;
     end if;

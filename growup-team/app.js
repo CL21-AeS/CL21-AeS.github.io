@@ -2673,8 +2673,9 @@ function nomeReport(n){
 /* Due formati, stesse persone: «KPI selezionati» (17 colonne) e «tutti i KPI» (26 colonne); le colonne si trovano
    per nome, in qualsiasi ordine. «Sponsorizzazione» è un codice interno Amway: non si legge. «Dimensioni gruppo» c'è solo
    nel file con tutti i KPI: senza, non si sa se il file nasconde il gruppo di qualcuno (per esempio di un Platino).
-   Privacy: dalla mappa si leggono SOLO codice, nome, codice dello sponsor, VPP, VPG, percentuale, dimensioni del gruppo
-   e il livello. Telefono, Email, Indirizzo, date e le altre colonne non si leggono mai: non arrivano al database. */
+   Privacy: dalla mappa si leggono SOLO codice, nome, codice dello sponsor, data di ingresso, VPP, VPG, percentuale,
+   dimensioni del gruppo e il livello. Telefono, Email, Indirizzo, Data di rinnovo e le altre colonne non si leggono mai:
+   non arrivano al database. La data di ingresso serve (nuovi iscritti, Path to Bronze, 30 giorni del primo ordine). */
 function leggiReport(testo){
   const tutte = righeCsv(testo);
   const iMese = tutte.findIndex(r => /mese di competenza/i.test(pulito(r[0])));
@@ -2685,7 +2686,7 @@ function leggiReport(testo){
   const testa = tutte[iTesta].map(pulito), col = n => testa.indexOf(n);
   const c = { livello:col("Qualifica Amway Partner"), sponsor:col("Codice Amway Partner Sponsor"),
               codice:col("Codice Amway Partner"), nome:col("Nome"), vpp:col("VPP"), vpg:col("VPG"),
-              perc:col("Percentuale di bonus"), dimensione:col("Dimensioni gruppo"), paese:col("Paese") };
+              perc:col("Percentuale di bonus"), dimensione:col("Dimensioni gruppo"), ingresso:col("Data di ingresso"), paese:col("Paese") };
   const manca = [["codice", "Codice Amway Partner"], ["sponsor", "Codice Amway Partner Sponsor"], ["nome", "Nome"], ["vpp", "VPP"], ["paese", "Paese"]]
     .filter(([k]) => c[k] < 0).map(([, n]) => `«${n}»`);
   if(manca.length) return { errore:`Nel file manca${manca.length > 1 ? "no le colonne" : " la colonna"} ${manca.join(", ")}: scaricalo di nuovo dal sito Amway.` };
@@ -2700,7 +2701,9 @@ function leggiReport(testo){
     const vpp = numReport(r[c.vpp]);
     if(!(vpp >= 0)) return { errore:`I VPP di ${nomeReport(r[c.nome])} non sono un numero: scarica di nuovo il file.` };
     const vpg = c.vpg >= 0 ? numReport(r[c.vpg]) : NaN, perc = c.perc >= 0 ? parseInt(soloCifre(pulito(r[c.perc])), 10) : NaN;
+    const ingresso = c.ingresso >= 0 ? dataLunga(r[c.ingresso]) : null;
     righe.push({ codice, livello:c.livello >= 0 ? Number(pulito(r[c.livello])) || 0 : 0,
+      ingresso:ingresso && ingresso >= "2000-01-01" && ingresso <= oggi() ? ingresso : null,
       sponsor:c.sponsor >= 0 ? soloCifre(pulito(r[c.sponsor])) : "", nome:nomeReport(r[c.nome]), vpp:Math.round(vpp * 100) / 100,
       vpg:vpg >= 0 ? Math.round(vpg * 100) / 100 : null, perc:isFinite(perc) ? perc : null,
       dimensione:c.dimensione >= 0 ? Number(soloCifre(pulito(r[c.dimensione]))) || 0 : null });
@@ -2805,7 +2808,7 @@ function vImporta(){
     <p class="small">La struttura dell'app è la mappa Amway, la stessa per tutti: il tuo import aggiorna posizioni e numeri di
       tutto il tuo gruppo (anche di chi usa l'app) e li vede anche la tua upline. Vale il report più aggiornato: conta la data
       del file scaricato. Puoi nascondere chi vuoi (solo per te, resta nei numeri).
-      Il file resta sul telefono: si salvano solo nome, codice e numeri. Telefono, email e indirizzo non si salvano mai.</p>
+      Il file resta sul telefono: si salvano solo nome, codice, data di ingresso e numeri. Telefono, email, indirizzo e data di rinnovo non si salvano mai.</p>
     <label class="btn primary wide" style="margin-top:12px">Scegli il file CSV
       <input type="file" id="file-report" accept=".csv,text/csv,text/comma-separated-values" multiple hidden></label>
     <p class="nota">Puoi scegliere più file insieme (per esempio i mesi passati): dei mesi chiusi si salvano solo i numeri.</p>
@@ -3075,11 +3078,11 @@ async function eseguiImport(f){
   const profondita = r => { let n = 0; for(let c = r.sponsor; c && a.perCodice.has(c) && n < 200; c = a.perCodice.get(c).sponsor) n++; return n; };
   const persone = [...a.perCodice.values()].filter(r => r.codice !== a.prima.codice)
     .sort((x, y) => profondita(x) - profondita(y))
-    .map(r => Object.assign({ codice:r.codice, nome:r.nome, vpp:r.vpp, sponsor:r.sponsor || null }, numeri(r)));
+    .map(r => Object.assign({ codice:r.codice, nome:r.nome, vpp:r.vpp, sponsor:r.sponsor || null, ingresso:r.ingresso }, numeri(r)));
   st.occupato = true;
   try{
     const esito = await api.importaMappa({ p_mese:a.mese + "-01", p_dati_al:a.datiAl || new Date().toISOString(),
-      p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp }, numeri(a.prima)), p_persone:persone,
+      p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp, ingresso:a.prima.ingresso }, numeri(a.prima)), p_persone:persone,
       p_nascondi:[...nascondi], p_fuori:a.mancanti.map(p => p.id), p_esteri:a.esteri }) || {};
     if(a.codiceMio) st.profilo = Object.assign({}, io, { codice_amway:a.prima.codice });
     if(daNascondere.length) await api.nascondiTanti(io.id, daNascondere);
