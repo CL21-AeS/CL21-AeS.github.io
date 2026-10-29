@@ -2846,6 +2846,21 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const conEsteri = persone51.concat([estero(2, "7600001", "7600009", "ESTERO, GIA", "Spagna"), estero(3, "7600009", "7600010", "LONTANO, LEO", "Regno Unito")]);
   await scegliFile(page, "con-esteri.csv", csvCon(testa26, conEsteri));
   await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+  // chi non è admin non cancella: il codice estero resta nascosto e segnato (i codici arrivano dal telefono)
+  check(await page.locator(".sheet .imp-esteri", { hasText:"si nascondono 1" }).isVisible(), "045: chi non è admin: i codici esteri si nascondono");
+  await page.click(".sheet button:has-text('Importa')");
+  await page.getByText(/1 codice di altri Paesi nascosto/).waitFor();
+  await sync(page);
+  check(DB.partners.some(p => p.id === "est51" && p.fuori_report_dal) && DB.nascosti.some(n => n.partner_id === "mappa51" && n.nascosto_id === "est51"),
+    "045: chi non è admin non cancella nessuno: il codice estero resta, nascosto e segnato");
+  await ctx.close();
+  DB.partners.find(p => p.id === "mappa51").is_admin = true;
+  DB.partners.find(p => p.id === "est51").fuori_report_dal = null;
+  ({ ctx, page } = await apri({}, "#chiave=" + "d1".repeat(16)));
+  await page.getByText("Ciao Mappa").waitFor(); await apriTappa(page);
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await scegliFile(page, "con-esteri.csv", csvCon(testa26, conEsteri));
+  await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
   check(await page.getByText("4 persone nel file (più 2 di altri Paesi, che non si salvano)").isVisible()
     && await page.locator(".sheet .imp-esteri", { hasText:"si cancellano 1" }).getByText("Estero Gia Importato (7600009)").isVisible()
     && !(await page.locator(".sheet .imp-nuovi").getByText("Leo").count()) && !(await page.locator(".sheet").getByText("Non più nel report").count()),

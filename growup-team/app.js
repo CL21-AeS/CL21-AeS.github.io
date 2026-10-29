@@ -2877,9 +2877,11 @@ function vImporta(){
       `${a.troppiMancanti ? `<p class="avviso">Mancano molte persone insieme: controlla di aver esportato <b>l'intera linea senza filtri</b>.</p>` : ""}
       <p class="small">${a.mancanti.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})`).join(", ")}</p>`,
       "Codici che Amway non ha più (per esempio non rinnovati). Nessuno si cancella: restano nella tua struttura con il segno «non più nel report» e vanno tra le nascoste. Se tornano nel report, il segno sparisce.") : ""}
-    ${a.esteriNellApp.length ? sezione(`Di altri Paesi · si cancellano ${a.esteriNellApp.length}`,
+    ${a.esteriNellApp.length ? sezione(`Di altri Paesi · ${st.profilo.is_admin ? "si cancellano" : "si nascondono"} ${a.esteriNellApp.length}`,
       `<p class="small">${a.esteriNellApp.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})`).join(", ")}</p>`,
-      "Si importano solo i codici italiani: questi codici di altri Paesi erano già nell'app e si cancellano con tutti i loro dati.", "imp-esteri") : ""}
+      st.profilo.is_admin ? "Si importano solo i codici italiani: questi codici di altri Paesi erano già nell'app e si cancellano con tutti i loro dati."
+        : "Si importano solo i codici italiani: questi codici di altri Paesi erano già nell'app. Restano nascosti; li cancella l'import di Stefano e Alessia.",
+      "imp-esteri") : ""}
     ${a.usanoApp.length || a.usanoAppMancanti.length ? sezione("Usano l'app: posizione e numeri dal report",
       `<p class="small">${plur(a.usanoApp.length, "persona trovata", "persone trovate")} nel report.
         ${a.spostati.length ? `<br>Vanno sotto il loro sponsor del report: ${a.spostati.map(x => `<b>${esc(x.p.nome)}</b> (da ${esc(x.da)} a ${esc(x.a)})`).join(", ")}.` : ""}
@@ -3093,6 +3095,7 @@ async function eseguiImport(f){
       plur(n("aggiornati"), "persona aggiornata", "persone aggiornate"), n("piu_vecchi") ? plur(n("piu_vecchi"), "già più aggiornata", "già più aggiornate") : "", n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
       n("fuori") ? plur(n("fuori"), "persona non più nel report", "persone non più nel report") : "",
       n("esteri") ? plur(n("esteri"), "codice di altri Paesi cancellato", "codici di altri Paesi cancellati") : "",
+      n("esteri_nascosti") ? plur(n("esteri_nascosti"), "codice di altri Paesi nascosto", "codici di altri Paesi nascosti") : "",
       daNascondere.length ? plur(daNascondere.length, "nascosta", "nascoste") : "",
       daMostrare.length ? plur(daMostrare.length, "di nuovo visibile", "di nuovo visibili") : ""].filter(Boolean).join(", ")}`);
   }catch(e){

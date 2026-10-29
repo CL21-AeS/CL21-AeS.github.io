@@ -52,7 +52,8 @@ numeri di quel mese; un italiano che esce dalla mappa resta nascosto e si cancel
   report». Test: stesse persone nei due formati → al database arrivano esattamente gli stessi dati. App v63.
 - **Punto 1 · solo Italia** (migrazione **045**, da applicare): colonna «Paese» obbligatoria; si tengono solo le righe
   «Italia»; delle estere l'app tiene solo il codice e lo manda a `importa_mappa`, che cancella con tutti i dati i codici
-  esteri già importati (solo persone senza app nella downline di chi importa). L'import si ferma se un italiano ha come
+  esteri già importati (solo persone senza app nella downline di chi importa, e solo se importa un admin: per gli altri
+  restano nascosti e segnati, perché i codici arrivano dal telefono e non si possono verificare). L'import si ferma se un italiano ha come
   sponsor un codice estero presente nel file, o se la riga 1 è estera; lo sponsor della prima riga (fuori dal file) va
   bene. Anteprima: «N persone nel file (più M di altri Paesi, che non si salvano)» e la sezione «Di altri Paesi · si
   cancellano». App v64.

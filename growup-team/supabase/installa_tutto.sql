@@ -6743,7 +6743,8 @@ grant execute on function public.guida_conteggi(date) to authenticated;
 -- qualcosa al database) e un codice italiano non sta mai sotto un codice estero (l'app ferma l'import).
 -- Un codice estero già importato prima di questa regola si cancella al primo import con tutti i suoi dati:
 -- l'app manda solo i codici delle righe estere (p_esteri), nient'altro. Si cancellano solo persone senza app
--- (stato 'gestito') nella downline di chi importa.
+-- (stato 'gestito') nella downline di chi importa, e solo se importa un admin: i codici arrivano dal telefono e non
+-- si possono verificare, quindi per gli altri partner restano solo nascosti e segnati «non più nel report».
 -- La funzione cambia firma (un parametro in più, facoltativo): la vecchia si toglie.
 -- ============================================================
 
@@ -6773,6 +6774,7 @@ declare
   numeri    int := 0;
   vecchi    int := 0;
   esteri    int := 0;
+  esteri_nascosti int := 0;
 begin
   if io is null then
     raise exception 'non_autenticato';
@@ -6802,16 +6804,24 @@ begin
      or me.codice_amway = any(coalesce(p_esteri, '{}')) then
     raise exception 'import_non_valido';
   end if;
-  -- un codice estero già nella mia struttura (persona senza app) si cancella con tutti i suoi dati;
-  -- chi stava sotto (non dovrebbe succedere) passa al suo sponsor e la mappa lo rimette al suo posto qui sotto
+  -- un codice estero già nella mia struttura (persona senza app): se importa un admin si cancella con tutti i suoi
+  -- dati (chi stava sotto, non dovrebbe succedere, passa al suo sponsor e la mappa lo rimette al suo posto qui sotto).
+  -- Se importa un altro partner non si cancella niente: il codice arriva dal telefono e non si può verificare, quindi
+  -- resta segnato «non più nel report» e nascosto finché non importa un admin.
   for x in select g.* from public.partners g
             where g.stato = 'gestito' and g.codice_amway = any(coalesce(p_esteri, '{}')) and g.id <> io
               and public.is_in_downline(g.id) loop
-    update public.partners set sponsor_id = x.sponsor_id where sponsor_id = x.id;
-    update public.partners set gestore_id = null where gestore_id = x.id;
-    update public.partners set creato_da = null where creato_da = x.id;
-    delete from public.partners where id = x.id;
-    esteri := esteri + 1;
+    if me.is_admin then
+      update public.partners set sponsor_id = x.sponsor_id where sponsor_id = x.id;
+      update public.partners set gestore_id = null where gestore_id = x.id;
+      update public.partners set creato_da = null where creato_da = x.id;
+      delete from public.partners where id = x.id;
+      esteri := esteri + 1;
+    else
+      update public.partners set fuori_report_dal = coalesce(fuori_report_dal, m) where id = x.id;
+      insert into public.nascosti (partner_id, nascosto_id) values (io, x.id) on conflict do nothing;
+      esteri_nascosti := esteri_nascosti + 1;
+    end if;
   end loop;
 
   if public.salva_numero(io, io, m, p_io, al) then numeri := numeri + 1; else vecchi := vecchi + 1; end if;
@@ -6888,7 +6898,7 @@ begin
   end loop;
 
   return jsonb_build_object('aggiunte', aggiunte, 'spostate', spostate, 'fuori', fuori, 'aggiornati', numeri, 'piu_vecchi', vecchi,
-                            'esteri', esteri);
+                            'esteri', esteri, 'esteri_nascosti', esteri_nascosti);
 end;
 $$;
 

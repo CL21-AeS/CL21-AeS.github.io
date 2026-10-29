@@ -314,7 +314,11 @@
       /* 045: i codici esteri non entrano; quelli già importati (senza app, nella mia downline) si cancellano con i loro dati */
       const est = a.p_esteri || [];
       if(a.p_persone.some(r => est.includes(r.codice)) || est.includes(io.codice_amway)) throw new Error("import_non_valido");
+      let esteriNascosti = 0;
       for(const x of sotto(io.id).filter(p => p.stato === "gestito" && est.includes(p.codice_amway))){
+        if(!io.is_admin){ x.fuori_report_dal = x.fuori_report_dal || a.p_mese;
+          if(!(db.nascosti || []).some(n => n.partner_id === io.id && n.nascosto_id === x.id)) db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:x.id }]);
+          esteriNascosti++; continue; }
         db.partners.filter(p => p.sponsor_id === x.id).forEach(p => { p.sponsor_id = x.sponsor_id; });
         db.partners = db.partners.filter(p => p.id !== x.id);
         db.numeri = (db.numeri || []).filter(n => n.partner_id !== x.id);
@@ -350,7 +354,7 @@
         if(!x.fuori_report_dal && (!x.posizione_al || x.posizione_al <= al)){ x.fuori_report_dal = a.p_mese; x.posizione_al = al;
           db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:x.id }]); fuori++; } }
       salva();
-      return { aggiunte, spostate, fuori, aggiornati:numeri, piu_vecchi:vecchi, esteri }; },
+      return { aggiunte, spostate, fuori, aggiornati:numeri, piu_vecchi:vecchi, esteri, esteri_nascosti:esteriNascosti }; },
     prossime: async () => { const io = mio(); if(!io) return [];
       return visibiliRicuciti(io).filter(p => p.prossima_qualifica).map(p => ({ partner_id:p.id, prossima_qualifica:p.prossima_qualifica })); },
     nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid);

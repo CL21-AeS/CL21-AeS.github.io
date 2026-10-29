@@ -1381,21 +1381,30 @@ begin
     perform growup_test.deve_fallire($q$select public.importa_mappa(current_date, now(), '{"codice":"2000001"}',
       '[{"codice":"8500001","nome":"Estero Uno","sponsor":"2000001"}]', '{}', '{}', '{8500001}')$q$, '045: un codice estero non entra tra le persone');
     perform growup_test.ok((public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":60}',
-      '[{"codice":"8500002","nome":"Italiano Sotto","sponsor":"2000001","vpp":5,"vpg":5}]', '{}', '{}', '{8500001,8500003}')->>'esteri')::int = 1,
-      '045: A cancella solo il codice estero della sua downline');
+      '[{"codice":"8500002","nome":"Italiano Sotto","sponsor":"2000001","vpp":5,"vpg":5}]', '{}', '{}', '{8500001,8500003}')->>'esteri_nascosti')::int = 1,
+      '045: A (non admin) non cancella: il codice estero della sua downline resta nascosto e segnato');
+    execute 'reset role';
+    perform growup_test.ok(exists (select 1 from public.partners where id = est and fuori_report_dal is not null)
+                           and exists (select 1 from public.nascosti where partner_id = a and nascosto_id = est),
+                           '045: un codice arrivato dal telefono di chi non è admin non cancella nessuno');
+    perform growup_test.come(u1);  -- R (admin) importa: il codice estero della sua downline si cancella
+    perform growup_test.ok((public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":470}',
+      '[{"codice":"8500002","nome":"Italiano Sotto","sponsor":"2000001","vpp":5,"vpg":5}]', '{}', '{}', '{8500001}')->>'esteri')::int = 1,
+      '045: l''admin cancella il codice estero della sua downline');
     execute 'reset role';
     perform growup_test.ok(not exists (select 1 from public.partners where id = est)
                            and not exists (select 1 from public.numeri_mese where partner_id = est)
                            and not exists (select 1 from public.activities where partner_id = est), '045: l''estero sparisce con numeri e attività');
     perform growup_test.ok((select sponsor_id from public.partners where id = it) = a, '045: l''italiano che era sotto va sotto il suo sponsor del file');
-    perform growup_test.ok(exists (select 1 from public.partners where id = est_c), '045: il codice estero di un''altra linea (C) non si tocca');
+    perform growup_test.ok(exists (select 1 from public.partners where id = est_c), '045: il codice estero indicato da A in un''altra linea (C) non si tocca');
     perform growup_test.ok(exists (select 1 from public.partners where id = a and codice_amway = '2000001'), '045: chi usa l''app non si cancella');
-    perform growup_test.come(u4);  -- C cancella il suo
-    perform public.importa_mappa(current_date, now(), '{"codice":"2000003","vpp":1}', '[]', '{}', '{}', '{8500003}');
+    perform growup_test.come(u4);
     perform growup_test.deve_fallire($q$select public.importa_mappa(current_date, now(), '{"codice":"2000003"}', '[]', '{}', '{}', '{2000003}')$q$,
                                      '045: il proprio codice non è estero');
+    perform growup_test.come(u1);  -- R (admin) cancella anche quello sotto C (è nella sua downline)
+    perform public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":470}', '[]', '{}', '{}', '{8500003}');
     execute 'reset role';
-    perform growup_test.ok(not exists (select 1 from public.partners where id = est_c), '045: C cancella il codice estero della sua downline');
+    perform growup_test.ok(not exists (select 1 from public.partners where id = est_c), '045: l''admin cancella il codice estero sotto C');
     delete from public.numeri_mese where partner_id = it; delete from public.partners where id = it;
   end;
 
