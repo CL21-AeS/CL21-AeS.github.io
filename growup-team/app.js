@@ -2665,6 +2665,8 @@ function nomeReport(n){ const [cognome, nome] = pulito(n).split(/,\s*/); return 
    Attenzione: la colonna «Qualifica Amway Partner» NON contiene la qualifica ma il livello di profondità nella mappa
    (1 = chi ha scaricato il file, 2 = i suoi frontali, 3 = i loro, …). Serve solo a trovare la riga di chi importa e
    non si salva. La qualifica l'app la ricava dalla «Percentuale di bonus» e dai VP. */
+/* Privacy: dalla mappa si leggono SOLO codice, nome, codice dello sponsor, VPP, VPG, percentuale, dimensioni del gruppo
+   e il livello. Telefono, Email, Indirizzo, date e le altre colonne non si leggono mai: non arrivano al database. */
 function leggiReport(testo){
   const tutte = righeCsv(testo);
   const iMese = tutte.findIndex(r => /mese di competenza/i.test(pulito(r[0])));
@@ -2779,7 +2781,7 @@ function vImporta(){
     <p class="small">La struttura dell'app è la mappa Amway, la stessa per tutti: il tuo import aggiorna posizioni e numeri di
       tutto il tuo gruppo (anche di chi usa l'app) e li vede anche la tua upline. Vale il report più aggiornato: conta la data
       del file scaricato. Puoi nascondere chi vuoi (solo per te, resta nei numeri).
-      Il file resta sul telefono: si salvano solo nome, codice e numeri.</p>
+      Il file resta sul telefono: si salvano solo nome, codice e numeri. Telefono, email e indirizzo non si salvano mai.</p>
     <label class="btn primary wide" style="margin-top:12px">Scegli il file CSV
       <input type="file" id="file-report" accept=".csv,text/csv,text/comma-separated-values" multiple hidden></label>
     <p class="nota">Puoi scegliere più file insieme (per esempio i mesi passati): dei mesi chiusi si salvano solo i numeri.</p>

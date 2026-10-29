@@ -296,7 +296,7 @@
     togliFatto: async (chiave, giorno) => { const io = mio(); db.guidaFatti = (db.guidaFatti || [])
       .filter(x => !(x.partner_id === io.id && x.chiave === chiave && x.giorno === giorno)); salva(); },
     datiAl: async (pid, mese) => { const n = numeroDi(pid, mese.slice(0, 7)); return n && n.dati_al ? [{ dati_al:n.dati_al }] : []; },
-    salvaMesePassato: async a => { const io = mio(); const m = a.p_mese.slice(0, 7), al = a.p_dati_al || new Date().toISOString();
+    salvaMesePassato: async a => { const io = mio(); db.ultimoImport = JSON.parse(JSON.stringify(a)); const m = a.p_mese.slice(0, 7), al = a.p_dati_al || new Date().toISOString();
       if(io.confermato_il === null && !io.is_admin) throw new Error("in_attesa");
       if(!io.codice_amway) throw new Error("codice_mancante");
       if(a.p_io.codice !== io.codice_amway) throw new Error("import_di_altri");
@@ -305,6 +305,7 @@
       salva(); return n; },
     /* come importa_mappa (033): tutto il mio gruppo, vince il report più aggiornato */
     importaMappa: async a => { const io = mio(); if(!io) throw new Error("non_autenticato");
+      db.ultimoImport = JSON.parse(JSON.stringify(a));   // per i controlli sulla privacy: cosa arriva al database
       if(io.confermato_il === null && !io.is_admin) throw new Error("in_attesa");
       const m = a.p_mese.slice(0, 7), al = a.p_dati_al && a.p_dati_al < new Date().toISOString() ? a.p_dati_al : new Date().toISOString();
       if(!io.codice_amway && a.p_io.codice) io.codice_amway = a.p_io.codice;
