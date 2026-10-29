@@ -2829,6 +2829,51 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await scegliFile(page, "senza-sponsor.csv", csv51(testa17.filter(t => t !== "Codice Amway Partner Sponsor")));
   await page.locator(".sheet .errore").waitFor();
   check((await page.locator(".sheet .errore").innerText()).includes("manca la colonna «Codice Amway Partner Sponsor»"), "senza la colonna dello sponsor: rifiutato, con il nome della colonna");
+  await page.click(".sheet button[data-act=chiudi]");
+
+  // 45. Solo Paese = Italia: le righe di altri Paesi non si salvano; i codici esteri già nell'app si cancellano con i loro dati
+  const estero = (liv, sp, cod, nome, paese) => Object.assign(p51(liv, sp, cod, nome, "50,00", "50,00", 0, 1), { "Paese":"'" + paese });
+  const csvCon = (testa, righe) => "\ufeff" + [csvRiga(["Amway","CONFIDENZIALE - REPORT DI PROVA"]), csvRiga(["Mese di competenza", meseFile]), csvRiga(testa)]
+    .concat(righe.map(p => csvRiga(testa.map(t => p[t])))).join("\n");
+  DB.partners.push({ id:"est51", nome:"Estero Gia Importato", sponsor_id:"mappa51", stato:"gestito", gestore_id:"mappa51", codice_amway:"7600009",
+    codice_invito:"EST51A", creato_il:new Date().toISOString() });
+  DB.numeri.push({ visto_da:"mappa51", partner_id:"est51", mese:oggiStr.slice(0, 7), vpp:50, vpg:50, percentuale:0, linee:[] });
+  DB.activities.push({ id:"att-est51", partner_id:"est51", tipo:"contatto", quantita:1, vp:0, data:oggiStr, inserito_da:"mappa51", inserito_il:new Date().toISOString() });
+  await page.close(); await ctx.close();
+  ({ ctx, page } = await apri({}, "#chiave=" + "d1".repeat(16)));
+  await page.getByText("Ciao Mappa").waitFor(); await apriTappa(page);
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  const conEsteri = persone51.concat([estero(2, "7600001", "7600009", "ESTERO, GIA", "Spagna"), estero(3, "7600009", "7600010", "LONTANO, LEO", "Regno Unito")]);
+  await scegliFile(page, "con-esteri.csv", csvCon(testa26, conEsteri));
+  await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+  check(await page.getByText("4 persone nel file (più 2 di altri Paesi, che non si salvano)").isVisible()
+    && await page.locator(".sheet .imp-esteri", { hasText:"si cancellano 1" }).getByText("Estero Gia Importato (7600009)").isVisible()
+    && !(await page.locator(".sheet .imp-nuovi").getByText("Leo").count()) && !(await page.locator(".sheet").getByText("Non più nel report").count()),
+    "045: anteprima: le righe estere non entrano, il codice estero già nell'app è tra quelli che si cancellano (non «non più nel report»)");
+  await page.click(".sheet button:has-text('Importa')");
+  await page.getByText(/1 codice di altri Paesi cancellato/).waitFor();
+  await sync(page);
+  const inviato45 = DB.ultimoImport;
+  check(!inviato45.p_persone.some(r => ["7600009", "7600010"].includes(r.codice)) && inviato45.p_esteri.slice().sort().join() === "7600009,7600010"
+    && !/ESTERO|Estero|LONTANO|Lontano|Leo/.test(JSON.stringify(inviato45)), "045: delle righe estere al database arriva solo il codice, per cancellarlo");
+  check(!DB.partners.some(p => p.id === "est51") && !DB.numeri.some(n => n.partner_id === "est51") && !DB.activities.some(a => a.partner_id === "est51"),
+    "045: il codice estero già importato è cancellato con numeri e attività");
+  // un italiano sotto un codice estero presente nel file: l'import si ferma
+  await scegliFile(page, "sotto-estero.csv", csvCon(testa17, persone51.concat([estero(2, "7600001", "7600011", "FUORI, FIO", "Svizzera"),
+    p51(3, "7600011", "7600012", "ITALO, IVO", "10,00", "10,00", 0, 1)])));
+  await page.locator(".sheet .errore").waitFor();
+  check((await page.locator(".sheet .errore").innerText()).startsWith("Ivo Italo (7600012) è in Italia, ma nel file il suo sponsor (7600011) è di un altro Paese"),
+    "045: un italiano sotto un codice estero del file: import fermato con il messaggio");
+  // lo sponsor della prima riga non è nel file: è normale
+  check(!(await page.getByText("7600000").count()), "045: lo sponsor della prima riga (fuori dal file) non ferma l'import");
+  await page.click(".sheet button[data-act=chiudi]");
+  await scegliFile(page, "senza-paese.csv", csvCon(testa17.filter(t => t !== "Paese"), persone51));
+  await page.locator(".sheet .errore").waitFor();
+  check((await page.locator(".sheet .errore").innerText()).includes("manca la colonna «Paese»"), "045: senza la colonna Paese l'import è rifiutato");
+  await page.click(".sheet button[data-act=chiudi]");
+  await scegliFile(page, "estero-io.csv", csvCon(testa17, [estero(1, "7600000", "7600001", "PROVA, MAPPA", "Spagna")].concat(persone51.slice(1))));
+  await page.locator(".sheet .errore").waitFor();
+  check((await page.locator(".sheet .errore").innerText()).startsWith("Questo file è di un codice di un altro Paese"), "045: il file di un codice estero è rifiutato");
   await ctx.close();
 }
 
