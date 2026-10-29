@@ -45,6 +45,11 @@ numeri di quel mese; un italiano che esce dalla mappa resta nascosto e si cancel
   e livello; telefono, email, indirizzo e date non arrivano mai al database (test sui dati inviati, anche per i mesi
   chiusi; scritto nel foglio dell'import). Nel database: `partners.email` esiste dal primo schema ma è vuota e l'app non
   la usa; `persone.contatto` viene da Lista e Clienti, non dalla mappa. App v62.
+- **Punto 2 · i due formati**: funzionano l'export «KPI selezionati» (17 colonne) e «tutti i KPI» (26), colonne trovate per
+  nome in qualsiasi ordine; obbligatorie codice, sponsor, nome e VPP (altrimenti il messaggio dice quale manca);
+  «Sponsorizzazione» non si legge; «Utente riservato/non visualizzabile» entra come «Utente riservato». Senza «Dimensioni
+  gruppo» (17 colonne) chi non ha nessuno sotto nel file può nascondere un gruppo: chi sta sotto di lui non va «fuori dal
+  report». Test: stesse persone nei due formati → al database arrivano esattamente gli stessi dati. App v63.
 
 ## Fermi la sera del 21 ottobre 2026
 

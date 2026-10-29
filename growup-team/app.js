@@ -2627,7 +2627,7 @@ function vAzioni(){
 
 /* ---- 9b. Import dal report Amway ----
    Ognuno importa il CSV della propria linea (Business Centre → Linea di Sponsorizzazione → Esporta →
-   "Intera Linea di Sponsorizzazione con tutti i KPI", senza filtri). Il file si legge qui, sul telefono:
+   "Intera Linea di Sponsorizzazione", con tutti i KPI o con i KPI selezionati, senza filtri). Il file si legge qui, sul telefono:
    al database arrivano solo persona e VPP, per me e per le persone senza app che gestisco.
    Chi usa l'app non viene mai toccato. */
 function righeCsv(testo){
@@ -2659,26 +2659,36 @@ function numReport(v){
   return isFinite(n) ? n : NaN;
 }
 function maiuscole(n){ return n.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (x, a, b) => a + b.toUpperCase()); }
-function nomeReport(n){ const [cognome, nome] = pulito(n).split(/,\s*/); return maiuscole(nome ? `${nome} ${cognome}` : cognome); }
+/* "COGNOME, NOME" → "Nome Cognome"; chi ha chiesto di non mostrarsi ("Utente riservato/non visualizzabile") resta così */
+const UTENTE_RISERVATO = "Utente riservato";
+function nomeReport(n){
+  if(/utente riservato|non visualizzabile/i.test(pulito(n))) return UTENTE_RISERVATO;
+  const [cognome, nome] = pulito(n).split(/,\s*/); return maiuscole(nome ? `${nome} ${cognome}` : cognome);
+}
 
 /* Le colonne si cercano per nome, mai per posizione.
    Attenzione: la colonna «Qualifica Amway Partner» NON contiene la qualifica ma il livello di profondità nella mappa
    (1 = chi ha scaricato il file, 2 = i suoi frontali, 3 = i loro, …). Serve solo a trovare la riga di chi importa e
    non si salva. La qualifica l'app la ricava dalla «Percentuale di bonus» e dai VP. */
-/* Privacy: dalla mappa si leggono SOLO codice, nome, codice dello sponsor, VPP, VPG, percentuale, dimensioni del gruppo
+/* Due formati, stesse persone: «KPI selezionati» (17 colonne) e «tutti i KPI» (26 colonne); le colonne si trovano
+   per nome, in qualsiasi ordine. «Sponsorizzazione» è un codice interno Amway: non si legge. «Dimensioni gruppo» c'è solo
+   nel file con tutti i KPI: senza, non si sa se il file nasconde il gruppo di qualcuno (per esempio di un Platino).
+   Privacy: dalla mappa si leggono SOLO codice, nome, codice dello sponsor, VPP, VPG, percentuale, dimensioni del gruppo
    e il livello. Telefono, Email, Indirizzo, date e le altre colonne non si leggono mai: non arrivano al database. */
 function leggiReport(testo){
   const tutte = righeCsv(testo);
   const iMese = tutte.findIndex(r => /mese di competenza/i.test(pulito(r[0])));
   const mm = iMese >= 0 ? pulito(tutte[iMese][1]).match(/^(\d{4})(\d{2})$/) : null;
   const iTesta = tutte.findIndex(r => r.some(x => pulito(x) === "Codice Amway Partner"));
-  if(iTesta < 0) return { errore:"Questo file non sembra il report della Linea di Sponsorizzazione di Amway. Scegli il file CSV esportato con «Intera Linea di Sponsorizzazione con tutti i KPI»." };
+  if(iTesta < 0) return { errore:"Questo file non sembra il report della Linea di Sponsorizzazione di Amway. Scegli il file CSV esportato con «Intera Linea di Sponsorizzazione» (con tutti i KPI o con i KPI selezionati)." };
   if(!mm) return { errore:"Nel file non c'è il mese di competenza: scaricalo di nuovo dal sito Amway." };
   const testa = tutte[iTesta].map(pulito), col = n => testa.indexOf(n);
   const c = { livello:col("Qualifica Amway Partner"), sponsor:col("Codice Amway Partner Sponsor"),
               codice:col("Codice Amway Partner"), nome:col("Nome"), vpp:col("VPP"), vpg:col("VPG"),
               perc:col("Percentuale di bonus"), dimensione:col("Dimensioni gruppo") };
-  if(c.codice < 0 || c.nome < 0 || c.vpp < 0) return { errore:"Nel file mancano le colonne del codice, del nome o dei VPP: esporta «con tutti i KPI disponibili»." };
+  const manca = [["codice", "Codice Amway Partner"], ["sponsor", "Codice Amway Partner Sponsor"], ["nome", "Nome"], ["vpp", "VPP"]]
+    .filter(([k]) => c[k] < 0).map(([, n]) => `«${n}»`);
+  if(manca.length) return { errore:`Nel file manca${manca.length > 1 ? "no le colonne" : " la colonna"} ${manca.join(", ")}: scaricalo di nuovo dal sito Amway.` };
   const righe = [];
   for(const r of tutte.slice(iTesta + 1)){
     const codice = soloCifre(pulito(r[c.codice]));
@@ -2689,7 +2699,7 @@ function leggiReport(testo){
     righe.push({ codice, livello:c.livello >= 0 ? Number(pulito(r[c.livello])) || 0 : 0,
       sponsor:c.sponsor >= 0 ? soloCifre(pulito(r[c.sponsor])) : "", nome:nomeReport(r[c.nome]), vpp:Math.round(vpp * 100) / 100,
       vpg:vpg >= 0 ? Math.round(vpg * 100) / 100 : null, perc:isFinite(perc) ? perc : null,
-      dimensione:c.dimensione >= 0 ? Number(soloCifre(pulito(r[c.dimensione]))) || 0 : 0 });
+      dimensione:c.dimensione >= 0 ? Number(soloCifre(pulito(r[c.dimensione]))) || 0 : null });
   }
   if(!righe.length) return { errore:"Nel file non c'è nessuna persona." };
   return { mese:`${mm[1]}-${mm[2]}`, righe };
@@ -2737,7 +2747,8 @@ function analizzaReport(rep){
   }
   /* le mie persone importate: il codice viene dal report, quindi si abbinano sempre per codice */
   /* chi sta sotto un gruppo che il report non mostra (per esempio un Platino) non è "fuori dal report" */
-  const nascostiReport = new Set(rep.righe.filter(r => r.dimensione > 1 && !rep.righe.some(x => x.sponsor === r.codice)).map(r => r.codice));
+  /* senza «Dimensioni gruppo» (file con i KPI selezionati) ogni persona senza nessuno sotto nel file può nascondere un gruppo */
+  const nascostiReport = new Set(rep.righe.filter(r => (r.dimensione == null || r.dimensione > 1) && !rep.righe.some(x => x.sponsor === r.codice)).map(r => r.codice));
   const sottoNascosto = p => { for(let s = st.struttura.find(x => x.id === p.sponsor_id), n = 0; s && n < 200; s = st.struttura.find(x => x.id === s.sponsor_id), n++)
     if(s.codice_amway && nascostiReport.has(s.codice_amway)) return true; return false; };
   for(const p of mie){
@@ -2777,7 +2788,7 @@ function vImporta(){
   const chiudi = `<button type="button" class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
   if(!a || a.errore) return `<h2>Importa dal report Amway</h2>
     <p class="small">Sul sito Amway: <b>Linea di Sponsorizzazione (LOS)</b> → pulsante di download →
-      <b>Intera Linea di Sponsorizzazione con tutti i KPI disponibili</b>, formato <b>CSV</b>. Prima togli i filtri.</p>
+      <b>Intera Linea di Sponsorizzazione</b> (con tutti i KPI o con i KPI selezionati), formato <b>CSV</b>. Prima togli i filtri.</p>
     <p class="small">La struttura dell'app è la mappa Amway, la stessa per tutti: il tuo import aggiorna posizioni e numeri di
       tutto il tuo gruppo (anche di chi usa l'app) e li vede anche la tua upline. Vale il report più aggiornato: conta la data
       del file scaricato. Puoi nascondere chi vuoi (solo per te, resta nei numeri).
@@ -2923,8 +2934,8 @@ function poiOrdini(){
 function vImportaAmway(){
   const e = st.erroriAmway || [];
   return `<h2>Importa da Amway</h2>
-    <p class="small">Scegli i file CSV che hai scaricato dal sito Amway: la mappa (Intera Linea di Sponsorizzazione con tutti i
-      KPI), gli Ordini e i Clienti. Anche tutti insieme: l'app riconosce quale è quale.</p>
+    <p class="small">Scegli i file CSV che hai scaricato dal sito Amway: la mappa (Intera Linea di Sponsorizzazione, con tutti i
+      KPI o con i KPI selezionati), gli Ordini e i Clienti. Anche tutti insieme: l'app riconosce quale è quale.</p>
     ${e.length ? `<div class="avviso">${e.map(x => `<p style="margin:2px 0">${esc(x)}</p>`).join("")}</div>` : ""}
     ${btnAmway("Scegli i file", "primary wide", "margin-top:12px")}
     <button type="button" class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>`;
