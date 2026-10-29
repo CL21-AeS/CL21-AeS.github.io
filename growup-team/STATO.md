@@ -32,6 +32,16 @@ prima/dopo a 360 px chiaro e scuro nella pagina privata «Growup · grafica prim
 **Come si lavora alla grafica**: prima/dopo con la stessa API finta dei test, a 360 px; spiegare in due righe cosa cambia
 per i partner prima di ogni PR; `sw.js` va alzato a ogni consegna (ora v60).
 
+## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
+
+Regole decise da Stefano: si salvano solo le righe con Paese = Italia (le altre si scartano e i codici esteri già
+salvati si cancellano con i loro dati); funzionano entrambi gli export (17 colonne «KPI selezionati» e 26 «tutti i KPI»),
+colonne riconosciute dal nome, «Sponsorizzazione» ignorata; telefono, email e indirizzo della mappa mai salvati;
+rifà la struttura solo la mappa con il «Mese di competenza» più recente, una mappa di un mese precedente salva solo i
+numeri di quel mese; un italiano che esce dalla mappa resta nascosto e si cancella dopo 12 mesi.
+- **Punto 6 · livello di profondità**: «Qualifica Amway Partner» contiene il livello (1 = chi ha scaricato il file), non
+  la qualifica: serve solo a trovare la riga di chi importa, non si salva. Verificato con un test (riga 1 in fondo al file). App v61.
+
 ## Fermi la sera del 21 ottobre 2026
 
 **Dove siamo**: Target, Lista e Clienti sono dentro Growup (pagina Persone), con conferma dal report Amway, blocco
