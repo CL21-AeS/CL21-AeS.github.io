@@ -57,6 +57,16 @@ numeri di quel mese; un italiano che esce dalla mappa resta nascosto e si cancel
   sponsor un codice estero presente nel file, o se la riga 1 è estera; lo sponsor della prima riga (fuori dal file) va
   bene. Anteprima: «N persone nel file (più M di altri Paesi, che non si salvano)» e la sezione «Di altri Paesi · si
   cancellano». App v64.
+- **Punto 4 · ogni mappa sostituisce la precedente** (migrazione **046**, da applicare dopo la 045): decide il «Mese di
+  competenza» del file, non la data del file né il giorno dell'import. `partners.mappa_mese` = mese della mappa che ha messo
+  ognuno al suo posto: una mappa dello stesso mese o più recente rifà sempre struttura, VP e percentuali; una di un mese
+  precedente salva solo i numeri di quel mese (servono a Stabilità e mesi da Argento). L'app rilegge il proprio
+  `mappa_mese` prima di leggere i file (la upline può aver importato da poco); con più file insieme rifà la struttura il
+  mese più recente. Chi esce dalla mappa resta nascosto («non più nel report») e se ricompare riprende i suoi dati; dopo 12
+  mesi fuori si cancella con i suoi dati (solo con l'import di un admin; anteprima «Fuori dalla mappa da 12 mesi · si
+  cancellano»). «Utente riservato» prende il nome vero quando il file lo mostra. Lista, obiettivi, inviti e «perché» di
+  chi usa l'app non si toccano. Attenzione, scelta di Stefano: con più importatori nello stesso mese vince l'ultimo file
+  importato, anche se scaricato prima. App v65.
 
 ## Fermi la sera del 21 ottobre 2026
 

@@ -168,7 +168,9 @@ const scegliFile = async (pg, nome, testo, daGruppo) => {
 };
 /* 033: chi è appena entrato è "in attesa della mappa" finché un report della upline non lo mostra */
 check(await page.locator(".primi-passi .stato-attesa").isVisible(), "chi è appena entrato è in attesa della mappa (riga in Primi passi)");
-const confermaCodice = async (pg, codice) => pg.evaluate(c => { const p = window.__DB.partners.find(x => x.codice_amway === c); p.confermato_il = new Date().toISOString(); }, codice);
+/* come dopo l'import della sua upline: confermato e messo al suo posto dalla mappa del mese in corso (046: mappa_mese) */
+const confermaCodice = async (pg, codice) => pg.evaluate(([c, m]) => { const p = window.__DB.partners.find(x => x.codice_amway === c); p.confermato_il = new Date().toISOString();
+  p.mappa_mese = m; }, [codice, new Intl.DateTimeFormat("en-CA", { timeZone:"Europe/Rome" }).format(new Date()).slice(0, 7) + "-01"]);
 await confermaCodice(page, "2000001");   // come dopo l'import della sua upline
 await page.click("button[data-act=vista-gruppo]");
 await page.getByText("Il mio gruppo").first().waitFor();
@@ -911,8 +913,8 @@ await page.click(".sheet button[data-act=chiudi]");
 const meseVecchio = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - 3); return d.toISOString().slice(0, 7).replace("-", ""); })();
 await scegliFile(page, "vecchio.csv", creaCsv(meseVecchio, righeCsv));
 await page.locator(".sheet .errore, .sheet button:has-text('Salva i numeri')").first().waitFor();
-check(await page.getByText("Prima importa il report del mese in corso").isVisible() || await page.getByText("È un mese chiuso: salvo solo i numeri").isVisible(),
-  "import: un mese chiuso salva solo i numeri (serve prima il codice dal mese in corso)");
+check(await page.getByText("Prima importa la mappa del mese più recente").isVisible() || await page.getByText("C'è già una mappa di un mese più recente").isVisible(),
+  "import: la mappa di un mese precedente all'ultima importata salva solo i numeri (serve prima il codice)");
 await mettiFile(page, { name:"report.xlsx", mimeType:"application/octet-stream", buffer:Buffer.from("PK") });
 check(await page.locator(".sheet").getByText("sul sito Amway scegli il formato CSV").isVisible(), "import: il file Excel non va, serve il CSV");
 await mettiFile(page, { name:"los.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, righeCsv)) });
@@ -1890,7 +1892,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const gaia = persona(1, "1000000", "7200001", "PROVA, GAIA", "120"); gaia[10] = "'10.500,00"; gaia[13] = "'21%";
   await scegliFile(page, "passato.csv", creaCsv(mm(-3).replace("-", ""), [gaia]));
   await page.locator(".sheet button", { hasText:"Salva i numeri" }).waitFor();
-  check(await page.getByText("È un mese chiuso: salvo solo i numeri").isVisible(), "report di un mese chiuso: si salvano solo i numeri");
+  check(await page.getByText("C'è già una mappa di un mese più recente: di").isVisible(), "046: la mappa di un mese precedente: si salvano solo i numeri");
   await page.click(".sheet button:has-text('Salva i numeri')");
   await page.getByText(/Numeri di .* salvati/).waitFor();
   check((await reqOro.locator(".num").innerText()) === "1 / 3" && await page.locator(".report-da-importare li.ok").count() === 1, "un mese al 21%: 1 su 3, il mese segnato ✓");
@@ -2072,7 +2074,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     { name:"sbagliato.csv", mimeType:"text/csv", buffer:Buffer.from("niente") }]);
   await page.locator(".sheet h2", { hasText:"Report di più mesi" }).waitFor();
   check(await page.locator(".sheet ul.imp li").count() === 2 && await page.getByText("sbagliato.csv:").isVisible()
-    && await page.getByText("(mese in corso): l'import completo").isVisible(), "anteprima: 2 mesi chiusi, il mese in corso dopo, il file sbagliato segnalato con il nome");
+    && await page.getByText("(il mese più recente): l'import completo").isVisible(), "anteprima: 2 mesi precedenti, la mappa più recente dopo, il file sbagliato segnalato con il nome");
   await page.click(".sheet button:has-text('Salva i numeri')");
   await page.getByText(/Numeri salvati: .*, /).waitFor();
   await sync(page);
@@ -2104,23 +2106,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
 
 // 38. Una sola struttura: la data del file decide, chi è in attesa non importa
 {
-  const conFile = async (pg, nome, testo, ms) => pg.evaluate(([n, t, m]) => {
-    const f = new File([t], n, { type:"text/csv", lastModified:m }), dt = new DataTransfer(); dt.items.add(f);
-    const i = document.querySelector(".sheet #file-report") || document.querySelector("input.file-amway"); i.files = dt.files; i.dispatchEvent(new Event("change", { bubbles:true })); }, [nome, testo, ms]);
-  const codR = DB.partners.find(p => p.id === "R").codice_amway;
-  DB.numeri = DB.numeri.filter(x => !(x.partner_id === "R" && x.mese === oggiStr.slice(0, 7)))
-    .concat([{ visto_da:"R", partner_id:"R", mese:oggiStr.slice(0, 7), vpp:300, vpg:5000, percentuale:15, linee:[], dati_al:new Date().toISOString() }]);
-  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
-  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
-  await page.click("button[data-act=vista-gruppo]");
-  await conFile(page, "vecchio.csv", creaCsv(meseFile, [persona(1, "9", codR, "ROSSI, MARIO", "120,00")]), Date.now() - 5 * 86400000);
-  await page.locator(".sheet .data-report").waitFor();
-  check((await page.locator(".sheet .data-report").innerText()).startsWith("File del ") && await page.locator(".sheet .data-report").getByText("più vecchio dell'ultimo importato").isVisible(),
-    "anteprima: la data del file e l'avviso che è più vecchio");
-  await page.click(".sheet button:has-text('Importa')");
-  await page.getByText(/già più aggiornat/).waitFor();
-  await sync(page); await ctx.close();
-  check((DB.numeri.filter(x => x.partner_id === "R" && x.mese === oggiStr.slice(0, 7)).pop() || {}).vpp === 300, "un file più vecchio non cambia i miei numeri");
+  /* 046: la data del file non decide più niente (decide il mese di competenza): i controlli sono nella sezione 51 */
   // chi è appena entrato (in attesa) non può importare
   ({ ctx, page } = await apri({}, invitoPer("R", "Quinto Prova", "7500001")));
   await page.getByText("Benvenuto in Growup").waitFor();
@@ -2889,6 +2875,59 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await scegliFile(page, "estero-io.csv", csvCon(testa17, [estero(1, "7600000", "7600001", "PROVA, MAPPA", "Spagna")].concat(persone51.slice(1))));
   await page.locator(".sheet .errore").waitFor();
   check((await page.locator(".sheet .errore").innerText()).startsWith("Questo file è di un codice di un altro Paese"), "045: il file di un codice estero è rifiutato");
+  await page.click(".sheet button[data-act=chiudi]");
+
+  // 46. Ogni mappa sostituisce la precedente: decide il «Mese di competenza», non la data del file
+  const conFile = async (nome, testo, ms) => page.evaluate(([n, t, m]) => {
+    const f = new File([t], n, { type:"text/csv", lastModified:m }), dt = new DataTransfer(); dt.items.add(f);
+    const i = document.querySelector(".sheet #file-report") || document.querySelector("input.file-amway"); i.files = dt.files; i.dispatchEvent(new Event("change", { bubbles:true })); }, [nome, testo, ms]);
+  const idCod = c => (DB.partners.find(p => p.codice_amway === c) || {}).id;
+  const conMese = (mese, righe) => csvCon(testa17, righe).replace(`"Mese di competenza","${meseFile}"`, `"Mese di competenza","${mese}"`);
+  // stesso mese, file scaricato 5 giorni fa: sostituisce lo stesso (numeri, posizioni e il nome vero di «Utente riservato»)
+  const stessoMese = [Object.assign({}, persone51[0], { "VPP":"'99,00" }), persone51[1],
+    Object.assign({}, persone51[2], { "Nome":"'RISERVA, RITA" }), Object.assign({}, persone51[3], { "Codice Amway Partner Sponsor":"'7600002", "Qualifica Amway Partner":"3" })];
+  await page.locator(".toast", { hasText:"Import di" }).waitFor({ state:"detached" });
+  await conFile("stesso-mese.csv", csvCon(testa17, stessoMese), Date.now() - 5 * 86400000);
+  await page.locator(".sheet .data-report").waitFor();
+  check((await page.locator(".sheet .data-report").innerText()).startsWith("File del ") && !(await page.getByText("più vecchio").count()),
+    "046: la data del file si vede, ma non c'è più l'avviso «più vecchio»");
+  await page.click(".sheet button:has-text('Importa')");
+  await page.locator(".toast", { hasText:"Import di" }).waitFor();
+  await sync(page);
+  const numMappa = m => (DB.numeri || []).filter(x => x.partner_id === "mappa51" && x.mese === m).pop() || {};
+  check(numMappa(oggiStr.slice(0, 7)).vpp === 99 && DB.partners.find(p => p.codice_amway === "7600004").sponsor_id === idCod("7600002"),
+    "046: una mappa dello stesso mese scaricata prima sostituisce comunque numeri e posizioni");
+  check(DB.partners.find(p => p.codice_amway === "7600003").nome === "Rita Riserva", "046: «Utente riservato» prende il nome vero quando il file lo mostra");
+  // un mese precedente: solo i numeri di quel mese, la struttura non cambia
+  const nomeMeseIt = m => ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"][Number(m.slice(5, 7)) - 1] + " " + m.slice(0, 4);
+  const mesePrima = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0, 7); })();
+  await page.locator(".toast", { hasText:"Import di" }).waitFor({ state:"detached" });
+  await scegliFile(page, "mese-prima.csv", conMese(mesePrima.replace("-", ""), [Object.assign({}, persone51[0], { "VPP":"'55,00", "VPG":"'7.777,00" }),
+    Object.assign({}, persone51[1], { "Codice Amway Partner Sponsor":"'7600004", "Qualifica Amway Partner":"4" })].concat(persone51.slice(2))));
+  await page.locator(".sheet button", { hasText:"Salva i numeri" }).waitFor();
+  check(await page.getByText(`C'è già una mappa di un mese più recente: di ${nomeMeseIt(mesePrima)} salvo solo i numeri`).isVisible(),
+    "046: la mappa di un mese precedente dice che salva solo i numeri di quel mese");
+  await page.click(".sheet button:has-text('Salva i numeri')");
+  await page.getByText(/Numeri di .* salvati/).waitFor();
+  await sync(page);
+  check(numMappa(mesePrima).vpg === 7777 && numMappa(oggiStr.slice(0, 7)).vpp === 99 && DB.partners.find(p => p.codice_amway === "7600002").sponsor_id === "mappa51"
+    && DB.partners.find(p => p.id === "mappa51").mappa_mese === oggiStr.slice(0, 7) + "-01",
+    "046: la mappa di un mese precedente salva i numeri di quel mese e non tocca struttura né mese della mappa");
+  // fuori dalla mappa da 12 mesi: l'import dell'admin lo cancella con i suoi dati
+  const unAnnoFa = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - 12); return d.toISOString().slice(0, 10); })();
+  await ctx.close();
+  DB.partners.find(p => p.codice_amway === "7600003").fuori_report_dal = unAnnoFa;
+  ({ ctx, page } = await apri({}, "#chiave=" + "d1".repeat(16)));
+  await page.getByText("Ciao Mappa").waitFor(); await apriTappa(page);
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await scegliFile(page, "senza-rita.csv", csvCon(testa17, [stessoMese[0], stessoMese[1], stessoMese[3]]));
+  await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+  check(await page.locator(".sheet .imp-cancellati", { hasText:"Fuori dalla mappa da 12 mesi · si cancellano 1" }).getByText("Rita Riserva (7600003)").isVisible(),
+    "046: anteprima: chi è fuori dalla mappa da 12 mesi si cancella");
+  await page.click(".sheet button:has-text('Importa')");
+  await page.getByText(/1 persona fuori dalla mappa da 12 mesi cancellata/).waitFor();
+  await sync(page);
+  check(!DB.partners.some(p => p.codice_amway === "7600003"), "046: cancellata con i suoi dati");
   await ctx.close();
 }
 

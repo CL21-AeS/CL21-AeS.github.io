@@ -120,6 +120,9 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 41b. `supabase/045_solo_italia.sql` — dalla mappa solo le righe con Paese = Italia: l'import riceve solo i codici esteri e
     cancella, con tutti i loro dati, i codici esteri già importati (persone senza app nella downline di chi importa; solo
     se importa un admin, per gli altri restano nascosti)
+41c. `supabase/046_mappa_del_mese.sql` — ogni mappa sostituisce la precedente: rifà la struttura solo la mappa con il mese
+    di competenza più recente (`partners.mappa_mese`), una mappa di un mese precedente salva solo i numeri; i numeri di un
+    mese sono sempre quelli dell'ultimo file; chi è fuori dalla mappa da 12 mesi si cancella (import di un admin)
 42. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 21. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**

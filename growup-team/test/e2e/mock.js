@@ -21,7 +21,7 @@
   const salvaNumero = (io, pid, m, r, al) => {
     const pp = db.partners.find(y => y.id === pid); if(pp && pp.stato !== "gestito" && !pp.confermato_il) pp.confermato_il = new Date().toISOString();
     if(r.vpg == null) return false;
-    const ora = numeroDi(pid, m); if(ora && String(ora.dati_al || "") > al) return false;
+    /* 046: i numeri di un mese sono sempre quelli dell'ultimo file importato di quel mese */
     db.numeri = (db.numeri || []).filter(x => !(x.partner_id === pid && x.mese === m))
       .concat([{ visto_da:io.id, partner_id:pid, mese:m, vpp:r.vpp, vpg:r.vpg, percentuale:r.percentuale, linee:r.linee || [], nascoste:!!r.nascoste, dati_al:al }]);
     return true; };
@@ -310,6 +310,10 @@
       const m = a.p_mese.slice(0, 7), al = a.p_dati_al && a.p_dati_al < new Date().toISOString() ? a.p_dati_al : new Date().toISOString();
       if(!io.codice_amway && a.p_io.codice) io.codice_amway = a.p_io.codice;
       else if(a.p_io.codice !== io.codice_amway) throw new Error("import_di_altri");
+      /* 046: rifà la struttura solo la mappa del mese più recente mai importato */
+      const mm = m + "-01";
+      if(io.mappa_mese && mm < io.mappa_mese) throw new Error("mappa_vecchia");
+      io.mappa_mese = mm;
       let aggiunte = 0, spostate = 0, fuori = 0, numeri = 0, vecchi = 0, esteri = 0;
       /* 045: i codici esteri non entrano; quelli già importati (senza app, nella mia downline) si cancellano con i loro dati */
       const est = a.p_esteri || [];
@@ -337,24 +341,34 @@
         if(!x){
           if(db.partners.some(p => p.codice_amway === r.codice)) continue;
           x = { id:uid(), nome:r.nome, sponsor_id:sp, stato:"gestito", gestore_id:io.id, codice_amway:r.codice, codice_invito:codiceInvito(),
-            partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString(), posizione_al:al,
+            partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString(), posizione_al:al, mappa_mese:mm,
             in_mappa_dal:secondo ? new Date().toISOString() : null };
           db.partners.push(x); aggiunte++;
           if((a.p_nascondi || []).includes(r.codice) || (db.esclusi || []).some(e => e.partner_id === io.id && e.codice === r.codice))
             db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:x.id }]);
-        } else if(!x.posizione_al || x.posizione_al <= al){
+        } else if(!x.mappa_mese || x.mappa_mese <= mm){
           if(x.sponsor_id !== sp && sp !== x.id && !giu(x.id).includes(sp)){ x.sponsor_id = sp; spostate++; }
-          x.posizione_al = al; x.fuori_report_dal = null; if(x.stato === "gestito") x.gestore_id = io.id;
+          x.posizione_al = al; x.mappa_mese = mm; x.fuori_report_dal = null; if(x.stato === "gestito") x.gestore_id = io.id;
+          if(x.stato === "gestito" && x.nome === "Utente riservato" && r.nome) x.nome = r.nome;
         }
         db.esclusi = (db.esclusi || []).filter(e => !(e.partner_id === io.id && e.codice === r.codice));
         if(salvaNumero(io, x.id, m, r, al)) numeri++; else vecchi++;
       }
       for(const pid of a.p_fuori || []){ const x = db.partners.find(y => y.id === pid);
         if(!x || x.stato !== "gestito" || !vedo(io, x)) throw new Error("non_autorizzato");
-        if(!x.fuori_report_dal && (!x.posizione_al || x.posizione_al <= al)){ x.fuori_report_dal = a.p_mese; x.posizione_al = al;
+        if(!x.fuori_report_dal && (!x.mappa_mese || x.mappa_mese <= mm)){ x.fuori_report_dal = a.p_mese; x.posizione_al = al; x.mappa_mese = mm;
           db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:x.id }]); fuori++; } }
+      /* 046: fuori dalla mappa da 12 mesi: l'import di un admin lo cancella */
+      let cancellati = 0;
+      if(io.is_admin){ const [y, mo] = m.split("-").map(Number), limite = `${y - 1}-${String(mo).padStart(2, "0")}-01`;
+        for(const x of sotto(io.id).filter(p => p.stato === "gestito" && p.fuori_report_dal && p.fuori_report_dal <= limite)){
+          db.partners.filter(p => p.sponsor_id === x.id).forEach(p => { p.sponsor_id = x.sponsor_id; });
+          db.partners = db.partners.filter(p => p.id !== x.id);
+          db.numeri = (db.numeri || []).filter(n => n.partner_id !== x.id);
+          db.activities = (db.activities || []).filter(n => n.partner_id !== x.id);
+          cancellati++; } }
       salva();
-      return { aggiunte, spostate, fuori, aggiornati:numeri, piu_vecchi:vecchi, esteri, esteri_nascosti:esteriNascosti }; },
+      return { cancellati, aggiunte, spostate, fuori, aggiornati:numeri, piu_vecchi:vecchi, esteri, esteri_nascosti:esteriNascosti }; },
     prossime: async () => { const io = mio(); if(!io) return [];
       return visibiliRicuciti(io).filter(p => p.prossima_qualifica).map(p => ({ partner_id:p.id, prossima_qualifica:p.prossima_qualifica })); },
     nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid);
