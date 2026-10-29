@@ -41,9 +41,11 @@ rifà la struttura solo la mappa con il «Mese di competenza» più recente, una
 numeri di quel mese; un italiano che esce dalla mappa resta nascosto e si cancella dopo 12 mesi.
 - **Punto 6 · livello di profondità**: «Qualifica Amway Partner» contiene il livello (1 = chi ha scaricato il file), non
   la qualifica: serve solo a trovare la riga di chi importa, non si salva. Verificato con un test (riga 1 in fondo al file). App v61.
-- **Punto 3 · privacy**: dalla mappa si leggono solo codice, nome, sponsor, VPP, VPG, percentuale, dimensioni del gruppo
-  e livello; telefono, email, indirizzo e date non arrivano mai al database (test sui dati inviati, anche per i mesi
-  chiusi; scritto nel foglio dell'import). Nel database: `partners.email` esiste dal primo schema ma è vuota e l'app non
+- **Punto 3 · privacy** (migrazione **044b**): dalla mappa si leggono solo codice, nome, sponsor, **data di ingresso**, VPP,
+  VPG, percentuale, dimensioni del gruppo e livello; telefono, email, indirizzo e data di rinnovo non arrivano mai al
+  database (test sui dati inviati, anche per i mesi chiusi; scritto nel foglio dell'import). La data di ingresso della
+  mappa fa fede: va in `partners.data_iscrizione` per tutti (anche chi importa e chi usa l'app); una data non valida o
+  fuori dal 2000-oggi si ignora. Nel database: `partners.email` esiste dal primo schema ma è vuota e l'app non
   la usa; `persone.contatto` viene da Lista e Clienti, non dalla mappa. App v62.
 
 ## Fermi la sera del 21 ottobre 2026
