@@ -361,7 +361,9 @@
       /* 046: fuori dalla mappa da 12 mesi: l'import di un admin lo cancella */
       let cancellati = 0;
       if(io.is_admin){ const [y, mo] = m.split("-").map(Number), limite = `${y - 1}-${String(mo).padStart(2, "0")}-01`;
-        for(const x of sotto(io.id).filter(p => p.stato === "gestito" && p.fuori_report_dal && p.fuori_report_dal <= limite)){
+        const nelFile = new Set(a.p_persone.map(r => r.codice));
+        for(const x of sotto(io.id).filter(p => p.stato === "gestito" && p.fuori_report_dal && p.fuori_report_dal <= limite
+            && !nelFile.has(p.codice_amway) && (!p.mappa_mese || p.mappa_mese <= mm))){
           db.partners.filter(p => p.sponsor_id === x.id).forEach(p => { p.sponsor_id = x.sponsor_id; });
           db.partners = db.partners.filter(p => p.id !== x.id);
           db.numeri = (db.numeri || []).filter(n => n.partner_id !== x.id);

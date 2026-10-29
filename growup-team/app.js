@@ -2772,7 +2772,8 @@ function analizzaReport(rep, piuRecente){
     if(r){ a.aggiorna.push({ p, r }); usati.add(r.codice); }
     else if(p.codice_amway && !esteri.has(p.codice_amway) && !p.fuori_report_dal && !sottoNascosto(p)) a.mancanti.push(p);
     /* fuori dalla mappa da 12 mesi e ancora assente: l'import di un admin lo cancella */
-    else if(!r && io.is_admin && p.fuori_report_dal && meseDi(p.fuori_report_dal) <= spostaMese(m, -12)) a.daCancellare.push(p);
+    else if(!r && io.is_admin && p.fuori_report_dal && meseDi(p.fuori_report_dal) <= spostaMese(m, -12)
+      && (!p.mappa_mese || meseDi(p.mappa_mese) <= m)) a.daCancellare.push(p);
   }
   /* l'import è sempre completo: tutte le persone del report entrano nella mia struttura */
   for(const r of rep.righe) if(!usati.has(r.codice)) a.nuovi.push(r);

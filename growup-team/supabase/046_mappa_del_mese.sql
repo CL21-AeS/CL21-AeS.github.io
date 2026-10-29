@@ -100,6 +100,11 @@ begin
   end if;
   -- 046: rifà la struttura solo la mappa con il mese più recente mai importato (per me); una mappa di un mese
   -- precedente salva solo i numeri (salva_mese_passato)
+  -- il mese di competenza non può essere futuro né più vecchio di 24 mesi (bloccherebbe le mappe vere)
+  if m > date_trunc('month', (now() at time zone 'Europe/Rome')::date)::date
+     or m < (date_trunc('month', (now() at time zone 'Europe/Rome')::date) - interval '24 months')::date then
+    raise exception 'import_non_valido';
+  end if;
   if me.mappa_mese is not null and m < me.mappa_mese then
     raise exception 'mappa_vecchia';
   end if;
@@ -209,11 +214,13 @@ begin
 
   -- 046: un italiano fuori dalla mappa da 12 mesi (persona senza app della mia downline) si cancella con i suoi dati
   -- (chi stava sotto passa al suo sponsor). Come per i codici esteri, cancella solo l'import di un admin: per gli altri
-  -- resta nascosto.
+  -- resta nascosto. Mai chi è nel file appena importato o chi ha messo al suo posto una mappa più recente.
   if me.is_admin then
     for x in select g.* from public.partners g
               where g.stato = 'gestito' and g.fuori_report_dal is not null and g.id <> io
-                and g.fuori_report_dal <= (m - interval '12 months')::date and public.is_in_downline(g.id) loop
+                and g.fuori_report_dal <= (m - interval '12 months')::date and public.is_in_downline(g.id)
+                and (g.mappa_mese is null or g.mappa_mese <= m)
+                and not exists (select 1 from jsonb_array_elements(p_persone) j where j->>'codice' = g.codice_amway) loop
       update public.partners set sponsor_id = x.sponsor_id where sponsor_id = x.id;
       update public.partners set gestore_id = null where gestore_id = x.id;
       update public.partners set creato_da = null where creato_da = x.id;
