@@ -314,6 +314,8 @@
       const mm = m + "-01";
       if(io.mappa_mese && mm < io.mappa_mese) throw new Error("mappa_vecchia");
       io.mappa_mese = mm;
+      /* 044b: la data di ingresso della mappa fa fede */
+      if(a.p_io.ingresso) io.data_iscrizione = a.p_io.ingresso;
       let aggiunte = 0, spostate = 0, fuori = 0, numeri = 0, vecchi = 0, esteri = 0;
       /* 045: i codici esteri non entrano; quelli già importati (senza app, nella mia downline) si cancellano con i loro dati */
       const est = a.p_esteri || [];
@@ -342,7 +344,7 @@
           if(db.partners.some(p => p.codice_amway === r.codice)) continue;
           x = { id:uid(), nome:r.nome, sponsor_id:sp, stato:"gestito", gestore_id:io.id, codice_amway:r.codice, codice_invito:codiceInvito(),
             partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString(), posizione_al:al, mappa_mese:mm,
-            in_mappa_dal:secondo ? new Date().toISOString() : null };
+            in_mappa_dal:secondo ? new Date().toISOString() : null, data_iscrizione:r.ingresso || null };
           db.partners.push(x); aggiunte++;
           if((a.p_nascondi || []).includes(r.codice) || (db.esclusi || []).some(e => e.partner_id === io.id && e.codice === r.codice))
             db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:x.id }]);
@@ -350,6 +352,7 @@
           if(x.sponsor_id !== sp && sp !== x.id && !giu(x.id).includes(sp)){ x.sponsor_id = sp; spostate++; }
           x.posizione_al = al; x.mappa_mese = mm; x.fuori_report_dal = null; if(x.stato === "gestito") x.gestore_id = io.id;
           if(x.stato === "gestito" && x.nome === "Utente riservato" && r.nome) x.nome = r.nome;
+          if(r.ingresso) x.data_iscrizione = r.ingresso;
         }
         db.esclusi = (db.esclusi || []).filter(e => !(e.partner_id === io.id && e.codice === r.codice));
         if(salvaNumero(io, x.id, m, r, al)) numeri++; else vecchi++;

@@ -135,6 +135,8 @@ begin
     end if;
   end loop;
 
+  -- 044b: la data di ingresso della mappa fa fede, anche per chi importa
+  update public.partners set data_iscrizione = coalesce(public.data_ingresso(p_io), data_iscrizione) where id = io;
   if public.salva_numero(io, io, m, p_io, al) then numeri := numeri + 1; else vecchi := vecchi + 1; end if;
 
   -- copie di persone che ora usano l'app (stesso codice): spariscono, chi sta sotto passa a chi usa l'app
@@ -171,8 +173,9 @@ begin
       if length(btrim(coalesce(r->>'nome', ''))) = 0 then
         raise exception 'import_non_valido';
       end if;
-      insert into public.partners (nome, sponsor_id, stato, gestore_id, codice_amway, consenso_confermato_il, creato_da, posizione_al, mappa_mese)
-      values (left(btrim(r->>'nome'), 80), sp, 'gestito', io, cod, now(), io, al, m)
+      insert into public.partners (nome, sponsor_id, stato, gestore_id, codice_amway, consenso_confermato_il, creato_da, posizione_al, mappa_mese,
+                                   data_iscrizione)
+      values (left(btrim(r->>'nome'), 80), sp, 'gestito', io, cod, now(), io, al, m, public.data_ingresso(r))
       returning * into x;
       aggiunte := aggiunte + 1;
       if cod = any(coalesce(p_nascondi, '{}'))
@@ -191,6 +194,7 @@ begin
       -- chi era «non più nel report» e ricompare riprende il suo posto e i suoi dati; «Utente riservato» prende il nome
       -- vero quando il file lo mostra
       update public.partners set posizione_al = al, mappa_mese = m, fuori_report_dal = null,
+             data_iscrizione = coalesce(public.data_ingresso(r), data_iscrizione),
              gestore_id = case when stato = 'gestito' then io else gestore_id end,
              nome = case when stato = 'gestito' and nome = 'Utente riservato' and length(btrim(coalesce(r->>'nome', ''))) > 0
                          then left(btrim(r->>'nome'), 80) else nome end

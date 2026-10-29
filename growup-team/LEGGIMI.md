@@ -117,6 +117,7 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     con un profilo (l'ingresso riceve le qualifiche con l'invito); il punto di partenza solo da `modifica_partenza`;
     notifiche solo dai servizi ufficiali e prova limitata (`notifiche_prova_ok`, con la Edge Function aggiornata);
     indici e regole di accesso più veloci
+41a. `supabase/044b_data_ingresso.sql` — la «Data di ingresso» della mappa va nella data di iscrizione (la mappa fa fede)
 41b. `supabase/045_solo_italia.sql` — dalla mappa solo le righe con Paese = Italia: l'import riceve solo i codici esteri e
     cancella, con tutti i loro dati, i codici esteri già importati (persone senza app nella downline di chi importa; solo
     se importa un admin, per gli altri restano nascosti)
