@@ -2690,8 +2690,8 @@ function leggiReport(testo){
   const manca = [["codice", "Codice Amway Partner"], ["sponsor", "Codice Amway Partner Sponsor"], ["nome", "Nome"], ["vpp", "VPP"], ["paese", "Paese"]]
     .filter(([k]) => c[k] < 0).map(([, n]) => `«${n}»`);
   if(manca.length) return { errore:`Nel file manca${manca.length > 1 ? "no le colonne" : " la colonna"} ${manca.join(", ")}: scaricalo di nuovo dal sito Amway.` };
-  /* solo Paese = Italia: delle righe di altri Paesi si tiene solo il codice (per cancellarlo se era già stato importato)
-     e lo sponsor (per il controllo qui sotto), nient'altro */
+  /* solo Paese = Italia: le righe di altri Paesi si scartano e non arrivano mai al database; qui se ne tengono solo
+     codice e sponsor, per il controllo qui sotto (un italiano non sta mai sotto un codice estero) */
   const righe = [], esteri = [];
   for(const r of tutte.slice(iTesta + 1)){
     const codice = soloCifre(pulito(r[c.codice]));
@@ -2755,9 +2755,6 @@ function analizzaReport(rep, piuRecente){
   const mie = altri.filter(p => p.stato === "gestito");
   const a = { mese:m, prima, codiceMio:!io.codice_amway, perCodice, aggiorna:[], mancanti:[], usanoApp:[], usanoAppMancanti:[], daCancellare:[],
               spostati:[], nuovi:[], totale:rep.righe.length, esteri:rep.esteri || [] };
-  /* 045: i codici esteri già nella mia struttura (persone senza app) si cancellano con i loro dati */
-  const esteri = new Set(a.esteri);
-  a.esteriNellApp = mie.filter(p => p.codice_amway && esteri.has(p.codice_amway));
   const usati = new Set([prima.codice]);
   for(const p of altri.filter(p => p.stato !== "gestito")){
     const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
@@ -2773,7 +2770,7 @@ function analizzaReport(rep, piuRecente){
   for(const p of mie){
     const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
     if(r){ a.aggiorna.push({ p, r }); usati.add(r.codice); }
-    else if(p.codice_amway && !esteri.has(p.codice_amway) && !p.fuori_report_dal && !sottoNascosto(p)) a.mancanti.push(p);
+    else if(p.codice_amway && !p.fuori_report_dal && !sottoNascosto(p)) a.mancanti.push(p);
     /* fuori dalla mappa da 12 mesi e ancora assente: l'import di un admin lo cancella */
     else if(!r && io.is_admin && p.fuori_report_dal && meseDi(p.fuori_report_dal) <= spostaMese(m, -12)
       && (!p.mappa_mese || meseDi(p.mappa_mese) <= m)) a.daCancellare.push(p);
@@ -2890,11 +2887,6 @@ function vImporta(){
     ${a.daCancellare.length ? sezione(`Fuori dalla mappa da 12 mesi · si cancellano ${a.daCancellare.length}`,
       `<p class="small">${a.daCancellare.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})`).join(", ")}</p>`,
       "Non sono più ricomparsi in una mappa da 12 mesi: si cancellano con tutti i loro dati.", "imp-cancellati") : ""}
-    ${a.esteriNellApp.length ? sezione(`Di altri Paesi · ${st.profilo.is_admin ? "si cancellano" : "si nascondono"} ${a.esteriNellApp.length}`,
-      `<p class="small">${a.esteriNellApp.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})`).join(", ")}</p>`,
-      st.profilo.is_admin ? "Si importano solo i codici italiani: questi codici di altri Paesi erano già nell'app e si cancellano con tutti i loro dati."
-        : "Si importano solo i codici italiani: questi codici di altri Paesi erano già nell'app. Restano nascosti; li cancella l'import di Stefano e Alessia.",
-      "imp-esteri") : ""}
     ${a.usanoApp.length || a.usanoAppMancanti.length ? sezione("Usano l'app: posizione e numeri dal report",
       `<p class="small">${plur(a.usanoApp.length, "persona trovata", "persone trovate")} nel report.
         ${a.spostati.length ? `<br>Vanno sotto il loro sponsor del report: ${a.spostati.map(x => `<b>${esc(x.p.nome)}</b> (da ${esc(x.da)} a ${esc(x.a)})`).join(", ")}.` : ""}
@@ -3100,7 +3092,7 @@ async function eseguiImport(f){
   try{
     const esito = await api.importaMappa({ p_mese:a.mese + "-01", p_dati_al:a.datiAl || new Date().toISOString(),
       p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp, ingresso:a.prima.ingresso }, numeri(a.prima)), p_persone:persone,
-      p_nascondi:[...nascondi], p_fuori:a.mancanti.map(p => p.id), p_esteri:a.esteri }) || {};
+      p_nascondi:[...nascondi], p_fuori:a.mancanti.map(p => p.id) }) || {};
     st.profilo = Object.assign({}, st.profilo, { mappa_mese:a.mese + "-01" }, a.codiceMio ? { codice_amway:a.prima.codice } : {});
     if(daNascondere.length) await api.nascondiTanti(io.id, daNascondere);
     if(daMostrare.length) await api.mostraTanti(io.id, daMostrare);
@@ -3114,9 +3106,7 @@ async function eseguiImport(f){
     toast(`Import di ${nomeMese(a.mese).split(" ")[0]}: ${[n("aggiunte") ? plur(n("aggiunte"), "persona aggiunta", "persone aggiunte") : "",
       plur(n("aggiornati"), "persona aggiornata", "persone aggiornate"), n("piu_vecchi") ? plur(n("piu_vecchi"), "già più aggiornata", "già più aggiornate") : "", n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
       n("fuori") ? plur(n("fuori"), "persona non più nel report", "persone non più nel report") : "",
-      n("esteri") ? plur(n("esteri"), "codice di altri Paesi cancellato", "codici di altri Paesi cancellati") : "",
       n("cancellati") ? plur(n("cancellati"), "persona fuori dalla mappa da 12 mesi cancellata", "persone fuori dalla mappa da 12 mesi cancellate") : "",
-      n("esteri_nascosti") ? plur(n("esteri_nascosti"), "codice di altri Paesi nascosto", "codici di altri Paesi nascosti") : "",
       daNascondere.length ? plur(daNascondere.length, "nascosta", "nascoste") : "",
       daMostrare.length ? plur(daMostrare.length, "di nuovo visibile", "di nuovo visibili") : ""].filter(Boolean).join(", ")}`);
   }catch(e){

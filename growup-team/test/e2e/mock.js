@@ -316,22 +316,7 @@
       io.mappa_mese = mm;
       /* 044b: la data di ingresso della mappa fa fede */
       if(a.p_io.ingresso) io.data_iscrizione = a.p_io.ingresso;
-      let aggiunte = 0, spostate = 0, fuori = 0, numeri = 0, vecchi = 0, esteri = 0;
-      /* 045: i codici esteri non entrano; quelli già importati (senza app, nella mia downline) si cancellano con i loro dati */
-      const est = a.p_esteri || [];
-      if(a.p_persone.some(r => est.includes(r.codice)) || est.includes(io.codice_amway)) throw new Error("import_non_valido");
-      let esteriNascosti = 0;
-      for(const x of sotto(io.id).filter(p => p.stato === "gestito" && est.includes(p.codice_amway))){
-        if(!io.is_admin){ x.fuori_report_dal = x.fuori_report_dal || a.p_mese;
-          if(!(db.nascosti || []).some(n => n.partner_id === io.id && n.nascosto_id === x.id)) db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:x.id }]);
-          esteriNascosti++; continue; }
-        db.partners.filter(p => p.sponsor_id === x.id).forEach(p => { p.sponsor_id = x.sponsor_id; });
-        db.partners = db.partners.filter(p => p.id !== x.id);
-        db.numeri = (db.numeri || []).filter(n => n.partner_id !== x.id);
-        db.activities = (db.activities || []).filter(n => n.partner_id !== x.id);
-        db.nascosti = (db.nascosti || []).filter(n => n.nascosto_id !== x.id);
-        esteri++;
-      }
+      let aggiunte = 0, spostate = 0, fuori = 0, numeri = 0, vecchi = 0;
       /* 035: i codici nuovi contano nel gruppo solo dal secondo import di chi importa */
       const secondo = !!io.primo_import_il; if(!io.primo_import_il) io.primo_import_il = new Date().toISOString();
       if(salvaNumero(io, io.id, m, a.p_io, al)) numeri++; else vecchi++;
@@ -373,7 +358,7 @@
           db.activities = (db.activities || []).filter(n => n.partner_id !== x.id);
           cancellati++; } }
       salva();
-      return { cancellati, aggiunte, spostate, fuori, aggiornati:numeri, piu_vecchi:vecchi, esteri, esteri_nascosti:esteriNascosti }; },
+      return { cancellati, aggiunte, spostate, fuori, aggiornati:numeri, piu_vecchi:vecchi }; },
     prossime: async () => { const io = mio(); if(!io) return [];
       return visibiliRicuciti(io).filter(p => p.prossima_qualifica).map(p => ({ partner_id:p.id, prossima_qualifica:p.prossima_qualifica })); },
     nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid);

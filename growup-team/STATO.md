@@ -5,8 +5,9 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
 ## Ripartire da qui (fermi la sera del 28 ottobre 2026)
 
-**Dove siamo**: migrazioni applicate su Supabase fino alla **044** (la 045 e la 046 dell'import mappe sono nelle PR del 29 ottobre) (verificata sul database il 28 ottobre); funzione
-`invia-notifiche` v2 pubblicata. PR unite fino alla **#131**, nessuna aperta; il ramo di lavoro va ricreato da main.
+**Dove siamo** (aggiornato il 30 ottobre): migrazioni applicate su Supabase fino alla **046** (044b, 045 e 046 applicate
+dal connettore il 30 ottobre); funzione `invia-notifiche` v2 pubblicata. PR unite fino alla **#137** (import mappe). I 7
+codici esteri importati prima della regola «solo Italia» sono stati cancellati dal database il 30 ottobre (su ok di Stefano).
 Gruppi A–D del controllo di sicurezza fatti e uniti. **Grafica** (skill frontend-design, una PR per punto, schermate
 prima/dopo a 360 px chiaro e scuro nella pagina privata «Growup · grafica prima e dopo» di Stefano): punti **1–5 fatti**
 (sotto-linguette scure, colori con significato fisso, colori della profondità, Stabilità della tua rete, filtri di Persone).
@@ -26,11 +27,19 @@ prima/dopo a 360 px chiaro e scuro nella pagina privata «Growup · grafica prim
    «Chiuso senza risposta», separato dai «No» veri). Quando si chiude un contatto l'app chiede «Vuoi che te lo ricordi tra
    6 mesi?»: se sì, dopo 6 mesi torna in «Da riprendere». Dati: colonna nuova su `persone` (data «ricordamelo dal») e il
    nuovo valore di esito; calcolo nell'app dai passi; all'upline solo i numeri; il riepilogo del mattino può contare i
-   contatti fermi senza nomi. Migrazione 045 con i controlli in `tests_rls.sql` e i test e2e.
+   contatti fermi senza nomi. Migrazione nuova (il numero 045 è stato usato dall'import mappe) con i controlli in
+   `tests_rls.sql` e i test e2e.
 4. A parte, per Stefano: il compito suggerito sui campi dei fogli che si svuotano quando l'app ridisegna (render).
 
 **Come si lavora alla grafica**: prima/dopo con la stessa API finta dei test, a 360 px; spiegare in due righe cosa cambia
 per i partner prima di ogni PR; `sw.js` va alzato a ogni consegna (ora v60).
+
+## Import delle mappe Amway, seconda revisione (30 ottobre 2026)
+
+Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup legge e mostra, non corregge niente.
+- **Codici esteri** (migrazione **047**): le righe estere si scartano e basta, con qualsiasi import. Tolta la regola della
+  045 (il database riceveva i codici esteri per cancellarli o nasconderli): l'app non li manda più e `p_esteri` è
+  ignorato. Un codice che esce dalla mappa italiana segue la regola di tutti quelli che escono. App v66.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 
