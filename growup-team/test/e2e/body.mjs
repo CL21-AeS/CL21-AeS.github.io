@@ -2777,6 +2777,64 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.persone = DB.persone.filter(x => x.id !== pid);
 }
 
+// 51. Import mappe: i due export di Amway (17 colonne «KPI selezionati», 26 «tutti i KPI»), stesse persone, colonne per nome
+{
+  const testa17 = ["Qualifica Amway Partner","Codice Amway Partner Sponsor","Codice Amway Partner","Paese","Nome","Data di ingresso","Telefono",
+    "Email","Indirizzo","Data di rinnovo","VPG","VPP","Percentuale di bonus","VVG","VP Cliente"," Clienti","Punti al livello successivo"];
+  const altre26 = ["VP reso","VP Rubino","Linee qualificate","Dimensioni gruppo","Numero ordini personali","Numero ordini multicarrello",
+    "Sponsorizzazione","VPP annuali","Totale VP organizzazione"];
+  /* nel file con tutti i KPI le colonne stanno in un altro ordine: si devono trovare per nome */
+  const testa26 = altre26.slice(0, 4).concat(testa17.slice().reverse(), altre26.slice(4));
+  check(testa17.length === 17 && testa26.length === 26, "i due formati: 17 e 26 colonne");
+  const p51 = (liv, sp, cod, nome, vpp, vpg, perc, dim, riservato) => ({ "Qualifica Amway Partner":String(liv), "Codice Amway Partner Sponsor":"'" + sp,
+    "Codice Amway Partner":"'" + cod, "Paese":"'Italia", "Nome":riservato ? "Utente riservato/non visualizzabile" : "'" + nome,
+    "Data di ingresso":"'01 gennaio 2020", "Telefono":riservato ? "" : "'Principale: +39 333 0000000", "Email":riservato ? "" : "'prova@esempio.it",
+    "Indirizzo":"'Via Prova | XX | 00000 | Italia", "Data di rinnovo":"'31 dicembre 2026", "VPG":"'" + vpg, "VPP":"'" + vpp,
+    "Percentuale di bonus":"'" + perc + "%", "VVG":"35345.4", "VP Cliente":"'0,00", " Clienti":"'0", "Punti al livello successivo":"0",
+    "VP reso":"0", "VP Rubino":"0", "Linee qualificate":"0", "Dimensioni gruppo":"'" + dim, "Numero ordini personali":"0",
+    "Numero ordini multicarrello":"0", "Sponsorizzazione":"'S999999", "VPP annuali":"'1.000,00", "Totale VP organizzazione":"35345.4" });
+  const persone51 = [p51(1, "7600000", "7600001", "PROVA, MAPPA", "120,50", "15.626,29", 9, 4),
+    p51(2, "7600001", "7600002", "PRIMO, ALDO", "80,00", "300,00", 3, 2), p51(3, "7600002", "7600003", "", "10,00", "10,00", 0, 1, true),
+    p51(2, "7600001", "7600004", "SECONDA, BICE", "0,00", "0,00", 0, 1)];
+  const csv51 = testa => "\ufeff" + [csvRiga(["Amway","CONFIDENZIALE - REPORT DI PROVA"]), csvRiga(["Mese di competenza", meseFile]), csvRiga(testa)]
+    .concat(persone51.map(p => csvRiga(testa.map(t => p[t])))).join("\n");
+  DB.partners.push({ id:"mappa51", nome:"Mappa Prova", sponsor_id:"R", stato:"attivo", chiave:"d1".repeat(16), codice_invito:"MAP51A", codice_amway:"7600001",
+    privacy_accettata_il:"2026-10-01T00:00:00Z", partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() });
+  ({ ctx, page } = await apri({}, "#chiave=" + "d1".repeat(16)));
+  await page.getByText("Ciao Mappa").waitFor(); await apriTappa(page);
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  const importa51 = async (nome, testo, nuovi) => {
+    await page.locator(".toast", { hasText:"Import di" }).waitFor({ state:"detached" });
+    await scegliFile(page, nome, testo);
+    await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+    if(nuovi) await page.check(".sheet input[name=consenso]");
+    await page.click(".sheet button:has-text('Importa')");
+    await page.locator(".toast", { hasText:"Import di" }).waitFor();
+    await sync(page); return JSON.parse(JSON.stringify(DB.ultimoImport));
+  };
+  await scegliFile(page, "kpi-selezionati.csv", csv51(testa17));
+  await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+  check(await page.locator(".sheet .imp-sezione", { hasText:"Nuovi nel report · 3" }).isVisible()
+    && await page.locator(".sheet .imp-nuovi label", { hasText:"Utente riservato" }).isVisible(), "17 colonne: tre persone nuove, «Utente riservato» con il suo nome");
+  await page.click(".sheet button[data-act=chiudi]");
+  const da17 = await importa51("kpi-selezionati.csv", csv51(testa17), true);
+  check(Math.abs(da17.p_io.vpg - 15626.29) < 0.001 && da17.p_io.vpp === 120.5 && da17.p_io.percentuale === 9,
+    "17 colonne: numeri in formato italiano letti (15.626,29 VPG, 120,50 VPP, 9%)");
+  check(da17.p_persone.map(r => r.codice).join() === "7600002,7600004,7600003" && da17.p_persone.find(r => r.codice === "7600003").nome === "Utente riservato"
+    && da17.p_persone.find(r => r.codice === "7600003").sponsor === "7600002", "17 colonne: posizioni e sponsor dal file");
+  check(!/S999999|Sponsorizzazione/.test(JSON.stringify(da17)), "la colonna «Sponsorizzazione» non si legge");
+  const da26 = await importa51("tutti-i-kpi.csv", csv51(testa26), false);
+  check(JSON.stringify(da26.p_io) === JSON.stringify(da17.p_io) && JSON.stringify(da26.p_persone) === JSON.stringify(da17.p_persone),
+    "26 colonne in un altro ordine: al database arrivano esattamente gli stessi dati del file a 17 colonne");
+  check(!/S999999|\+39|@|Via Prova/.test(JSON.stringify(da26)), "26 colonne: niente Sponsorizzazione, telefono, email, indirizzo");
+  check(DB.partners.filter(p => ["7600002", "7600003", "7600004"].includes(p.codice_amway)).length === 3, "26 colonne dopo 17: nessun doppione");
+  // senza la colonna dello sponsor non si può rifare la struttura: il file è rifiutato
+  await scegliFile(page, "senza-sponsor.csv", csv51(testa17.filter(t => t !== "Codice Amway Partner Sponsor")));
+  await page.locator(".sheet .errore").waitFor();
+  check((await page.locator(".sheet .errore").innerText()).includes("manca la colonna «Codice Amway Partner Sponsor»"), "senza la colonna dello sponsor: rifiutato, con il nome della colonna");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
