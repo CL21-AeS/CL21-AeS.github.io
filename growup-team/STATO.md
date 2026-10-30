@@ -5,7 +5,7 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
 ## Ripartire da qui (fermi la sera del 28 ottobre 2026)
 
-**Dove siamo**: migrazioni applicate su Supabase fino alla **044** (verificata sul database il 28 ottobre); funzione
+**Dove siamo**: migrazioni applicate su Supabase fino alla **044** (la 045 e la 046 dell'import mappe sono nelle PR del 29 ottobre) (verificata sul database il 28 ottobre); funzione
 `invia-notifiche` v2 pubblicata. PR unite fino alla **#131**, nessuna aperta; il ramo di lavoro va ricreato da main.
 Gruppi A–D del controllo di sicurezza fatti e uniti. **Grafica** (skill frontend-design, una PR per punto, schermate
 prima/dopo a 360 px chiaro e scuro nella pagina privata «Growup · grafica prima e dopo» di Stefano): punti **1–5 fatti**
@@ -52,6 +52,13 @@ numeri di quel mese; un italiano che esce dalla mappa resta nascosto e si cancel
   «Sponsorizzazione» non si legge; «Utente riservato/non visualizzabile» entra come «Utente riservato». Senza «Dimensioni
   gruppo» (17 colonne) chi non ha nessuno sotto nel file può nascondere un gruppo: chi sta sotto di lui non va «fuori dal
   report». Test: stesse persone nei due formati → al database arrivano esattamente gli stessi dati. App v63.
+- **Punto 1 · solo Italia** (migrazione **045**, da applicare): colonna «Paese» obbligatoria; si tengono solo le righe
+  «Italia»; delle estere l'app tiene solo il codice e lo manda a `importa_mappa`, che cancella con tutti i dati i codici
+  esteri già importati (solo persone senza app nella downline di chi importa, e solo se importa un admin: per gli altri
+  restano nascosti e segnati, perché i codici arrivano dal telefono e non si possono verificare). L'import si ferma se un italiano ha come
+  sponsor un codice estero presente nel file, o se la riga 1 è estera; lo sponsor della prima riga (fuori dal file) va
+  bene. Anteprima: «N persone nel file (più M di altri Paesi, che non si salvano)» e la sezione «Di altri Paesi · si
+  cancellano». App v64.
 
 ## Fermi la sera del 21 ottobre 2026
 

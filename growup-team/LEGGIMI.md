@@ -118,6 +118,9 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     notifiche solo dai servizi ufficiali e prova limitata (`notifiche_prova_ok`, con la Edge Function aggiornata);
     indici e regole di accesso più veloci
 41a. `supabase/044b_data_ingresso.sql` — la «Data di ingresso» della mappa va nella data di iscrizione (la mappa fa fede)
+41b. `supabase/045_solo_italia.sql` — dalla mappa solo le righe con Paese = Italia: l'import riceve solo i codici esteri e
+    cancella, con tutti i loro dati, i codici esteri già importati (persone senza app nella downline di chi importa; solo
+    se importa un admin, per gli altri restano nascosti)
 42. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 21. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
