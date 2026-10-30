@@ -3835,7 +3835,8 @@ function maiComprato(p){ return !!p.codice_cliente && p.esito !== "cliente" && !
 function rigaPersona(p, suIo){
   const f = FASI[indiceFase(p.fase)], fermo = !p.prossima_data && !p.esito && p.fase !== "lista" ? giorniTra(ultimoPasso(p), oggi()) : 0;
   return `<li class="${suIo ? "su-io" : ""}"><button class="persona" data-act="apri-persona" data-id="${esc(p.id)}">
-      <span class="grow"><b>${esc(p.nome)}</b>${maiComprato(p) ? ` <span class="pill g mini">Mai comprato</span>` : ""}<br><span class="small">${p.esito ? ESITI[p.esito] : f.nome}${p.prossima_data ? " · " + esc(testoProssima(p))
+      <span class="grow"><b>${esc(p.nome)}</b>${maiComprato(p) ? ` <span class="pill g mini">Mai comprato</span>` : ""}${p.origine
+        ? `<br><span class="small origine">${esc(p.origine)}</span>` : ""}<br><span class="small">${p.esito ? ESITI[p.esito] : f.nome}${p.prossima_data ? " · " + esc(testoProssima(p))
         : fermo >= 14 ? ` · nessun passo da ${fermo} giorni` : ""}</span></span>
       <span class="punti" aria-hidden="true">${FASI.map((x, i) => `<i class="${i <= indiceFase(p.fase) ? "on" : ""}"></i>`).join("")}</span>
     </button>${suIo ? `<button class="x" data-act="togli-da-io" data-id="${esc(p.id)}" aria-label="Togli ${esc(p.nome)} da Io">×</button>` : ""}</li>`;
@@ -3849,9 +3850,9 @@ function vPersone(){
   const q = senzaAccenti(st.cercaLista || "");
   /* i clienti stanno in Clienti, non nella lista */
   const nellaLista = st.persone.filter(p => p.esito !== "cliente");
+  /* l'ultimo nome inserito sta in cima */
   const l = nellaLista.filter(filtro.ok).filter(p => !q || senzaAccenti(p.nome + " " + (p.origine || "")).includes(q))
-    .sort((a, b) => (a.prossima_data || "9999") < (b.prossima_data || "9999") ? -1 : (a.prossima_data || "9999") > (b.prossima_data || "9999") ? 1
-      : a.nome.localeCompare(b.nome, "it"));
+    .sort((a, b) => String(b.creato_il || "").localeCompare(String(a.creato_il || "")) || a.nome.localeCompare(b.nome, "it"));
   return `<div class="card">
     <div class="spread testa-sezione"><span class="con-aiuto"><span class="eyebrow">La mia lista</span>${aiutoBtn("lista")}</span>
       <span class="pulsanti"><button class="btn small" data-act="persone-tante">Importa</button>
@@ -6496,7 +6497,8 @@ let tocco = null;
 document.addEventListener("touchstart", e => {
   tocco = null;
   if(st.fase !== "home" || st.sheet || e.touches.length !== 1) return;
-  if(e.target.closest("input, select, textarea, .sheet, [data-no-swipe]")) return;
+  /* anche le righe di filtri che scorrono di lato (Persone, Clienti, …): scorrerle non cambia pagina */
+  if(e.target.closest("input, select, textarea, .sheet, [data-no-swipe], .filtri")) return;
   const t = e.touches[0];
   tocco = { x:t.clientX, y:t.clientY, quando:Date.now() };
 }, { passive:true });

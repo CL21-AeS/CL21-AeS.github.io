@@ -72,6 +72,8 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
   sua mappa anche se in attesa: lo conferma e lo mette sotto il suo sponsor vero se è già nel gruppo del Platino. Se il
   Platino usa l'app, la sua mappa rimette tutto a posto. I VP di gruppo del Platino restano quelli ufficiali (nessun
   cumulo, test). App v71.
+- **Ritocchi a Persone** (30 ottobre): scorrere di lato i filtri di Lista e Clienti non cambia più pagina e non trascina
+  la pagina; nella Lista l'ultimo nome inserito sta in cima e sotto il nome si legge «Come lo conosci». App v72.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 
