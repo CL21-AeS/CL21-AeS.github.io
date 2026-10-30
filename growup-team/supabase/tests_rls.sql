@@ -306,12 +306,19 @@ begin
   perform growup_test.come(u1);  -- R
   perform growup_test.ok((select count(*) from public.partners where id in (e, f)) = 2, '033: R vede le persone importate da A (sono nella sua mappa)');
   perform growup_test.ok((select count(*) from public.nascosti) = 0, 'R non vede le persone nascoste da A');
+  -- 048: senza codice Amway nell'app non si importa (il file non lo salva più): il codice arriva dall'invito
+  perform growup_test.deve_fallire($q$select public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":1,"vpg":1}', '[]', '{}', '{}')$q$,
+                                   '048: chi non ha il codice Amway nell''app non importa');
+  execute 'reset role';
+  update public.partners set codice_amway = '1000000' where id = r;
+  perform growup_test.come(u1);
   -- 033: R importa la sua mappa: E c'è già (una sola struttura), nessuna copia
   perform growup_test.ok((public.importa_mappa(current_date, now(),
       '{"codice":"1000000","vpp":120,"vpg":470,"percentuale":3,"linee":[{"codice":"2000001","vpg":250},{"codice":"2000003","vpg":100}]}',
       '[{"codice":"2000001","nome":"Anna","sponsor":"1000000"},{"codice":"2000002","nome":"Bruno","sponsor":"2000001"},{"codice":"3000001","nome":"Elena copia di R","sponsor":"2000002","vpp":45}]',
       '{}', '{}')->>'aggiunte')::int = 0, '033: R importa: E è già nella struttura, nessuna copia');
-  perform growup_test.ok((select codice_amway from public.partners where id = r) = '1000000', 'il codice di R viene dalla prima riga');
+  perform growup_test.deve_fallire($q$select public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":1,"vpg":1}', '[]', '{}', '{}')$q$,
+                                   '048: la mappa di un altro (codice della riga 1 diverso dal mio) è rifiutata');
   perform growup_test.come(u5);  -- A
   perform growup_test.ok((select count(*) from public.partners where codice_amway = '3000001') = 1, '033: una sola E per tutti');
   perform growup_test.deve_fallire(format('select public.imposta_codice_amway(%L, %L)', f, '3000001'), 'tra le mie importate il codice è unico');

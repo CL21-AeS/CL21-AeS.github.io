@@ -308,8 +308,9 @@
       db.ultimoImport = JSON.parse(JSON.stringify(a));   // per i controlli sulla privacy: cosa arriva al database
       if(io.confermato_il === null && !io.is_admin) throw new Error("in_attesa");
       const m = a.p_mese.slice(0, 7), al = a.p_dati_al && a.p_dati_al < new Date().toISOString() ? a.p_dati_al : new Date().toISOString();
-      if(!io.codice_amway && a.p_io.codice) io.codice_amway = a.p_io.codice;
-      else if(a.p_io.codice !== io.codice_amway) throw new Error("import_di_altri");
+      /* 048: si importa solo la propria mappa; senza codice nell'app non si importa */
+      if(!io.codice_amway) throw new Error("codice_mancante");
+      if(a.p_io.codice !== io.codice_amway) throw new Error("import_di_altri");
       /* 046: rifà la struttura solo la mappa del mese più recente mai importato */
       const mm = m + "-01";
       if(io.mappa_mese && mm < io.mappa_mese) throw new Error("mappa_vecchia");
