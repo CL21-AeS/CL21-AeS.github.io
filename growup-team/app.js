@@ -2441,7 +2441,9 @@ function confrontoMese(pid){
     { nome:"Piani", ora:ora.piani, allora:allora.piani, prima:prima.piani },
     soloReport(pid) ? null : { nome:"Ordini", ora:ora.ordini, allora:allora.ordini, prima:prima.ordini },
     { nome:"Nuovi clienti", ora:ora.clienti, allora:allora.clienti, prima:prima.clienti },
-    soloReport(pid)
+    /* con la mappa del mese (anche per chi non usa l'app) i VP personali sono quelli della mappa; la mappa dà solo il totale
+       del mese, quindi «al giorno» del mese prima non c'è */
+    soloReport(pid) || r.da_report
       ? { nome:"VP personali", ora:Number(r.vp_personali) || 0, allora:null, prima:Number(rp.vp_personali) || 0 }
       : { nome:"VP personali", ora:ora.vp, allora:allora.vp, prima: rp.vp_personali != null ? Number(rp.vp_personali) : prima.vp },
     { nome:"VP di gruppo", ora:Number(r.vp_gruppo) || 0, allora:null, prima:Number(rp.vp_gruppo) || 0 },
@@ -2455,7 +2457,9 @@ function vConfronto(p){
   return `<div class="card">
     <span class="con-aiuto"><span class="eyebrow">Questo mese e il mese prima</span>${aiutoBtn("confronto")}</span>
     ${aiutoTesto("confronto", `Questo mese fino a oggi, confrontato con lo stesso giorno del mese prima. ▼ in rosso: è sotto il mese prima.
-      L'ultima colonna è il totale di tutto il mese prima.${soloReport(p.id) ? " I VP sono quelli del report Amway." : ""}`)}
+      La colonna centrale è il mese prima fino allo stesso giorno di oggi (per esempio «set al 30»: settembre dal 1° al 30).
+      L'ultima colonna è il totale di tutto il mese prima.${soloReport(p.id) || (rigaDi(st.riep, p.id) || {}).da_report
+        ? " I VP sono quelli della mappa Amway, che dà solo il totale del mese: per questo «al giorno» del mese prima c'è un trattino." : ""}`)}
     <table class="confronto">
       <thead><tr><th></th><th>${breve(c.m)}<br><span>fino a oggi</span></th><th>${breve(c.mp)}<br><span>al ${Number(c.stessoGiorno.slice(8))}</span></th><th>${breve(c.mp)}<br><span>totale</span></th></tr></thead>
       <tbody>${c.righe.map(x => `<tr><td>${x.nome}</td>${cella(x.ora, x.allora)}
