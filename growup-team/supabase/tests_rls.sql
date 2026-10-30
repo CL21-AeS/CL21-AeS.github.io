@@ -786,14 +786,30 @@ begin
       {"codice":"3000002","nome":"Fabio","sponsor":"2000002","vpp":80,"vpg":500,"percentuale":3}]', '{}', '{}');
   execute 'reset role';
   perform growup_test.ok((select sponsor_id from public.partners where codice_amway = '3000002') = b, '033: il report più recente sposta Fabio sotto B');
-  perform growup_test.come(u1);  -- R, un report più vecchio (di due giorni fa): non cambia niente
+  perform growup_test.come(u1);  -- R, un file dello stesso mese scaricato prima: 046, decide il mese, non la data del file
   perform growup_test.ok((public.importa_mappa(current_date, now() - interval '2 days', '{"codice":"1000000","vpp":100,"vpg":400}',
-    '[{"codice":"3000002","nome":"Fabio","sponsor":"1000000","vpp":10,"vpg":300,"percentuale":3}]', '{}', '{}')->>'piu_vecchi')::int = 2,
-    '033: un report più vecchio non aggiorna numeri già più recenti');
+    '[{"codice":"3000002","nome":"Fabio","sponsor":"1000000","vpp":10,"vpg":300,"percentuale":3}]', '{}', '{}')->>'aggiornati')::int = 2,
+    '046: una mappa dello stesso mese sostituisce sempre i numeri');
   execute 'reset role';
-  perform growup_test.ok((select sponsor_id from public.partners where codice_amway = '3000002') = b
+  perform growup_test.ok((select sponsor_id from public.partners where codice_amway = '3000002') = r
                          and (select vpg from public.numeri_mese where partner_id = (select id from public.partners where codice_amway = '3000002')
-                                and mese = date_trunc('month', current_date)::date) = 500, '033: Fabio resta sotto B con i numeri del report più recente');
+                                and mese = date_trunc('month', current_date)::date) = 300, '046: e sostituisce la struttura (Fabio sotto R)');
+  perform growup_test.come(u1);  -- una mappa di un mese precedente non tocca la struttura: si salva solo come numeri
+  perform growup_test.deve_fallire($q$select public.importa_mappa((current_date - interval '1 month')::date, now(), '{"codice":"1000000","vpp":1,"vpg":1}',
+    '[{"codice":"3000002","nome":"Fabio","sponsor":"2000001","vpp":1,"vpg":1}]', '{}', '{}')$q$, '046: la mappa di un mese precedente non rifà la struttura');
+  perform growup_test.deve_fallire($q$select public.importa_mappa((current_date + interval '1 month')::date, now(), '{"codice":"1000000","vpp":1,"vpg":1}',
+    '[]', '{}', '{}')$q$, '046: una mappa di un mese futuro è rifiutata (bloccherebbe le mappe vere)');
+  perform growup_test.deve_fallire($q$select public.importa_mappa((current_date - interval '30 months')::date, now(), '{"codice":"1000000","vpp":1,"vpg":1}',
+    '[]', '{}', '{}')$q$, '046: una mappa più vecchia di 24 mesi è rifiutata');
+  execute 'reset role';
+  perform growup_test.ok((select mappa_mese from public.partners where id = r) = date_trunc('month', current_date)::date
+                         and (select mappa_mese from public.partners where codice_amway = '3000002') = date_trunc('month', current_date)::date,
+                         '046: il mese della mappa è segnato per chi importa e per le persone');
+  perform growup_test.come(u1);  -- R rimette Fabio sotto B, come nel file più recente
+  perform public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":470}',
+    '[{"codice":"2000001","nome":"Anna","sponsor":"1000000"},{"codice":"2000002","nome":"Bruno","sponsor":"2000001"},
+      {"codice":"3000002","nome":"Fabio","sponsor":"2000002","vpp":80,"vpg":500,"percentuale":3}]', '{}', '{}');
+  execute 'reset role';
   perform growup_test.come(u3);  -- B importa adesso il suo report: lo vede tutta la sua upline
   perform public.importa_mappa(current_date, now(), '{"codice":"2000002","vpp":90,"vpg":1000}',
     '[{"codice":"3000002","nome":"Fabio","sponsor":"2000002","vpp":80,"vpg":777,"percentuale":6}]', '{}', '{}');
@@ -1424,6 +1440,60 @@ begin
     execute 'reset role';
     perform growup_test.ok(not exists (select 1 from public.partners where id = est_c), '045: l''admin cancella il codice estero sotto C');
     delete from public.numeri_mese where partner_id = it; delete from public.partners where id = it;
+  end;
+
+  -- ---- 046: fuori dalla mappa da 12 mesi si cancella (solo con l'import di un admin); chi ricompare riprende i suoi dati ----
+  declare
+    vecchio uuid; ritorna uuid; ris uuid; m0 date := date_trunc('month', current_date)::date;
+  begin
+    perform growup_test.come(u1);  -- R
+    perform public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":470}',
+      '[{"codice":"8600001","nome":"Uscito Da Tanto","sponsor":"2000001","vpp":1,"vpg":1},
+        {"codice":"8600002","nome":"Torna Presto","sponsor":"2000001","vpp":1,"vpg":1},
+        {"codice":"8600003","nome":"Utente riservato","sponsor":"2000001","vpp":1,"vpg":1},
+        {"codice":"8600004","nome":"Sotto Uscito","sponsor":"8600001","vpp":1,"vpg":1},
+        {"codice":"8600005","nome":"Nel File","sponsor":"2000001","vpp":1,"vpg":1},
+        {"codice":"8600006","nome":"Mappa Piu Nuova","sponsor":"2000001","vpp":1,"vpg":1}]', '{}', '{}');
+    execute 'reset role';
+    -- segni «fuori» vecchi che non devono portare alla cancellazione: chi è nel file e chi ha una mappa più recente
+    update public.partners set fuori_report_dal = (m0 - interval '13 months')::date, mappa_mese = (m0 + interval '1 month')::date
+     where codice_amway in ('8600005', '8600006');
+    vecchio := (select id from public.partners where codice_amway = '8600001');
+    ritorna := (select id from public.partners where codice_amway = '8600002');
+    ris := (select id from public.partners where codice_amway = '8600003');
+    insert into public.activities (partner_id, tipo, inserito_da) values (ritorna, 'contatto', r);
+    update public.partners set fuori_report_dal = (m0 - interval '12 months')::date where id = vecchio;
+    update public.partners set fuori_report_dal = (m0 - interval '11 months')::date where id = ritorna;
+    perform growup_test.come(u5);  -- A non è admin: non cancella
+    perform growup_test.ok((public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":60}', '[]', '{}', '{}')->>'cancellati')::int = 0,
+                           '046: chi non è admin non cancella chi è fuori da 12 mesi');
+    perform growup_test.come(u1);  -- R (admin): Torna e Utente riservato (col nome vero) sono nel file, Uscito no
+    perform growup_test.ok((public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":470}',
+      '[{"codice":"8600002","nome":"Torna Presto","sponsor":"2000001","vpp":2,"vpg":2},
+        {"codice":"8600003","nome":"Rita Vera","sponsor":"2000001","vpp":2,"vpg":2},
+        {"codice":"8600004","nome":"Sotto Uscito","sponsor":"2000001","vpp":2,"vpg":2},
+        {"codice":"8600005","nome":"Nel File","sponsor":"2000001","vpp":2,"vpg":2}]', '{}', '{}')->>'cancellati')::int = 1,
+      '046: l''admin cancella chi è fuori dalla mappa da 12 mesi');
+    execute 'reset role';
+    perform growup_test.ok(not exists (select 1 from public.partners where id = vecchio)
+                           and not exists (select 1 from public.numeri_mese where partner_id = vecchio), '046: cancellato con i suoi numeri');
+    perform growup_test.ok((select sponsor_id from public.partners where codice_amway = '8600004') = a, '046: chi stava sotto resta, al suo posto nel file');
+    perform growup_test.ok((select fuori_report_dal is null from public.partners where id = ritorna)
+                           and exists (select 1 from public.activities where partner_id = ritorna), '046: chi ricompare entro 12 mesi riprende i suoi dati');
+    perform growup_test.ok((select nome from public.partners where id = ris) = 'Rita Vera', '046: «Utente riservato» prende il nome vero dal file');
+    perform growup_test.ok((select count(*) from public.partners where codice_amway in ('8600005', '8600006')) = 2,
+                           '046: non si cancella chi è nel file appena importato né chi ha messo al suo posto una mappa più recente');
+    -- una mappa di un mese precedente salva sempre i numeri di quel mese (anche se il file è più vecchio)
+    perform growup_test.come(u1);
+    perform public.salva_mese_passato((m0 - interval '1 month')::date, now(), '{"codice":"1000000","vpp":11,"vpg":111}', '[]');
+    perform public.salva_mese_passato((m0 - interval '1 month')::date, now() - interval '3 days', '{"codice":"1000000","vpp":22,"vpg":222}', '[]');
+    execute 'reset role';
+    perform growup_test.ok((select vpg from public.numeri_mese where partner_id = r and mese = (m0 - interval '1 month')::date) = 222,
+                           '046: i numeri del mese sono quelli dell''ultimo file importato');
+    delete from public.numeri_mese where partner_id = r and mese = (m0 - interval '1 month')::date;
+    delete from public.numeri_mese where partner_id in (select id from public.partners where codice_amway like '86000%');
+    delete from public.activities where partner_id = ritorna;
+    delete from public.partners where codice_amway like '86000%';
   end;
 
   -- ---- Nessuna tabella senza RLS ----

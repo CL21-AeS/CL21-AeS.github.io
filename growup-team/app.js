@@ -88,7 +88,6 @@ function creaApi(){
     inAttesa:     () => q(sb.rpc("in_attesa")),
     /* 042: chi è in attesa ed è nel report che sto importando (il codice torna solo se era già nel file) */
     attesaNelReport: codici => q(sb.rpc("attesa_nel_report", { p_codici:codici })),
-    datiAl:       (pid, mese) => q(sb.from("numeri_mese").select("dati_al").eq("partner_id", pid).eq("mese", mese)),
     /* 034: i miei numeri ufficiali (per sommare i miei ordini scritti dopo il report) */
     mioReport:    (pid, dal) => q(sb.from("numeri_mese").select("mese,vpp,vpg,percentuale,dati_al,importato_da").eq("partner_id", pid).gte("mese", dal)),
     /* 034: la bozza d'ordine e lo storico dei miei ordini (solo miei, RLS) */
@@ -296,7 +295,7 @@ const MESSAGGI_ERRORE = {
   ordine_vuoto: "La bozza è vuota: aggiungi almeno un prodotto.",
   data_non_valida: "La data dell'ordine non può essere nel futuro.",
   in_attesa: "Sei ancora in attesa della mappa: potrai importare dopo che un report della tua upline ti avrà inserito nella struttura.",
-  codice_mancante: "Prima importa il report del mese in corso: salva il tuo codice Amway nell'app.",
+  codice_mancante: "Prima importa la mappa del mese più recente: salva il tuo codice Amway nell'app.",
   percentuale_non_valida: "Percentuale non riconosciuta.",
   posizione_non_valida: "Puoi aggiungere persone solo nel tuo gruppo.",
   nome_mancante: "Scrivi il nome della persona.",
@@ -308,6 +307,7 @@ const MESSAGGI_ERRORE = {
   codice_amway_non_valido: "Il codice Amway è fatto di sole cifre (es. 1234567).",
   codice_amway_mancante: "Scrivi il codice Amway Partner della persona.",
   import_non_valido: "Il file non è stato letto bene: scaricalo di nuovo dal sito Amway e riprova.",
+  mappa_vecchia: "C'è già una mappa di un mese più recente: di questo mese si salvano solo i numeri. Scegli di nuovo il file.",
   import_di_altri: "Questo report non è il tuo: ognuno importa il report scaricato dal proprio accesso al sito Amway.",
   invito_non_valido: "Questo link d'invito non è valido. Chiedi a chi ti ha invitato di mandartene uno nuovo.",
   invito_usato: "Questo invito è già stato usato. Se sei tu, entra con il tuo link personale.",
@@ -2726,9 +2726,12 @@ async function attesaNelReport(rep){
   if(!rep || rep.errore || !(st.inAttesa || []).length) return;
   try{ st.attesaReport = await api.attesaNelReport(rep.righe.map(r => r.codice)) || []; }catch(e){ st.attesaReport = []; }
 }
-function analizzaReport(rep){
+/* 046: rifà la struttura solo la mappa con il «Mese di competenza» più recente mai importato (il mio `mappa_mese`, o il
+   mese più recente tra i file scelti insieme); una mappa di un mese precedente salva solo i numeri di quel mese */
+function analizzaReport(rep, piuRecente){
   const io = st.profilo, m = rep.mese;
-  const passato = m < meseDi(oggi()) && !(m === mesePrecedente() && precedenteAperto());
+  const ultima = [io.mappa_mese ? meseDi(io.mappa_mese) : "", piuRecente || ""].sort().pop();
+  const passato = !!ultima && m < ultima;
   if(m > meseDi(oggi())) return { errore:`Il report è di ${nomeMese(m)}, un mese che non è ancora iniziato.` };
   if(passato && m < spostaMese(meseDi(oggi()), -24)) return { errore:`Il report è di ${nomeMese(m)}: troppo vecchio, servono solo gli ultimi 12 mesi.` };
   /* chi importa è la riga di livello 1 (profondità), ovunque sia nel file */
@@ -2750,7 +2753,7 @@ function analizzaReport(rep){
       sponsor_id:((st.inAttesa || []).find(y => y.id === x.id) || {}).sponsor_id || null })));
   const attivi = new Map(altri.filter(p => p.stato !== "gestito" && p.codice_amway).map(p => [p.codice_amway, p]));
   const mie = altri.filter(p => p.stato === "gestito");
-  const a = { mese:m, prima, codiceMio:!io.codice_amway, perCodice, aggiorna:[], mancanti:[], usanoApp:[], usanoAppMancanti:[],
+  const a = { mese:m, prima, codiceMio:!io.codice_amway, perCodice, aggiorna:[], mancanti:[], usanoApp:[], usanoAppMancanti:[], daCancellare:[],
               spostati:[], nuovi:[], totale:rep.righe.length, esteri:rep.esteri || [] };
   /* 045: i codici esteri già nella mia struttura (persone senza app) si cancellano con i loro dati */
   const esteri = new Set(a.esteri);
@@ -2771,6 +2774,9 @@ function analizzaReport(rep){
     const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
     if(r){ a.aggiorna.push({ p, r }); usati.add(r.codice); }
     else if(p.codice_amway && !esteri.has(p.codice_amway) && !p.fuori_report_dal && !sottoNascosto(p)) a.mancanti.push(p);
+    /* fuori dalla mappa da 12 mesi e ancora assente: l'import di un admin lo cancella */
+    else if(!r && io.is_admin && p.fuori_report_dal && meseDi(p.fuori_report_dal) <= spostaMese(m, -12)
+      && (!p.mappa_mese || meseDi(p.mappa_mese) <= m)) a.daCancellare.push(p);
   }
   /* l'import è sempre completo: tutte le persone del report entrano nella mia struttura */
   for(const r of rep.righe) if(!usati.has(r.codice)) a.nuovi.push(r);
@@ -2806,19 +2812,20 @@ function vImporta(){
     <p class="small">Sul sito Amway: <b>Linea di Sponsorizzazione (LOS)</b> → pulsante di download →
       <b>Intera Linea di Sponsorizzazione</b> (con tutti i KPI o con i KPI selezionati), formato <b>CSV</b>. Prima togli i filtri.</p>
     <p class="small">La struttura dell'app è la mappa Amway, la stessa per tutti: il tuo import aggiorna posizioni e numeri di
-      tutto il tuo gruppo (anche di chi usa l'app) e li vede anche la tua upline. Vale il report più aggiornato: conta la data
-      del file scaricato. Puoi nascondere chi vuoi (solo per te, resta nei numeri).
+      tutto il tuo gruppo (anche di chi usa l'app) e li vede anche la tua upline. Ogni mappa sostituisce la precedente: rifà la
+      struttura la mappa del mese più recente (il «Mese di competenza» del file); di un mese precedente si salvano solo i numeri.
+      Puoi nascondere chi vuoi (solo per te, resta nei numeri).
       Il file resta sul telefono: si salvano solo nome, codice, data di ingresso e numeri. Telefono, email, indirizzo e data di rinnovo non si salvano mai.</p>
     <label class="btn primary wide" style="margin-top:12px">Scegli il file CSV
       <input type="file" id="file-report" accept=".csv,text/csv,text/comma-separated-values" multiple hidden></label>
-    <p class="nota">Puoi scegliere più file insieme (per esempio i mesi passati): dei mesi chiusi si salvano solo i numeri.</p>
+    <p class="nota">Puoi scegliere più file insieme (per esempio i mesi passati): dei mesi precedenti si salvano solo i numeri.</p>
     ${a && a.errore ? `<p class="errore">${esc(a.errore)}</p>` : ""}
     ${chiudi}`;
   if(a.multi) return `<h2>Report di più mesi</h2>
-  ${a.passati.length ? `<p class="small">Mesi chiusi: salvo solo i numeri (percentuale, VP di gruppo, linee). La tua struttura e i VP non cambiano.</p>
+  ${a.passati.length ? `<p class="small">Mesi precedenti: salvo solo i numeri di quei mesi (VP personali e di gruppo, percentuale, linee). La tua struttura non cambia.</p>
   <ul class="imp">${a.passati.map(x => `<li><span class="grow">${esc(nomeMese(x.mese))}</span>
     <b class="num">${x.prima.perc != null ? x.prima.perc + "%" : "–"} · ${num(x.prima.vpg)} VPG</b></li>`).join("")}</ul>` : ""}
-  ${a.corrente ? `<p class="small">${a.passati.length ? "Poi" : "Ora"} il report di <b>${esc(nomeMese(a.corrente.mese))}</b> (mese in corso): l'import completo, con la sua anteprima.</p>` : ""}
+  ${a.corrente ? `<p class="small">${a.passati.length ? "Poi" : "Ora"} la mappa di <b>${esc(nomeMese(a.corrente.mese))}</b> (il mese più recente): l'import completo, con la sua anteprima.</p>` : ""}
   ${a.errori.length ? `<div class="avviso">${a.errori.map(e => `<p style="margin:2px 0">${esc(e)}</p>`).join("")}</div>` : ""}
   <form data-form="importa" novalidate>
     <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">${a.passati.length || a.corrente ? "Annulla" : "Chiudi"}</button>
@@ -2827,8 +2834,8 @@ function vImporta(){
   </form>`;
   if(a.passato) return `<h2>Report di ${nomeMese(a.mese)}</h2>
   ${a.datiAl ? rigaDataReport(a) : ""}
-  <p class="small">È un mese chiuso: salvo solo i numeri (percentuale, VP di gruppo, linee) per contare i mesi da Argento.
-    La tua struttura e i VP non cambiano.</p>
+  <p class="small">C'è già una mappa di un mese più recente: di ${nomeMese(a.mese)} salvo solo i numeri (VP personali e di gruppo, percentuale, linee),
+    che servono per i mesi da Argento e per la Stabilità. La tua struttura non cambia.</p>
   <ul class="imp"><li><span class="grow">${esc(st.profilo.nome)} (tu)</span>
     <b class="num">${a.prima.perc != null ? a.prima.perc + "%" : "–"} · ${num(a.prima.vpg)} VPG</b></li></ul>
   <form data-form="importa" novalidate>
@@ -2879,7 +2886,10 @@ function vImporta(){
     ${a.mancanti.length ? sezione(`Non più nel report · ${a.mancanti.length}`,
       `${a.troppiMancanti ? `<p class="avviso">Mancano molte persone insieme: controlla di aver esportato <b>l'intera linea senza filtri</b>.</p>` : ""}
       <p class="small">${a.mancanti.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})`).join(", ")}</p>`,
-      "Codici che Amway non ha più (per esempio non rinnovati). Nessuno si cancella: restano nella tua struttura con il segno «non più nel report» e vanno tra le nascoste. Se tornano nel report, il segno sparisce.") : ""}
+      "Codici che Amway non ha più (per esempio non rinnovati). Restano nella tua struttura con il segno «non più nel report» e vanno tra le nascoste: se ricompaiono in una mappa riprendono i loro dati. Dopo 12 mesi fuori dalla mappa si cancellano.") : ""}
+    ${a.daCancellare.length ? sezione(`Fuori dalla mappa da 12 mesi · si cancellano ${a.daCancellare.length}`,
+      `<p class="small">${a.daCancellare.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})`).join(", ")}</p>`,
+      "Non sono più ricomparsi in una mappa da 12 mesi: si cancellano con tutti i loro dati.", "imp-cancellati") : ""}
     ${a.esteriNellApp.length ? sezione(`Di altri Paesi · ${st.profilo.is_admin ? "si cancellano" : "si nascondono"} ${a.esteriNellApp.length}`,
       `<p class="small">${a.esteriNellApp.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})`).join(", ")}</p>`,
       st.profilo.is_admin ? "Si importano solo i codici italiani: questi codici di altri Paesi erano già nell'app e si cancellano con tutti i loro dati."
@@ -2961,19 +2971,32 @@ function vImportaAmway(){
     ${btnAmway("Scegli i file", "primary wide", "margin-top:12px")}
     <button type="button" class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>`;
 }
+/* il mese dell'ultima mappa che mi ha messo al mio posto (046): può averla importata da poco la mia upline */
+async function aggiornaMeseMappa(){
+  try{ const p = await api.collega(); if(p) st.profilo = Object.assign({}, st.profilo, { mappa_mese:p.mappa_mese || null }); }catch(e){}
+}
 async function leggiFileReport(files){
   if(!files || !files.length) return;
+  await aggiornaMeseMappa();
   if(files.length === 1) return leggiUnReport(files[0]);
   const m = { multi:true, passati:[], corrente:null, errori:[] };
   try{ st.esclusi = new Set((await api.esclusi() || []).map(x => x.codice)); }catch(e){}
+  /* prima si leggono tutti i file: la struttura la rifà solo la mappa del mese più recente */
+  const letti = [];
   for(const file of files){
-    let a;
-    if(/\.xlsx?$/i.test(file.name)) a = { errore:"è il file Excel: sul sito Amway scegli il formato CSV." };
-    else try{ const rep = leggiReport(await file.text()); await attesaNelReport(rep); a = rep.errore ? rep : await conData(analizzaReport(rep), file); }
-    catch(e){ a = { errore:"non riesco a leggerlo: scaricalo di nuovo dal sito Amway." }; }
+    let rep;
+    if(/\.xlsx?$/i.test(file.name)) rep = { errore:"è il file Excel: sul sito Amway scegli il formato CSV." };
+    else try{ rep = leggiReport(await file.text()); }catch(e){ rep = { errore:"non riesco a leggerlo: scaricalo di nuovo dal sito Amway." }; }
+    letti.push({ file, rep });
+  }
+  const piuRecente = letti.filter(x => !x.rep.errore).map(x => x.rep.mese).sort().pop();
+  for(const { file, rep } of letti){
+    let a = rep;
+    if(!rep.errore) try{ await attesaNelReport(rep); a = conData(analizzaReport(rep, piuRecente), file); }
+      catch(e){ a = { errore:"non riesco a leggerlo: scaricalo di nuovo dal sito Amway." }; }
     if(a.errore) m.errori.push(`${file.name}: ${a.errore}`);
     else if(a.passato){ if(!m.passati.some(x => x.mese === a.mese)) m.passati.push(a); }
-    else if(m.corrente) m.errori.push(`${file.name}: c'è già un report del mese in corso, si importa uno alla volta.`);
+    else if(m.corrente) m.errori.push(`${file.name}: c'è già una mappa di ${nomeMese(a.mese)}, si importa una alla volta.`);
     else m.corrente = a;
   }
   m.passati.sort((x, y) => x.mese < y.mese ? -1 : 1);
@@ -3006,28 +3029,22 @@ async function leggiUnReport(file){
       const rep = leggiReport(await file.text());
       if(!rep.errore) try{ st.esclusi = new Set((await api.esclusi() || []).map(x => x.codice)); }catch(e){}
       await attesaNelReport(rep);
-      a = rep.errore ? rep : await conData(analizzaReport(rep), file);
+      a = rep.errore ? rep : conData(analizzaReport(rep), file);
     }catch(e){ a = { errore:"Non riesco a leggere il file: scaricalo di nuovo dal sito Amway." }; }
   }
   st.imp = a; render();
 }
-/* La data dei dati: il report Amway ha solo il mese, quindi vale la data e ora del file scaricato (mai nel futuro).
-   Si confronta con quella dei miei numeri già salvati per quel mese: un report più vecchio non cambia niente di
-   quello che viene da report più recenti. */
-async function conData(a, file){
+/* La data e ora del file scaricato (mai nel futuro): si salva con i numeri, perché gli ordini scritti dopo il file si
+   sommano ai VP del report. Non decide più cosa si sostituisce (046): decide il «Mese di competenza». */
+function conData(a, file){
   if(!a || a.errore) return a;
   const t = Number(file && file.lastModified) || Date.now();
   a.datiAl = new Date(Math.min(t, Date.now())).toISOString();
-  try{
-    const r = (await api.datiAl(st.profilo.id, a.mese + "-01") || [])[0];
-    if(r && r.dati_al && r.dati_al > a.datiAl) a.piuVecchio = r.dati_al;
-  }catch(e){}
   return a;
 }
 const fmtDataOra = new Intl.DateTimeFormat("it-IT", { timeZone:TZ, day:"numeric", month:"long", hour:"2-digit", minute:"2-digit" });
 function rigaDataReport(a){
-  return `<p class="small data-report" style="margin:4px 0 0">File del ${esc(fmtDataOra.format(new Date(a.datiAl)))}${a.piuVecchio
-    ? ` · <b>più vecchio dell'ultimo importato (${esc(fmtDataOra.format(new Date(a.piuVecchio)))})</b>: aggiorna solo chi non ha dati più recenti` : ""}</p>`;
+  return `<p class="small data-report" style="margin:4px 0 0">File del ${esc(fmtDataOra.format(new Date(a.datiAl)))}</p>`;
 }
 
 /* i numeri ufficiali di ognuno: VPP, VPG, percentuale e i VPG delle sue linee frontali del report
@@ -3084,7 +3101,7 @@ async function eseguiImport(f){
     const esito = await api.importaMappa({ p_mese:a.mese + "-01", p_dati_al:a.datiAl || new Date().toISOString(),
       p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp, ingresso:a.prima.ingresso }, numeri(a.prima)), p_persone:persone,
       p_nascondi:[...nascondi], p_fuori:a.mancanti.map(p => p.id), p_esteri:a.esteri }) || {};
-    if(a.codiceMio) st.profilo = Object.assign({}, io, { codice_amway:a.prima.codice });
+    st.profilo = Object.assign({}, st.profilo, { mappa_mese:a.mese + "-01" }, a.codiceMio ? { codice_amway:a.prima.codice } : {});
     if(daNascondere.length) await api.nascondiTanti(io.id, daNascondere);
     if(daMostrare.length) await api.mostraTanti(io.id, daMostrare);
     await caricaStruttura();
@@ -3098,6 +3115,7 @@ async function eseguiImport(f){
       plur(n("aggiornati"), "persona aggiornata", "persone aggiornate"), n("piu_vecchi") ? plur(n("piu_vecchi"), "già più aggiornata", "già più aggiornate") : "", n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
       n("fuori") ? plur(n("fuori"), "persona non più nel report", "persone non più nel report") : "",
       n("esteri") ? plur(n("esteri"), "codice di altri Paesi cancellato", "codici di altri Paesi cancellati") : "",
+      n("cancellati") ? plur(n("cancellati"), "persona fuori dalla mappa da 12 mesi cancellata", "persone fuori dalla mappa da 12 mesi cancellate") : "",
       n("esteri_nascosti") ? plur(n("esteri_nascosti"), "codice di altri Paesi nascosto", "codici di altri Paesi nascosti") : "",
       daNascondere.length ? plur(daNascondere.length, "nascosta", "nascoste") : "",
       daMostrare.length ? plur(daMostrare.length, "di nuovo visibile", "di nuovo visibili") : ""].filter(Boolean).join(", ")}`);
