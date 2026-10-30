@@ -15,7 +15,7 @@ const stages = [
    ["zaffiro","Zaffiro"],["zaffiro_fondatore","Zaffiro Fondatore"],["smeraldo","Smeraldo"],["smeraldo_fondatore","Smeraldo Fondatore"],
    ["diamante","Diamante"],["diamante_fondatore","Diamante Fondatore"]].map(([chiave, nome], i) =>
    ({ ordine:9 + i, chiave, nome, vp_personali:0, guadagno_mese:{ platino:3000, rubino:4000, zaffiro:5000, smeraldo:8000, diamante:18000 }[chiave.replace("_fondatore", "")] || null, descrizione:chiave === "smeraldo" ? "Da Platino: 3 linee frontali al 21% per almeno 6 mesi del Performance Year" : "Requisiti di prova" }))];
-const DB = { partners:[{id:"R",nome:"Stefano e Alessia",codice_invito:"RRRR22",chiave:"a".repeat(32),stato:"gestito",is_admin:true}],
+const DB = { partners:[{id:"R",nome:"Stefano e Alessia",codice_invito:"RRRR22",chiave:"a".repeat(32),stato:"gestito",is_admin:true,codice_amway:"1111111"}],
   /* il listino (prodotti inventati) */
   listino:[{codice:"900001",nome:"Double Prova (31 giorni)",formato:"140 g",categoria:"Integratori",prezzo_cliente:80,prezzo_partner:66.5,vp:26.5,attivo:true},
     {codice:"900002",nome:"Shampoo Prova",formato:"250 ml",categoria:"Capelli",prezzo_cliente:12.4,prezzo_partner:10.3,vp:4.1,attivo:true},

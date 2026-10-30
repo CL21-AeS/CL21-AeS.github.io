@@ -40,6 +40,13 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
 - **Codici esteri** (migrazione **047**): le righe estere si scartano e basta, con qualsiasi import. Tolta la regola della
   045 (il database riceveva i codici esteri per cancellarli o nasconderli): l'app non li manda più e `p_esteri` è
   ignorato. Un codice che esce dalla mappa italiana segue la regola di tutti quelli che escono. App v66.
+- **Import diretto e chi importa** (migrazione **048**): niente anteprima, niente spunta del consenso (chi importa è
+  upline delle persone della sua mappa), niente scelte «nascondi» durante l'import (le persone nascoste a mano dal Gruppo
+  restano). Scelto il file, l'import parte subito; alla fine il foglio mostra il riepilogo (nuove, numeri aggiornati,
+  spostati, non più nella mappa, cancellati, mesi precedenti salvati come numeri, file con errori). Chi importa è la riga di
+  livello 1 (la prima riga di dati): deve avere il mio codice Amway; senza quella riga, o senza codice nell'app, l'import è
+  rifiutato (il codice non si prende più dal file: arriva sempre dall'invito). Nessun blocco sui file parziali: chi esce
+  per errore rientra con i suoi dati al prossimo import giusto. App v67.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 

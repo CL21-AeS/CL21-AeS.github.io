@@ -295,7 +295,7 @@ const MESSAGGI_ERRORE = {
   ordine_vuoto: "La bozza è vuota: aggiungi almeno un prodotto.",
   data_non_valida: "La data dell'ordine non può essere nel futuro.",
   in_attesa: "Sei ancora in attesa della mappa: potrai importare dopo che un report della tua upline ti avrà inserito nella struttura.",
-  codice_mancante: "Prima importa la mappa del mese più recente: salva il tuo codice Amway nell'app.",
+  codice_mancante: "Nel tuo profilo manca il codice Amway: chiedi a Stefano e Alessia di inserirlo, poi importa la tua mappa.",
   percentuale_non_valida: "Percentuale non riconosciuta.",
   posizione_non_valida: "Puoi aggiungere persone solo nel tuo gruppo.",
   nome_mancante: "Scrivi il nome della persona.",
@@ -2734,16 +2734,18 @@ function analizzaReport(rep, piuRecente){
   const passato = !!ultima && m < ultima;
   if(m > meseDi(oggi())) return { errore:`Il report è di ${nomeMese(m)}, un mese che non è ancora iniziato.` };
   if(passato && m < spostaMese(meseDi(oggi()), -24)) return { errore:`Il report è di ${nomeMese(m)}: troppo vecchio, servono solo gli ultimi 12 mesi.` };
-  /* chi importa è la riga di livello 1 (profondità), ovunque sia nel file */
-  const prima = rep.righe.find(r => r.livello === 1) || rep.righe[0];
-  if(io.codice_amway && io.codice_amway !== prima.codice)
+  /* chi importa è la riga di livello 1 (profondità): nei file veri è la prima riga di dati. Si importa solo la propria
+     mappa: il codice di quella riga deve essere il mio codice Amway nell'app (che arriva sempre dall'invito) */
+  const prima = rep.righe.find(r => r.livello === 1);
+  if(!prima) return { errore:"Nel file non c'è la riga di livello 1 (chi ha scaricato la mappa): scaricalo di nuovo dal sito Amway." };
+  if(!io.codice_amway) return { errore:MESSAGGI_ERRORE.codice_mancante };
+  if(io.codice_amway !== prima.codice)
     return { errore:`Questo report è di ${prima.nome} (${prima.codice}), ma il tuo codice nell'app è ${io.codice_amway}. `
       + `Ognuno importa il report scaricato dal proprio accesso al sito Amway. Se il report è tuo, il codice nell'app è sbagliato: `
       + (io.is_admin ? "correggilo in fondo alla pagina Io." : "chiedi a Stefano e Alessia di correggerlo.") };
   const perCodice = new Map(rep.righe.map(r => [r.codice, r]));
   /* un mese chiuso: si salvano solo i numeri (21%, VPG, linee) per contare i mesi da Argento */
   if(passato){
-    if(!io.codice_amway) return { errore:MESSAGGI_ERRORE.codice_mancante };
     return { passato:true, mese:m, prima, perCodice, totale:rep.righe.length };
   }
   /* 033: anche chi è in attesa della mappa (usa l'app ma non è nella struttura): l'import lo trova e lo conferma.
@@ -2753,7 +2755,7 @@ function analizzaReport(rep, piuRecente){
       sponsor_id:((st.inAttesa || []).find(y => y.id === x.id) || {}).sponsor_id || null })));
   const attivi = new Map(altri.filter(p => p.stato !== "gestito" && p.codice_amway).map(p => [p.codice_amway, p]));
   const mie = altri.filter(p => p.stato === "gestito");
-  const a = { mese:m, prima, codiceMio:!io.codice_amway, perCodice, aggiorna:[], mancanti:[], usanoApp:[], usanoAppMancanti:[], daCancellare:[],
+  const a = { mese:m, prima, perCodice, aggiorna:[], mancanti:[], usanoApp:[], usanoAppMancanti:[], daCancellare:[],
               spostati:[], nuovi:[], totale:rep.righe.length, esteri:rep.esteri || [] };
   const usati = new Set([prima.codice]);
   for(const p of altri.filter(p => p.stato !== "gestito")){
@@ -2785,11 +2787,6 @@ function analizzaReport(rep, piuRecente){
       a.spostati.push({ p, da:p.sponsor_id === io.id ? "te" : nomeDi(p.sponsor_id) || (altri.find(x => x.id === p.sponsor_id) || {}).nome || "",
         a:nuovo === io.id ? "te" : nomeDi(nuovo) || (altri.find(x => x.id === nuovo) || {}).nome || "" });
   }
-  /* reimport: chi è già nella mia struttura (importato o con l'app), per riapplicare i filtri a tutti */
-  a.esistenti = a.aggiorna.concat(a.usanoApp);
-  /* tante persone che mancano insieme: forse il file è parziale (filtri, "Vista corrente") */
-  const conCodice = mie.filter(p => p.codice_amway).length;
-  a.troppiMancanti = a.mancanti.length > Math.max(3, Math.round(conCodice * 0.1));
   return a;
 }
 /* risale la catena degli sponsor del report fino al primo codice che soddisfa la condizione */
@@ -2802,108 +2799,49 @@ function antenatoNelReport(r, perCodice, va){
   return null;
 }
 
+/* Il foglio dell'import (30 ottobre: niente anteprima, niente spunte). Scelto il file, l'import parte subito: qui si
+   vedono solo le istruzioni, gli errori, l'attesa e alla fine il riepilogo di cosa è cambiato. */
 function vImporta(){
   const a = st.imp;
   const chiudi = `<button type="button" class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
-  if(!a || a.errore) return `<h2>Importa dal report Amway</h2>
+  if(a && a.inCorso) return `<h2>Importo la mappa…</h2><p class="small">Un momento: aggiorno la struttura e i numeri.</p>`;
+  if(a && a.fatto) return vRiepilogoImport(a.esito) + chiudi;
+  return `<h2>Importa dal report Amway</h2>
     <p class="small">Sul sito Amway: <b>Linea di Sponsorizzazione (LOS)</b> → pulsante di download →
       <b>Intera Linea di Sponsorizzazione</b> (con tutti i KPI o con i KPI selezionati), formato <b>CSV</b>. Prima togli i filtri.</p>
-    <p class="small">La struttura dell'app è la mappa Amway, la stessa per tutti: il tuo import aggiorna posizioni e numeri di
-      tutto il tuo gruppo (anche di chi usa l'app) e li vede anche la tua upline. Ogni mappa sostituisce la precedente: rifà la
-      struttura la mappa del mese più recente (il «Mese di competenza» del file); di un mese precedente si salvano solo i numeri.
-      Puoi nascondere chi vuoi (solo per te, resta nei numeri).
+    <p class="small">La mappa Amway fa fede: l'import parte appena scegli il file e aggiorna posizioni e numeri di tutto il tuo
+      gruppo (anche di chi usa l'app); li vede anche la tua upline. Rifà la struttura la mappa del mese più recente (il «Mese di
+      competenza» del file); di un mese precedente si salvano solo i numeri.
       Il file resta sul telefono: si salvano solo nome, codice, data di ingresso e numeri. Telefono, email, indirizzo e data di rinnovo non si salvano mai.</p>
     <label class="btn primary wide" style="margin-top:12px">Scegli il file CSV
       <input type="file" id="file-report" accept=".csv,text/csv,text/comma-separated-values" multiple hidden></label>
     <p class="nota">Puoi scegliere più file insieme (per esempio i mesi passati): dei mesi precedenti si salvano solo i numeri.</p>
     ${a && a.errore ? `<p class="errore">${esc(a.errore)}</p>` : ""}
     ${chiudi}`;
-  if(a.multi) return `<h2>Report di più mesi</h2>
-  ${a.passati.length ? `<p class="small">Mesi precedenti: salvo solo i numeri di quei mesi (VP personali e di gruppo, percentuale, linee). La tua struttura non cambia.</p>
-  <ul class="imp">${a.passati.map(x => `<li><span class="grow">${esc(nomeMese(x.mese))}</span>
-    <b class="num">${x.prima.perc != null ? x.prima.perc + "%" : "–"} · ${num(x.prima.vpg)} VPG</b></li>`).join("")}</ul>` : ""}
-  ${a.corrente ? `<p class="small">${a.passati.length ? "Poi" : "Ora"} la mappa di <b>${esc(nomeMese(a.corrente.mese))}</b> (il mese più recente): l'import completo, con la sua anteprima.</p>` : ""}
-  ${a.errori.length ? `<div class="avviso">${a.errori.map(e => `<p style="margin:2px 0">${esc(e)}</p>`).join("")}</div>` : ""}
-  <form data-form="importa" novalidate>
-    <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">${a.passati.length || a.corrente ? "Annulla" : "Chiudi"}</button>
-      ${a.passati.length ? `<button class="btn primary grow"${st.occupato ? " disabled" : ""}>Salva i numeri</button>`
-        : a.corrente ? `<button class="btn primary grow">Continua</button>` : ""}</div>
-  </form>`;
-  if(a.passato) return `<h2>Report di ${nomeMese(a.mese)}</h2>
-  ${a.datiAl ? rigaDataReport(a) : ""}
-  <p class="small">C'è già una mappa di un mese più recente: di ${nomeMese(a.mese)} salvo solo i numeri (VP personali e di gruppo, percentuale, linee),
-    che servono per i mesi da Argento e per la Stabilità. La tua struttura non cambia.</p>
-  <ul class="imp"><li><span class="grow">${esc(st.profilo.nome)} (tu)</span>
-    <b class="num">${a.prima.perc != null ? a.prima.perc + "%" : "–"} · ${num(a.prima.vpg)} VPG</b></li></ul>
-  <form data-form="importa" novalidate>
-    <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
-      <button class="btn primary grow"${st.occupato ? " disabled" : ""}>Salva i numeri</button></div>
-  </form>`;
-  const riga = (p, extra) => `<span class="grow">${esc(p.nome)}${extra ? `<br><span class="small">${extra}</span>` : ""}</span>`;
-  const sezione = (titolo, corpo, nota, cl) => `<div class="imp-sezione${cl ? " " + cl : ""}"><h3>${titolo}</h3>${nota ? `<p class="small">${nota}</p>` : ""}${corpo}</div>`;
-  const sponsorDi = r => { const s = a.perCodice.get(r.sponsor); return s ? `sponsor ${esc(s.nome)}` : ""; };
-  const scelta = r => `<label data-nome="${esc(senzaAccenti(r.nome) + " " + r.codice)}"><input type="checkbox" name="nascondi" value="${esc(r.codice)}" data-vpp="${r.vpp > 0 ? 1 : 0}"${st.esclusi.has(r.codice) ? " checked" : ""}>
-      <span>${esc(r.nome)} · <b>${num(r.vpp)} VP</b><br><span class="small">${esc(r.codice)}${sponsorDi(r) ? " · " + sponsorDi(r) : ""}</span></span></label>`;
-  const aggiorna = [{ p:st.profilo, r:a.prima, io:true }].concat(a.aggiorna);
-  const pos = posizioni(); [...pos.values()].forEach((x, i) => { x.ordine = i; });
-  return `<h2>Report di ${nomeMese(a.mese)}</h2>
-  ${a.datiAl ? rigaDataReport(a) : ""}
-  <p class="small">${plur(a.totale, "persona", "persone")} nel file${a.esteri.length ? ` (più ${a.esteri.length} di altri Paesi, che non si salvano)` : ""}. L'import aggiorna la struttura e i numeri di <b>tutto il tuo gruppo</b>,
-    anche per chi usa l'app: vale il report più aggiornato.</p>
-  <form data-form="importa" novalidate>
-    ${a.esistenti.length ? sezione("Chi vuoi vedere dopo l'import?",
-      `<label class="check"><input type="radio" name="modo" value="tieni" checked>
-        <span><b>Lascia tutto com'è</b>: si aggiornano solo i VP; chi hai nascosto resta nascosto, chi vedi resta visibile.</span></label>
-      <label class="check"><input type="radio" name="modo" value="filtri">
-        <span><b>Riapplica i filtri a tutti</b>: scegli di nuovo chi nascondere, anche tra chi è già nella tua struttura.</span></label>
-      <div class="imp-filtri">
-        <div class="row wrap scelte-rapide" style="gap:6px;margin-top:8px">
-          <button type="button" class="btn small" data-act="nascondi-zero" aria-pressed="false">Nascondi chi ha 0 VP</button>
-          <button type="button" class="btn small" data-act="nascondi-tutti" aria-pressed="false">Nascondi tutti</button>
-          <button type="button" class="btn small" data-act="mostra-tutti" aria-pressed="false">Mostra tutti</button></div>
-        <p class="small">Valgono per tutti: chi è già nella struttura e i nuovi. Spuntato = nascosto.</p>
-        ${a.esistenti.length > 8 ? `<input type="search" class="cerca" data-cerca=".imp-esistenti" placeholder="Cerca per nome o codice…" autocomplete="off" aria-label="Cerca per nome o codice">` : ""}
-        <div class="scelte imp-esistenti">${a.esistenti.slice().sort((x, y) => (pos.get(x.p.id) || {}).ordine - (pos.get(y.p.id) || {}).ordine).map(({ p, r }) =>
-          `<label data-nome="${esc(senzaAccenti(p.nome) + " " + r.codice)}"><input type="checkbox" name="nascondi-es" value="${esc(p.id)}" data-vpp="${r.vpp > 0 ? 1 : 0}"${st.nascosti.has(p.id) ? " checked" : ""}>
-          <span>${esc(p.nome)} · <b>${num(r.vpp)} VP</b><br><span class="small">${testoPosizione(pos.get(p.id))}</span></span></label>`).join("")}</div>
-      </div>`) : ""}
-    ${a.nuovi.length ? sezione(`Nuovi nel report · ${a.nuovi.length}`,
-      `<div class="row wrap scelte-rapide" style="gap:6px;margin-top:8px">
-        <button type="button" class="btn small" data-act="nascondi-zero" aria-pressed="false">Nascondi chi ha 0 VP</button>
-        <button type="button" class="btn small" data-act="nascondi-tutti" aria-pressed="false">Nascondi tutti</button>
-        <button type="button" class="btn small" data-act="mostra-tutti" aria-pressed="false">Mostra tutti</button></div>
-      ${a.nuovi.length > 8 ? `<input type="search" class="cerca" data-cerca=".imp-nuovi" placeholder="Cerca per nome o codice…" autocomplete="off" aria-label="Cerca per nome o codice">` : ""}
-      <div class="scelte imp-nuovi">${a.nuovi.map(scelta).join("")}</div>
-      <label class="check"><input type="checkbox" name="consenso">
-        <span>Ho il consenso delle persone della mia linea a inserire il loro nome e i loro numeri nell'app.</span></label>`,
-      "Entrano tutti nella tua struttura, nella posizione del report. Spunta chi vuoi <b>nascondere</b>: lo vedi solo nell'elenco «Nascoste» e i suoi VP contano lo stesso.",
-      "imp-da-scegliere") : ""}
-    ${sezione(`Si aggiornano i numeri · ${aggiorna.length}`, `<ul class="imp">${aggiorna.map(x => `<li>${riga(x.io ? { nome:`${st.profilo.nome} (tu)` } : x.p,
-        x.io && a.codiceMio ? `il tuo codice ${esc(x.r.codice)} viene salvato` : "")}<b class="num">${num(x.r.vpp)} VP</b></li>`).join("")}</ul>`)}
-    ${a.mancanti.length ? sezione(`Non più nel report · ${a.mancanti.length}`,
-      `${a.troppiMancanti ? `<p class="avviso">Mancano molte persone insieme: controlla di aver esportato <b>l'intera linea senza filtri</b>.</p>` : ""}
-      <p class="small">${a.mancanti.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})`).join(", ")}</p>`,
-      "Codici che Amway non ha più (per esempio non rinnovati). Restano nella tua struttura con il segno «non più nel report» e vanno tra le nascoste: se ricompaiono in una mappa riprendono i loro dati. Dopo 12 mesi fuori dalla mappa si cancellano.") : ""}
-    ${a.daCancellare.length ? sezione(`Fuori dalla mappa da 12 mesi · si cancellano ${a.daCancellare.length}`,
-      `<p class="small">${a.daCancellare.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})`).join(", ")}</p>`,
-      "Non sono più ricomparsi in una mappa da 12 mesi: si cancellano con tutti i loro dati.", "imp-cancellati") : ""}
-    ${a.usanoApp.length || a.usanoAppMancanti.length ? sezione("Usano l'app: posizione e numeri dal report",
-      `<p class="small">${plur(a.usanoApp.length, "persona trovata", "persone trovate")} nel report.
-        ${a.spostati.length ? `<br>Vanno sotto il loro sponsor del report: ${a.spostati.map(x => `<b>${esc(x.p.nome)}</b> (da ${esc(x.da)} a ${esc(x.a)})`).join(", ")}.` : ""}
-        ${a.usanoAppMancanti.length ? `<br>Non sono nel report: ${a.usanoAppMancanti.map(p => esc(p.nome)).join(", ")}.` : ""}</p>`) : ""}
-    <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
-      <button class="btn primary grow"${st.occupato ? " disabled" : ""}>Importa</button></div>
-  </form>`;
 }
-
-function accendiRapida(el){
-  document.querySelectorAll(".scelte-rapide .btn").forEach(b => { const on = b === el; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
-}
-function sceltaRapida(el, spunta){
-  const tutti = el.closest(".imp-filtri");
-  document.querySelectorAll(tutti ? ".imp-da-scegliere input[name=nascondi], .imp-esistenti input[name=nascondi-es]"
-    : ".imp-da-scegliere input[name=nascondi]").forEach(i => { i.checked = spunta(i); });
-  accendiRapida(el);
+/* il riepilogo dopo l'import: la mappa (se c'era), i mesi precedenti salvati come numeri, i file con un errore */
+function vRiepilogoImport(e){
+  const sezione = (titolo, corpo, cl) => `<div class="imp-sezione${cl ? " " + cl : ""}"><h3>${titolo}</h3>${corpo}</div>`;
+  const nomi = l => `<p class="small">${l.map(p => `${esc(p.nome)} (${esc(p.codice_amway || p.codice)})`).join(", ")}</p>`;
+  const a = e.mappa;
+  let h = a ? `<h2>Mappa di ${nomeMese(a.mese)} importata</h2>${a.datiAl ? rigaDataReport(a) : ""}
+    <p class="small">${plur(a.totale, "persona", "persone")} nel file${a.esteri.length ? ` (più ${a.esteri.length} di altri Paesi, che non si salvano)` : ""}.</p>`
+    : `<h2>${e.numeri.length ? "Numeri salvati" : "Import non fatto"}</h2>`;
+  if(a){
+    const aggiorna = [{ p:{ nome:`${st.profilo.nome} (tu)` }, r:a.prima }].concat(a.aggiorna, a.usanoApp);
+    if(a.nuovi.length) h += sezione(`Nuove nella tua struttura · ${a.nuovi.length}`, nomi(a.nuovi), "imp-nuovi");
+    h += sezione(`Numeri aggiornati · ${aggiorna.length}`, `<ul class="imp">${aggiorna.map(x =>
+      `<li><span class="grow">${esc(x.p.nome)}</span><b class="num">${num(x.r.vpp)} VP</b></li>`).join("")}</ul>`, "imp-aggiornati");
+    if(a.spostati.length) h += sezione("Usano l'app: spostati sotto il loro sponsor della mappa",
+      `<p class="small">${a.spostati.map(x => `<b>${esc(x.p.nome)}</b> (da ${esc(x.da)} a ${esc(x.a)})`).join(", ")}</p>`, "imp-spostati");
+    if(a.mancanti.length) h += sezione(`Non più nella mappa · ${a.mancanti.length}`, nomi(a.mancanti), "imp-mancanti");
+    if(a.daCancellare.length) h += sezione(`Fuori dalla mappa da 12 mesi · cancellate ${a.daCancellare.length}`, nomi(a.daCancellare), "imp-cancellati");
+  }
+  if(e.numeri.length) h += sezione(a ? "Mesi precedenti: salvati solo i numeri" : "Mappe di mesi precedenti: salvati solo i numeri, la struttura non cambia",
+    `<ul class="imp">${e.numeri.map(x => `<li><span class="grow">${esc(nomeMese(x.mese))}</span>
+      <b class="num">${x.prima.perc != null ? x.prima.perc + "%" : "–"} · ${num(x.prima.vpg)} VPG</b></li>`).join("")}</ul>`, "imp-numeri");
+  if(e.errori.length) h += `<div class="avviso">${e.errori.map(x => `<p style="margin:2px 0">${esc(x)}</p>`).join("")}</div>`;
+  return h;
 }
 
 /* Più file insieme: i mesi chiusi si salvano solo come numeri, uno dopo l'altro; il mese in corso (al massimo uno)
@@ -2933,7 +2871,7 @@ async function smistaFileAmway(files){
   if(mappe.length){
     st.ordiniInAttesa = ordini.length ? ordini : null;
     st.imp = null; st.errore = ""; st.sheet = "importa"; render();
-    return leggiFileReport(mappe);
+    return leggiFileReport(mappe, errori);
   }
   if(ordini.length){ st.ordiniInAttesa = null; return apriImportOrdini(ordini); }
   st.sheet = "importa-amway"; render();
@@ -2967,64 +2905,49 @@ function vImportaAmway(){
 async function aggiornaMeseMappa(){
   try{ const p = await api.collega(); if(p) st.profilo = Object.assign({}, st.profilo, { mappa_mese:p.mappa_mese || null }); }catch(e){}
 }
-async function leggiFileReport(files){
+/* L'import è diretto: si leggono i file, si salvano i numeri dei mesi precedenti (dal più vecchio) e poi si importa la
+   mappa del mese più recente, se c'è. Un file sbagliato non ferma gli altri. Con un file solo, un errore resta nel foglio. */
+async function leggiFileReport(files, erroriPrima){
   if(!files || !files.length) return;
+  st.imp = { inCorso:true }; st.errore = ""; render();
   await aggiornaMeseMappa();
-  if(files.length === 1) return leggiUnReport(files[0]);
-  const m = { multi:true, passati:[], corrente:null, errori:[] };
-  try{ st.esclusi = new Set((await api.esclusi() || []).map(x => x.codice)); }catch(e){}
-  /* prima si leggono tutti i file: la struttura la rifà solo la mappa del mese più recente */
+  const uno = files.length === 1 && !(erroriPrima || []).length;
   const letti = [];
   for(const file of files){
     let rep;
-    if(/\.xlsx?$/i.test(file.name)) rep = { errore:"è il file Excel: sul sito Amway scegli il formato CSV." };
-    else try{ rep = leggiReport(await file.text()); }catch(e){ rep = { errore:"non riesco a leggerlo: scaricalo di nuovo dal sito Amway." }; }
+    if(/\.xlsx?$/i.test(file.name)) rep = { errore:"Questo è il file Excel: sul sito Amway scegli il formato CSV." };
+    else try{ rep = leggiReport(await file.text()); }catch(e){ rep = { errore:"Non riesco a leggere il file: scaricalo di nuovo dal sito Amway." }; }
     letti.push({ file, rep });
   }
+  /* la struttura la rifà solo la mappa del mese più recente tra quelle scelte (e mai più vecchia della mia ultima) */
   const piuRecente = letti.filter(x => !x.rep.errore).map(x => x.rep.mese).sort().pop();
+  /* i file che non sono una mappa (scelti insieme) restano nel riepilogo */
+  const esito = { mappa:null, numeri:[], errori:(erroriPrima || []).slice() }, passati = [];
+  let corrente = null;
+  const errore = (file, testo) => esito.errori.push(uno ? testo : `${file.name}: ${testo.charAt(0).toLowerCase() + testo.slice(1)}`);
   for(const { file, rep } of letti){
     let a = rep;
     if(!rep.errore) try{ await attesaNelReport(rep); a = conData(analizzaReport(rep, piuRecente), file); }
-      catch(e){ a = { errore:"non riesco a leggerlo: scaricalo di nuovo dal sito Amway." }; }
-    if(a.errore) m.errori.push(`${file.name}: ${a.errore}`);
-    else if(a.passato){ if(!m.passati.some(x => x.mese === a.mese)) m.passati.push(a); }
-    else if(m.corrente) m.errori.push(`${file.name}: c'è già una mappa di ${nomeMese(a.mese)}, si importa una alla volta.`);
-    else m.corrente = a;
+      catch(e){ a = { errore:"Non riesco a leggere il file: scaricalo di nuovo dal sito Amway." }; }
+    if(a.errore) errore(file, a.errore);
+    else if(a.passato){ if(!passati.some(x => x.mese === a.mese)) passati.push(a); }
+    else if(corrente) errore(file, `C'è già una mappa di ${nomeMese(a.mese)}: si importa una alla volta.`);
+    else corrente = a;
   }
-  m.passati.sort((x, y) => x.mese < y.mese ? -1 : 1);
-  if(!m.passati.length && !m.errori.length) st.imp = m.corrente;
-  else st.imp = m;
-  render();
-}
-async function salvaReportPassati(m, f){
-  st.occupato = true; render();
-  const fatti = [];
-  for(const a of m.passati){
-    try{ await api.salvaMesePassato(argomentiPassato(a)); fatti.push(nomeMese(a.mese)); }
-    catch(e){ m.errori.push(`${nomeMese(a.mese)}: ${messaggio(e)}`); }
+  passati.sort((x, y) => x.mese < y.mese ? -1 : 1);
+  for(const a of passati){
+    try{ await api.salvaMesePassato(argomentiPassato(a)); esito.numeri.push(a); }
+    catch(e){ esito.errori.push(`${nomeMese(a.mese)}: ${messaggio(e)}`); }
   }
-  await caricaNumeri();
-  st.occupato = false;
-  if(fatti.length) toast(`Numeri salvati: ${fatti.join(", ")}`);
-  /* il mese in corso, se c'era, si importa adesso con la sua anteprima */
-  if(m.corrente && !m.errori.length){ st.imp = m.corrente; render(); }
-  else if(m.errori.length){ st.imp = { multi:true, passati:[], corrente:m.corrente, errori:m.errori }; render(); }
-  else { st.sheet = null; st.imp = null; render(); poiOrdini(); }
+  if(corrente) try{ await importaMappa(corrente); esito.mappa = corrente; }
+    catch(e){ esito.errori.push(uno ? messaggio(e) : `${nomeMese(corrente.mese)}: ${messaggio(e)}`); try{ await caricaStruttura(); }catch(x){} }
+  if(esito.numeri.length || esito.mappa) await caricaNumeri();
+  /* un file solo con un errore: il foglio resta quello di partenza, con l'errore */
+  if(!esito.mappa && !esito.numeri.length && uno){ st.imp = { errore:esito.errori[0] }; render(); return; }
+  st.imp = { fatto:true, esito }; render();
+  toastImport(esito);
   riconosciPlatino();
-}
-async function leggiUnReport(file){
-  if(!file) return;
-  let a;
-  if(/\.xlsx?$/i.test(file.name)) a = { errore:"Questo è il file Excel: sul sito Amway scegli il formato CSV." };
-  else{
-    try{
-      const rep = leggiReport(await file.text());
-      if(!rep.errore) try{ st.esclusi = new Set((await api.esclusi() || []).map(x => x.codice)); }catch(e){}
-      await attesaNelReport(rep);
-      a = rep.errore ? rep : conData(analizzaReport(rep), file);
-    }catch(e){ a = { errore:"Non riesco a leggere il file: scaricalo di nuovo dal sito Amway." }; }
-  }
-  st.imp = a; render();
+  if(!esito.errori.length) setTimeout(poiOrdini, 50);
 }
 /* La data e ora del file scaricato (mai nel futuro): si salva con i numeri, perché gli ordini scritti dopo il file si
    sommano ai VP del report. Non decide più cosa si sostituisce (046): decide il «Mese di competenza». */
@@ -3055,65 +2978,29 @@ function argomentiPassato(a){
   return { p_mese:a.mese + "-01", p_dati_al:a.datiAl || new Date().toISOString(),
     p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp }, numeri(a.prima)), p_altri:altri };
 }
-async function salvaReportPassato(a, f){
-  st.occupato = true;
-  try{
-    await api.salvaMesePassato(argomentiPassato(a));
-    await caricaNumeri();
-    st.sheet = null; st.imp = null; st.occupato = false; render();
-    toast(`Numeri di ${nomeMese(a.mese)} salvati`);
-    riconosciPlatino(); poiOrdini();
-  }catch(e){ st.occupato = false; mostraErroreForm(f, messaggio(e)); }
-}
-async function eseguiImport(f){
-  const a = st.imp, io = st.profilo;
-  if(a.multi){
-    if(a.passati.length) return salvaReportPassati(a, f);
-    if(a.corrente){ st.imp = a.corrente; render(); return; }
-    st.sheet = null; st.imp = null; render(); return;
-  }
-  if(a.passato) return salvaReportPassato(a, f);
-  const scelti = nome => new Set([...f.querySelectorAll(`input[name=${nome}]:checked`)].map(i => i.value));
-  const nascondi = scelti("nascondi");
-  /* "Riapplica i filtri": chi c'è già si nasconde o si rimette secondo le caselle; "Lascia tutto com'è": nessun cambio */
-  const filtri = !!f.querySelector("input[name=modo][value=filtri]:checked"), voglio = scelti("nascondi-es");
-  const elencati = filtri ? [...f.querySelectorAll("input[name=nascondi-es]")].map(i => i.value) : [];
-  const daNascondere = elencati.filter(id => voglio.has(id) && !st.nascosti.has(id));
-  const daMostrare = elencati.filter(id => !voglio.has(id) && st.nascosti.has(id));
-  if(a.nuovi.length && !f.consenso.checked){ mostraErroreForm(f, "Conferma di avere il consenso delle persone della tua linea."); return; }
-  /* 033: una sola struttura. Tutte le persone del report, dalla più vicina a me: posizione e numeri di tutto il mio
-     gruppo (chi usa l'app e chi no). Il database tiene il report più aggiornato per ognuno. */
+/* la mappa del mese più recente: posizione e numeri di tutto il mio gruppo, chi usa l'app e chi no (033) */
+async function importaMappa(a){
+  const io = st.profilo;
   const numeri = numeriDelReport(a.perCodice);
   const profondita = r => { let n = 0; for(let c = r.sponsor; c && a.perCodice.has(c) && n < 200; c = a.perCodice.get(c).sponsor) n++; return n; };
   const persone = [...a.perCodice.values()].filter(r => r.codice !== a.prima.codice)
     .sort((x, y) => profondita(x) - profondita(y))
     .map(r => Object.assign({ codice:r.codice, nome:r.nome, vpp:r.vpp, sponsor:r.sponsor || null, ingresso:r.ingresso }, numeri(r)));
-  st.occupato = true;
-  try{
-    const esito = await api.importaMappa({ p_mese:a.mese + "-01", p_dati_al:a.datiAl || new Date().toISOString(),
-      p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp, ingresso:a.prima.ingresso }, numeri(a.prima)), p_persone:persone,
-      p_nascondi:[...nascondi], p_fuori:a.mancanti.map(p => p.id) }) || {};
-    st.profilo = Object.assign({}, st.profilo, { mappa_mese:a.mese + "-01" }, a.codiceMio ? { codice_amway:a.prima.codice } : {});
-    if(daNascondere.length) await api.nascondiTanti(io.id, daNascondere);
-    if(daMostrare.length) await api.mostraTanti(io.id, daMostrare);
-    await caricaStruttura();
-    st.att = await api.activities(io.id, [settimana(), primoDelMese()].sort()[0]) || [];
-    await caricaNumeri();
-    st.sheet = null; st.imp = null; st.occupato = false; render();
-    riconosciPlatino();
-    const n = k => Number(esito[k]) || 0;
-    setTimeout(poiOrdini, 50);
-    toast(`Import di ${nomeMese(a.mese).split(" ")[0]}: ${[n("aggiunte") ? plur(n("aggiunte"), "persona aggiunta", "persone aggiunte") : "",
-      plur(n("aggiornati"), "persona aggiornata", "persone aggiornate"), n("piu_vecchi") ? plur(n("piu_vecchi"), "già più aggiornata", "già più aggiornate") : "", n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
-      n("fuori") ? plur(n("fuori"), "persona non più nel report", "persone non più nel report") : "",
-      n("cancellati") ? plur(n("cancellati"), "persona fuori dalla mappa da 12 mesi cancellata", "persone fuori dalla mappa da 12 mesi cancellate") : "",
-      daNascondere.length ? plur(daNascondere.length, "nascosta", "nascoste") : "",
-      daMostrare.length ? plur(daMostrare.length, "di nuovo visibile", "di nuovo visibili") : ""].filter(Boolean).join(", ")}`);
-  }catch(e){
-    st.occupato = false;
-    try{ await caricaStruttura(); }catch(x){}
-    mostraErroreForm(f, messaggio(e));
-  }
+  a.risultato = await api.importaMappa({ p_mese:a.mese + "-01", p_dati_al:a.datiAl || new Date().toISOString(),
+    p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp, ingresso:a.prima.ingresso }, numeri(a.prima)), p_persone:persone,
+    p_nascondi:[], p_fuori:a.mancanti.map(p => p.id) }) || {};
+  st.profilo = Object.assign({}, st.profilo, { mappa_mese:a.mese + "-01" });
+  await caricaStruttura();
+  st.att = await api.activities(io.id, [settimana(), primoDelMese()].sort()[0]) || [];
+}
+function toastImport(e){
+  const a = e.mappa, n = k => a ? Number((a.risultato || {})[k]) || 0 : 0;
+  const parti = a ? [n("aggiunte") ? plur(n("aggiunte"), "persona aggiunta", "persone aggiunte") : "",
+    plur(n("aggiornati"), "persona aggiornata", "persone aggiornate"), n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
+    n("fuori") ? plur(n("fuori"), "persona non più nella mappa", "persone non più nella mappa") : "",
+    n("cancellati") ? plur(n("cancellati"), "persona fuori dalla mappa da 12 mesi cancellata", "persone fuori dalla mappa da 12 mesi cancellate") : ""] : [];
+  if(e.numeri.length) parti.push(`numeri di ${e.numeri.map(x => nomeMese(x.mese)).join(", ")} salvati`);
+  if(a || e.numeri.length) toast(`${a ? `Import di ${nomeMese(a.mese).split(" ")[0]}: ` : ""}${parti.filter(Boolean).join(", ")}`);
 }
 
 /* ---- 10. Fogli in basso ---- */
@@ -3391,9 +3278,6 @@ const AZIONI = {
   "copia-link"(el){ copiaTesto(el.dataset.link, "Link copiato"); },
   /* pulsanti rapidi dell'import: agiscono sulle caselle "Non ancora nell'app" senza ridisegnare il foglio;
      il pulsante usato resta acceso finché non si cambia una casella a mano */
-  "nascondi-zero"(el){ sceltaRapida(el, i => i.dataset.vpp !== "1"); },
-  "nascondi-tutti"(el){ sceltaRapida(el, () => true); },
-  "mostra-tutti"(el){ sceltaRapida(el, () => false); },
   codice(el){ st.codiceId = el.dataset.id; st.errore = ""; st.sheet = "codice"; render(); focusSheet(); },
   storico(){ st.sheet = "storico"; render(); },
   async "mese-gruppo"(el){
@@ -3666,7 +3550,6 @@ const MODULI = {
       st.invitiMiei = await api.inviti() || []; render();
     }catch(e){ mostraErroreForm(f, messaggioInvita(e)); }
   },
-  importa(f){ return eseguiImport(f); },
   async codice(f){
     const codice = soloCifre(f.codice_amway.value);
     if(!codiceValido(codice)){ mostraErroreForm(f, codice ? MESSAGGI_ERRORE.codice_amway_non_valido : MESSAGGI_ERRORE.codice_amway_mancante); return; }
@@ -6509,7 +6392,6 @@ document.addEventListener("submit", e => {
    è obbligatoria solo per chi inizia (nel modulo d'ingresso). */
 document.addEventListener("change", e => {
   if(e.target.id === "file-report" || e.target.classList.contains("file-amway")){ smistaFileAmway(e.target.files ? [...e.target.files] : []); return; }
-  if(e.target.name === "nascondi" && e.target.closest(".imp-da-scegliere")){ accendiRapida(null); return; }
   if(e.target.name !== "qualifica") return;
   const f = e.target.form;
   const t = st.stages.find(s => s.chiave === f.qualifica.value);
