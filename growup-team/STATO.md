@@ -77,6 +77,8 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
 - **Scheda partner, «Questo mese e il mese prima»** (30 ottobre): per chi non usa l'app ma è nella mappa del mese, i VP
   personali del mese in corso sono quelli della mappa (prima contavano solo gli ordini scritti a mano: 0). Il «?» spiega la
   colonna centrale («set al 30» = il mese prima fino allo stesso giorno). App v73.
+- **«Questo mese e il mese prima» a due colonne** (30 ottobre, scelta di Stefano): tolta la colonna «al giorno» del mese prima
+  e il ▼ rosso che ne dipendeva; restano il mese in corso fino a oggi e il totale del mese prima. App v74.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 
