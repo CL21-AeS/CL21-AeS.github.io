@@ -2860,6 +2860,17 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await sync(page);
   check(!DB.partners.some(p => p.codice_amway === "7600003"), "046: cancellata con i suoi dati");
   await page.click(".sheet button[data-act=chiudi]");
+  // 049: il perimetro: una riga che non risale a chi importa (file modificato) si ignora, con chi sta sotto di lei
+  await page.locator(".toast", { hasText:"Import di" }).waitFor({ state:"detached" });
+  await scegliFile(page, "modificato.csv", csvCon(testa17, [stessoMese[0], stessoMese[1], stessoMese[3],
+    p51(2, "9999990", "7600030", "ALTRA, LINEA", "10,00", "10,00", 0, 2), p51(3, "7600030", "7600031", "SOTTO, ALTRA", "5,00", "5,00", 0, 1)]));
+  await page.locator(".sheet h2", { hasText:"importata" }).waitFor();
+  check(await page.locator(".sheet .imp-ignorate").getByText("2 righe ignorate").isVisible() && !(await page.locator(".sheet .imp-nuovi").count()),
+    "049: riepilogo: 2 righe ignorate perché non risalgono a chi importa");
+  await sync(page);
+  check(!DB.partners.some(p => ["7600030", "7600031"].includes(p.codice_amway)) && !JSON.stringify(DB.ultimoImport).includes("7600030"),
+    "049: le righe fuori dalla downline non arrivano al database e non creano nessuno");
+  await page.click(".sheet button[data-act=chiudi]");
   // 048: chi importa è la riga di livello 1; senza quella riga, o senza un codice Amway nell'app, l'import è rifiutato
   await page.locator(".toast", { hasText:"Import di" }).waitFor({ state:"detached" });
   await scegliFile(page, "senza-livello-1.csv", csvCon(testa17, persone51.slice(1)));

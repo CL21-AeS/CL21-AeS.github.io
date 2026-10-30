@@ -81,7 +81,6 @@ function creaApi(){
     /* codice Amway Partner: il mio o di una persona che ho importato */
     impostaCodice: (pid, codice) => q(sb.rpc("imposta_codice_amway", { p_partner:pid, p_codice:codice })),
     /* import della rete dal report Amway: le persone importate le vede solo chi le importa */
-    importaRete:  a => q(sb.rpc("importa_rete", a)),
     /* 033: una sola struttura, la mappa Amway: l'import aggiorna tutto il mio gruppo, vince il report più aggiornato */
     importaMappa: a => q(sb.rpc("importa_mappa", a)),
     salvaMesePassato: a => q(sb.rpc("salva_mese_passato", a)),
@@ -2743,6 +2742,15 @@ function analizzaReport(rep, piuRecente){
     return { errore:`Questo report è di ${prima.nome} (${prima.codice}), ma il tuo codice nell'app è ${io.codice_amway}. `
       + `Ognuno importa il report scaricato dal proprio accesso al sito Amway. Se il report è tuo, il codice nell'app è sbagliato: `
       + (io.is_admin ? "correggilo in fondo alla pagina Io." : "chiedi a Stefano e Alessia di correggerlo.") };
+  /* 049: il perimetro. Valgono solo le righe che, di sponsor in sponsor nel file, risalgono a chi importa: la mia mappa
+     contiene solo me e la mia downline, una riga che non ci arriva (file modificato) si ignora. Il database fa lo stesso. */
+  const collegati = new Set([prima.codice]);
+  for(let cambiato = true; cambiato;){
+    cambiato = false;
+    for(const r of rep.righe) if(!collegati.has(r.codice) && collegati.has(r.sponsor)){ collegati.add(r.codice); cambiato = true; }
+  }
+  const fuoriPerimetro = rep.righe.filter(r => !collegati.has(r.codice)).length;
+  rep = Object.assign({}, rep, { righe:rep.righe.filter(r => collegati.has(r.codice)) });
   const perCodice = new Map(rep.righe.map(r => [r.codice, r]));
   /* un mese chiuso: si salvano solo i numeri (21%, VPG, linee) per contare i mesi da Argento */
   if(passato){
@@ -2756,7 +2764,7 @@ function analizzaReport(rep, piuRecente){
   const attivi = new Map(altri.filter(p => p.stato !== "gestito" && p.codice_amway).map(p => [p.codice_amway, p]));
   const mie = altri.filter(p => p.stato === "gestito");
   const a = { mese:m, prima, perCodice, aggiorna:[], mancanti:[], usanoApp:[], usanoAppMancanti:[], daCancellare:[],
-              spostati:[], nuovi:[], totale:rep.righe.length, esteri:rep.esteri || [] };
+              spostati:[], nuovi:[], totale:rep.righe.length, esteri:rep.esteri || [], fuoriPerimetro };
   const usati = new Set([prima.codice]);
   for(const p of altri.filter(p => p.stato !== "gestito")){
     const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
@@ -2825,7 +2833,8 @@ function vRiepilogoImport(e){
   const nomi = l => `<p class="small">${l.map(p => `${esc(p.nome)} (${esc(p.codice_amway || p.codice)})`).join(", ")}</p>`;
   const a = e.mappa;
   let h = a ? `<h2>Mappa di ${nomeMese(a.mese)} importata</h2>${a.datiAl ? rigaDataReport(a) : ""}
-    <p class="small">${plur(a.totale, "persona", "persone")} nel file${a.esteri.length ? ` (più ${a.esteri.length} di altri Paesi, che non si salvano)` : ""}.</p>`
+    <p class="small">${plur(a.totale, "persona", "persone")} nel file${a.esteri.length ? ` (più ${a.esteri.length} di altri Paesi, che non si salvano)` : ""}.</p>
+    ${a.fuoriPerimetro ? `<p class="avviso imp-ignorate">${plur(a.fuoriPerimetro, "riga ignorata", "righe ignorate")}: non risal${a.fuoriPerimetro > 1 ? "gono" : "e"} a te di sponsor in sponsor, quindi non ${a.fuoriPerimetro > 1 ? "sono" : "è"} nella tua downline.</p>` : ""}`
     : `<h2>${e.numeri.length ? "Numeri salvati" : "Import non fatto"}</h2>`;
   if(a){
     const aggiorna = [{ p:{ nome:`${st.profilo.nome} (tu)` }, r:a.prima }].concat(a.aggiorna, a.usanoApp);

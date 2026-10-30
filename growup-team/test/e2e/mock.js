@@ -322,8 +322,13 @@
       const secondo = !!io.primo_import_il; if(!io.primo_import_il) io.primo_import_il = new Date().toISOString();
       if(salvaNumero(io, io.id, m, a.p_io, al)) numeri++; else vecchi++;
       const giu = id => [id].concat(sotto(id).map(x => x.id));
+      /* 049: il perimetro: una riga vale solo se il suo sponsor è chi importa, una riga già accettata o uno della mia downline */
+      const validi = new Set([io.codice_amway]);
+      let ignorate = 0;
       for(const r of a.p_persone){
         const mia = sotto(io.id);
+        if(!r.sponsor || !(validi.has(r.sponsor) || mia.some(p => p.codice_amway === r.sponsor))){ ignorate++; continue; }
+        validi.add(r.codice);
         const sp = (r.sponsor && r.sponsor !== io.codice_amway && (mia.find(p => p.codice_amway === r.sponsor) || {}).id) || io.id;
         let x = mia.filter(p => p.codice_amway === r.codice).sort((p, q) => (q.stato !== "gestito") - (p.stato !== "gestito"))[0];
         if(!x){
@@ -359,7 +364,7 @@
           db.activities = (db.activities || []).filter(n => n.partner_id !== x.id);
           cancellati++; } }
       salva();
-      return { cancellati, aggiunte, spostate, fuori, aggiornati:numeri, piu_vecchi:vecchi }; },
+      return { ignorate, cancellati, aggiunte, spostate, fuori, aggiornati:numeri, piu_vecchi:vecchi }; },
     prossime: async () => { const io = mio(); if(!io) return [];
       return visibiliRicuciti(io).filter(p => p.prossima_qualifica).map(p => ({ partner_id:p.id, prossima_qualifica:p.prossima_qualifica })); },
     nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid);
@@ -372,62 +377,6 @@
       if(db.partners.some(x => x.id !== pid && x.codice_amway === codice && (p.stato === "gestito" ? x.stato === "gestito" && x.gestore_id === p.gestore_id : x.stato !== "gestito")))
         throw new Error("codice_amway_usato");
       p.codice_amway = codice; salva(); return pub(p); },
-    importaRete: async a => { const io = mio();
-      if(io.codice_amway && io.codice_amway !== a.p_io.codice) throw new Error("import_di_altri");
-      io.codice_amway = a.p_io.codice;
-      const salvaNumeri = (pid, r) => { const pp = db.partners.find(y => y.id === pid);
-        if(pp && pp.stato !== "gestito" && !pp.confermato_il) pp.confermato_il = new Date().toISOString();
-        if(r.vpg == null) return; const m = a.p_mese.slice(0, 7);
-        db.numeri = (db.numeri || []).filter(x => !(x.visto_da === io.id && x.partner_id === pid && x.mese === m))
-          .concat([{ visto_da:io.id, partner_id:pid, mese:m, vpg:r.vpg, percentuale:r.percentuale, linee:r.linee || [], nascoste:!!r.nascoste }]); };
-      salvaNumeri(io.id, a.p_io);
-      const attivo = c => visibili(io).find(x => x.stato !== "gestito" && x.codice_amway === c);
-      const mia = c => db.partners.find(x => x.stato === "gestito" && x.gestore_id === io.id && x.codice_amway === c);
-      const giu = id => [id].concat(sotto(id).map(x => x.id));
-      let aggiunte = 0, spostate = 0, fuori = 0;
-      const nascondi = id => { if(!(db.nascosti || []).some(n => n.partner_id === io.id && n.nascosto_id === id))
-        db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:id }]); };
-      const righe = [{ partner_id:io.id, vpp:a.p_io.vpp }];
-      for(const r of a.p_persone){
-        const sp = (r.sponsor && r.sponsor !== io.codice_amway && ((attivo(r.sponsor) || mia(r.sponsor) || {}).id)) || io.id;
-        let x = mia(r.codice);
-        if(x){ if(x.sponsor_id !== sp && !giu(x.id).includes(sp)){ x.sponsor_id = sp; spostate++; } }
-        else{
-          if(attivo(r.codice)) continue;
-          x = { id:uid(), nome:r.nome, sponsor_id:sp, stato:"gestito", gestore_id:io.id, codice_amway:r.codice, codice_invito:codiceInvito(),
-            partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() };
-          db.partners.push(x); aggiunte++;
-          if(a.p_nascondi.includes(r.codice) || (db.esclusi || []).some(e => e.partner_id === io.id && e.codice === r.codice)) nascondi(x.id);
-        }
-        db.esclusi = (db.esclusi || []).filter(e => !(e.partner_id === io.id && e.codice === r.codice));
-        x.fuori_report_dal = null;
-        righe.push({ partner_id:x.id, vpp:r.vpp }); salvaNumeri(x.id, r);
-      }
-      for(const r of a.p_attivi){
-        const x = attivo(r.codice); if(!x || x.id === io.id) continue;
-        if(!vedo(io, x)) continue;
-        salvaNumeri(x.id, r);
-        const sp = !r.sponsor || r.sponsor === io.codice_amway ? io.id : (attivo(r.sponsor) || {}).id;
-        if(!sp || sp === x.sponsor_id || giu(x.id).includes(sp)) continue;
-        x.sponsor_id = sp; spostate++;
-      }
-      for(const pid of a.p_fuori){ const x = db.partners.find(y => y.id === pid);
-        if(!x || x.stato !== "gestito" || x.gestore_id !== io.id) throw new Error("non_autorizzato");
-        if(!x.fuori_report_dal){ x.fuori_report_dal = a.p_mese; nascondi(x.id); fuori++; } }
-      const oggi = new Intl.DateTimeFormat("en-CA", { timeZone:"Europe/Rome" }).format(new Date());
-      const m = a.p_mese.slice(0, 7), fine = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).toISOString().slice(0, 10);
-      const giorno = m === oggi.slice(0, 7) ? oggi : fine;
-      let aggiornati = 0, invariati = 0;
-      for(const r of righe){
-        const ora = db.activities.filter(x => x.partner_id === r.partner_id && (x.tipo === "ordine" || x.tipo === "rettifica") && x.data.slice(0, 7) === m)
-          .reduce((t, x) => t + Number(x.vp), 0);
-        const diff = Math.round((r.vpp - ora) * 100) / 100;
-        if(!diff){ invariati++; continue; }
-        db.activities.push({ id:uid(), partner_id:r.partner_id, tipo:"rettifica", vp:diff, quantita:1, data:giorno, inserito_da:io.id, inserito_il:new Date().toISOString() });
-        aggiornati++;
-      }
-      db.importi = (db.importi || 0) + 1; salva();
-      return { aggiornati, invariati, aggiunte, spostate, fuori }; },
     attivitaGruppo: async dal => { const io = mio(); if(!io) return [];
       const ids = new Set(visibili(io).map(p => p.id)); return db.activities.filter(a => ids.has(a.partner_id) && a.data >= dal && leggoAtt(io, a)); },
     obiettiviGruppo: async () => db.goals,

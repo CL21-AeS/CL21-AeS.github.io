@@ -47,6 +47,10 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
   livello 1 (la prima riga di dati): deve avere il mio codice Amway; senza quella riga, o senza codice nell'app, l'import è
   rifiutato (il codice non si prende più dal file: arriva sempre dall'invito). Nessun blocco sui file parziali: chi esce
   per errore rientra con i suoi dati al prossimo import giusto. App v67.
+- **Perimetro** (migrazione **049**): una riga vale solo se, di sponsor in sponsor, risale a chi importa (nel file, o a una
+  persona già nella sua downline); le altre si ignorano, nell'app (il riepilogo le conta: «N righe ignorate») e nel
+  database. Tolta la vecchia `importa_rete` (018), che l'app non usava più e saltava tutte le regole nuove; i controlli
+  in `tests_rls.sql` che la usavano ora usano `importa_mappa`. App v68.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 
