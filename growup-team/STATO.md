@@ -84,6 +84,11 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
   nel mese in corso), Usano l'app, Senza app, Percentuale (dalla più alta). Con un filtro l'albero diventa un elenco con
   livello, numeri e «sotto chi»; la ricerca lavora dentro il filtro; le persone nascoste restano fuori. «Nascondi» resta.
   Frontali no (si vedono chiudendo le linee). Il filtro acceso resta in vista anche in Persone. App v75.
+- 30 ottobre: tolti dal database i 111 «nascosto» del profilo di Stefano e Alessia (la scelta «Nascondi chi ha 0 VP»
+  del primo import): l'import porta tutta la mappa, si nasconde a mano solo dalla scheda («Nascondi dalla mia struttura»).
+- **Ricerca nel Gruppo** (scelta C di Stefano): compaiono solo le persone trovate, senza rientro e senza frecce; sotto ognuna
+  «Linea di <frontale> › … › <sponsor> (sponsor)» («Tuo frontale» per il livello 2); toccando «…» si apre il percorso
+  intero. Il percorso si aggiunge solo durante la ricerca (nessun ridisegno: il campo resta com'è). App v76.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 

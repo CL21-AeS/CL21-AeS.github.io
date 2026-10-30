@@ -380,28 +380,19 @@ await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator("
 check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isHidden() && await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isHidden(),
   "gruppo di Anna richiuso: Marco e Luca nascosti");
 check((await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator("button[data-act=piega]").innerText()).trim() === "▸ 3", "Anna: ▸ 3");
-// la ricerca trova anche dentro un gruppo richiuso e mostra la linea fino a noi
+// la ricerca trova anche dentro un gruppo richiuso: solo le persone trovate, con la loro linea e il loro sponsor
 await page.fill("#cerca-struttura", "lùca");
-check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isVisible()
-  && await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isHidden(),
-  "ricerca: Luca con la sua linea (Anna, Marco), gli altri nascosti");
+const rigaLucaR = page.locator(".albero.struttura li", { hasText:"Luca Verdi" });
+check(await rigaLucaR.isVisible() && await page.locator(".albero.struttura li:visible").count() === 1,
+  "ricerca: solo Luca, la persona trovata");
+check((await rigaLucaR.locator(".percorso").innerText()).trim() === "Linea di Anna Bianchi › Marco Rossi (sponsor)", "ricerca: sotto Luca la sua linea e il suo sponsor");
 check((await page.locator("#cerca-esito").innerText()).startsWith("1 persona trovata"), "ricerca: 1 persona trovata");
 await page.screenshot({ path: S + "/e2e/23-ricerca.png" });
-// durante la ricerca ▸ N apre anche il gruppo della persona trovata
 await page.fill("#cerca-struttura", "anna");
-const piegaAnna = page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator("button[data-act=piega]");
-check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isHidden() && (await piegaAnna.innerText()).trim() === "▸ 3", "ricerca: Anna trovata, il suo gruppo chiuso (▸ 3)");
-await piegaAnna.click();
-check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isVisible() && await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isHidden()
-  && (await piegaAnna.innerText()).trim() === "▾ 3" && await page.locator(".albero.struttura li", { hasText:"Ciro Neri" }).isHidden(), "ricerca: ▸ apre i frontali di Anna");
-const piegaMarco = page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).locator("button[data-act=piega]");
-check((await piegaMarco.innerText()).trim() === "▸ 1", "ricerca: anche Marco ha la sua freccia");
-await piegaMarco.click();
-check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isVisible() && (await piegaMarco.innerText()).trim() === "▾ 1", "ricerca: la freccia di Marco apre Luca");
-await piegaMarco.click();
+check((await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator(".percorso").innerText()).trim() === "Tuo frontale"
+  && await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator("button[data-act=piega]").isHidden(),
+  "ricerca: un frontale è «Tuo frontale», niente frecce durante la ricerca");
 check(await page.locator("#cerca-struttura").inputValue() === "anna", "ricerca: il testo cercato resta");
-await piegaAnna.click();
-check(await page.locator(".albero.struttura li", { hasText:"Luca Verdi" }).isHidden(), "ricerca: ▾ la richiude");
 await page.fill("#cerca-struttura", "zzz");
 check(await page.getByText("Nessuno con questo nome nel tuo gruppo.").isVisible(), "ricerca senza risultati");
 await page.fill("#cerca-struttura", "");
@@ -3049,24 +3040,26 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   g("fga00002", "Bruno Basso", "fga00001", "gestito", 50, 0);
   g("fga00003", "Carla Zero", "fg53", "gestito", 0, 0);
   g("fga00004", "Dario App", "fg53", "attivo", 0, 3);
+  g("fga00005", "Elio Profondo", "fga00002", "gestito", 0, 0);
+  g("fga00006", "Fede Fondo", "fga00005", "gestito", 0, 0);
   ({ ctx, page } = await apri({}, "#chiave=" + "f5".repeat(16)));
   await page.getByText("Ciao Filtra").waitFor(); await apriTappa(page);
   if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
   await page.click("button[data-act=vista-gruppo]");
   await page.locator(".filtri-gruppo").waitFor();
   const testi = (await page.locator(".filtri-gruppo button").allInnerTexts()).map(t => t.trim());
-  check(JSON.stringify(testi) === JSON.stringify(["Tutti", "Con VP · 2", "Senza VP · 2", "Oltre 200 VP · 1", "Nuovi · 1", "Usano l'app · 1", "Senza app · 3", "Percentuale · 2"]),
+  check(JSON.stringify(testi) === JSON.stringify(["Tutti", "Con VP · 2", "Senza VP · 4", "Oltre 200 VP · 1", "Nuovi · 1", "Usano l'app · 1", "Senza app · 5", "Percentuale · 2"]),
     "Gruppo: i filtri con i conteggi (" + testi.join(" | ") + ")");
-  const nomi = async () => (await page.locator(".elenco-filtro li .nome > span:first-child").allInnerTexts()).map(t => t.trim());
+  const nomi = async () => (await page.locator(".elenco-filtro li .nome-apri > span:first-child").allInnerTexts()).map(t => t.trim());
   const filtra = async id => { await page.click(`.filtri-gruppo button[data-filtro=${id}]`); await page.waitForTimeout(150); };
   await filtra("con-vp"); check(JSON.stringify(await nomi()) === JSON.stringify(["Alba Alta", "Bruno Basso"]), "Con VP: chi ha fatturato questo mese");
   check(await page.locator(".elenco-filtro li", { hasText:"Bruno Basso" }).getByText("sotto Alba Alta").isVisible(), "l'elenco dice sotto chi sta ognuno");
-  await filtra("senza-vp"); check(JSON.stringify(await nomi()) === JSON.stringify(["Carla Zero", "Dario App"]), "Senza VP: chi è a 0");
+  await filtra("senza-vp"); check(JSON.stringify(await nomi()) === JSON.stringify(["Elio Profondo", "Fede Fondo", "Carla Zero", "Dario App"]), "Senza VP: chi è a 0");
   await filtra("oltre-200"); check(JSON.stringify(await nomi()) === JSON.stringify(["Alba Alta"]), "Oltre 200 VP");
   await filtra("nuovi"); check(JSON.stringify(await nomi()) === JSON.stringify(["Alba Alta"]) && await page.locator(".elenco-filtro li").getByText(/entrato il/).isVisible(),
     "Nuovi: chi è entrato in Amway questo mese, con la data di ingresso");
   await filtra("app"); check(JSON.stringify(await nomi()) === JSON.stringify(["Dario App"]), "Usano l'app");
-  await filtra("senza-app"); check((await nomi()).length === 3 && !(await nomi()).includes("Dario App"), "Senza app");
+  await filtra("senza-app"); check((await nomi()).length === 5 && !(await nomi()).includes("Dario App"), "Senza app");
   await filtra("percentuale"); check(JSON.stringify(await nomi()) === JSON.stringify(["Alba Alta", "Dario App"])
     && await page.locator(".elenco-filtro li", { hasText:"Alba Alta" }).getByText("6%").isVisible(), "Percentuale: dalla più alta, con la percentuale");
   check(await page.evaluate(() => { const f = document.querySelector(".filtri-gruppo"), b = f.querySelector(".btn.on");
@@ -3079,6 +3072,15 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.locator(".card", { hasText:"La mia struttura" }).screenshot({ path: S + "/e2e/53-filtri-gruppo.png" });
   await filtra("tutti");
   check(await page.locator(".albero.struttura:not(.elenco-filtro) li", { hasText:"Bruno Basso" }).count() === 1, "Tutti: torna l'albero");
+  // ricerca in profondità: «Linea di … › … › sponsor»; toccando «…» si apre il percorso intero
+  await page.fill("#cerca-struttura", "fede");
+  const percFede = page.locator(".albero.struttura li", { hasText:"Fede Fondo" }).locator(".percorso");
+  check((await percFede.innerText()).replace(/\s+/g, " ").trim() === "Linea di Alba Alta › … › Elio Profondo (sponsor)", "ricerca: il percorso corto (linea, …, sponsor)");
+  await percFede.locator("button.puntini").click();
+  check((await percFede.innerText()).replace(/\s+/g, " ").trim() === "Linea di Alba Alta › Bruno Basso › Elio Profondo (sponsor)"
+    && await page.locator("#cerca-struttura").inputValue() === "fede", "ricerca: toccando «…» si apre il percorso intero, la ricerca resta");
+  await page.locator(".card", { hasText:"La mia struttura" }).screenshot({ path: S + "/e2e/54-ricerca-percorso.png" });
+  await page.fill("#cerca-struttura", "");
   await ctx.close();
 }
 
