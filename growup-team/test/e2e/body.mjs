@@ -2820,16 +2820,28 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const stessoMese = [Object.assign({}, persone51[0], { "VPP":"'99,00" }), persone51[1],
     Object.assign({}, persone51[2], { "Nome":"'RISERVA, RITA" }), Object.assign({}, persone51[3], { "Codice Amway Partner Sponsor":"'7600002", "Qualifica Amway Partner":"3" })];
   await page.locator(".toast", { hasText:"Import di" }).waitFor({ state:"detached" });
+  /* 051: un partner (non admin) con una mappa dello stesso mese scaricata 5 giorni fa: chi ha già i dati di una mappa
+     scaricata dopo non cambia */
   await conFile("stesso-mese.csv", csvCon(testa17, stessoMese), Date.now() - 5 * 86400000);
   await page.locator(".sheet .data-report").waitFor();
-  check((await page.locator(".sheet .data-report").innerText()).startsWith("File del ") && !(await page.getByText("più vecchio").count()),
-    "046: la data del file si vede nel riepilogo, senza l'avviso «più vecchio»");
+  check((await page.locator(".sheet .data-report").innerText()).startsWith("File del ")
+    && await page.locator(".sheet .imp-piu-vecchi").getByText("già i dati di una mappa").isVisible(),
+    "051: riepilogo: la data di scaricamento del file e chi ha già i dati di una mappa scaricata dopo");
+  await page.locator(".toast", { hasText:"Import di" }).waitFor();
+  await page.click(".sheet button[data-act=chiudi]");
+  await sync(page);
+  check((DB.numeri.filter(x => x.partner_id === "mappa51" && x.mese === oggiStr.slice(0, 7)).pop() || {}).vpp !== 99,
+    "051: la mappa di un partner scaricata prima non sostituisce i numeri");
+  // la stessa mappa scaricata adesso: sostituisce (numeri, posizioni e il nome vero di «Utente riservato»)
+  await page.locator(".toast", { hasText:"Import di" }).waitFor({ state:"detached" });
+  await conFile("stesso-mese.csv", csvCon(testa17, stessoMese), Date.now());
+  await page.locator(".sheet h2", { hasText:"importata" }).waitFor();
   await page.locator(".toast", { hasText:"Import di" }).waitFor();
   await page.click(".sheet button[data-act=chiudi]");
   await sync(page);
   const numMappa = m => (DB.numeri || []).filter(x => x.partner_id === "mappa51" && x.mese === m).pop() || {};
   check(numMappa(oggiStr.slice(0, 7)).vpp === 99 && DB.partners.find(p => p.codice_amway === "7600004").sponsor_id === idCod("7600002"),
-    "046: una mappa dello stesso mese scaricata prima sostituisce comunque numeri e posizioni");
+    "051: una mappa dello stesso mese scaricata dopo sostituisce numeri e posizioni");
   check(DB.partners.find(p => p.codice_amway === "7600003").nome === "Rita Riserva", "046: «Utente riservato» prende il nome vero quando il file lo mostra");
   // un mese precedente: solo i numeri di quel mese, la struttura non cambia
   const nomeMeseIt = m => ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"][Number(m.slice(5, 7)) - 1] + " " + m.slice(0, 4);

@@ -2842,6 +2842,11 @@ function vRiepilogoImport(e){
     ${a.fuoriPerimetro ? `<p class="avviso imp-ignorate">${plur(a.fuoriPerimetro, "riga ignorata", "righe ignorate")}: non risal${a.fuoriPerimetro > 1 ? "gono" : "e"} a te di sponsor in sponsor, quindi non ${a.fuoriPerimetro > 1 ? "sono" : "è"} nella tua downline.</p>` : ""}`
     : `<h2>${e.numeri.length ? "Numeri salvati" : "Import non fatto"}</h2>`;
   if(a){
+    /* 051: nello stesso mese una mappa scaricata prima non cambia chi ha già i dati di una mappa scaricata dopo
+       (quella dell'admin, invece, fa sempre fede) */
+    const piuVecchi = Number((a.risultato || {}).piu_vecchi) || 0;
+    if(piuVecchi) h += `<p class="avviso imp-piu-vecchi">${plur(piuVecchi, "persona ha", "persone hanno")} già i dati di una mappa di
+      ${nomeMese(a.mese)} scaricata dopo questa: per ${piuVecchi > 1 ? "loro" : "lei"} non cambia niente.</p>`;
     const aggiorna = [{ p:{ nome:`${st.profilo.nome} (tu)` }, r:a.prima }].concat(a.aggiorna, a.usanoApp);
     if(a.nuovi.length) h += sezione(`Nuove nella tua struttura · ${a.nuovi.length}`, nomi(a.nuovi), "imp-nuovi");
     h += sezione(`Numeri aggiornati · ${aggiorna.length}`, `<ul class="imp">${aggiorna.map(x =>
@@ -2965,8 +2970,10 @@ async function leggiFileReport(files, erroriPrima){
   riconosciPlatino();
   if(!esito.errori.length) setTimeout(poiOrdini, 50);
 }
-/* La data e ora del file scaricato (mai nel futuro): si salva con i numeri, perché gli ordini scritti dopo il file si
-   sommano ai VP del report. Non decide più cosa si sostituisce (046): decide il «Mese di competenza». */
+/* La data e ora in cui la mappa è stata scaricata (la data di ultima modifica del file, mai nel futuro; se il telefono non
+   la dà, l'ora dell'import). Decide il «Mese di competenza» (046); dentro lo stesso mese la mappa dell'admin fa sempre
+   fede, quella di un partner solo se è stata scaricata dopo quella in vigore (051). Serve anche agli ordini: quelli
+   scritti dopo il file si sommano ai VP del report. */
 function conData(a, file){
   if(!a || a.errore) return a;
   const t = Number(file && file.lastModified) || Date.now();
@@ -3013,6 +3020,7 @@ function toastImport(e){
   const a = e.mappa, n = k => a ? Number((a.risultato || {})[k]) || 0 : 0;
   const parti = a ? [n("aggiunte") ? plur(n("aggiunte"), "persona aggiunta", "persone aggiunte") : "",
     plur(n("aggiornati"), "persona aggiornata", "persone aggiornate"), n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
+    n("piu_vecchi") ? `${plur(n("piu_vecchi"), "già aggiornata", "già aggiornate")} da una mappa scaricata dopo` : "",
     n("fuori") ? plur(n("fuori"), "persona non più nella mappa", "persone non più nella mappa") : "",
     n("bloccati") ? plur(n("bloccati"), "app bloccata", "app bloccate") : ""] : [];
   if(e.numeri.length) parti.push(`numeri di ${e.numeri.map(x => nomeMese(x.mese)).join(", ")} salvati`);

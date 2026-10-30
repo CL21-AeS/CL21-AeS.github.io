@@ -1521,6 +1521,68 @@ begin
     execute 'reset role';
   end;
 
+  -- ---- 051: nello stesso mese l'admin fa sempre fede; un partner aggiorna solo con una mappa scaricata dopo ----
+  declare
+    q uuid;
+  begin
+    perform growup_test.come(u5);  -- A: mappa scaricata un'ora fa, Q sotto A
+    perform public.importa_mappa(current_date, now() - interval '1 hour', '{"codice":"2000001","vpp":60,"vpg":100}',
+      '[{"codice":"8800001","nome":"Quarto Test","sponsor":"2000001","vpp":10,"vpg":10}]', '{}', '{}');
+    execute 'reset role';
+    q := (select id from public.partners where codice_amway = '8800001');
+    perform growup_test.ok((select posizione_importata_il is not null and posizione_al < now() - interval '50 minutes' from public.partners where id = q),
+                           '051: si salvano la data di scaricamento della mappa e l''ora dell''import');
+    perform growup_test.come(u5);  -- A: una mappa scaricata prima (due ore fa) non cambia niente
+    perform growup_test.ok((public.importa_mappa(current_date, now() - interval '2 hours', '{"codice":"2000001","vpp":60,"vpg":100}',
+      '[{"codice":"8800001","nome":"Quarto Test","sponsor":"2000002","vpp":99,"vpg":99}]', '{}', '{}')->>'piu_vecchi')::int >= 1,
+      '051: la mappa di un partner scaricata prima non sostituisce i numeri');
+    execute 'reset role';
+    perform growup_test.ok((select sponsor_id from public.partners where id = q) = a
+                           and (select vpg from public.numeri_mese where partner_id = q and mese = date_trunc('month', current_date)::date) = 10,
+                           '051: né la posizione');
+    perform growup_test.come(u1);  -- R (admin): la sua mappa fa fede anche se scaricata prima (tre ore fa)
+    perform public.importa_mappa(current_date, now() - interval '3 hours', '{"codice":"1000000","vpp":120,"vpg":470}',
+      '[{"codice":"2000001","nome":"Anna","sponsor":"1000000"},{"codice":"2000002","nome":"Bruno","sponsor":"2000001"},
+        {"codice":"8800001","nome":"Quarto Test","sponsor":"2000002","vpp":55,"vpg":55}]', '{}', '{}');
+    execute 'reset role';
+    perform growup_test.ok((select sponsor_id from public.partners where id = q) = b
+                           and (select vpg from public.numeri_mese where partner_id = q and mese = date_trunc('month', current_date)::date) = 55,
+                           '051: la mappa dell''admin, quando viene caricata, torna a fare fede su tutto');
+    perform growup_test.come(u5);  -- A dopo, con una mappa scaricata adesso: aggiorna la sua parte
+    perform public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":60,"vpg":100}',
+      '[{"codice":"8800001","nome":"Quarto Test","sponsor":"2000001","vpp":12,"vpg":12}]', '{}', '{}');
+    execute 'reset role';
+    perform growup_test.ok((select sponsor_id from public.partners where id = q) = a
+                           and (select vpg from public.numeri_mese where partner_id = q and mese = date_trunc('month', current_date)::date) = 12,
+                           '051: dopo l''admin, la mappa di un partner scaricata dopo aggiorna la sua parte');
+    delete from public.numeri_mese where partner_id = q; delete from public.partners where id = q;
+  end;
+  declare
+    uw constant uuid := '00000000-0000-0000-0000-0000000000ca';
+    w uuid;
+  begin
+    insert into auth.users (id, aud, role) values (uw, 'authenticated', 'authenticated');
+    perform growup_test.come(uw);
+    w := (public.entra_con_invito(growup_test.invito(a, 'Walter Test', '8800002'))->'profilo'->>'id')::uuid;
+    perform growup_test.come(u5);
+    perform public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":60,"vpg":100}',
+      '[{"codice":"8800002","nome":"Walter Test","sponsor":"2000001","vpp":1,"vpg":1}]', '{}', '{}');
+    perform public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":60,"vpg":100}', '[]', '{}', array[w]);
+    execute 'reset role';
+    perform growup_test.ok((select fuori_mappa_da = a and blocco_mappa from public.partners where id = w),
+                           '051: resta scritto chi ha segnato una persona fuori dalla mappa');
+    perform growup_test.come(u1);  -- R (admin) blocca anche lui l'app di W
+    perform public.blocca_app(w, true);
+    perform growup_test.come(u5);  -- W rientra nella mappa: il blocco dell'admin resta
+    perform public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":60,"vpg":100}',
+      '[{"codice":"8800002","nome":"Walter Test","sponsor":"2000001","vpp":1,"vpg":1}]', '{}', '{}');
+    perform growup_test.come(uw);
+    perform growup_test.ok(public.my_partner_id() is null and public.stato_accesso() = 'bloccato',
+                           '051: chi rientra nella mappa ritrova l''app solo se non l''ha bloccata un admin');
+    execute 'reset role';
+    delete from public.numeri_mese where partner_id = w; delete from public.accessi where partner_id = w; delete from public.partners where id = w;
+  end;
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),

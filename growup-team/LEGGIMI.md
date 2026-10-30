@@ -130,6 +130,8 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 41g. `supabase/050_fuori_mappa.sql` — chi esce dalla mappa esce dalla struttura (app bloccata se la usa), rientra con i suoi
     dati; la pulizia `pulisci_fuori_mappa` cancella chi è fuori da 12 mesi
 41h. `supabase/050b_pulizia_cron.sql` — l'attività pianificata della pulizia, ogni notte (solo su Supabase, come la 006b)
+41i. `supabase/051_ordine_import.sql` — nello stesso mese la mappa dell'admin fa sempre fede, quella di un partner solo se
+    scaricata dopo; il blocco dell'admin resta anche se si rientra nella mappa
 42. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 21. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**
