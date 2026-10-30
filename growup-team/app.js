@@ -43,6 +43,9 @@ function creaApi(){
     invitoAperto: codice => q(sb.rpc("invito_aperto", { p_codice:codice })),
     inviti:       () => q(sb.from("inviti").select("id,nome,codice_amway,creato_il,scade_il,annullato_il,usato_il,usato_da").order("creato_il", { ascending:false })),
     creaInvito:   (nome, codice) => q(sb.rpc("crea_invito", { p_nome:nome, p_codice_amway:codice })),
+    /* 052: solo admin, nel gruppo di un Platino che non usa l'app: sotto di lui (sotto) o sopra chi usa l'app (sopraDi) */
+    creaInvitoPlatino: (nome, codice, sotto, sopraDi) => q(sb.rpc("crea_invito_platino",
+      { p_nome:nome, p_codice_amway:codice, p_sotto:sotto || null, p_sopra_di:sopraDi || null })),
     annullaInvito: id => q(sb.rpc("annulla_invito", { p_invito:id })),
     rigeneraInvito: id => q(sb.rpc("rigenera_invito", { p_invito:id })),
     collega:      () => q(sb.rpc("collega_profilo")),
@@ -328,6 +331,8 @@ function messaggioInvita(e){
   if(m.includes("codice_amway_altra_linea")) return "Questa persona è già nella mappa, in un altro gruppo: la può invitare solo chi le sta sopra.";
   if(m.includes("in_attesa")) return "Potrai invitare quando una mappa importata ti avrà messo al tuo posto nella struttura.";
   if(m.includes("codice_tolto")) return "Questo codice Amway è stato tolto dalla struttura: lo può sbloccare solo Stefano e Alessia.";
+  if(m.includes("codice_nella_mappa")) return "Questa persona è già nella mappa: invitala con «Invita» dal Gruppo.";
+  if(m.includes("non_platino_nascosto")) return "Si può fare solo nel gruppo di un Platino che non usa l'app e che la tua mappa non mostra.";
   return messaggio(e);
 }
 function messaggio(e){
@@ -1559,8 +1564,11 @@ function vPrimiPassi(){
         <span class="grow"><b>${esc(x.nome)}</b>${x.fatto ? "" : `<br><span class="small">${esc(x.sotto)}</span>`}</span>
         ${x.fatto ? "" : `<span class="fr" aria-hidden="true">${aperta ? "▴" : "▾"}</span>`}</button>
         ${aperta ? `<div class="passo-aperto">${x.corpo()}</div>` : ""}</li>`; }).join("")}</ul>
-    ${attesa ? `<div class="stato-attesa"><span class="grow">In attesa della mappa: i tuoi numeri restano solo tuoi.</span>${aiutoBtn("attesa-io")}</div>
-      ${aiutoTesto("attesa-io", `Non sei ancora nel report mappe importato dalla tua upline. Puoi già usare tutta l'app, ma i tuoi numeri li
+    ${attesa ? `<div class="stato-attesa"><span class="grow">${st.profilo.area_platino ? "In attesa della mappa: importa la tua mappa dal Gruppo."
+      : "In attesa della mappa: i tuoi numeri restano solo tuoi."}</span>${aiutoBtn("attesa-io")}</div>
+      ${aiutoTesto("attesa-io", st.profilo.area_platino ? `Sei nel gruppo di un Platino che non usa l'app: nessuna mappa della tua upline ti mostrerà.
+        Importa tu la tua mappa (Gruppo → Importa da Amway): ti mette al tuo posto nella struttura, con il tuo gruppo.`
+        : `Non sei ancora nel report mappe importato dalla tua upline. Puoi già usare tutta l'app, ma i tuoi numeri li
         vedi solo tu. Quando la tua upline importa una mappa in cui ci sei, entri nella struttura al tuo posto.`)}` : ""}
   </div>`;
 }
@@ -2529,6 +2537,7 @@ function vScheda(){
       <p class="nota">Solo per chi ha perso il suo link: quello vecchio smette di funzionare e i suoi telefoni vanno ricollegati.</p>` : ""}
   </div>`}
   ${vAccessoScheda(p)}
+  ${vPlatinoScheda(p)}
   <div class="card">
     <span class="eyebrow">Struttura</span>
     ${p.fuori_report_dal ? `<p class="small" style="margin:6px 0 0"><span class="pill g">non più nel report</span> da ${nomeMese(meseDi(p.fuori_report_dal))}</p>` : ""}
@@ -2539,6 +2548,33 @@ function vScheda(){
       nei numeri personali e di gruppo.
       La rimetti quando vuoi da «Nascoste». Nell'app nessuno si cancella: la struttura rispecchia il report Amway.</p>
   </div>`}`;
+}
+
+/* 052: un Platino «nascosto» non usa l'app (quindi non importa) e la mappa non mostra il suo gruppo (linee nascoste);
+   il suo gruppo è la parte di struttura sotto di lui */
+function platinoNascosto(p){ const r = p && rigaDi(st.riep, p.id); return !!(p && p.stato === "gestito" && !p.fuori_report_dal && r && r.linee_nascoste); }
+function areaPlatino(p){
+  for(let s = p && st.struttura.find(x => x.id === p.sponsor_id), n = 0; s && n < 200; s = st.struttura.find(x => x.id === s.sponsor_id), n++)
+    if(platinoNascosto(s)) return s;
+  return null;
+}
+/* solo l'admin, e solo nel gruppo di un Platino nascosto: invitare sotto il Platino o inserire qualcuno sopra chi usa l'app */
+function vPlatinoScheda(p){
+  if(!st.profilo.is_admin || p.id === st.profilo.id) return "";
+  if(platinoNascosto(p)) return `<div class="card platino-scheda">
+    <span class="eyebrow">Gruppo di un Platino senza app</span>
+    <p class="small" style="margin:6px 0 0">La tua mappa non mostra il gruppo di ${esc(nomeSaluto(p.nome))} e ${esc(nomeSaluto(p.nome))} non usa l'app.
+      Puoi invitare una persona del suo gruppo: entra sotto di lui e importa subito la sua mappa.</p>
+    <div style="margin-top:10px">${soloAdmin(`<button class="btn wide" data-act="invita-platino" data-sotto="${esc(p.id)}" data-titolo="${esc("sotto " + p.nome)}">Invita una persona del suo gruppo</button>`, true)}</div>
+  </div>`;
+  const pl = p.stato !== "gestito" ? areaPlatino(p) : null;
+  if(pl) return `<div class="card platino-scheda">
+    <span class="eyebrow">Gruppo di ${esc(pl.nome)} (Platino senza app)</span>
+    <p class="small" style="margin:6px 0 0">Se tra ${esc(nomeSaluto(p.nome))} e ${p.sponsor_id === pl.id ? esc(nomeSaluto(pl.nome)) : "il suo sponsor"} c'è uno sponsor che vuole usare
+      l'app, invitalo da qui: entra in mezzo e importa la sua mappa.</p>
+    <div style="margin-top:10px">${soloAdmin(`<button class="btn wide" data-act="invita-platino" data-sopra="${esc(p.id)}" data-titolo="${esc("sopra " + p.nome)}">Inserisci lo sponsor sopra</button>`, true)}</div>
+  </div>`;
+  return "";
 }
 
 /* Da confermare: sponsor, upline e admin la possono togliere. Bloccare l'app: solo admin. */
@@ -3010,9 +3046,11 @@ async function importaMappa(a){
     .sort((x, y) => profondita(x) - profondita(y))
     .map(r => Object.assign({ codice:r.codice, nome:r.nome, vpp:r.vpp, sponsor:r.sponsor || null, ingresso:r.ingresso }, numeri(r)));
   a.risultato = await api.importaMappa({ p_mese:a.mese + "-01", p_dati_al:a.datiAl || new Date().toISOString(),
-    p_io:Object.assign({ codice:a.prima.codice, vpp:a.prima.vpp, ingresso:a.prima.ingresso }, numeri(a.prima)), p_persone:persone,
+    p_io:Object.assign({ codice:a.prima.codice, sponsor:a.prima.sponsor || null, vpp:a.prima.vpp, ingresso:a.prima.ingresso }, numeri(a.prima)), p_persone:persone,
     p_nascondi:[], p_fuori:a.mancanti.map(p => p.id) }) || {};
   st.profilo = Object.assign({}, st.profilo, { mappa_mese:a.mese + "-01" });
+  /* 052: chi era in attesa nel gruppo di un Platino ora è confermato dalla sua mappa (e forse sotto il suo sponsor vero) */
+  try{ const p = await api.collega(); if(p) st.profilo = Object.assign({}, st.profilo, { confermato_il:p.confermato_il, sponsor_id:p.sponsor_id }); }catch(e){}
   await caricaStruttura();
   st.att = await api.activities(io.id, [settimana(), primoDelMese()].sort()[0]) || [];
 }
@@ -3075,7 +3113,9 @@ function vSheet(){
   }
   if(s === "storico") return vStorico();
   if(s === "importa") return vImporta();
-  if(s === "invita") return `<h2>Invita un nuovo partner</h2>
+  if(s === "invita") return `<h2>${st.invitaPlatino ? `Invita ${esc(st.invitaPlatino.titolo)}` : "Invita un nuovo partner"}</h2>
+    ${st.invitaPlatino ? `<p class="small">Nel gruppo di un Platino che non usa l'app: chi entra con questo link può importare subito la sua mappa,
+      che lo mette al posto giusto.</p>` : ""}
     <p class="small">Scrivi nome e codice Amway Partner della persona: restano nel database, nel link non si vedono e non si
       possono cambiare. Se il codice è sbagliato, la persona resta «in attesa della mappa».</p>
     <form data-form="invita" novalidate>
@@ -3283,7 +3323,9 @@ const AZIONI = {
   "totale-mese"(){ st.errore = ""; st.meseTotale = meseDi(oggi()); st.sheet = "totale-mese"; render(); focusSheet(); },
   "scegli-mese"(el){ st.meseTotale = el.value; render(); },
   importa(){ st.imp = null; st.errore = ""; st.sheet = "importa"; render(); },
-  invita(el){ st.invitaNome = (el && el.dataset.nome) || ""; st.errore = ""; st.sheet = "invita"; render(); focusSheet(); },
+  invita(el){ st.invitaNome = (el && el.dataset.nome) || ""; st.invitaPlatino = null; st.errore = ""; st.sheet = "invita"; render(); focusSheet(); },
+  "invita-platino"(el){ st.invitaNome = ""; st.errore = ""; st.sheet = "invita";
+    st.invitaPlatino = { sotto:el.dataset.sotto || null, sopra:el.dataset.sopra || null, titolo:el.dataset.titolo || "" }; render(); focusSheet(); },
   async "annulla-invito"(el){
     const x = (st.invitiMiei || []).find(y => y.id === el.dataset.id);
     if(!x || !confirm(`Annullare l'invito di ${x.nome}? Il suo link smette di funzionare.`)) return;
@@ -3569,7 +3611,9 @@ const MODULI = {
     else if(soloCifre(f.codice_amway2.value) !== codice) err = "I due codici non sono uguali: controllali.";
     if(err){ mostraErroreForm(f, err); return; }
     try{
-      const r = await api.creaInvito(nome, codice);
+      const x = st.invitaPlatino;
+      const r = x ? await api.creaInvitoPlatino(nome, codice, x.sotto, x.sopra) : await api.creaInvito(nome, codice);
+      st.invitaPlatino = null;
       st.invitoFatto = { nome, codice:r.codice, scade_il:r.scade_il }; st.invitaNome = ""; st.errore = ""; st.sheet = "invito-link";
       st.invitiMiei = await api.inviti() || []; render();
     }catch(e){ mostraErroreForm(f, messaggioInvita(e)); }

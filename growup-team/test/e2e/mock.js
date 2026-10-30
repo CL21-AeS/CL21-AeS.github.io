@@ -73,6 +73,21 @@
       const ora = new Date(), i = { id:uid(), codice:hex(), creato_da:io.id, nome:String(nome).trim(), codice_amway:codice,
         creato_il:ora.toISOString(), scade_il:new Date(ora.getTime() + 7 * 864e5).toISOString(), annullato_il:null, usato_il:null, usato_da:null };
       db.invitiP = (db.invitiP || []).concat([i]); salva(); return { id:i.id, codice:i.codice, scade_il:i.scade_il }; },
+    /* 052: solo admin, nel gruppo di un Platino senza app con il gruppo nascosto nella mappa */
+    creaInvitoPlatino: async (nome, codice, sottoId, sopraDi) => { const io = mio(); if(!io || !io.is_admin) throw new Error("non_autorizzato");
+      const nascosto = id => { const p = db.partners.find(x => x.id === id);
+        const n = (db.numeri || []).filter(x => x.partner_id === id).sort((a, b) => a.mese < b.mese ? 1 : -1)[0];
+        return !!(p && p.stato === "gestito" && !p.fuori_report_dal && n && n.nascoste); };
+      let area = null, sottoA = null;
+      if(sottoId){ if(!sotto(io.id).some(x => x.id === sottoId) || !nascosto(sottoId)) throw new Error("non_platino_nascosto"); area = sottoA = sottoId; }
+      else { const q = db.partners.find(x => x.id === sopraDi); if(!q || q.stato === "gestito") throw new Error("non_autorizzato");
+        for(let x = db.partners.find(y => y.id === q.sponsor_id); x; x = db.partners.find(y => y.id === x.sponsor_id)) if(nascosto(x.id)){ area = x.id; break; }
+        if(!area) throw new Error("non_platino_nascosto"); sottoA = q.sponsor_id; }
+      if(db.partners.some(p => p.codice_amway === codice)) throw new Error("codice_nella_mappa");
+      const ora = new Date(), i = { id:uid(), codice:hex(), creato_da:io.id, nome:String(nome).trim(), codice_amway:codice, sotto_id:sottoA,
+        sopra_di:sopraDi || null, area_platino:area, creato_il:ora.toISOString(), scade_il:new Date(ora.getTime() + 7 * 864e5).toISOString(),
+        annullato_il:null, usato_il:null, usato_da:null };
+      db.invitiP = (db.invitiP || []).concat([i]); salva(); return { id:i.id, codice:i.codice, scade_il:i.scade_il }; },
     annullaInvito: async id => { const io = mio(), i = (db.invitiP || []).find(x => x.id === id);
       if(!io || !i || i.creato_da !== io.id || i.usato_il) throw new Error("non_autorizzato");
       i.annullato_il = i.annullato_il || new Date().toISOString(); salva(); },
@@ -135,10 +150,11 @@
         for(const c of copie) if(c !== p){ db.partners.filter(x => x.sponsor_id === c.id).forEach(x => { x.sponsor_id = p.id; }); db.partners = db.partners.filter(x => x !== c); }
         Object.assign(p, dati, { gestore_id:null, sponsor_id:antenatoConApp(p), confermato_il:new Date().toISOString() });
       }else{
-        p = Object.assign({ id:uid(), sponsor_id:sp.id, codice_amway:codiceA, confermato_il:null,
+        p = Object.assign({ id:uid(), sponsor_id:invito.sotto_id || sp.id, area_platino:invito.area_platino || null, codice_amway:codiceA, confermato_il:null,
           invitato_da:sp.id, invitato_il:new Date().toISOString(),
           codice_invito:"N" + Math.random().toString(36).slice(2,7).toUpperCase() }, dati);
         db.partners.push(p);
+        if(invito.sopra_di){ const q = db.partners.find(x => x.id === invito.sopra_di); if(q && q.sponsor_id === invito.sotto_id) q.sponsor_id = p.id; }
       }
       invito.usato_il = new Date().toISOString(); invito.usato_da = p.id;
       for(const x of db.invitiP) if(x !== invito && x.codice_amway === codiceA && !x.usato_il && !x.annullato_il) x.annullato_il = invito.usato_il;
@@ -309,7 +325,7 @@
     /* come importa_mappa (033): tutto il mio gruppo, vince il report più aggiornato */
     importaMappa: async a => { const io = mio(); if(!io) throw new Error("non_autenticato");
       db.ultimoImport = JSON.parse(JSON.stringify(a));   // per i controlli sulla privacy: cosa arriva al database
-      if(io.confermato_il === null && !io.is_admin) throw new Error("in_attesa");
+      if(io.confermato_il === null && !io.is_admin && !io.area_platino) throw new Error("in_attesa");
       const m = a.p_mese.slice(0, 7), al = a.p_dati_al && a.p_dati_al < new Date().toISOString() ? a.p_dati_al : new Date().toISOString();
       /* 048: si importa solo la propria mappa; senza codice nell'app non si importa */
       if(!io.codice_amway) throw new Error("codice_mancante");
@@ -318,6 +334,10 @@
       const mm = m + "-01";
       if(io.mappa_mese && mm < io.mappa_mese) throw new Error("mappa_vecchia");
       io.mappa_mese = mm;
+      /* 052: nel gruppo di un Platino nascosto la mia mappa mi mette sotto il mio sponsor vero, se è nel gruppo del Platino */
+      if(io.area_platino && a.p_io.sponsor){ const s2 = db.partners.find(p => p.codice_amway === a.p_io.sponsor && p.id !== io.id
+          && (p.id === io.area_platino || sotto(io.area_platino).some(x => x.id === p.id)) && !sotto(io.id).some(x => x.id === p.id));
+        if(s2) io.sponsor_id = s2.id; }
       /* 044b: la data di ingresso della mappa fa fede */
       if(a.p_io.ingresso) io.data_iscrizione = a.p_io.ingresso;
       let aggiunte = 0, spostate = 0, fuori = 0, numeri = 0, vecchi = 0;

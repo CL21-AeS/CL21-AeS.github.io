@@ -1583,6 +1583,73 @@ begin
     delete from public.numeri_mese where partner_id = w; delete from public.accessi where partner_id = w; delete from public.partners where id = w;
   end;
 
+  -- ---- 052: il gruppo di un Platino che non usa l'app ----
+  declare
+    ux constant uuid := '00000000-0000-0000-0000-0000000000f1';
+    uw constant uuid := '00000000-0000-0000-0000-0000000000f2';
+    pl uuid; xx uuid; ww uuid; k text;
+  begin
+    insert into auth.users (id, aud, role) values (ux, 'authenticated', 'authenticated'), (uw, 'authenticated', 'authenticated');
+    perform growup_test.come(u1);  -- R (admin) importa: il Platino P senza app, con il gruppo nascosto, e Q senza app (gruppo visibile)
+    perform public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":9000}',
+      '[{"codice":"8900000","nome":"Platino Test","sponsor":"1000000","vpp":0,"vpg":5000,"percentuale":15,"linee":[],"nascoste":true},
+        {"codice":"8900009","nome":"Qualcuno Visibile","sponsor":"1000000","vpp":10,"vpg":10,"linee":[],"nascoste":false}]', '{}', '{}');
+    perform growup_test.deve_fallire(format('select public.crea_invito_platino(%L, %L, %L)', 'Xeno', '8900001',
+      (select id from public.partners where codice_amway = '8900009')), '052: sotto chi non ha il gruppo nascosto non si invita così');
+    execute 'reset role';
+    pl := (select id from public.partners where codice_amway = '8900000');
+    perform growup_test.come(u5);  -- A non è admin
+    perform growup_test.deve_fallire(format('select public.crea_invito_platino(%L, %L, %L)', 'Xeno', '8900001', pl),
+                                     '052: solo l''admin invita sotto un Platino');
+    perform growup_test.come(u1);
+    perform growup_test.deve_fallire(format('select public.crea_invito_platino(%L, %L, %L)', 'Doppio', '8900009', pl),
+                                     '052: chi è già nella mappa si invita con l''invito di sempre');
+    k := public.crea_invito_platino('Xeno Test', '8900001', pl)->>'codice';
+    perform growup_test.come(ux);
+    xx := (public.entra_con_invito(k)->'profilo'->>'id')::uuid;
+    execute 'reset role';
+    perform growup_test.ok((select sponsor_id = pl and area_platino = pl and confermato_il is null from public.partners where id = xx),
+                           '052: X entra sotto il Platino, in attesa, nel gruppo del Platino');
+    perform growup_test.come(ux);  -- X importa subito la sua mappa, anche se è in attesa
+    perform public.importa_mappa(current_date, now(), '{"codice":"8900001","sponsor":"8900000","vpp":50,"vpg":800,"linee":[]}',
+      '[{"codice":"8900002","nome":"Ypsilon Test","sponsor":"8900001","vpp":30,"vpg":30}]', '{}', '{}');
+    execute 'reset role';
+    perform growup_test.ok((select confermato_il is not null and sponsor_id = pl from public.partners where id = xx)
+                           and (select sponsor_id from public.partners where codice_amway = '8900002') = xx,
+                           '052: la sua mappa lo conferma e mette il suo gruppo sotto di lui');
+    perform growup_test.come(u1);  -- nessun cumulo: i VP di gruppo del Platino restano quelli ufficiali della mappa di R
+    select * into x from public.riepilogo_mese(current_date) where partner_id = pl;
+    perform growup_test.ok(x.vp_gruppo = 5000, '052: i VP di chi è sotto il Platino non fanno cumulo con i suoi (' || x.vp_gruppo || ')');
+    -- in mezzo: solo sopra chi usa l'app nel gruppo del Platino
+    perform growup_test.deve_fallire(format('select public.crea_invito_platino(%L, %L, null, %L)', 'Fuori Area', '8900005', a),
+                                     '052: fuori dal gruppo di un Platino nascosto non si inserisce nessuno in mezzo');
+    k := public.crea_invito_platino('Walter Mezzo', '8900003', null, xx)->>'codice';
+    perform growup_test.come(uw);
+    ww := (public.entra_con_invito(k)->'profilo'->>'id')::uuid;
+    execute 'reset role';
+    perform growup_test.ok((select sponsor_id = pl and area_platino = pl from public.partners where id = ww)
+                           and (select sponsor_id from public.partners where id = xx) = ww,
+                           '052: W entra tra il Platino e X');
+    perform growup_test.come(ux);  -- X reimporta: il suo sponsor (W) è nel gruppo del Platino, resta sotto di lui
+    perform public.importa_mappa(current_date, now(), '{"codice":"8900001","sponsor":"8900003","vpp":50,"vpg":800,"linee":[]}', '[]', '{}', '{}');
+    execute 'reset role';
+    perform growup_test.ok((select sponsor_id from public.partners where id = xx) = ww, '052: X resta sotto il suo sponsor vero');
+    -- il Platino comincia a usare l'app: tutto torna normale (niente più inviti «nel gruppo del Platino»)
+    update public.partners set stato = 'attivo', confermato_il = now() where id = pl;
+    perform growup_test.come(u1);
+    perform growup_test.deve_fallire(format('select public.crea_invito_platino(%L, %L, %L)', 'Dopo', '8900007', pl),
+                                     '052: un Platino che usa l''app non è più «nascosto»');
+    execute 'reset role';
+    perform growup_test.ok(not exists (select 1 from information_schema.role_routine_grants
+                                        where routine_name in ('sotto_di', 'platino_nascosto', 'area_platino_di') and grantee in ('anon', 'authenticated')),
+                           '052: le funzioni interne non si chiamano dall''app');
+    delete from public.numeri_mese where partner_id in (select id from public.partners where codice_amway like '89000%');
+    delete from public.accessi where partner_id in (xx, ww);
+    delete from public.inviti where codice_amway like '89000%';
+    update public.partners set sponsor_id = null where codice_amway like '89000%';
+    delete from public.partners where codice_amway like '89000%';
+  end;
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),
