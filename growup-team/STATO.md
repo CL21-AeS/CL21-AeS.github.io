@@ -79,6 +79,11 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
   colonna centrale («set al 30» = il mese prima fino allo stesso giorno). App v73.
 - **«Questo mese e il mese prima» a due colonne** (30 ottobre, scelta di Stefano): tolta la colonna «al giorno» del mese prima
   e il ▼ rosso che ne dipendeva; restano il mese in corso fino a oggi e il totale del mese prima. App v74.
+- **Filtri del Gruppo** (30 ottobre, scelte di Stefano): si importa tutta la mappa (sempre solo Italia) e nel Gruppo, sotto
+  la ricerca, una riga di filtri con i conteggi: Tutti (l'albero), Con VP, Senza VP, Oltre 200 VP, Nuovi (data di ingresso
+  nel mese in corso), Usano l'app, Senza app, Percentuale (dalla più alta). Con un filtro l'albero diventa un elenco con
+  livello, numeri e «sotto chi»; la ricerca lavora dentro il filtro; le persone nascoste restano fuori. «Nascondi» resta.
+  Frontali no (si vedono chiudendo le linee). Il filtro acceso resta in vista anche in Persone. App v75.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 

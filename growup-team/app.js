@@ -58,6 +58,8 @@ function creaApi(){
     struttura:    () => q(sb.rpc("struttura_visibile")),
     /* chi è da confermare dal report Amway e chi è bloccato (per chi vedo) */
     accessiStruttura: () => q(sb.rpc("accessi_struttura")),
+    /* la data di ingresso (dalla mappa) di chi vedo: serve al filtro «Nuovi» del Gruppo */
+    ingressi:     () => q(sb.from("partners").select("id, data_iscrizione")),
     statoAccesso: () => q(sb.rpc("stato_accesso")),
     togliDallaStruttura: pid => q(sb.rpc("togli_dalla_struttura", { p_partner:pid })),
     bloccaApp:    (pid, blocca) => q(sb.rpc("blocca_app", { p_partner:pid, p_blocca:blocca })),
@@ -200,6 +202,8 @@ const st = {
   invitoRiserva: null,    // l'invito lasciato per "entra con il tuo link": si può tornare indietro
   struttura: [],          // io e la mia downline
   accessi: new Map(),     // chi è da confermare o bloccato, tra chi vedo
+  ingressi: new Map(),    // la data di ingresso di chi vedo (filtro «Nuovi» del Gruppo)
+  filtroGruppo: "tutti",  // il filtro scelto nel Gruppo
   linkGestito: null,      // { nome, chiave }: nuovo link personale creato dall'admin per chi l'ha perso
   nascosti: new Set(),    // persone nascoste dalla mia struttura (solo loro: chi sta sotto resta)
   persone: [], passi: [], // la mia lista (solo mia) e i suoi passi
@@ -920,6 +924,7 @@ async function vaiHome(profilo){
 async function caricaStruttura(){
   st.struttura = await api.struttura() || [];
   try{ st.accessi = new Map((await api.accessiStruttura() || []).map(r => [r.id, r])); }catch(e){ st.accessi = new Map(); }
+  try{ st.ingressi = new Map((await api.ingressi() || []).map(r => [r.id, r.data_iscrizione])); }catch(e){ st.ingressi = new Map(); }
   try{ st.preferiti = new Set((await api.preferiti() || []).map(r => r.preferito_id)); }catch(e){}
   try{ st.nascosti = new Set((await api.nascosti() || []).map(r => r.nascosto_id)); }catch(e){}
   try{ st.prossime = new Map((await api.prossime() || []).map(r => [r.partner_id, r.prossima_qualifica])); }catch(e){ st.prossime = new Map(); }
@@ -1039,8 +1044,18 @@ function render(){
   if(!st.sheet) chiudiFoglioPiano(foglio);
   foglio.innerHTML = st.sheet ? `<div class="sheet" data-act="chiudi-fuori"><div class="sheet-box" role="dialog" aria-modal="true">${vSheet()}</div></div>` : "";
   applicaRicerca();
+  filtroInVista();
   muoviDopo(prima);
   aggiornaPreviste();
+}
+/* le righe di filtri che scorrono di lato: il filtro acceso resta sempre in vista (anche dopo un ridisegno) */
+function filtroInVista(){
+  document.querySelectorAll("#app .filtri").forEach(f => {
+    const b = f.querySelector(".btn.on");
+    if(!b) return;
+    const sx = b.offsetLeft - f.offsetLeft, dx = sx + b.offsetWidth;
+    if(sx < f.scrollLeft || dx > f.scrollLeft + f.clientWidth) f.scrollLeft = Math.max(0, dx - f.clientWidth + 16);
+  });
 }
 
 function vAvvio(){ return `<div class="centro"><p class="muted">Caricamento…</p></div>`; }
@@ -2216,6 +2231,18 @@ function vAttesaIo(){
       ordini), ma i tuoi dati restano solo tuoi finché la mappa Amway non ti mostra: al primo import della tua upline entri nella struttura.</p>
   </div>`;
 }
+/* I filtri del Gruppo: si importa tutta la mappa e qui si sceglie chi vedere. «Tutti» è l'albero; gli altri un elenco
+   (con livello e sponsor) delle persone che corrispondono, me escluso. Le persone nascoste restano fuori anche dai filtri. */
+const FILTRI_GRUPPO = [
+  { id:"tutti", nome:"Tutti" },
+  { id:"con-vp", nome:"Con VP", ok:(p, r) => Number(r.vp_personali) > 0 },
+  { id:"senza-vp", nome:"Senza VP", ok:(p, r) => !(Number(r.vp_personali) > 0) },
+  { id:"oltre-200", nome:"Oltre 200 VP", ok:(p, r) => Number(r.vp_personali) > 200 },
+  { id:"nuovi", nome:"Nuovi", ok:p => String(st.ingressi && st.ingressi.get(p.id) || "").slice(0, 7) === meseDi(oggi()) },
+  { id:"app", nome:"Usano l'app", ok:p => p.stato !== "gestito" },
+  { id:"senza-app", nome:"Senza app", ok:p => p.stato === "gestito" },
+  { id:"percentuale", nome:"Percentuale", ok:(p, r) => Number(r.percentuale) > 0 }
+];
 function vStruttura(){
   /* Come nei report Amway: in cima chi usa l'app (livello 1), poi i suoi frontali (2), i loro (3) e così via;
      il gruppo di una persona si può richiudere. Tutte le righe sono nella pagina: quelle dei gruppi richiusi
@@ -2231,6 +2258,8 @@ function vStruttura(){
   const righe = completa ? tutte : tutte.filter(r => !st.nascosti.has(r.p.id));
   if(!completa) for(const r of righe) r.path = r.path.filter(id => !st.nascosti.has(id));
   const rIo = rigaDi(st.riep, io) || {}, chiusoIo = st.chiusi.has(io);
+  const filtro = !completa && FILTRI_GRUPPO.find(f => f.id === st.filtroGruppo && f.ok) || null;
+  const conta = f => righe.filter(({ p }) => f.ok(p, rigaDi(st.riep, p.id) || {})).length;
   const rigaIo = `<li class="liv io" style="--rientro:0px" data-id="${esc(io)}" data-path="" data-nome="${esc(senzaAccenti(st.profilo.nome))}">
       <span class="livello l0" title="Livello 1">1</span>
       <div class="nome"><span>${esc(st.profilo.nome)}</span>
@@ -2246,7 +2275,11 @@ function vStruttura(){
     ${righe.length > 1 ? `<input type="search" id="cerca-struttura" class="cerca" placeholder="Cerca un nome nel tuo gruppo…"
         autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Cerca un nome nel tuo gruppo" value="${esc(st.cerca || "")}">
       <p class="small" id="cerca-esito" aria-live="polite" style="margin:6px 0 0"></p>` : ""}
-    ${tutte.length ? `<ul class="albero struttura">${rigaIo}${righe.map(({ p, livello, path }) => {
+    ${righe.length && !completa ? `<div class="row filtri scelte-rapide filtri-gruppo" style="gap:6px;margin-top:8px">${FILTRI_GRUPPO.map(f => {
+      const on = (filtro ? filtro.id : "tutti") === f.id;
+      return `<button class="btn small${on ? " on" : ""}" data-act="filtro-gruppo" data-filtro="${f.id}" aria-pressed="${on}">${f.nome}${f.ok ? ` · ${conta(f)}` : ""}</button>`; }).join("")}</div>` : ""}
+    ${tutte.length && filtro ? vElencoFiltrato(righe, filtro) : ""}
+    ${tutte.length && !filtro ? `<ul class="albero struttura">${rigaIo}${righe.map(({ p, livello, path }) => {
       const r = rigaDi(st.riep, p.id) || {}, sp = statoDi(p);
       const quanti = righe.filter(x => x.path.includes(p.id)).length, chiuso = st.chiusi.has(p.id);
       const piegato = path.some(id => st.chiusi.has(id)), nascosta = st.nascosti.has(p.id);
@@ -2268,9 +2301,27 @@ function vStruttura(){
         <button class="btn link small" data-act="nascoste" style="min-height:0;padding:0 4px">${nascoste ? "Rivedi" : "Scegli chi nascondere"}</button></p>
       ${nascoste ? `<button class="btn small ghost${completa ? " on" : ""}" data-act="con-nascoste" aria-pressed="${!!completa}" style="margin-top:8px">
         ${completa ? "Torna alla mia struttura" : "Mostra anche le nascoste"}</button>` : ""}`
-      : `<p class="muted" style="margin:8px 0 0">Ancora nessuno nel tuo gruppo. Invita chi vuole usare l'app con il link qui sotto,
+      : tutte.length ? "" : `<p class="muted" style="margin:8px 0 0">Ancora nessuno nel tuo gruppo. Invita chi vuole usare l'app con il link qui sotto,
           oppure importa il report Amway per vedere anche chi non la usa.</p>`}
   </div>`;
+}
+/* l'elenco di un filtro: una riga per persona, con livello e sponsor; «Percentuale» va dalla più alta */
+function vElencoFiltrato(righe, filtro){
+  const pos = posizioni();
+  let l = righe.filter(({ p }) => filtro.ok(p, rigaDi(st.riep, p.id) || {}));
+  if(filtro.id === "percentuale") l = l.slice().sort((a, b) => (Number((rigaDi(st.riep, b.p.id) || {}).percentuale) || 0)
+    - (Number((rigaDi(st.riep, a.p.id) || {}).percentuale) || 0) || a.p.nome.localeCompare(b.p.nome, "it"));
+  if(!l.length) return `<p class="muted" style="margin:10px 0 0">Nessuno qui.</p>`;
+  return `<ul class="albero struttura elenco-filtro">${l.map(({ p, livello }) => {
+    const r = rigaDi(st.riep, p.id) || {}, sp = statoDi(p), x = pos.get(p.id);
+    const ingresso = filtro.id === "nuovi" && st.ingressi.get(p.id) ? ` · entrato il ${dataIt(String(st.ingressi.get(p.id)).slice(0, 10))}` : "";
+    return `<li class="liv" style="--rientro:0px" data-id="${esc(p.id)}" data-path="" data-nome="${esc(senzaAccenti(p.nome))}">
+      <span class="livello l${livello % 5 + 1}" title="Livello ${livello + 2}">${livello + 2}</span>
+      <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}">
+        <span>${esc(p.nome)}</span>
+        <span class="small">${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${x ? ` · sotto ${esc(x.sponsor)}` : ""}${ingresso}</span>
+      </button>
+      ${filtro.id === "percentuale" ? `<span class="pill v">${Number(r.percentuale) || 0}%</span>` : `<span class="pill ${sp.cl}">${sp.txt}</span>`}</li>`; }).join("")}</ul>`;
 }
 
 /* ---- Blocco 3: imbuto del gruppo ed etichette (ultime 4 settimane) ---- */
@@ -4052,6 +4103,7 @@ Object.assign(AZIONI, {
   "apri-persona"(el){ st.vista = "persone"; st.sezPersone = "lista"; st.invitoId = null; st.personaId = el.dataset.id; render(); window.scrollTo(0, 0); },
   "torna-lista"(){ st.personaId = null; render(); window.scrollTo(0, 0); },
   "filtro-lista"(el){ st.filtroLista = el.dataset.filtro; render(); },
+  "filtro-gruppo"(el){ st.filtroGruppo = el.dataset.filtro; render(); applicaRicerca(); },
   "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = null; st.sheet = "persona-nuova"; render(); },
   /* i pulsanti rapidi di Io: + Contatto apre "un nome", + Piano apre il passo Piano di una persona */
   "contatto-rapido"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = "contatto"; st.sheet = "persona-nuova"; render(); },
