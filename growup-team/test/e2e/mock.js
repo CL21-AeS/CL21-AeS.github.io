@@ -14,7 +14,9 @@
   /* come nel database (033): vedo me e, nella mia downline, chi è nella mappa: le persone senza app (di chiunque le abbia
      importate) e chi usa l'app confermato da un report. Chi è "in attesa" (confermato_il === null) resta solo suo. */
   const sotto = id => db.partners.filter(p => p.sponsor_id === id).flatMap(p => [p].concat(sotto(p.id)));
-  const vedo = (io, p) => p.id === io.id || (sotto(io.id).some(x => x.id === p.id) && (p.stato === "gestito" || p.confermato_il !== null || !!p.is_admin));
+  /* 050: chi è fuori dalla mappa non lo vede più nessuno */
+  const vedo = (io, p) => p.id === io.id || (sotto(io.id).some(x => x.id === p.id) && !p.fuori_report_dal
+    && (p.stato === "gestito" || p.confermato_il !== null || !!p.is_admin));
   /* i numeri ufficiali condivisi: per persona e mese vale il report più aggiornato */
   const numeroDi = (id, m) => (db.numeri || []).filter(x => x.partner_id === id && x.mese === m)
     .sort((x, y) => String(x.dati_al || "") < String(y.dati_al || "") ? -1 : 1).pop();
@@ -83,7 +85,7 @@
       return db.partners.filter(p => p.stato !== "gestito" && vedo(io, p)).map(p => ({ id:p.id, confermato_il:p.confermato_il || null, bloccato_il:p.bloccato_il || null, is_admin:!!p.is_admin })); },
     statoAccesso: async () => { if(!session) return null;
       const a = db.accessi.find(x => x.user_id === session.user.id), p = a && db.partners.find(y => y.id === a.partner_id);
-      return p && p.bloccato_il ? "bloccato" : (db.accessiTolti || []).includes(session.user.id) ? "tolto" : null; },
+      return p && p.bloccato_il ? (p.blocco_mappa ? "fuori_mappa" : "bloccato") : (db.accessiTolti || []).includes(session.user.id) ? "tolto" : null; },
     togliDallaStruttura: async pid => { const io = mio(), t = db.partners.find(p => p.id === pid);
       if(!io || !t || t.stato === "gestito" || t.id === io.id || t.is_admin || !(io.is_admin || t.sponsor_id === io.id)) throw new Error("non_autorizzato");
       if(t.confermato_il) throw new Error("gia_confermato");
@@ -341,30 +343,24 @@
             db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:x.id }]);
         } else if(!x.mappa_mese || x.mappa_mese <= mm){
           if(x.sponsor_id !== sp && sp !== x.id && !giu(x.id).includes(sp)){ x.sponsor_id = sp; spostate++; }
-          x.posizione_al = al; x.mappa_mese = mm; x.fuori_report_dal = null; if(x.stato === "gestito") x.gestore_id = io.id;
+          x.posizione_al = al; x.mappa_mese = mm; x.fuori_report_dal = null; x.fuori_mappa_il = null; if(x.stato === "gestito") x.gestore_id = io.id;
+          if(x.blocco_mappa){ x.bloccato_il = null; x.blocco_mappa = false; }   // 050: rientra nella mappa, l'app si sblocca
           if(x.stato === "gestito" && x.nome === "Utente riservato" && r.nome) x.nome = r.nome;
           if(r.ingresso) x.data_iscrizione = r.ingresso;
         }
         db.esclusi = (db.esclusi || []).filter(e => !(e.partner_id === io.id && e.codice === r.codice));
         if(salvaNumero(io, x.id, m, r, al)) numeri++; else vecchi++;
       }
+      /* 050: chi non è più nella mappa esce dalla struttura (non lo vede più nessuno); se usa l'app gli si blocca */
+      let bloccati = 0;
       for(const pid of a.p_fuori || []){ const x = db.partners.find(y => y.id === pid);
-        if(!x || x.stato !== "gestito" || !vedo(io, x)) throw new Error("non_autorizzato");
-        if(!x.fuori_report_dal && (!x.mappa_mese || x.mappa_mese <= mm)){ x.fuori_report_dal = a.p_mese; x.posizione_al = al; x.mappa_mese = mm;
-          db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:x.id }]); fuori++; } }
-      /* 046: fuori dalla mappa da 12 mesi: l'import di un admin lo cancella */
-      let cancellati = 0;
-      if(io.is_admin){ const [y, mo] = m.split("-").map(Number), limite = `${y - 1}-${String(mo).padStart(2, "0")}-01`;
-        const nelFile = new Set(a.p_persone.map(r => r.codice));
-        for(const x of sotto(io.id).filter(p => p.stato === "gestito" && p.fuori_report_dal && p.fuori_report_dal <= limite
-            && !nelFile.has(p.codice_amway) && (!p.mappa_mese || p.mappa_mese <= mm))){
-          db.partners.filter(p => p.sponsor_id === x.id).forEach(p => { p.sponsor_id = x.sponsor_id; });
-          db.partners = db.partners.filter(p => p.id !== x.id);
-          db.numeri = (db.numeri || []).filter(n => n.partner_id !== x.id);
-          db.activities = (db.activities || []).filter(n => n.partner_id !== x.id);
-          cancellati++; } }
+        if(!x || x.id === io.id || !vedo(io, x)) throw new Error("non_autorizzato");
+        if(x.is_admin || a.p_persone.some(r => r.codice === x.codice_amway)) continue;
+        if(!x.fuori_report_dal && (!x.mappa_mese || x.mappa_mese <= mm)){ x.fuori_report_dal = a.p_mese; x.fuori_mappa_il = new Date().toISOString();
+          x.posizione_al = al; x.mappa_mese = mm; fuori++;
+          if(x.stato !== "gestito"){ if(!x.bloccato_il){ x.blocco_mappa = true; x.bloccato_il = new Date().toISOString(); } bloccati++; } } }
       salva();
-      return { ignorate, cancellati, aggiunte, spostate, fuori, aggiornati:numeri, piu_vecchi:vecchi }; },
+      return { ignorate, bloccati, aggiunte, spostate, fuori, aggiornati:numeri, piu_vecchi:vecchi }; },
     prossime: async () => { const io = mio(); if(!io) return [];
       return visibiliRicuciti(io).filter(p => p.prossima_qualifica).map(p => ({ partner_id:p.id, prossima_qualifica:p.prossima_qualifica })); },
     nuovaChiavePer: async pid => { if(!mio().is_admin) throw new Error("non_autorizzato"); const p = db.partners.find(x => x.id === pid);

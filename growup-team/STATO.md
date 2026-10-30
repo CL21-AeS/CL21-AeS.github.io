@@ -51,6 +51,13 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
   persona già nella sua downline); le altre si ignorano, nell'app (il riepilogo le conta: «N righe ignorate») e nel
   database. Tolta la vecchia `importa_rete` (018), che l'app non usava più e saltava tutte le regole nuove; i controlli
   in `tests_rls.sql` che la usavano ora usano `importa_mappa`. App v68.
+- **Chi esce dalla mappa** (migrazioni **050** e **050b**): con qualsiasi import, chi non compare più nella mappa esce dalla
+  struttura e non lo vede più nessuno (`struttura_visibile` e `vedo` lo escludono); se usa l'app, l'app gli si blocca
+  (`blocco_mappa`, separato dal blocco dell'admin; schermata «App bloccata»). I dati restano: se ricompare in una mappa
+  riprende posto e dati e l'app si sblocca da sola. Dopo 12 mesi fuori (da `fuori_mappa_il`, ora del server) li cancella
+  `pulisci_fuori_mappa`, ogni notte alle 02:15 UTC (050b, solo su Supabase), con i telefoni che vedono «accesso tolto».
+  Tolta la cancellazione «solo con l'import dell'admin» (046). Chi sta sotto un gruppo che la mappa non mostra (Platino)
+  non conta come uscito. App v69.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 
