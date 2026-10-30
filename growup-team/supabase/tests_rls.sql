@@ -396,8 +396,12 @@ begin
   perform growup_test.come(u5);  -- A
   perform growup_test.ok((public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":60}', '[]', '{}', array[f])->>'fuori')::int = 1,
                          'A: F non è più nel report');
-  perform growup_test.ok(exists (select 1 from public.partners where id = f and fuori_report_dal is not null)
-                         and exists (select 1 from public.nascosti where nascosto_id = f), 'F resta, segnata e nascosta');
+  perform growup_test.ok(not exists (select 1 from public.partners where id = f)
+                         and not exists (select 1 from public.struttura_visibile() where id = f), '050: F non è più nella mappa: A non la vede più');
+  execute 'reset role';
+  perform growup_test.ok(exists (select 1 from public.partners where id = f and fuori_report_dal is not null and fuori_mappa_il is not null),
+                         '050: i dati di F restano conservati, nel caso rientri');
+  perform growup_test.come(u5);
   perform growup_test.ok((public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":60}',
       '[{"codice":"3000002","nome":"Fabio Test","sponsor":"2000001","vpp":0}]', '{}', '{}')->>'aggiunte')::int = 0, 'F torna nel report: niente doppioni');
   perform growup_test.ok(exists (select 1 from public.partners where id = f and fuori_report_dal is null), 'F torna nel report: segno tolto');
@@ -1429,7 +1433,7 @@ begin
     delete from public.numeri_mese where partner_id = est; delete from public.partners where id = est;
   end;
 
-  -- ---- 046: fuori dalla mappa da 12 mesi si cancella (solo con l'import di un admin); chi ricompare riprende i suoi dati ----
+  -- ---- 046/050: chi ricompare riprende i suoi dati; l'import non cancella più nessuno (lo fa la pulizia della notte) ----
   declare
     vecchio uuid; ritorna uuid; ris uuid; m0 date := date_trunc('month', current_date)::date;
   begin
@@ -1438,38 +1442,26 @@ begin
       '[{"codice":"8600001","nome":"Uscito Da Tanto","sponsor":"2000001","vpp":1,"vpg":1},
         {"codice":"8600002","nome":"Torna Presto","sponsor":"2000001","vpp":1,"vpg":1},
         {"codice":"8600003","nome":"Utente riservato","sponsor":"2000001","vpp":1,"vpg":1},
-        {"codice":"8600004","nome":"Sotto Uscito","sponsor":"8600001","vpp":1,"vpg":1},
-        {"codice":"8600005","nome":"Nel File","sponsor":"2000001","vpp":1,"vpg":1},
-        {"codice":"8600006","nome":"Mappa Piu Nuova","sponsor":"2000001","vpp":1,"vpg":1}]', '{}', '{}');
+        {"codice":"8600004","nome":"Sotto Uscito","sponsor":"8600001","vpp":1,"vpg":1}]', '{}', '{}');
     execute 'reset role';
-    -- segni «fuori» vecchi che non devono portare alla cancellazione: chi è nel file e chi ha una mappa più recente
-    update public.partners set fuori_report_dal = (m0 - interval '13 months')::date, mappa_mese = (m0 + interval '1 month')::date
-     where codice_amway in ('8600005', '8600006');
     vecchio := (select id from public.partners where codice_amway = '8600001');
     ritorna := (select id from public.partners where codice_amway = '8600002');
     ris := (select id from public.partners where codice_amway = '8600003');
     insert into public.activities (partner_id, tipo, inserito_da) values (ritorna, 'contatto', r);
-    update public.partners set fuori_report_dal = (m0 - interval '12 months')::date where id = vecchio;
-    update public.partners set fuori_report_dal = (m0 - interval '11 months')::date where id = ritorna;
-    perform growup_test.come(u5);  -- A non è admin: non cancella
-    perform growup_test.ok((public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":60}', '[]', '{}', '{}')->>'cancellati')::int = 0,
-                           '046: chi non è admin non cancella chi è fuori da 12 mesi');
+    update public.partners set fuori_report_dal = (m0 - interval '12 months')::date, fuori_mappa_il = now() - interval '13 months' where id = vecchio;
+    update public.partners set fuori_report_dal = (m0 - interval '11 months')::date, fuori_mappa_il = now() - interval '11 months' where id = ritorna;
     perform growup_test.come(u1);  -- R (admin): Torna e Utente riservato (col nome vero) sono nel file, Uscito no
-    perform growup_test.ok((public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":470}',
+    perform growup_test.ok(not ((public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":470}',
       '[{"codice":"8600002","nome":"Torna Presto","sponsor":"2000001","vpp":2,"vpg":2},
         {"codice":"8600003","nome":"Rita Vera","sponsor":"2000001","vpp":2,"vpg":2},
-        {"codice":"8600004","nome":"Sotto Uscito","sponsor":"2000001","vpp":2,"vpg":2},
-        {"codice":"8600005","nome":"Nel File","sponsor":"2000001","vpp":2,"vpg":2}]', '{}', '{}')->>'cancellati')::int = 1,
-      '046: l''admin cancella chi è fuori dalla mappa da 12 mesi');
+        {"codice":"8600004","nome":"Sotto Uscito","sponsor":"2000001","vpp":2,"vpg":2}]', '{}', '{}')) ? 'cancellati'),
+      '050: l''import non cancella più nessuno, nemmeno quello dell''admin');
     execute 'reset role';
-    perform growup_test.ok(not exists (select 1 from public.partners where id = vecchio)
-                           and not exists (select 1 from public.numeri_mese where partner_id = vecchio), '046: cancellato con i suoi numeri');
+    perform growup_test.ok(exists (select 1 from public.partners where id = vecchio), '050: chi è fuori da 12 mesi lo cancella solo la pulizia della notte');
     perform growup_test.ok((select sponsor_id from public.partners where codice_amway = '8600004') = a, '046: chi stava sotto resta, al suo posto nel file');
-    perform growup_test.ok((select fuori_report_dal is null from public.partners where id = ritorna)
+    perform growup_test.ok((select fuori_report_dal is null and fuori_mappa_il is null from public.partners where id = ritorna)
                            and exists (select 1 from public.activities where partner_id = ritorna), '046: chi ricompare entro 12 mesi riprende i suoi dati');
     perform growup_test.ok((select nome from public.partners where id = ris) = 'Rita Vera', '046: «Utente riservato» prende il nome vero dal file');
-    perform growup_test.ok((select count(*) from public.partners where codice_amway in ('8600005', '8600006')) = 2,
-                           '046: non si cancella chi è nel file appena importato né chi ha messo al suo posto una mappa più recente');
     -- una mappa di un mese precedente salva sempre i numeri di quel mese (anche se il file è più vecchio)
     perform growup_test.come(u1);
     perform public.salva_mese_passato((m0 - interval '1 month')::date, now(), '{"codice":"1000000","vpp":11,"vpg":111}', '[]');
@@ -1481,6 +1473,52 @@ begin
     delete from public.numeri_mese where partner_id in (select id from public.partners where codice_amway like '86000%');
     delete from public.activities where partner_id = ritorna;
     delete from public.partners where codice_amway like '86000%';
+  end;
+
+  -- ---- 050: chi usa l'app ed esce dalla mappa ha l'app bloccata; se rientra si sblocca; dopo 12 mesi si cancella ----
+  declare
+    uz constant uuid := '00000000-0000-0000-0000-0000000000c9';
+    z uuid; g2 uuid;
+  begin
+    insert into auth.users (id, aud, role) values (uz, 'authenticated', 'authenticated');
+    perform growup_test.come(uz);
+    z := (public.entra_con_invito(growup_test.invito(a, 'Zaira Test', '8700001'))->'profilo'->>'id')::uuid;
+    perform growup_test.come(u5);  -- A: la mappa mette Z al suo posto (confermata) e porta una persona senza app
+    perform public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":60,"vpg":100}',
+      '[{"codice":"8700001","nome":"Zaira Test","sponsor":"2000001","vpp":5,"vpg":5},{"codice":"8700002","nome":"Gilda Test","sponsor":"2000001","vpp":1,"vpg":1}]',
+      '{}', '{}');
+    execute 'reset role';
+    g2 := (select id from public.partners where codice_amway = '8700002');
+    perform growup_test.come(u5);  -- A importa una mappa senza Z: l'app di Z si blocca
+    perform growup_test.deve_fallire(format('select public.importa_mappa(current_date, now(), %L, %L, %L, %L)',
+      '{"codice":"2000001","vpp":60,"vpg":100}', '[]', '{}', array[r]::text), '050: chi non è nella mia downline non si segna fuori');
+    perform growup_test.ok((public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":60,"vpg":100}',
+      '[{"codice":"8700002","nome":"Gilda Test","sponsor":"2000001","vpp":1,"vpg":1}]', '{}', array[z])->>'bloccati')::int = 1,
+      '050: chi usa l''app e non è più nella mappa ha l''app bloccata');
+    perform growup_test.come(uz);
+    perform growup_test.ok(public.my_partner_id() is null and public.stato_accesso() = 'fuori_mappa', '050: Z non entra più e sa perché (fuori_mappa)');
+    perform growup_test.come(u1);  -- R non vede più Z
+    perform growup_test.ok(not exists (select 1 from public.struttura_visibile() where id = z), '050: nessuno vede più chi è fuori dalla mappa');
+    perform growup_test.come(u5);  -- Z ricompare nella mappa: si sblocca e riprende il suo posto
+    perform public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":60,"vpg":100}',
+      '[{"codice":"8700001","nome":"Zaira Test","sponsor":"2000001","vpp":5,"vpg":5},{"codice":"8700002","nome":"Gilda Test","sponsor":"2000001","vpp":1,"vpg":1}]',
+      '{}', '{}');
+    perform growup_test.come(uz);
+    perform growup_test.ok(public.my_partner_id() = z and public.stato_accesso() is null, '050: Z rientra nella mappa: l''app si sblocca da sola');
+    -- di nuovo fuori, con G: dopo 12 mesi il controllo della notte li cancella con tutti i dati
+    perform growup_test.come(u5);
+    perform public.importa_mappa(current_date, now(), '{"codice":"2000001","vpp":60,"vpg":100}', '[]', '{}', array[z, g2]);
+    execute 'reset role';
+    insert into public.activities (partner_id, tipo, inserito_da) values (g2, 'contatto', a);
+    perform growup_test.ok(public.pulisci_fuori_mappa() = 0, '050: prima dei 12 mesi la pulizia non tocca nessuno');
+    update public.partners set fuori_mappa_il = now() - interval '12 months' - interval '1 hour' where id in (z, g2);
+    perform growup_test.ok(public.pulisci_fuori_mappa() = 2, '050: dopo 12 mesi fuori dalla mappa la pulizia della notte li cancella');
+    perform growup_test.ok(not exists (select 1 from public.partners where id in (z, g2)) and not exists (select 1 from public.activities where partner_id = g2)
+                           and not exists (select 1 from public.numeri_mese where partner_id in (z, g2)), '050: con tutti i loro dati');
+    perform growup_test.come(uz);
+    perform growup_test.ok(public.stato_accesso() = 'tolto', '050: il telefono di Z vede «accesso tolto»');
+    perform growup_test.deve_fallire('select public.pulisci_fuori_mappa()', '050: la pulizia la fa solo il server');
+    execute 'reset role';
   end;
 
   -- ---- Nessuna tabella senza RLS ----

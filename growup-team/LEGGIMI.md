@@ -127,6 +127,9 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 41d. `supabase/047_esteri_scartati.sql` — i codici esteri si scartano e basta: il database ignora `p_esteri` (va dopo la 046)
 41e. `supabase/048_chi_importa.sql` — si importa solo la propria mappa; senza codice Amway nell'app non si importa
 41f. `supabase/049_perimetro.sql` — le righe fuori dalla downline di chi importa si ignorano; via la vecchia `importa_rete`
+41g. `supabase/050_fuori_mappa.sql` — chi esce dalla mappa esce dalla struttura (app bloccata se la usa), rientra con i suoi
+    dati; la pulizia `pulisci_fuori_mappa` cancella chi è fuori da 12 mesi
+41h. `supabase/050b_pulizia_cron.sql` — l'attività pianificata della pulizia, ogni notte (solo su Supabase, come la 006b)
 42. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 21. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**

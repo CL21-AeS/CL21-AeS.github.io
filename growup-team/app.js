@@ -1022,7 +1022,7 @@ function render(){
   const app = document.getElementById("app");
   const viste = { avvio:vAvvio, config:vConfig, benvenuto:vBenvenuto, chiave_errata:vChiaveErrata,
                   ingresso:vIngresso, invito_chiuso:vInvitoChiuso, privacy_primo:vPrivacyPrimo, obiettivo_primo:vObiettivoPrimo, home:vHome, errore:vErrore,
-                  contatto:vContatto, bloccato:vAccessoNegato, tolto:vAccessoNegato };
+                  contatto:vContatto, bloccato:vAccessoNegato, tolto:vAccessoNegato, fuori_mappa:vAccessoNegato };
   const html = (viste[st.fase] || vAvvio)();
   const prima = fotoMovimento();
   prima.pagina = cambioPagina() ? fotoPagina(app) : null;
@@ -1078,11 +1078,18 @@ function vBenvenuto(){
 async function accessoNegato(){
   let stato = null;
   try{ stato = await api.statoAccesso(); }catch(e){}
-  if(stato !== "bloccato" && stato !== "tolto") return false;
+  if(stato !== "bloccato" && stato !== "tolto" && stato !== "fuori_mappa") return false;
   st.fase = stato; st.sheet = null; st.profilo = null; render();
   return true;
 }
 function vAccessoNegato(){
+  /* 050: chi non è più nella mappa Amway del suo gruppo ha l'app bloccata finché non ricompare */
+  if(st.fase === "fuori_mappa") return `<div class="centro">
+    ${marchio()}
+    <h1 style="margin-top:6px">App bloccata</h1>
+    <p class="muted">Non sei più nella mappa Amway del tuo gruppo, quindi Growup è bloccata. Se rientri in una mappa si sblocca da
+      sola, con tutti i tuoi dati. Dopo 12 mesi fuori dalla mappa i tuoi dati vengono cancellati.</p>
+  </div>`;
   const bloccato = st.fase === "bloccato";
   return `<div class="centro">
     ${marchio()}
@@ -2763,27 +2770,25 @@ function analizzaReport(rep, piuRecente){
       sponsor_id:((st.inAttesa || []).find(y => y.id === x.id) || {}).sponsor_id || null })));
   const attivi = new Map(altri.filter(p => p.stato !== "gestito" && p.codice_amway).map(p => [p.codice_amway, p]));
   const mie = altri.filter(p => p.stato === "gestito");
-  const a = { mese:m, prima, perCodice, aggiorna:[], mancanti:[], usanoApp:[], usanoAppMancanti:[], daCancellare:[],
+  const a = { mese:m, prima, perCodice, aggiorna:[], mancanti:[], usanoApp:[],
               spostati:[], nuovi:[], totale:rep.righe.length, esteri:rep.esteri || [], fuoriPerimetro };
-  const usati = new Set([prima.codice]);
-  for(const p of altri.filter(p => p.stato !== "gestito")){
-    const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
-    if(r){ a.usanoApp.push({ p, r }); usati.add(r.codice); }
-    else if(p.codice_amway) a.usanoAppMancanti.push(p);
-  }
-  /* le mie persone importate: il codice viene dal report, quindi si abbinano sempre per codice */
   /* chi sta sotto un gruppo che il report non mostra (per esempio un Platino) non è "fuori dal report" */
   /* senza «Dimensioni gruppo» (file con i KPI selezionati) ogni persona senza nessuno sotto nel file può nascondere un gruppo */
   const nascostiReport = new Set(rep.righe.filter(r => (r.dimensione == null || r.dimensione > 1) && !rep.righe.some(x => x.sponsor === r.codice)).map(r => r.codice));
   const sottoNascosto = p => { for(let s = st.struttura.find(x => x.id === p.sponsor_id), n = 0; s && n < 200; s = st.struttura.find(x => x.id === s.sponsor_id), n++)
     if(s.codice_amway && nascostiReport.has(s.codice_amway)) return true; return false; };
+  const usati = new Set([prima.codice]);
+  /* 050: anche chi usa l'app e non è più nella mappa esce dalla struttura (e l'app gli si blocca) */
+  for(const p of altri.filter(p => p.stato !== "gestito")){
+    const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
+    if(r){ a.usanoApp.push({ p, r }); usati.add(r.codice); }
+    else if(p.codice_amway && !sottoNascosto(p)) a.mancanti.push(p);
+  }
+  /* le mie persone importate: il codice viene dal report, quindi si abbinano sempre per codice */
   for(const p of mie){
     const r = p.codice_amway ? perCodice.get(p.codice_amway) : null;
     if(r){ a.aggiorna.push({ p, r }); usati.add(r.codice); }
     else if(p.codice_amway && !p.fuori_report_dal && !sottoNascosto(p)) a.mancanti.push(p);
-    /* fuori dalla mappa da 12 mesi e ancora assente: l'import di un admin lo cancella */
-    else if(!r && io.is_admin && p.fuori_report_dal && meseDi(p.fuori_report_dal) <= spostaMese(m, -12)
-      && (!p.mappa_mese || meseDi(p.mappa_mese) <= m)) a.daCancellare.push(p);
   }
   /* l'import è sempre completo: tutte le persone del report entrano nella mia struttura */
   for(const r of rep.righe) if(!usati.has(r.codice)) a.nuovi.push(r);
@@ -2843,8 +2848,10 @@ function vRiepilogoImport(e){
       `<li><span class="grow">${esc(x.p.nome)}</span><b class="num">${num(x.r.vpp)} VP</b></li>`).join("")}</ul>`, "imp-aggiornati");
     if(a.spostati.length) h += sezione("Usano l'app: spostati sotto il loro sponsor della mappa",
       `<p class="small">${a.spostati.map(x => `<b>${esc(x.p.nome)}</b> (da ${esc(x.da)} a ${esc(x.a)})`).join(", ")}</p>`, "imp-spostati");
-    if(a.mancanti.length) h += sezione(`Non più nella mappa · ${a.mancanti.length}`, nomi(a.mancanti), "imp-mancanti");
-    if(a.daCancellare.length) h += sezione(`Fuori dalla mappa da 12 mesi · cancellate ${a.daCancellare.length}`, nomi(a.daCancellare), "imp-cancellati");
+    if(a.mancanti.length) h += sezione(`Non più nella mappa · ${a.mancanti.length}`,
+      `<p class="small">${a.mancanti.map(p => `${esc(p.nome)} (${esc(p.codice_amway)})${p.stato !== "gestito" ? " · app bloccata" : ""}`).join(", ")}</p>
+      <p class="nota">Escono dalla struttura e non li vede più nessuno; chi usa l'app la trova bloccata. Se ricompaiono in una mappa
+        riprendono posto e dati; dopo 12 mesi fuori dalla mappa i loro dati si cancellano da soli.</p>`, "imp-mancanti");
   }
   if(e.numeri.length) h += sezione(a ? "Mesi precedenti: salvati solo i numeri" : "Mappe di mesi precedenti: salvati solo i numeri, la struttura non cambia",
     `<ul class="imp">${e.numeri.map(x => `<li><span class="grow">${esc(nomeMese(x.mese))}</span>
@@ -3007,7 +3014,7 @@ function toastImport(e){
   const parti = a ? [n("aggiunte") ? plur(n("aggiunte"), "persona aggiunta", "persone aggiunte") : "",
     plur(n("aggiornati"), "persona aggiornata", "persone aggiornate"), n("spostate") ? plur(n("spostate"), "spostata", "spostate") : "",
     n("fuori") ? plur(n("fuori"), "persona non più nella mappa", "persone non più nella mappa") : "",
-    n("cancellati") ? plur(n("cancellati"), "persona fuori dalla mappa da 12 mesi cancellata", "persone fuori dalla mappa da 12 mesi cancellate") : ""] : [];
+    n("bloccati") ? plur(n("bloccati"), "app bloccata", "app bloccate") : ""] : [];
   if(e.numeri.length) parti.push(`numeri di ${e.numeri.map(x => nomeMese(x.mese)).join(", ")} salvati`);
   if(a || e.numeri.length) toast(`${a ? `Import di ${nomeMese(a.mese).split(" ")[0]}: ` : ""}${parti.filter(Boolean).join(", ")}`);
 }

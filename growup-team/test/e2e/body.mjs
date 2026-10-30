@@ -928,7 +928,8 @@ const numDi = id => (DB.numeri || []).filter(x => x.partner_id === id && x.mese 
 check(DB.partners.find(p => p.id === "R").codice_amway === "1234567" && Math.abs(numDi("R").vpp - 400) < 0.001, "i miei VPP del mese sono quelli del report");
 check(numDi("imp-gino").vpp === 1055.5, "VPP delle persone importate");
 check(DB.nascosti.some(x => x.nascosto_id === "imp-gino"), "l'import non tocca chi ho nascosto io: Gino resta nascosto");
-check(DB.partners.find(p => p.id === "imp-ugo").fuori_report_dal, "Ugo segnato «non più nella mappa»");
+check(DB.partners.find(p => p.id === "imp-ugo").fuori_report_dal && !(await page.locator(".albero.struttura li", { hasText:"Ugo Uscito" }).count()),
+  "050: Ugo non è più nella mappa: esce dalla struttura e non si vede più");
 check(!DB.activities.some(a => a.tipo === "rettifica" && a.inserito_da === "R" && usanoApp.some(p => p.id === a.partner_id)), "nessun dato di chi usa l'app toccato");
 const nRett = DB.activities.filter(a => a.tipo === "rettifica").length;
 await scegliFile(page, "los.csv", losCsv);
@@ -2844,22 +2845,51 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(numMappa(mesePrima).vpg === 7777 && numMappa(oggiStr.slice(0, 7)).vpp === 99 && DB.partners.find(p => p.codice_amway === "7600002").sponsor_id === "mappa51"
     && DB.partners.find(p => p.id === "mappa51").mappa_mese === oggiStr.slice(0, 7) + "-01",
     "046: la mappa di un mese precedente salva i numeri di quel mese e non tocca struttura né mese della mappa");
-  // fuori dalla mappa da 12 mesi: l'import dell'admin lo cancella con i suoi dati
-  const unAnnoFa = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - 12); return d.toISOString().slice(0, 10); })();
+  // 050: chi esce dalla mappa esce dalla struttura; chi usa l'app la trova bloccata; se rientra si sblocca da solo
   await ctx.close();
-  DB.partners.find(p => p.codice_amway === "7600003").fuori_report_dal = unAnnoFa;
-  DB.partners.find(p => p.id === "mappa51").is_admin = true;   // 046: la cancellazione dopo 12 mesi la fa l'import di un admin
+  DB.partners.push({ id:"zz51", nome:"Zeno Zaino", sponsor_id:"mappa51", stato:"attivo", chiave:"e2".repeat(16), codice_invito:"ZZ51ZZ", codice_amway:"7600040",
+    confermato_il:new Date().toISOString(), privacy_accettata_il:"2026-10-01T00:00:00Z", partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() });
+  const conZeno = stessoMese.concat([p51(2, "7600001", "7600040", "ZAINO, ZENO", "30,00", "30,00", 3, 1)]);
+  // Zeno entra dal suo telefono (il telefono resta collegato al suo profilo)
+  ({ ctx, page } = await apri({}, "#chiave=" + "e2".repeat(16)));
+  await page.getByText("Ciao Zeno").waitFor();
+  const sessZeno = await page.evaluate(() => localStorage.getItem("mock.session"));
+  await sync(page);
+  const telefonoZeno = () => apri({ storageState:{ cookies:[], origins:[{ origin:"http://127.0.0.1:8765", localStorage:[{ name:"mock.session", value:sessZeno }] }] } }, "");
+  await ctx.close();
   ({ ctx, page } = await apri({}, "#chiave=" + "d1".repeat(16)));
   await page.getByText("Ciao Mappa").waitFor(); await apriTappa(page);
   if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
-  await scegliFile(page, "senza-rita.csv", csvCon(testa17, [stessoMese[0], stessoMese[1], stessoMese[3]]));
+  await scegliFile(page, "senza-rita-e-zeno.csv", csvCon(testa17, [stessoMese[0], stessoMese[1], stessoMese[3]]));
   await page.locator(".sheet h2", { hasText:"importata" }).waitFor();
-  check(await page.locator(".sheet .imp-cancellati", { hasText:"Fuori dalla mappa da 12 mesi · cancellate 1" }).getByText("Rita Riserva (7600003)").isVisible(),
-    "046: riepilogo: chi è fuori dalla mappa da 12 mesi è cancellato");
-  await page.getByText(/1 persona fuori dalla mappa da 12 mesi cancellata/).waitFor();
-  await sync(page);
-  check(!DB.partners.some(p => p.codice_amway === "7600003"), "046: cancellata con i suoi dati");
+  check(await page.locator(".sheet .imp-mancanti").getByText(/Rita Riserva \(7600003\), Zeno Zaino \(7600040\) · app bloccata|Zeno Zaino \(7600040\) · app bloccata, Rita Riserva \(7600003\)/).isVisible(),
+    "050: riepilogo: chi non è più nella mappa esce; per chi usa l'app «app bloccata»");
+  await page.getByText(/1 app bloccata/).waitFor();
   await page.click(".sheet button[data-act=chiudi]");
+  await sync(page);
+  check(!(await page.locator(".albero.struttura li", { hasText:"Rita Riserva" }).count()) && !(await page.locator(".albero.struttura li", { hasText:"Zeno Zaino" }).count())
+    && DB.partners.some(p => p.codice_amway === "7600003" && p.fuori_report_dal), "050: escono dalla struttura (non si vedono più), i dati restano");
+  await ctx.close();
+  ({ ctx, page } = await telefonoZeno());
+  await page.getByText("App bloccata").waitFor();
+  check(await page.getByText("Non sei più nella mappa Amway del tuo gruppo").isVisible(), "050: chi usa l'app ed è uscito dalla mappa trova l'app bloccata, con il perché");
+  await ctx.close();
+  ({ ctx, page } = await apri({}, "#chiave=" + "d1".repeat(16)));
+  await page.getByText("Ciao Mappa").waitFor(); await apriTappa(page);
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await scegliFile(page, "rientrano.csv", csvCon(testa17, conZeno));
+  await page.locator(".sheet h2", { hasText:"importata" }).waitFor();
+  await page.click(".sheet button[data-act=chiudi]");
+  await sync(page);
+  check(await page.locator(".albero.struttura li", { hasText:"Zeno Zaino" }).isVisible() && DB.partners.some(p => p.codice_amway === "7600003" && !p.fuori_report_dal),
+    "050: chi ricompare in una mappa riprende il suo posto");
+  await ctx.close();
+  ({ ctx, page } = await telefonoZeno());
+  await page.getByText("Ciao Zeno").waitFor(); check(true, "050: e l'app si sblocca da sola");
+  await ctx.close();
+  ({ ctx, page } = await apri({}, "#chiave=" + "d1".repeat(16)));
+  await page.getByText("Ciao Mappa").waitFor(); await apriTappa(page);
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
   // 049: il perimetro: una riga che non risale a chi importa (file modificato) si ignora, con chi sta sotto di lei
   await page.locator(".toast", { hasText:"Import di" }).waitFor({ state:"detached" });
   await scegliFile(page, "modificato.csv", csvCon(testa17, [stessoMese[0], stessoMese[1], stessoMese[3],
