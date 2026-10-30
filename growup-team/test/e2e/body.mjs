@@ -1055,6 +1055,17 @@ await page.fill(".sheet input[name=nome]", "Luigi Verdi"); await page.fill(".she
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("Luigi Verdi nella tua lista").waitFor();
 check(await page.locator(".card", { hasText:"La mia lista" }).isVisible() && !(await page.locator("button[data-act=passo]").count()), "+ Un nome: si resta nella lista");
+// l'ultimo nome inserito va in cima; sotto il nome «Come lo conosci»
+await page.click("button[data-act=persona-nuova]");
+await page.fill(".sheet input[name=nome]", "Aldo Ultimo"); await page.fill(".sheet input[name=origine]", "collega di Roma");
+await page.click(".sheet button:has-text('Salva')");
+await page.getByText("Aldo Ultimo nella tua lista").waitFor();
+check((await page.locator("ul.persone li").first().innerText()).includes("Aldo Ultimo")
+  && await page.locator("ul.persone li", { hasText:"Aldo Ultimo" }).locator(".origine").innerText() === "collega di Roma",
+  "lista: l'ultimo nome inserito è in cima, con «Come lo conosci» sotto il nome");
+await page.locator(".card", { hasText:"La mia lista" }).screenshot({ path: S + "/e2e/53-lista-origine.png" });
+check(await page.evaluate(() => { const f = document.querySelector(".filtri"); return !!f && getComputedStyle(f).overscrollBehaviorX === "contain"; }),
+  "lista: scorrere i filtri non trascina la pagina");
 await page.locator("button[data-act=apri-persona]", { hasText:"Luigi Verdi" }).click();
 check(await page.locator("button[data-act=passo]").innerText() === "Segna un passo · Contatto", "scheda persona: il passo proposto è il contatto");
 const contattiPrima = DB.activities.filter(a => a.partner_id === "R" && a.tipo === "contatto").length;
@@ -1194,7 +1205,7 @@ await page.click("button[data-act=persone-tante]");
 await page.fill(".sheet textarea[name=righe]", "Marta Neri, 333 999, palestra\nLuigi Verdi");
 await page.click(".sheet button:has-text('Aggiungi')");
 await page.getByText("1 nome aggiunto").waitFor();
-check(await page.getByText("Chiusi · 2").isVisible() && await page.getByText("In lista · 1").isVisible(), "filtri con i conteggi (il cliente non è tra i chiusi)");
+check(await page.getByText("Chiusi · 2").isVisible() && await page.getByText("In lista · 2").isVisible(), "filtri con i conteggi (il cliente non è tra i chiusi)");
 check(!(await page.locator(".persone button[data-act=togli-da-io]").count()), "nella lista nessuna × (quella è solo su Io)");
 await ctx.close();
 // lo sponsor vede solo i numeri della lista di chi sta sotto
@@ -1359,6 +1370,15 @@ check(await page.locator(".card .pill", { hasText:"A posto" }).first().isVisible
 // Vera: fatto il "come ti sei trovato"
 await page.click("button[data-act=torna-clienti]");
 check(await page.locator("button[data-filtro=tutti].on").isVisible() && await page.locator(".scelte-rapide button[data-filtro]").first().getAttribute("data-filtro") === "tutti", "Clienti: Tutti è il primo filtro e parte selezionato");
+/* uno scorrimento di lato sui filtri di Clienti non cambia pagina (come nella Lista) */
+await page.evaluate(() => { const f = document.querySelector(".filtri"), r = f.getBoundingClientRect(), y = r.top + r.height / 2;
+  const t = x => new Touch({ identifier:1, target:f, clientX:x, clientY:y });
+  f.dispatchEvent(new TouchEvent("touchstart", { touches:[t(r.right - 20)], changedTouches:[t(r.right - 20)], bubbles:true }));
+  f.dispatchEvent(new TouchEvent("touchend", { touches:[], changedTouches:[t(r.left + 20)], bubbles:true })); });
+await page.waitForTimeout(400);
+check(await page.locator("button[data-act=cliente-nuovo]").isVisible()
+  && await page.evaluate(() => getComputedStyle(document.querySelector(".filtri")).overscrollBehaviorX === "contain"),
+  "Clienti: scorrere i filtri di lato non cambia pagina e non trascina la pagina");
 await page.click("button[data-filtro=tutti]");
 await page.locator("button[data-act=apri-cliente]", { hasText:"Vera Verifica" }).click();
 await page.click("button[data-act=verifica-fatta]");
@@ -2946,8 +2966,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(await page.locator(".platino-scheda").getByText("Gruppo di un Platino senza app").isVisible(), "052: scheda del Platino senza app: la sezione per l'admin");
   await page.click("button[data-act=invita-platino]");
   await page.locator(".sheet h2", { hasText:"Invita sotto Plinio Platino" }).waitFor();
-  await page.fill(".sheet input[name=nome]", "Xena Sotto"); await page.fill(".sheet input[name=codice_amway]", "7600061");
-  await page.fill(".sheet input[name=codice_amway2]", "7600061");
+  await page.waitForTimeout(800);
+  await compila([[".sheet input[name=nome]", "Xena Sotto"], [".sheet input[name=codice_amway]", "7600061"], [".sheet input[name=codice_amway2]", "7600061"]]);
   await page.click(".sheet button.primary");
   await page.locator(".sheet h2", { hasText:"Il link per Xena Sotto" }).waitFor();
   const linkX = await page.locator(".sheet .linkbox").innerText();
@@ -2986,8 +3006,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await azioniScheda(page);
   await page.click("button[data-act=invita-platino]");
   await page.locator(".sheet h2", { hasText:"Invita sopra Xena Sotto" }).waitFor();
-  await page.fill(".sheet input[name=nome]", "Walter Mezzo"); await page.fill(".sheet input[name=codice_amway]", "7600063");
-  await page.fill(".sheet input[name=codice_amway2]", "7600063");
+  await page.waitForTimeout(800);
+  await compila([[".sheet input[name=nome]", "Walter Mezzo"], [".sheet input[name=codice_amway]", "7600063"], [".sheet input[name=codice_amway2]", "7600063"]]);
   await page.click(".sheet button.primary");
   await page.locator(".sheet h2", { hasText:"Il link per Walter Mezzo" }).waitFor();
   const linkW = await page.locator(".sheet .linkbox").innerText();
