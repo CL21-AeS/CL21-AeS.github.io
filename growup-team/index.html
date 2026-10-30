@@ -240,7 +240,9 @@ ul.imp li:first-child{border-top:0}
 .btn.pericolo{color:var(--rosso);border-color:color-mix(in srgb,var(--rosso) 40%,transparent)}
 .albero .nome{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:0;background:none;
   color:var(--ink);font:inherit;text-align:left;padding:2px 0;cursor:pointer}
-.albero .nome:hover>span:first-child{color:var(--accent)}
+.albero .nome-apri{display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:0;background:none;width:100%;
+  color:var(--ink);font:inherit;text-align:left;padding:0;cursor:pointer}
+.albero .nome-apri:hover>span:first-child{color:var(--accent)}
 .pill.r{color:var(--rosso);border-color:color-mix(in srgb,var(--rosso) 35%,transparent)}
 .dati-scheda{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .dati-scheda>div{display:flex;flex-direction:column;padding:10px 12px;background:var(--bg);border-radius:10px}
@@ -269,7 +271,15 @@ ul.imp li:first-child{border-top:0}
 .albero li.piegato{display:none}
 .albero.in-ricerca li.piegato{display:flex}
 .albero li.fuori{display:none !important}
-.albero li.trovato .nome>span:first-child{color:var(--ink);font-weight:800;text-decoration:underline 3px var(--scelta);text-underline-offset:3px}
+.albero li.trovato .nome-apri>span:first-child{color:var(--ink);font-weight:800;text-decoration:underline 3px var(--scelta);text-underline-offset:3px}
+/* la ricerca: solo le persone trovate, senza rientro e senza frecce, con la linea e lo sponsor sotto il nome */
+.albero.in-ricerca li.liv{padding-left:0}
+.albero.in-ricerca .piega{display:none}
+.albero .percorso{display:block;margin-top:2px;color:var(--ink2);line-height:1.4}
+.percorso .intero{display:none}
+.percorso.aperto .puntini{display:none}
+.percorso.aperto .intero{display:inline}
+.percorso .puntini{border:0;background:none;padding:0 4px;min-height:24px;font:inherit;font-weight:800;color:var(--scelta);cursor:pointer}
 .cerca{margin-top:12px}
 .livello{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;
   font-variant-numeric:tabular-nums;color:#fff;background:var(--lv)}

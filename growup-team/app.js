@@ -1002,23 +1002,22 @@ let ultimoApp = "";
 /* Ricerca nella struttura: si filtra sulla pagina senza ridisegnarla, così la tastiera resta aperta.
    Restano visibili le persone trovate e la loro linea fino a te. */
 function senzaAccenti(s){ return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim(); }
+/* La ricerca nel Gruppo: compaiono solo le persone trovate, ognuna con la sua linea e il suo sponsor (percorsoHtml).
+   Si fa sulle righe già nella pagina, senza ridisegnare (il campo di ricerca resta com'è). */
 function applicaRicerca(){
   const ul = document.querySelector(".albero.struttura"), esito = document.getElementById("cerca-esito");
   if(!ul) return;
   const q = senzaAccenti(st.cerca), lis = [...ul.querySelectorAll("li")];
   ul.classList.toggle("in-ricerca", !!q);
-  if(!q){ lis.forEach(li => li.classList.remove("fuori", "trovato")); if(esito) esito.textContent = ""; st.espansi.clear(); etichettePiega(false); return; }
-  const trovati = lis.filter(li => li.dataset.nome.includes(q)), visibili = new Set();
-  for(const li of trovati){ visibili.add(li.dataset.id); li.dataset.path.split(" ").filter(Boolean).forEach(id => visibili.add(id)); }
-  /* ▸ N su una persona visibile apre i suoi frontali; ognuno ha la sua freccia per scendere ancora */
-  for(const li of lis){
-    const sopra = li.dataset.path.split(" ").filter(Boolean), sponsor = sopra[sopra.length - 1];
-    if(sponsor && st.espansi.has(sponsor) && visibili.has(sponsor)) visibili.add(li.dataset.id);
-  }
-  for(const li of lis){ li.classList.toggle("fuori", !visibili.has(li.dataset.id)); li.classList.toggle("trovato", trovati.includes(li)); }
-  etichettePiega(true);
+  ul.querySelectorAll(".percorso").forEach(x => x.remove());
+  if(!q){ lis.forEach(li => li.classList.remove("fuori", "trovato")); if(esito) esito.textContent = ""; etichettePiega(false); return; }
+  const trovati = lis.filter(li => !li.classList.contains("io") && li.dataset.nome.includes(q));
+  for(const li of lis){ li.classList.toggle("fuori", !trovati.includes(li)); li.classList.toggle("trovato", trovati.includes(li)); }
+  /* sotto ogni persona trovata, la sua linea e il suo sponsor (si aggiungono solo durante la ricerca) */
+  for(const li of trovati){ const p = st.struttura.find(x => x.id === li.dataset.id), n = li.querySelector(".nome");
+    if(p && n) n.insertAdjacentHTML("beforeend", percorsoHtml(p)); }
   if(esito) esito.textContent = !trovati.length ? "Nessuno con questo nome nel tuo gruppo."
-    : (trovati.length === 1 ? "1 persona trovata" : `${trovati.length} persone trovate`) + ", con la linea fino a te.";
+    : (trovati.length === 1 ? "1 persona trovata" : `${trovati.length} persone trovate`) + ": sotto ognuna la sua linea e il suo sponsor.";
 }
 /* L'etichetta ▾ N / ▸ N: fuori dalla ricerca segue i gruppi richiusi, durante la ricerca i gruppi aperti */
 function etichettePiega(inRicerca){
@@ -2286,10 +2285,10 @@ function vStruttura(){
       return `<li class="liv${piegato ? " piegato" : ""}${nascosta ? " nascosta" : ""}" style="--rientro:${Math.min(path.length, 4) * 10}px"
         data-id="${esc(p.id)}" data-path="${esc(path.join(" "))}" data-nome="${esc(senzaAccenti(p.nome))}">
       <span class="livello l${livello % 5 + 1}" title="Livello ${livello + 2}">${livello + 2}</span>
-      <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}">
+      <div class="nome"><button class="nome-apri" data-act="apri-scheda" data-id="${esc(p.id)}">
         <span>${esc(p.nome)}</span>
         <span class="small">${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${r.linee_attive ? ` · ${r.linee_attive} ${r.linee_attive === 1 ? "linea" : "linee"}` : ""}</span>
-      </button>
+      </button></div>
       ${quanti ? `<button class="piega" data-act="piega" data-id="${esc(p.id)}" data-quanti="${quanti}" aria-expanded="${!chiuso}"
         aria-label="${chiuso ? "Mostra" : "Nascondi"} il gruppo di ${esc(p.nome)}">${chiuso ? "▸" : "▾"} ${quanti}</button>` : ""}
       ${p.fuori_report_dal ? `<span class="pill g" title="Non più nel report Amway">fuori</span>` : ""}
@@ -2305,6 +2304,20 @@ function vStruttura(){
           oppure importa il report Amway per vedere anche chi non la usa.</p>`}
   </div>`;
 }
+/* Dove sta una persona, per la ricerca: «Linea di <frontale> › … › <sponsor> (sponsor)». Il percorso intero (tutti gli
+   sponsor tra il frontale e lo sponsor diretto) si apre toccando «…». Conta la struttura vera, anche con le nascoste. */
+function percorsoHtml(p){
+  const catena = [];   // dallo sponsor diretto in su, fino al mio frontale (me escluso)
+  for(let s = st.struttura.find(x => x.id === p.sponsor_id), n = 0; s && s.id !== st.profilo.id && n < 200; s = st.struttura.find(x => x.id === s.sponsor_id), n++)
+    catena.push(s.nome);
+  if(!catena.length) return `<span class="small percorso">Tuo frontale</span>`;
+  catena.reverse();
+  const frontale = esc(catena[0]), sponsor = esc(catena[catena.length - 1]), mezzo = catena.slice(1, -1).map(esc);
+  if(catena.length === 1) return `<span class="small percorso">Linea di ${frontale} (sponsor)</span>`;
+  if(!mezzo.length) return `<span class="small percorso">Linea di ${frontale} › ${sponsor} (sponsor)</span>`;
+  return `<span class="small percorso">Linea di ${frontale} › <button class="puntini" data-act="percorso-intero" aria-label="Mostra tutto il percorso">…</button><span class="intero">${mezzo.join(" › ")}</span> › ${sponsor} (sponsor)</span>`;
+}
+
 /* l'elenco di un filtro: una riga per persona, con livello e sponsor; «Percentuale» va dalla più alta */
 function vElencoFiltrato(righe, filtro){
   const pos = posizioni();
@@ -2317,10 +2330,10 @@ function vElencoFiltrato(righe, filtro){
     const ingresso = filtro.id === "nuovi" && st.ingressi.get(p.id) ? ` · entrato il ${dataIt(String(st.ingressi.get(p.id)).slice(0, 10))}` : "";
     return `<li class="liv" style="--rientro:0px" data-id="${esc(p.id)}" data-path="" data-nome="${esc(senzaAccenti(p.nome))}">
       <span class="livello l${livello % 5 + 1}" title="Livello ${livello + 2}">${livello + 2}</span>
-      <button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}">
+      <div class="nome"><button class="nome-apri" data-act="apri-scheda" data-id="${esc(p.id)}">
         <span>${esc(p.nome)}</span>
         <span class="small">${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${x ? ` · sotto ${esc(x.sponsor)}` : ""}${ingresso}</span>
-      </button>
+      </button></div>
       ${filtro.id === "percentuale" ? `<span class="pill v">${Number(r.percentuale) || 0}%</span>` : `<span class="pill ${sp.cl}">${sp.txt}</span>`}</li>`; }).join("")}</ul>`;
 }
 
@@ -4103,6 +4116,8 @@ Object.assign(AZIONI, {
   "apri-persona"(el){ st.vista = "persone"; st.sezPersone = "lista"; st.invitoId = null; st.personaId = el.dataset.id; render(); window.scrollTo(0, 0); },
   "torna-lista"(){ st.personaId = null; render(); window.scrollTo(0, 0); },
   "filtro-lista"(el){ st.filtroLista = el.dataset.filtro; render(); },
+  /* «…» nel percorso: si apre il percorso intero di quella persona (senza ridisegnare) */
+  "percorso-intero"(el){ const p = el.closest(".percorso"); if(p) p.classList.add("aperto"); },
   "filtro-gruppo"(el){ st.filtroGruppo = el.dataset.filtro; render(); applicaRicerca(); },
   "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = null; st.sheet = "persona-nuova"; render(); },
   /* i pulsanti rapidi di Io: + Contatto apre "un nome", + Piano apre il passo Piano di una persona */
