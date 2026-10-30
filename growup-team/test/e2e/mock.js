@@ -23,7 +23,8 @@
   const salvaNumero = (io, pid, m, r, al) => {
     const pp = db.partners.find(y => y.id === pid); if(pp && pp.stato !== "gestito" && !pp.confermato_il) pp.confermato_il = new Date().toISOString();
     if(r.vpg == null) return false;
-    /* 046: i numeri di un mese sono sempre quelli dell'ultimo file importato di quel mese */
+    /* 051: i numeri dell'admin fanno sempre fede; quelli di un partner solo se il file è stato scaricato dopo */
+    const ora = numeroDi(pid, m); if(ora && !io.is_admin && String(ora.dati_al || "") > al) return false;
     db.numeri = (db.numeri || []).filter(x => !(x.partner_id === pid && x.mese === m))
       .concat([{ visto_da:io.id, partner_id:pid, mese:m, vpp:r.vpp, vpg:r.vpg, percentuale:r.percentuale, linee:r.linee || [], nascoste:!!r.nascoste, dati_al:al }]);
     return true; };
@@ -341,10 +342,11 @@
           db.partners.push(x); aggiunte++;
           if((a.p_nascondi || []).includes(r.codice) || (db.esclusi || []).some(e => e.partner_id === io.id && e.codice === r.codice))
             db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:x.id }]);
-        } else if(!x.mappa_mese || x.mappa_mese <= mm){
+        } else if(!x.mappa_mese || x.mappa_mese < mm || (x.mappa_mese === mm && (io.is_admin || !x.posizione_al || x.posizione_al <= al))){
           if(x.sponsor_id !== sp && sp !== x.id && !giu(x.id).includes(sp)){ x.sponsor_id = sp; spostate++; }
           x.posizione_al = al; x.mappa_mese = mm; x.fuori_report_dal = null; x.fuori_mappa_il = null; if(x.stato === "gestito") x.gestore_id = io.id;
-          if(x.blocco_mappa){ x.bloccato_il = null; x.blocco_mappa = false; }   // 050: rientra nella mappa, l'app si sblocca
+          /* 050: rientra nella mappa, l'app si sblocca (051: non se l'ha bloccata un admin) */
+          if(x.blocco_mappa){ if(!x.bloccato_da) x.bloccato_il = null; x.blocco_mappa = false; }
           if(x.stato === "gestito" && x.nome === "Utente riservato" && r.nome) x.nome = r.nome;
           if(r.ingresso) x.data_iscrizione = r.ingresso;
         }

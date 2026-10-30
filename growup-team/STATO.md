@@ -58,6 +58,12 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
   `pulisci_fuori_mappa`, ogni notte alle 02:15 UTC (050b, solo su Supabase), con i telefoni che vedono «accesso tolto».
   Tolta la cancellazione «solo con l'import dell'admin» (046). Chi sta sotto un gruppo che la mappa non mostra (Platino)
   non conta come uscito. App v69.
+- **Ordine degli import nello stesso mese** (migrazione **051**): riferimento = data e ora di scaricamento della mappa
+  (ultima modifica del file; se manca, l'ora dell'import), salvata con l'ora dell'import (`posizione_importata_il`,
+  `numeri_mese.aggiornato_il`). La mappa dell'admin, quando viene caricata, fa sempre fede su tutto; dopo, la mappa di un
+  partner aggiorna posizioni e numeri della sua parte solo se scaricata dopo quella in vigore. Il riepilogo dice chi ha
+  già i dati di una mappa scaricata dopo. Chi rientra nella mappa ritrova l'app solo se non l'ha bloccata un admin;
+  `fuori_mappa_da` registra chi ha segnato una persona fuori. App v70.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 
