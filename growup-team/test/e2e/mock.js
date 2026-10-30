@@ -296,7 +296,7 @@
     togliFatto: async (chiave, giorno) => { const io = mio(); db.guidaFatti = (db.guidaFatti || [])
       .filter(x => !(x.partner_id === io.id && x.chiave === chiave && x.giorno === giorno)); salva(); },
     datiAl: async (pid, mese) => { const n = numeroDi(pid, mese.slice(0, 7)); return n && n.dati_al ? [{ dati_al:n.dati_al }] : []; },
-    salvaMesePassato: async a => { const io = mio(); const m = a.p_mese.slice(0, 7), al = a.p_dati_al || new Date().toISOString();
+    salvaMesePassato: async a => { const io = mio(); db.ultimoImport = JSON.parse(JSON.stringify(a)); const m = a.p_mese.slice(0, 7), al = a.p_dati_al || new Date().toISOString();
       if(io.confermato_il === null && !io.is_admin) throw new Error("in_attesa");
       if(!io.codice_amway) throw new Error("codice_mancante");
       if(a.p_io.codice !== io.codice_amway) throw new Error("import_di_altri");
@@ -305,10 +305,13 @@
       salva(); return n; },
     /* come importa_mappa (033): tutto il mio gruppo, vince il report più aggiornato */
     importaMappa: async a => { const io = mio(); if(!io) throw new Error("non_autenticato");
+      db.ultimoImport = JSON.parse(JSON.stringify(a));   // per i controlli sulla privacy: cosa arriva al database
       if(io.confermato_il === null && !io.is_admin) throw new Error("in_attesa");
       const m = a.p_mese.slice(0, 7), al = a.p_dati_al && a.p_dati_al < new Date().toISOString() ? a.p_dati_al : new Date().toISOString();
       if(!io.codice_amway && a.p_io.codice) io.codice_amway = a.p_io.codice;
       else if(a.p_io.codice !== io.codice_amway) throw new Error("import_di_altri");
+      /* 044b: la data di ingresso della mappa fa fede */
+      if(a.p_io.ingresso) io.data_iscrizione = a.p_io.ingresso;
       let aggiunte = 0, spostate = 0, fuori = 0, numeri = 0, vecchi = 0;
       /* 035: i codici nuovi contano nel gruppo solo dal secondo import di chi importa */
       const secondo = !!io.primo_import_il; if(!io.primo_import_il) io.primo_import_il = new Date().toISOString();
@@ -322,13 +325,14 @@
           if(db.partners.some(p => p.codice_amway === r.codice)) continue;
           x = { id:uid(), nome:r.nome, sponsor_id:sp, stato:"gestito", gestore_id:io.id, codice_amway:r.codice, codice_invito:codiceInvito(),
             partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString(), posizione_al:al,
-            in_mappa_dal:secondo ? new Date().toISOString() : null };
+            in_mappa_dal:secondo ? new Date().toISOString() : null, data_iscrizione:r.ingresso || null };
           db.partners.push(x); aggiunte++;
           if((a.p_nascondi || []).includes(r.codice) || (db.esclusi || []).some(e => e.partner_id === io.id && e.codice === r.codice))
             db.nascosti = (db.nascosti || []).concat([{ partner_id:io.id, nascosto_id:x.id }]);
         } else if(!x.posizione_al || x.posizione_al <= al){
           if(x.sponsor_id !== sp && sp !== x.id && !giu(x.id).includes(sp)){ x.sponsor_id = sp; spostate++; }
           x.posizione_al = al; x.fuori_report_dal = null; if(x.stato === "gestito") x.gestore_id = io.id;
+          if(r.ingresso) x.data_iscrizione = r.ingresso;
         }
         db.esclusi = (db.esclusi || []).filter(e => !(e.partner_id === io.id && e.codice === r.codice));
         if(salvaNumero(io, x.id, m, r, al)) numeri++; else vecchi++;

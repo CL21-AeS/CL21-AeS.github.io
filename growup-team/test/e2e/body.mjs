@@ -934,6 +934,16 @@ await page.check(".sheet input[name=consenso]");
 await page.click(".sheet button:has-text('Importa')");
 await page.getByText(/persone aggiornate.*1 persona non più nel report/).waitFor(); check(true, "import fatto");
 await sync(page);
+{
+  /* privacy: al database arrivano solo codice, nome, sponsor, data di ingresso e numeri; mai telefono, email, indirizzo o data di rinnovo */
+  const inviato = JSON.stringify(DB.ultimoImport || {});
+  check(DB.ultimoImport && DB.ultimoImport.p_persone.length > 0 && !/\+39|@|esempio|Citta|Principale|gennaio|dicembre/i.test(inviato)
+    && DB.ultimoImport.p_persone.every(r => Object.keys(r).every(k => ["codice","nome","vpp","sponsor","ingresso","vpg","percentuale","linee","nascoste"].includes(k))),
+    "privacy: dalla mappa non arrivano al database telefono, email, indirizzo né data di rinnovo");
+  check(DB.ultimoImport.p_persone.every(r => r.ingresso === "2020-01-01") && !JSON.stringify(DB.ultimoImport).includes("2026-12-31")
+    && DB.partners.find(p => p.id === "imp-gino").data_iscrizione === "2020-01-01",
+    "la data di ingresso della mappa si salva (01 gennaio 2020 → 2020-01-01), la data di rinnovo no");
+}
 const vppDi = id => DB.activities.filter(a => a.partner_id === id && ["ordine","rettifica"].includes(a.tipo) && a.data.slice(0, 7) === oggiStr.slice(0, 7))
   .reduce((t, a) => t + Number(a.vp), 0);
 /* 033: i VPP ufficiali stanno nei numeri del report (vincono sugli ordini scritti a mano) */
@@ -963,6 +973,7 @@ await scegliFile(page, "di-altri.csv", creaCsv(meseFile, [persona(1, "1", "77777
 await page.locator(".sheet .errore").waitFor();
 check(await page.locator(".sheet .errore").getByText("il tuo codice nell'app è 1234567").isVisible()
   && await page.locator(".sheet .errore").getByText("correggilo in fondo alla pagina Io").isVisible(), "import: il report di un altro partner è rifiutato (admin: correggi)");
+check(await page.locator(".sheet").getByText("Telefono, email, indirizzo e data di rinnovo non si salvano mai.").isVisible(), "import: la privacy è scritta nel foglio");
 await page.click(".sheet button[data-act=chiudi]");
 await page.click("button[data-act=vista-gruppo]");
 await page.locator(".albero.struttura li", { hasText:"Gino Gestito" }).locator("button[data-act=apri-scheda]").click();
@@ -2069,6 +2080,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.getByText(/Numeri salvati: .*, /).waitFor();
   await sync(page);
   check(DB.numeri.filter(x => x.visto_da === "lea" && x.partner_id === "lea" && [mm(-3), mm(-2)].includes(x.mese)).length === 2, "salvati i numeri dei due mesi chiusi");
+  check(DB.ultimoImport && DB.ultimoImport.p_io && !/\+39|@|esempio|Citta|Principale|gennaio|dicembre/i.test(JSON.stringify(DB.ultimoImport)),
+    "privacy: anche dai mesi chiusi niente telefono, email, indirizzo né data di rinnovo");
   // il file sbagliato è segnalato subito e non entra nell'import: dopo i mesi chiusi si passa al mese in corso
   await page.locator(".sheet h2", { hasText:`Report di ` }).filter({ hasNotText:"più mesi" }).waitFor();
   check(await page.locator(".sheet button.primary", { hasText:"Importa" }).isVisible(), "poi l'import completo del mese in corso");
