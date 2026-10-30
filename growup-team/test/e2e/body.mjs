@@ -952,6 +952,12 @@ await page.getByText("Gino Gestito di nuovo nella tua struttura").waitFor();
 await page.click(".sheet button[data-act=chiudi]");
 await page.locator(".albero.struttura li", { hasText:"Gino Gestito" }).locator("button[data-act=apri-scheda]").click();
 await page.getByText("Scheda partner").waitFor();
+{
+  /* chi non usa l'app ma è nella mappa del mese: i VP personali del mese in corso sono quelli della mappa, non zero */
+  const rigaVp = page.locator("table.confronto tr", { hasText:"VP personali" });
+  check((await rigaVp.locator("td").nth(1).innerText()).includes("1.055,5") && (await rigaVp.locator("td").nth(2).innerText()).trim() === "–",
+    "confronto: chi non usa l'app ha i VP personali del mese dalla mappa (non 0)");
+}
 const testoScheda = await page.locator("#app").innerText();
 check(testoScheda.includes("Codice Amway 3000001") && !(await page.locator(".card button[data-act=codice]").count()), "scheda: codice Amway, senza modifica per chi è importato");
 await page.click("button.link[data-act=vista-gruppo]");

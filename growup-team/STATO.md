@@ -74,6 +74,9 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
   cumulo, test). App v71.
 - **Ritocchi a Persone** (30 ottobre): scorrere di lato i filtri di Lista e Clienti non cambia più pagina e non trascina
   la pagina; nella Lista l'ultimo nome inserito sta in cima e sotto il nome si legge «Come lo conosci». App v72.
+- **Scheda partner, «Questo mese e il mese prima»** (30 ottobre): per chi non usa l'app ma è nella mappa del mese, i VP
+  personali del mese in corso sono quelli della mappa (prima contavano solo gli ordini scritti a mano: 0). Il «?» spiega la
+  colonna centrale («set al 30» = il mese prima fino allo stesso giorno). App v73.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 
