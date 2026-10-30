@@ -2930,6 +2930,87 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.partners.find(p => p.id === "mappa51").codice_amway = "7600001";
 }
 
+// 52. Il gruppo di un Platino che non usa l'app: l'admin invita sotto di lui; chi entra importa subito la sua mappa
+{
+  const mese = oggiStr.slice(0, 7);
+  DB.partners.find(p => p.id === "mappa51").is_admin = true;
+  DB.partners.push({ id:"pl52", nome:"Plinio Platino", sponsor_id:"mappa51", stato:"gestito", gestore_id:"mappa51", codice_amway:"7600060",
+    codice_invito:"PL52PL", creato_il:new Date().toISOString(), mappa_mese:mese + "-01" });
+  DB.numeri.push({ visto_da:"mappa51", partner_id:"pl52", mese, vpp:0, vpg:5000, percentuale:15, linee:[], nascoste:true, dati_al:new Date().toISOString() });
+  ({ ctx, page } = await apri({}, "#chiave=" + "d1".repeat(16)));
+  await page.getByText("Ciao Mappa").waitFor(); await apriTappa(page);
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-gruppo]");
+  await page.locator(".albero.struttura li", { hasText:"Plinio Platino" }).locator("button[data-act=apri-scheda]").click();
+  await azioniScheda(page);
+  check(await page.locator(".platino-scheda").getByText("Gruppo di un Platino senza app").isVisible(), "052: scheda del Platino senza app: la sezione per l'admin");
+  await page.click("button[data-act=invita-platino]");
+  await page.locator(".sheet h2", { hasText:"Invita sotto Plinio Platino" }).waitFor();
+  await page.fill(".sheet input[name=nome]", "Xena Sotto"); await page.fill(".sheet input[name=codice_amway]", "7600061");
+  await page.fill(".sheet input[name=codice_amway2]", "7600061");
+  await page.click(".sheet button.primary");
+  await page.locator(".sheet h2", { hasText:"Il link per Xena Sotto" }).waitFor();
+  const linkX = await page.locator(".sheet .linkbox").innerText();
+  await sync(page);
+  const invX = DB.invitiP.find(i => i.codice_amway === "7600061");
+  check(invX && invX.sotto_id === "pl52" && invX.area_platino === "pl52", "052: l'invito è «sotto il Platino»");
+  // la scheda di chi non è un Platino nascosto non ha la sezione
+  await page.click(".sheet button[data-act=chiudi]");
+  await ctx.close();
+  // Xena entra: sotto il Platino, in attesa, e importa subito la sua mappa
+  ({ ctx, page } = await apri({}, linkX.slice(linkX.indexOf("#"))));
+  await page.getByText("Ciao Xena!").waitFor();
+  await page.selectOption("select[name=qualifica]", "pin:3");
+  await page.check("input[name=privacy]"); await page.click("form button.primary");
+  await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
+  await page.getByText("Ciao Xena").waitFor(); await apriTappa(page);
+  await sync(page);
+  const xena = DB.partners.find(p => p.codice_amway === "7600061");
+  check(xena.sponsor_id === "pl52" && xena.area_platino === "pl52" && !xena.confermato_il, "052: Xena entra sotto il Platino, in attesa");
+  check(await page.locator(".primi-passi .stato-attesa").getByText("importa la tua mappa").isVisible(), "052: in attesa, ma le si dice di importare la sua mappa");
+  await scegliFile(page, "xena.csv", creaCsv(meseFile, [persona(1, "7600060", "7600061", "SOTTO, XENA", "60,00"),
+    persona(2, "7600061", "7600062", "GRUPPO, YARA", "20,00")]));
+  await page.locator(".sheet h2", { hasText:"importata" }).waitFor();
+  await page.click(".sheet button[data-act=chiudi]");
+  await sync(page);
+  check(!!DB.partners.find(p => p.codice_amway === "7600061").confermato_il && DB.partners.find(p => p.codice_amway === "7600062").sponsor_id === xena.id,
+    "052: chi è sotto un Platino senza app importa subito la sua mappa: confermata, con il suo gruppo sotto di lei");
+  check(!(await page.locator(".primi-passi .stato-attesa").count()), "052: dopo l'import non è più in attesa");
+  await ctx.close();
+  // l'admin inserisce uno sponsor tra Xena (usa l'app) e il Platino
+  ({ ctx, page } = await apri({}, "#chiave=" + "d1".repeat(16)));
+  await page.getByText("Ciao Mappa").waitFor(); await apriTappa(page);
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-gruppo]");
+  await page.locator(".albero.struttura li", { hasText:"Xena Sotto" }).locator("button[data-act=apri-scheda]").click();
+  await azioniScheda(page);
+  await page.click("button[data-act=invita-platino]");
+  await page.locator(".sheet h2", { hasText:"Invita sopra Xena Sotto" }).waitFor();
+  await page.fill(".sheet input[name=nome]", "Walter Mezzo"); await page.fill(".sheet input[name=codice_amway]", "7600063");
+  await page.fill(".sheet input[name=codice_amway2]", "7600063");
+  await page.click(".sheet button.primary");
+  await page.locator(".sheet h2", { hasText:"Il link per Walter Mezzo" }).waitFor();
+  const linkW = await page.locator(".sheet .linkbox").innerText();
+  await sync(page);
+  await page.click(".sheet button[data-act=chiudi]");
+  // fuori dal gruppo di un Platino senza app: nessuna sezione (niente inserimenti in mezzo altrove)
+  await page.click("button.link[data-act=vista-gruppo]");
+  await page.locator(".albero.struttura li", { hasText:"Aldo Primo" }).locator("button[data-act=apri-scheda]").click();
+  await azioniScheda(page);
+  check(!(await page.locator(".platino-scheda").count()), "052: fuori dal gruppo di un Platino senza app l'admin non inserisce nessuno in mezzo");
+  await ctx.close();
+  ({ ctx, page } = await apri({}, linkW.slice(linkW.indexOf("#"))));
+  await page.getByText("Ciao Walter!").waitFor();
+  await page.selectOption("select[name=qualifica]", "pin:3");
+  await page.check("input[name=privacy]"); await page.click("form button.primary");
+  await page.getByText("Il tuo primo obiettivo").waitFor();
+  await sync(page);
+  const walter = DB.partners.find(p => p.codice_amway === "7600063");
+  check(walter.sponsor_id === "pl52" && DB.partners.find(p => p.codice_amway === "7600061").sponsor_id === walter.id,
+    "052: Walter entra tra il Platino e Xena");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

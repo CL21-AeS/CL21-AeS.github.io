@@ -64,6 +64,14 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
   partner aggiorna posizioni e numeri della sua parte solo se scaricata dopo quella in vigore. Il riepilogo dice chi ha
   già i dati di una mappa scaricata dopo. Chi rientra nella mappa ritrova l'app solo se non l'ha bloccata un admin;
   `fuori_mappa_da` registra chi ha segnato una persona fuori. App v70.
+- Il 30 ottobre: migrazioni 047–051 (e 050b) applicate su Supabase e PR #138–#142 unite (v70 online).
+- **Gruppo di un Platino senza app** (migrazione **052**): Platino «nascosto» = senza app e con le linee nascoste nella
+  mappa più recente. Solo l'admin, dalla scheda (Azioni, «Gruppo di un Platino senza app»): «Invita una persona del suo
+  gruppo» (entra sotto il Platino) e, dalla scheda di chi usa l'app nel gruppo del Platino, «Inserisci lo sponsor sopra»
+  (entra tra lui e il suo sponsor); altrove niente inserimenti in mezzo. Chi entra così (`area_platino`) importa subito la
+  sua mappa anche se in attesa: lo conferma e lo mette sotto il suo sponsor vero se è già nel gruppo del Platino. Se il
+  Platino usa l'app, la sua mappa rimette tutto a posto. I VP di gruppo del Platino restano quelli ufficiali (nessun
+  cumulo, test). App v71.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 
