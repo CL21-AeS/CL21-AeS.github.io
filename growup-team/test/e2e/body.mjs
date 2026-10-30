@@ -803,8 +803,8 @@ check(await cardInvita.locator("button[data-act=invita]").isVisible() && !(await
 // un invito si annulla e si rigenera
 await page.waitForTimeout(1000);
 await cardInvita.locator("button[data-act=invita]").click();
-await page.fill(".sheet input[name=nome]", "Prova Annulla");
-await page.fill(".sheet input[name=codice_amway]", "2111111"); await page.fill(".sheet input[name=codice_amway2]", "2111111");
+await page.locator(".sheet h2", { hasText:"Invita un nuovo partner" }).waitFor();
+await compila([[".sheet input[name=nome]", "Prova Annulla"], [".sheet input[name=codice_amway]", "2111111"], [".sheet input[name=codice_amway2]", "2111111"]]);
 await page.click(".sheet button.primary");
 await page.locator(".sheet h2", { hasText:"Il link per Prova Annulla" }).waitFor();
 const linkAnnulla = await page.locator(".sheet .linkbox").innerText();
@@ -896,6 +896,17 @@ await page.locator(".sheet .avviso").waitFor();
 check(await page.locator(".sheet .avviso").getByText("altro.csv: non sembra un export Amway").isVisible(), "import: file sbagliato riconosciuto, con il nome");
 await mettiFile(page, { name:"altri.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, [persona(1, "1", "1234567", "ROSSI, MARIO", "1"), persona(2, "1234567", "9999999", "ALTRO, ALDO", "1")])) });
 await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+await page.click(".sheet button[data-act=chiudi]");
+// «Qualifica Amway Partner» è il livello di profondità: chi importa è la riga con 1, anche se non è la prima del file
+await mettiFile(page, { name:"ordine.csv", mimeType:"text/csv", buffer:Buffer.from(creaCsv(meseFile, [persona(3, "9999998", "9999997", "TERZO, TEO", "5"),
+  persona(2, "1234567", "9999998", "SECONDO, SARA", "6"), persona(1, "1", "1234567", "ROSSI, MARIO", "321,00")])) });
+await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
+{
+  const io = page.locator(".sheet .imp-sezione", { hasText:"Si aggiornano i numeri" }).locator("li", { hasText:"(tu)" });
+  check(await io.getByText("321 VP").isVisible() && await io.getByText("il tuo codice 1234567 viene salvato").isVisible()
+    && await page.locator(".sheet .imp-sezione", { hasText:"Nuovi nel report · 2" }).isVisible(),
+    "livello di profondità: chi importa è la riga di livello 1, ovunque sia nel file; il livello non è una qualifica");
+}
 await page.click(".sheet button[data-act=chiudi]");
 const meseVecchio = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - 3); return d.toISOString().slice(0, 7).replace("-", ""); })();
 await scegliFile(page, "vecchio.csv", creaCsv(meseVecchio, righeCsv));

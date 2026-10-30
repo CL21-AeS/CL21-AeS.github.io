@@ -2661,6 +2661,10 @@ function numReport(v){
 function maiuscole(n){ return n.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (x, a, b) => a + b.toUpperCase()); }
 function nomeReport(n){ const [cognome, nome] = pulito(n).split(/,\s*/); return maiuscole(nome ? `${nome} ${cognome}` : cognome); }
 
+/* Le colonne si cercano per nome, mai per posizione.
+   Attenzione: la colonna «Qualifica Amway Partner» NON contiene la qualifica ma il livello di profondità nella mappa
+   (1 = chi ha scaricato il file, 2 = i suoi frontali, 3 = i loro, …). Serve solo a trovare la riga di chi importa e
+   non si salva. La qualifica l'app la ricava dalla «Percentuale di bonus» e dai VP. */
 function leggiReport(testo){
   const tutte = righeCsv(testo);
   const iMese = tutte.findIndex(r => /mese di competenza/i.test(pulito(r[0])));
@@ -2702,6 +2706,7 @@ function analizzaReport(rep){
   const passato = m < meseDi(oggi()) && !(m === mesePrecedente() && precedenteAperto());
   if(m > meseDi(oggi())) return { errore:`Il report è di ${nomeMese(m)}, un mese che non è ancora iniziato.` };
   if(passato && m < spostaMese(meseDi(oggi()), -24)) return { errore:`Il report è di ${nomeMese(m)}: troppo vecchio, servono solo gli ultimi 12 mesi.` };
+  /* chi importa è la riga di livello 1 (profondità), ovunque sia nel file */
   const prima = rep.righe.find(r => r.livello === 1) || rep.righe[0];
   if(io.codice_amway && io.codice_amway !== prima.codice)
     return { errore:`Questo report è di ${prima.nome} (${prima.codice}), ma il tuo codice nell'app è ${io.codice_amway}. `
