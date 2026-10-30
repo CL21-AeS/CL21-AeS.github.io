@@ -97,6 +97,8 @@
       i.codice = hex(); i.annullato_il = null; i.scade_il = new Date(Date.now() + 7 * 864e5).toISOString(); salva();
       return { id:i.id, codice:i.codice, scade_il:i.scade_il }; },
     collega: async () => pub(mio()),
+    ingressi: async () => { const io = mio(); if(!io) return [];
+      return db.partners.filter(p => vedo(io, p)).map(p => ({ id:p.id, data_iscrizione:p.data_iscrizione || null })); },
     accessiStruttura: async () => { const io = mio(); if(!io) return [];
       return db.partners.filter(p => p.stato !== "gestito" && vedo(io, p)).map(p => ({ id:p.id, confermato_il:p.confermato_il || null, bloccato_il:p.bloccato_il || null, is_admin:!!p.is_admin })); },
     statoAccesso: async () => { if(!session) return null;

@@ -3036,6 +3036,52 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
 }
 
+// 53. I filtri del Gruppo: tutta la mappa, poi si sceglie chi vedere
+{
+  const mese = oggiStr.slice(0, 7), oggiD = oggiStr;
+  DB.partners.push({ id:"fg53", nome:"Filtra Gruppo", sponsor_id:"R", stato:"attivo", chiave:"f5".repeat(16), codice_invito:"FG53FG", codice_amway:"7700001",
+    confermato_il:new Date().toISOString(), privacy_accettata_il:"2026-10-01T00:00:00Z", partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() });
+  const g = (id, nome, sp, stato, vpp, perc, ingresso) => {
+    DB.partners.push({ id, nome, sponsor_id:sp, stato, gestore_id:stato === "gestito" ? "fg53" : null, codice_amway:"77" + id.slice(-5), codice_invito:id.toUpperCase(),
+      confermato_il:stato === "gestito" ? null : new Date().toISOString(), creato_il:new Date().toISOString(), data_iscrizione:ingresso || "2020-01-01" });
+    DB.numeri.push({ visto_da:"fg53", partner_id:id, mese, vpp, vpg:vpp, percentuale:perc, linee:[], dati_al:new Date().toISOString() }); };
+  g("fga00001", "Alba Alta", "fg53", "gestito", 250, 6, oggiD);
+  g("fga00002", "Bruno Basso", "fga00001", "gestito", 50, 0);
+  g("fga00003", "Carla Zero", "fg53", "gestito", 0, 0);
+  g("fga00004", "Dario App", "fg53", "attivo", 0, 3);
+  ({ ctx, page } = await apri({}, "#chiave=" + "f5".repeat(16)));
+  await page.getByText("Ciao Filtra").waitFor(); await apriTappa(page);
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-gruppo]");
+  await page.locator(".filtri-gruppo").waitFor();
+  const testi = (await page.locator(".filtri-gruppo button").allInnerTexts()).map(t => t.trim());
+  check(JSON.stringify(testi) === JSON.stringify(["Tutti", "Con VP · 2", "Senza VP · 2", "Oltre 200 VP · 1", "Nuovi · 1", "Usano l'app · 1", "Senza app · 3", "Percentuale · 2"]),
+    "Gruppo: i filtri con i conteggi (" + testi.join(" | ") + ")");
+  const nomi = async () => (await page.locator(".elenco-filtro li .nome > span:first-child").allInnerTexts()).map(t => t.trim());
+  const filtra = async id => { await page.click(`.filtri-gruppo button[data-filtro=${id}]`); await page.waitForTimeout(150); };
+  await filtra("con-vp"); check(JSON.stringify(await nomi()) === JSON.stringify(["Alba Alta", "Bruno Basso"]), "Con VP: chi ha fatturato questo mese");
+  check(await page.locator(".elenco-filtro li", { hasText:"Bruno Basso" }).getByText("sotto Alba Alta").isVisible(), "l'elenco dice sotto chi sta ognuno");
+  await filtra("senza-vp"); check(JSON.stringify(await nomi()) === JSON.stringify(["Carla Zero", "Dario App"]), "Senza VP: chi è a 0");
+  await filtra("oltre-200"); check(JSON.stringify(await nomi()) === JSON.stringify(["Alba Alta"]), "Oltre 200 VP");
+  await filtra("nuovi"); check(JSON.stringify(await nomi()) === JSON.stringify(["Alba Alta"]) && await page.locator(".elenco-filtro li").getByText(/entrato il/).isVisible(),
+    "Nuovi: chi è entrato in Amway questo mese, con la data di ingresso");
+  await filtra("app"); check(JSON.stringify(await nomi()) === JSON.stringify(["Dario App"]), "Usano l'app");
+  await filtra("senza-app"); check((await nomi()).length === 3 && !(await nomi()).includes("Dario App"), "Senza app");
+  await filtra("percentuale"); check(JSON.stringify(await nomi()) === JSON.stringify(["Alba Alta", "Dario App"])
+    && await page.locator(".elenco-filtro li", { hasText:"Alba Alta" }).getByText("6%").isVisible(), "Percentuale: dalla più alta, con la percentuale");
+  check(await page.evaluate(() => { const f = document.querySelector(".filtri-gruppo"), b = f.querySelector(".btn.on");
+    const rf = f.getBoundingClientRect(), rb = b.getBoundingClientRect(); return rb.left >= rf.left - 1 && rb.right <= rf.right + 1; }),
+    "il filtro acceso resta in vista nella riga dei filtri");
+  await page.fill("#cerca-struttura", "dario");
+  await page.waitForTimeout(150);
+  check(await page.locator(".elenco-filtro li:visible").count() === 1, "la ricerca lavora dentro il filtro");
+  await page.fill("#cerca-struttura", "");
+  await page.locator(".card", { hasText:"La mia struttura" }).screenshot({ path: S + "/e2e/53-filtri-gruppo.png" });
+  await filtra("tutti");
+  check(await page.locator(".albero.struttura:not(.elenco-filtro) li", { hasText:"Bruno Basso" }).count() === 1, "Tutti: torna l'albero");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
