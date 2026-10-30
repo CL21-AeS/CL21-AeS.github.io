@@ -38,7 +38,8 @@ await page.click("button[data-act=torna-invito]");
 await page.getByText("Due informazioni e iniziamo").waitFor(); check(true, "si torna all'invito");
 await page.click("form button.primary");
 check(await page.getByText("serve la data di iscrizione").isVisible(), "data obbligatoria per chi inizia");
-await page.fill("input[name=data]", "2026-10-01");
+/* una data di iscrizione di 5 giorni fa: il conto alla rovescia dei 30 giorni è sempre aperto, qualunque giorno giri il test */
+await page.fill("input[name=data]", new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10));
 await page.check("input[name=privacy]");
 check(await page.locator("form button.primary").innerText() === "Inizia", "pulsante Inizia");
 await page.screenshot({ path: S + "/e2e/1-ingresso.png", fullPage:true });
@@ -2820,14 +2821,12 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await page.locator(".sheet .errore").innerText()).includes("manca la colonna «Codice Amway Partner Sponsor»"), "senza la colonna dello sponsor: rifiutato, con il nome della colonna");
   await page.click(".sheet button[data-act=chiudi]");
 
-  // 45. Solo Paese = Italia: le righe di altri Paesi non si salvano; i codici esteri già nell'app si cancellano con i loro dati
+  // 45/47. Solo Paese = Italia: le righe di altri Paesi si scartano e basta, con qualsiasi import; al database non arriva niente di loro
   const estero = (liv, sp, cod, nome, paese) => Object.assign(p51(liv, sp, cod, nome, "50,00", "50,00", 0, 1), { "Paese":"'" + paese });
   const csvCon = (testa, righe) => "\ufeff" + [csvRiga(["Amway","CONFIDENZIALE - REPORT DI PROVA"]), csvRiga(["Mese di competenza", meseFile]), csvRiga(testa)]
     .concat(righe.map(p => csvRiga(testa.map(t => p[t])))).join("\n");
   DB.partners.push({ id:"est51", nome:"Estero Gia Importato", sponsor_id:"mappa51", stato:"gestito", gestore_id:"mappa51", codice_amway:"7600009",
     codice_invito:"EST51A", creato_il:new Date().toISOString() });
-  DB.numeri.push({ visto_da:"mappa51", partner_id:"est51", mese:oggiStr.slice(0, 7), vpp:50, vpg:50, percentuale:0, linee:[] });
-  DB.activities.push({ id:"att-est51", partner_id:"est51", tipo:"contatto", quantita:1, vp:0, data:oggiStr, inserito_da:"mappa51", inserito_il:new Date().toISOString() });
   await page.close(); await ctx.close();
   ({ ctx, page } = await apri({}, "#chiave=" + "d1".repeat(16)));
   await page.getByText("Ciao Mappa").waitFor(); await apriTappa(page);
@@ -2835,33 +2834,16 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const conEsteri = persone51.concat([estero(2, "7600001", "7600009", "ESTERO, GIA", "Spagna"), estero(3, "7600009", "7600010", "LONTANO, LEO", "Regno Unito")]);
   await scegliFile(page, "con-esteri.csv", csvCon(testa26, conEsteri));
   await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
-  // chi non è admin non cancella: il codice estero resta nascosto e segnato (i codici arrivano dal telefono)
-  check(await page.locator(".sheet .imp-esteri", { hasText:"si nascondono 1" }).isVisible(), "045: chi non è admin: i codici esteri si nascondono");
-  await page.click(".sheet button:has-text('Importa')");
-  await page.getByText(/1 codice di altri Paesi nascosto/).waitFor();
-  await sync(page);
-  check(DB.partners.some(p => p.id === "est51" && p.fuori_report_dal) && DB.nascosti.some(n => n.partner_id === "mappa51" && n.nascosto_id === "est51"),
-    "045: chi non è admin non cancella nessuno: il codice estero resta, nascosto e segnato");
-  await ctx.close();
-  DB.partners.find(p => p.id === "mappa51").is_admin = true;
-  DB.partners.find(p => p.id === "est51").fuori_report_dal = null;
-  ({ ctx, page } = await apri({}, "#chiave=" + "d1".repeat(16)));
-  await page.getByText("Ciao Mappa").waitFor(); await apriTappa(page);
-  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
-  await scegliFile(page, "con-esteri.csv", csvCon(testa26, conEsteri));
-  await page.locator(".sheet h2", { hasText:"Report di" }).waitFor();
   check(await page.getByText("4 persone nel file (più 2 di altri Paesi, che non si salvano)").isVisible()
-    && await page.locator(".sheet .imp-esteri", { hasText:"si cancellano 1" }).getByText("Estero Gia Importato (7600009)").isVisible()
-    && !(await page.locator(".sheet .imp-nuovi").getByText("Leo").count()) && !(await page.locator(".sheet").getByText("Non più nel report").count()),
-    "045: anteprima: le righe estere non entrano, il codice estero già nell'app è tra quelli che si cancellano (non «non più nel report»)");
+    && !(await page.locator(".sheet .imp-esteri").count()) && !(await page.locator(".sheet .imp-nuovi").getByText("Leo").count()),
+    "047: anteprima: le righe estere non entrano e non c'è più la sezione «Di altri Paesi»");
   await page.click(".sheet button:has-text('Importa')");
-  await page.getByText(/1 codice di altri Paesi cancellato/).waitFor();
+  await page.locator(".toast", { hasText:"Import di" }).waitFor();
   await sync(page);
   const inviato45 = DB.ultimoImport;
-  check(!inviato45.p_persone.some(r => ["7600009", "7600010"].includes(r.codice)) && inviato45.p_esteri.slice().sort().join() === "7600009,7600010"
-    && !/ESTERO|Estero|LONTANO|Lontano|Leo/.test(JSON.stringify(inviato45)), "045: delle righe estere al database arriva solo il codice, per cancellarlo");
-  check(!DB.partners.some(p => p.id === "est51") && !DB.numeri.some(n => n.partner_id === "est51") && !DB.activities.some(a => a.partner_id === "est51"),
-    "045: il codice estero già importato è cancellato con numeri e attività");
+  check(!inviato45.p_persone.some(r => ["7600009", "7600010"].includes(r.codice)) && !("p_esteri" in inviato45)
+    && !/7600010|ESTERO|Estero|LONTANO|Lontano|Leo/.test(JSON.stringify(inviato45)), "047: delle righe estere al database non arriva niente, nemmeno il codice");
+  check(DB.partners.some(p => p.id === "est51" && p.fuori_report_dal), "047: un codice già nell'app che non è più nella mappa italiana esce come tutti («non più nel report»)");
   // un italiano sotto un codice estero presente nel file: l'import si ferma
   await scegliFile(page, "sotto-estero.csv", csvCon(testa17, persone51.concat([estero(2, "7600001", "7600011", "FUORI, FIO", "Svizzera"),
     p51(3, "7600011", "7600012", "ITALO, IVO", "10,00", "10,00", 0, 1)])));
@@ -2920,6 +2902,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const unAnnoFa = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() - 12); return d.toISOString().slice(0, 10); })();
   await ctx.close();
   DB.partners.find(p => p.codice_amway === "7600003").fuori_report_dal = unAnnoFa;
+  DB.partners.find(p => p.id === "mappa51").is_admin = true;   // 046: la cancellazione dopo 12 mesi la fa l'import di un admin
   ({ ctx, page } = await apri({}, "#chiave=" + "d1".repeat(16)));
   await page.getByText("Ciao Mappa").waitFor(); await apriTappa(page);
   if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
