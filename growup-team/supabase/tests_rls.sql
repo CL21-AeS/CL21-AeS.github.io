@@ -1635,7 +1635,14 @@ begin
     execute 'reset role';
     perform growup_test.ok((select sponsor_id from public.partners where id = xx) = ww, '052: X resta sotto il suo sponsor vero');
     -- il Platino comincia a usare l'app: tutto torna normale (niente più inviti «nel gruppo del Platino»)
+    perform growup_test.come(u1);
+    k := public.crea_invito_platino('Tardi Test', '8900004', pl)->>'codice';   -- creato prima che il Platino usi l'app
+    execute 'reset role';
     update public.partners set stato = 'attivo', confermato_il = now() where id = pl;
+    insert into auth.users (id, aud, role) values ('00000000-0000-0000-0000-0000000000f3', 'authenticated', 'authenticated');
+    perform growup_test.come('00000000-0000-0000-0000-0000000000f3');
+    perform growup_test.deve_fallire(format('select public.entra_con_invito(%L)', k),
+                                     '052: un invito «sotto il Platino» non vale più se nel frattempo il Platino usa l''app');
     perform growup_test.come(u1);
     perform growup_test.deve_fallire(format('select public.crea_invito_platino(%L, %L, %L)', 'Dopo', '8900007', pl),
                                      '052: un Platino che usa l''app non è più «nascosto»');

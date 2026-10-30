@@ -221,7 +221,12 @@ begin
   else
     -- non ancora nella mappa: resta in attesa sotto chi l'ha invitato
     -- 052: invitato dall'admin nel gruppo di un Platino nascosto: entra sotto il Platino (o tra chi usa l'app e il suo
-    -- sponsor) e può importare la sua mappa anche se è in attesa
+    -- sponsor) e può importare la sua mappa anche se è in attesa. Si ricontrolla adesso: se nel frattempo il Platino usa
+    -- l'app (o il posto non è più nel suo gruppo), l'invito non vale più
+    if i.area_platino is not null and (not public.platino_nascosto(i.area_platino)
+         or (i.sotto_id is distinct from i.area_platino and not public.sotto_di(i.area_platino, i.sotto_id))) then
+      raise exception 'invito_non_valido';
+    end if;
     insert into public.partners (nome, sponsor_id, stato, chiave_hash, codice_amway, data_iscrizione,
                                  qualifica_iniziale, percentuale_iniziale, qualifica_iniziale_mese, pagamenti_iniziali,
                                  privacy_accettata_il, ultimo_aggiornamento, area_platino)
@@ -230,7 +235,7 @@ begin
             now(), now(), i.area_platino)
     returning * into p;
     update public.partners set creato_da = p.id where id = p.id returning * into p;
-    if i.sopra_di is not null then
+    if i.sopra_di is not null and public.area_platino_di(i.sopra_di) is not distinct from i.area_platino then
       update public.partners set sponsor_id = p.id where id = i.sopra_di and sponsor_id is not distinct from i.sotto_id;
     end if;
     perform public.avvisa(i.creato_da, 'entrato-' || p.id,
@@ -279,6 +284,10 @@ begin
   -- chi non è ancora nella mappa non può cambiare la struttura degli altri
   -- 052: chi è entrato sotto un Platino che non usa l'app importa la sua mappa anche se è ancora in attesa
   -- (nessuna mappa della upline lo mostrerà mai)
+  -- (vale solo finché il Platino è ancora senza app e io sono nel suo gruppo)
+  if me.area_platino is not null and not (public.platino_nascosto(me.area_platino) and public.sotto_di(me.area_platino, io)) then
+    me.area_platino := null;
+  end if;
   if me.confermato_il is null and not me.is_admin and me.area_platino is null then
     raise exception 'in_attesa';
   end if;
