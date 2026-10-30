@@ -623,16 +623,15 @@ await page.click("button[data-act=vista-gruppo]");
 await page.locator(".albero.struttura li", { hasText:"Cri Crescita" }).locator("button[data-act=apri-scheda]").click();
 await page.getByText("Questo mese e il mese prima").waitFor();
 const riga = async nome => (await page.locator(".confronto tr", { hasText:nome }).locator("td").allInnerTexts()).map(t => t.trim());
-const fineMese = Number(oggiStr.slice(8, 10)) >= Number(ultimoPrec.slice(8, 10));
 const rc = await riga("Contatti");
-check(rc[1] === "▼ 2" && rc[2] === (fineMese ? "8" : "5") && rc[3] === "8", "contatti: 2 ora, 5 allo stesso giorno, 8 totale (" + rc.join("|") + ")");
+check(rc.length === 3 && rc[1] === "2" && rc[2] === "8", "contatti: 2 questo mese, 8 il mese prima (solo due colonne) (" + rc.join("|") + ")");
 const rp = await riga("Piani");
-check(rp[1] === "1" && rp[3] === "0", "piani sopra il mese prima: nessun ▼");
+check(rp[1] === "1" && rp[2] === "0", "piani: questo mese e il mese prima");
 const rv = await riga("VP personali");
-check(rv[1] === "0" && rv[2] === "–" && rv[3] === "80", "034: VP personali di chi ha l'app dal report: questo mese e il mese prima (" + rv.join("|") + ")");
+check(rv[1] === "0" && rv[2] === "80", "034: VP personali di chi ha l'app dal report: questo mese e il mese prima (" + rv.join("|") + ")");
 check(!(await riga("Ordini")).length, "034: gli ordini a mano di chi ha l'app non si vedono");
-check((await riga("VP di gruppo"))[2] === "–", "VP di gruppo: solo il totale del mese prima");
-check(await page.locator(".confronto td.sotto").count() >= 1, "valori sotto evidenziati");
+check(await page.locator(".confronto thead th").count() === 3 && !(await page.locator(".confronto td.sotto").count()),
+  "niente più colonna «al giorno» del mese prima e niente ▼: solo questo mese e il totale del mese prima");
 await page.screenshot({ path: S + "/e2e/15-confronto.png", fullPage:true });
 
 // 11. Fissa una chiamata: calendario e WhatsApp neutro
@@ -955,7 +954,7 @@ await page.getByText("Scheda partner").waitFor();
 {
   /* chi non usa l'app ma è nella mappa del mese: i VP personali del mese in corso sono quelli della mappa, non zero */
   const rigaVp = page.locator("table.confronto tr", { hasText:"VP personali" });
-  check((await rigaVp.locator("td").nth(1).innerText()).includes("1.055,5") && (await rigaVp.locator("td").nth(2).innerText()).trim() === "–",
+  check((await rigaVp.locator("td").nth(1).innerText()).includes("1.055,5"),
     "confronto: chi non usa l'app ha i VP personali del mese dalla mappa (non 0)");
 }
 const testoScheda = await page.locator("#app").innerText();

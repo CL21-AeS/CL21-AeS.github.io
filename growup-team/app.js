@@ -2421,12 +2421,9 @@ function erroreChiamata(c){
   return "";
 }
 
-/* Questo mese fino a oggi, il mese prima fino allo stesso giorno e il mese prima intero.
-   Solo i dati: in rosso con ▼ dove è sotto il mese prima allo stesso giorno. */
+/* Questo mese fino a oggi e il mese prima intero, uno accanto all'altro. Solo i dati, nessun confronto «allo stesso giorno». */
 function confrontoMese(pid){
   const m = meseDi(oggi()), mp = mesePrecedente();
-  const giorniPrec = Number(piuGiorni(m + "-01", -1).slice(8, 10));
-  const stessoGiorno = mp + "-" + String(Math.min(Number(oggi().slice(8, 10)), giorniPrec)).padStart(2, "0");
   const att = st.gruppo4.att.filter(a => a.partner_id === pid);
   const conta = (dal, al) => {
     const l = att.filter(a => a.data >= dal && a.data <= al);
@@ -2434,36 +2431,31 @@ function confrontoMese(pid){
     return { contatti:q("contatto"), piani:q("piano"), ordini:q("ordine"), clienti:q("cliente"),
              vp:somma(l.filter(a => a.tipo === "ordine" || a.tipo === "rettifica"), "vp") };
   };
-  const ora = conta(m + "-01", oggi()), allora = conta(mp + "-01", stessoGiorno), prima = conta(mp + "-01", mp + "-31");
+  const ora = conta(m + "-01", oggi()), prima = conta(mp + "-01", mp + "-31");
   const r = rigaDi(st.riep, pid) || {}, rp = rigaDi(st.riepPrec, pid) || {};
-  return { m, mp, stessoGiorno, righe: [
-    { nome:"Contatti", ora:ora.contatti, allora:allora.contatti, prima:prima.contatti },
-    { nome:"Piani", ora:ora.piani, allora:allora.piani, prima:prima.piani },
-    soloReport(pid) ? null : { nome:"Ordini", ora:ora.ordini, allora:allora.ordini, prima:prima.ordini },
-    { nome:"Nuovi clienti", ora:ora.clienti, allora:allora.clienti, prima:prima.clienti },
-    /* con la mappa del mese (anche per chi non usa l'app) i VP personali sono quelli della mappa; la mappa dà solo il totale
-       del mese, quindi «al giorno» del mese prima non c'è */
+  return { m, mp, righe: [
+    { nome:"Contatti", ora:ora.contatti, prima:prima.contatti },
+    { nome:"Piani", ora:ora.piani, prima:prima.piani },
+    soloReport(pid) ? null : { nome:"Ordini", ora:ora.ordini, prima:prima.ordini },
+    { nome:"Nuovi clienti", ora:ora.clienti, prima:prima.clienti },
+    /* con la mappa del mese (anche per chi non usa l'app) i VP personali sono quelli della mappa */
     soloReport(pid) || r.da_report
-      ? { nome:"VP personali", ora:Number(r.vp_personali) || 0, allora:null, prima:Number(rp.vp_personali) || 0 }
-      : { nome:"VP personali", ora:ora.vp, allora:allora.vp, prima: rp.vp_personali != null ? Number(rp.vp_personali) : prima.vp },
-    { nome:"VP di gruppo", ora:Number(r.vp_gruppo) || 0, allora:null, prima:Number(rp.vp_gruppo) || 0 },
-    { nome:"Linee attive", ora:Number(r.linee_attive) || 0, allora:null, prima:Number(rp.linee_attive) || 0 }
+      ? { nome:"VP personali", ora:Number(r.vp_personali) || 0, prima:Number(rp.vp_personali) || 0 }
+      : { nome:"VP personali", ora:ora.vp, prima: rp.vp_personali != null ? Number(rp.vp_personali) : prima.vp },
+    { nome:"VP di gruppo", ora:Number(r.vp_gruppo) || 0, prima:Number(rp.vp_gruppo) || 0 },
+    { nome:"Linee attive", ora:Number(r.linee_attive) || 0, prima:Number(rp.linee_attive) || 0 }
   ].filter(Boolean)};
 }
 function vConfronto(p){
   const c = confrontoMese(p.id);
   const breve = m => MESI[Number(m.slice(5, 7)) - 1].slice(0, 3);
-  const cella = (v, rif) => rif != null && v < rif ? `<td class="num sotto">▼ ${num(v)}</td>` : `<td class="num">${num(v)}</td>`;
   return `<div class="card">
     <span class="con-aiuto"><span class="eyebrow">Questo mese e il mese prima</span>${aiutoBtn("confronto")}</span>
-    ${aiutoTesto("confronto", `Questo mese fino a oggi, confrontato con lo stesso giorno del mese prima. ▼ in rosso: è sotto il mese prima.
-      La colonna centrale è il mese prima fino allo stesso giorno di oggi (per esempio «set al 30»: settembre dal 1° al 30).
-      L'ultima colonna è il totale di tutto il mese prima.${soloReport(p.id) || (rigaDi(st.riep, p.id) || {}).da_report
-        ? " I VP sono quelli della mappa Amway, che dà solo il totale del mese: per questo «al giorno» del mese prima c'è un trattino." : ""}`)}
+    ${aiutoTesto("confronto", `Questo mese fino a oggi e, accanto, il totale di tutto il mese prima.${soloReport(p.id) || (rigaDi(st.riep, p.id) || {}).da_report
+      ? " I VP sono quelli della mappa Amway." : ""}`)}
     <table class="confronto">
-      <thead><tr><th></th><th>${breve(c.m)}<br><span>fino a oggi</span></th><th>${breve(c.mp)}<br><span>al ${Number(c.stessoGiorno.slice(8))}</span></th><th>${breve(c.mp)}<br><span>totale</span></th></tr></thead>
-      <tbody>${c.righe.map(x => `<tr><td>${x.nome}</td>${cella(x.ora, x.allora)}
-        <td class="num faint">${x.allora == null ? "–" : num(x.allora)}</td><td class="num faint">${num(x.prima)}</td></tr>`).join("")}</tbody>
+      <thead><tr><th></th><th>${breve(c.m)}<br><span>fino a oggi</span></th><th>${breve(c.mp)}<br><span>totale</span></th></tr></thead>
+      <tbody>${c.righe.map(x => `<tr><td>${x.nome}</td><td class="num">${num(x.ora)}</td><td class="num faint">${num(x.prima)}</td></tr>`).join("")}</tbody>
     </table>
   </div>`;
 }
