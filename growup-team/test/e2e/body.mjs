@@ -1174,7 +1174,10 @@ check(await page.locator(".sheet h2", { hasText:"Modifica i dati" }).isVisible()
 await page.click(".sheet button[data-act=chiudi]");
 check(await page.locator(".card", { hasText:"I passi" }).getByText("preferisce essere chiamata la sera").isVisible(), "la nota compare anche tra i passi della scheda");
 await page.click("button[data-act=torna-lista]");
-check(!await page.locator("button[data-act=apri-persona]", { hasText:"Nina Nonora" }).count(), "Non ora: non è tra gli Aperti");
+check(await page.locator("button[data-filtro=tutti].on").isVisible() && !await page.locator("button[data-filtro=aperti]").count()
+  && await page.locator("button[data-act=apri-persona]", { hasText:"Nina Nonora" }).isVisible(), "Lista: si apre su «Tutti» (niente più «Aperti»), con dentro anche chi è da riprendere");
+await page.click("button[data-filtro=corso]");
+check(!await page.locator("button[data-act=apri-persona]", { hasText:"Nina Nonora" }).count(), "Non ora: non è tra In corso");
 /* grafica 5: i filtri stanno su una riga sola che scorre; i pulsanti in alto su una riga */
 { const f = await page.locator(".filtri button[data-act=filtro-lista]").evaluateAll(l => l.map(b => [b.offsetTop, b.offsetHeight]));
   check(f.length === 5 && f.every(x => x[0] === f[0][0]) && f.every(x => x[1] <= 40), "Lista: i filtri su una riga sola, nessuno va a capo");
@@ -1182,7 +1185,7 @@ check(!await page.locator("button[data-act=apri-persona]", { hasText:"Nina Nonor
   check(t.length === 2 && t.every(h => h <= 40), "Lista: «Importa» e «+ Nome» senza andare a capo"); }
 await page.click("button[data-filtro=riprendere]");
 check(await page.locator("button[data-act=apri-persona]", { hasText:"Nina Nonora" }).isVisible(), "Non ora: è in Da riprendere");
-await page.click("button[data-filtro=aperti]");
+await page.click("button[data-filtro=tutti]");
 await chiudi("Nico No", "No");
 check(!await page.locator(".sheet [data-per-esito=partner]").isVisible() && !await page.locator(".sheet [data-per-esito=non_ora]").isVisible()
   && await page.locator(".sheet input[name=nota]").isVisible(), "No: resta solo la nota");
@@ -1198,7 +1201,7 @@ await page.click("button[data-sez=lista]");
 await page.click("button[data-filtro=chiusi]");
 check(!await page.locator("button[data-act=apri-persona]", { hasText:"Carla Compra" }).count() && await page.locator("button[data-act=apri-persona]", { hasText:"Nico No" }).isVisible(),
   "il cliente esce dalla lista (i chiusi con No restano)");
-await page.click("button[data-filtro=aperti]");
+await page.click("button[data-filtro=tutti]");
 await page.click("button[data-act=persone-tante]");
 await page.fill(".sheet textarea[name=righe]", "Marta Neri, 333 999, palestra\nLuigi Verdi");
 await page.click(".sheet button:has-text('Aggiungi')");
@@ -3116,7 +3119,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.click(".sheet [data-act=chiudi]");
   check(await page.locator(".cerchie-lista button.on", { hasText:"Tutti i nomi · 3" }).isVisible()
     && !await page.locator(".cerchie-lista button.on", { hasText:"Palestra" }).count() && !await page.locator(".cerchia-barra").count()
-    && (await page.locator(".persone button[data-act=apri-persona]").count()) === 2, "dopo la cerchia nuova si vede la lista completa");
+    && (await page.locator(".persone button[data-act=apri-persona]").count()) === 3, "dopo la cerchia nuova si vede la lista completa");
   // una cerchia vuota scelta lo dice, con il modo di tornare a tutta la lista
   await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Palestra')");
   check(await page.getByText("La cerchia «Palestra» è ancora vuota.").isVisible(), "cerchia vuota: lo dice invece dei soli zeri");
@@ -3142,13 +3145,16 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.locator(".sheet .scelte-cerchia label", { hasText:"Ciro Chiuso" }).click();
   await page.click(".sheet button:has-text('Aggiungi')");
   await page.getByText("2 nomi aggiunti alla cerchia").waitFor();
-  // filtro combinato: Aperti + Palestra = solo Anna; Chiusi + Palestra = solo Ciro
+  // filtro combinato: Tutti + Palestra = Anna e Ciro; In lista + Palestra = solo Anna; Chiusi + Palestra = solo Ciro
   const nomiLista = async () => (await page.locator(".persone button[data-act=apri-persona]").allInnerTexts()).map(t => t.split("\n")[0].trim());
+  check(JSON.stringify(await nomiLista()) === JSON.stringify(["Anna Palestra", "Ciro Chiuso"]) && await page.getByText("Tutti · 2").isVisible(),
+    "cerchia + Tutti: tutta la cerchia");
+  await page.click("button[data-filtro=lista]");
   check(JSON.stringify(await nomiLista()) === JSON.stringify(["Anna Palestra"]) && await page.getByText("Chiusi · 1").isVisible(),
-    "cerchia + Aperti: solo chi è in tutte e due; i conteggi degli stati contano nella cerchia");
+    "cerchia + In lista: solo chi è in tutte e due; i conteggi degli stati contano nella cerchia");
   await page.click("button[data-filtro=chiusi]");
   check(JSON.stringify(await nomiLista()) === JSON.stringify(["Ciro Chiuso"]), "cerchia + Chiusi");
-  await page.click("button[data-filtro=aperti]");
+  await page.click("button[data-filtro=lista]");
   await page.locator(".card", { hasText:"La mia lista" }).screenshot({ path: S + "/e2e/55-cerchie.png" });
   // un nome nuovo da dentro la cerchia: la cerchia è già spuntata; si può mettere anche in un'altra
   await page.click("button[data-act=persona-nuova]");
@@ -3177,6 +3183,9 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Palestra')");
   await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Tutti i nomi')");
   check((await nomiLista()).length === 3, "«Tutti i nomi» torna a tutta la lista");
+  await page.click("button[data-filtro=tutti]");
+  check((await nomiLista()).length === 4 && await page.getByText("Tutti · 4").isVisible(), "Lista: il filtro «Tutti» mostra anche i chiusi");
+  await page.click("button[data-filtro=lista]");
   // Importa: più nomi insieme dentro una cerchia
   await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Colleghi')");
   await page.click("button[data-act=persone-tante]");

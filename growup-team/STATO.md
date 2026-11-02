@@ -106,6 +106,8 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
   vedevano solo zeri e non si trovava la lista). Dopo la creazione si apre «Aggiungi nomi» e poi si torna alla lista
   completa; la cerchia filtra solo quando la si tocca. Primo pulsante della riga: «Tutti i nomi» («Tutti i clienti»).
   Una cerchia scelta vuota lo dice, con «Aggiungi nomi» e «Mostra tutta la lista». App v80.
+- **Lista: «Tutti» al posto di «Aperti»** (2 novembre, Stefano: «Aperti» = In lista + In corso, non serviva). La Lista si
+  apre su «Tutti» (anche Da riprendere e Chiusi); filtri: Tutti, In lista, In corso, Da riprendere, Chiusi. App v81.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 

@@ -219,7 +219,7 @@ const st = {
   cerchiaLista: null,     // la cerchia scelta nei filtri della Lista
   cerchiaClienti: null,   // la cerchia scelta nei filtri dei Clienti (054: cerchie separate)
   cerchiaAggiungi: null,  // la cerchia del foglio «Aggiungi nomi» (anche appena creata, senza sceglierla nei filtri)
-  personaId: null, filtroLista: "aperti", cercaLista: "", passoTipo: null,
+  personaId: null, filtroLista: "tutti",  cercaLista: "", passoTipo: null,
   numeriLista: {},
   schedaPila: [],          // le schede aperte scendendo lungo le linee, per "Indietro"
   consigliAperti: new Set(),
@@ -3849,7 +3849,7 @@ const PROSSIMA_CHIUSURA = { partner:"Primo passo insieme", cliente:"Quando risen
 const RISENTI = [["1", "1 mese"], ["3", "3 mesi"], ["6", "6 mesi"], ["12", "1 anno"]], RISENTI_PRIMA = 2;
 function piuMesi(d, m){ const x = new Date(d + "T00:00:00Z"); x.setUTCMonth(x.getUTCMonth() + m); return x.toISOString().slice(0, 10); }
 const FILTRI_LISTA = [
-  { id:"aperti", nome:"Aperti", ok:p => !p.esito },
+  { id:"tutti", nome:"Tutti", ok:() => true },
   { id:"lista", nome:"In lista", ok:p => !p.esito && p.fase === "lista" },
   { id:"corso", nome:"In corso", ok:p => !p.esito && p.fase !== "lista" },
   { id:"riprendere", nome:"Da riprendere", ok:p => p.esito === "non_ora" },
