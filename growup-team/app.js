@@ -3883,7 +3883,8 @@ function personeSezione(){ return tipoCerchie() === "clienti" ? clientiTutti() :
 /* la riga delle cerchie sotto i filtri e, con una cerchia scelta, i suoi pulsanti */
 function rigaCerchie(base){
   const t = tipoCerchie(), cerchia = cerchiaScelta();
-  const tutti = cerchieTipo(t).length ? `<button class="btn small cerchia${cerchia ? "" : " on"}" data-act="filtro-cerchia" data-id="" aria-pressed="${!cerchia}">${t === "clienti" ? "Tutti i clienti" : "Tutti i nomi"} · ${base.length}</button>` : "";
+  /* nei Clienti il primo pulsante è «Tutti i clienti»; nella Lista no (Stefano): da una cerchia si torna ritoccandola */
+  const tutti = t === "clienti" && cerchieTipo(t).length ? `<button class="btn small cerchia${cerchia ? "" : " on"}" data-act="filtro-cerchia" data-id="" aria-pressed="${!cerchia}">Tutti i clienti · ${base.length}</button>` : "";
   return `<div class="row filtri cerchie-lista" style="gap:6px;margin-top:6px">${tutti}${cerchieTipo(t).map(c => { const on = cerchia && cerchia.id === c.id;
       return `<button class="btn small cerchia${on ? " on" : ""}" data-act="filtro-cerchia" data-id="${esc(c.id)}" aria-pressed="${!!on}">${esc(c.nome)} · ${base.filter(p => inCerchia(p.id, c.id)).length}</button>`; }).join("")}
       <button class="btn small ghost" data-act="cerchia-nuova">+ Cerchia</button></div>
