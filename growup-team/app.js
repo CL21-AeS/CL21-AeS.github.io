@@ -2315,7 +2315,7 @@ function percorsoHtml(p){
   const frontale = esc(catena[0]), sponsor = esc(catena[catena.length - 1]), mezzo = catena.slice(1, -1).map(esc);
   if(catena.length === 1) return `<span class="small percorso">Linea di ${frontale} (sponsor)</span>`;
   if(!mezzo.length) return `<span class="small percorso">Linea di ${frontale} › ${sponsor} (sponsor)</span>`;
-  return `<span class="small percorso">Linea di ${frontale} › <button class="puntini" data-act="percorso-intero" aria-label="Mostra tutto il percorso">…</button><span class="intero">${mezzo.join(" › ")}</span> › ${sponsor} (sponsor)</span>`;
+  return `<span class="small percorso">Linea di ${frontale} › <button class="puntini" data-act="percorso-intero" aria-label="Mostra tutto il percorso">…</button><span class="intero">${mezzo.join(" › ")}</span> › ${sponsor} (sponsor)<button class="chiudi-percorso" data-act="percorso-corto" aria-label="Richiudi il percorso">Chiudi ▴</button></span>`;
 }
 
 /* l'elenco di un filtro: una riga per persona, con livello e sponsor; «Percentuale» va dalla più alta */
@@ -4118,6 +4118,7 @@ Object.assign(AZIONI, {
   "filtro-lista"(el){ st.filtroLista = el.dataset.filtro; render(); },
   /* «…» nel percorso: si apre il percorso intero di quella persona (senza ridisegnare) */
   "percorso-intero"(el){ const p = el.closest(".percorso"); if(p) p.classList.add("aperto"); },
+  "percorso-corto"(el){ const p = el.closest(".percorso"); if(p) p.classList.remove("aperto"); },
   "filtro-gruppo"(el){ st.filtroGruppo = el.dataset.filtro; render(); applicaRicerca(); },
   "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = null; st.sheet = "persona-nuova"; render(); },
   /* i pulsanti rapidi di Io: + Contatto apre "un nome", + Piano apre il passo Piano di una persona */

@@ -89,6 +89,8 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
 - **Ricerca nel Gruppo** (scelta C di Stefano): compaiono solo le persone trovate, senza rientro e senza frecce; sotto ognuna
   «Linea di <frontale> › … › <sponsor> (sponsor)» («Tuo frontale» per il livello 2); toccando «…» si apre il percorso
   intero. Il percorso si aggiunge solo durante la ricerca (nessun ridisegno: il campo resta com'è). App v76.
+- **«Chiudi ▴» nel percorso** (2 novembre): il percorso intero aperto con «…» si richiude e torna come prima. Reso il test dei
+  pagamenti indipendente dalla data (usava luglio 2026 fisso). App v77.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 

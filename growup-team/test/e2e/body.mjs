@@ -287,7 +287,9 @@ await sync(page); await ctx.close();
 await page.getByText("Benvenuto in Growup").waitFor();
 await page.selectOption("select[name=qualifica]", "foundation_9");
 check(await page.locator("input[name=mese]").isVisible(), "campi pagamenti visibili");
-await page.fill("input[name=mese]", "2026-07"); await page.fill("input[name=pagamenti]", "3");
+/* tre mesi prima del mese in corso: «restano 15 mesi su 18» vale qualunque giorno giri il test */
+await page.fill("input[name=mese]", (() => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 3); return d.toISOString().slice(0, 7); })());
+await page.fill("input[name=pagamenti]", "3");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
 await page.getByText("Ciao Ciro").waitFor(); await apriTappa(page);
@@ -3077,9 +3079,12 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const percFede = page.locator(".albero.struttura li", { hasText:"Fede Fondo" }).locator(".percorso");
   check((await percFede.innerText()).replace(/\s+/g, " ").trim() === "Linea di Alba Alta › … › Elio Profondo (sponsor)", "ricerca: il percorso corto (linea, …, sponsor)");
   await percFede.locator("button.puntini").click();
-  check((await percFede.innerText()).replace(/\s+/g, " ").trim() === "Linea di Alba Alta › Bruno Basso › Elio Profondo (sponsor)"
+  check((await percFede.innerText()).replace(/\s+/g, " ").trim() === "Linea di Alba Alta › Bruno Basso › Elio Profondo (sponsor)Chiudi ▴"
     && await page.locator("#cerca-struttura").inputValue() === "fede", "ricerca: toccando «…» si apre il percorso intero, la ricerca resta");
   await page.locator(".card", { hasText:"La mia struttura" }).screenshot({ path: S + "/e2e/54-ricerca-percorso.png" });
+  await percFede.locator("button.chiudi-percorso").click();
+  check((await percFede.innerText()).replace(/\s+/g, " ").trim() === "Linea di Alba Alta › … › Elio Profondo (sponsor)"
+    && await page.locator("#cerca-struttura").inputValue() === "fede", "ricerca: «Chiudi» richiude il percorso e torna come prima");
   await page.fill("#cerca-struttura", "");
   await ctx.close();
 }
