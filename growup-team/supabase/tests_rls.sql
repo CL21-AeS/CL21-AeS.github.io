@@ -1687,6 +1687,24 @@ begin
     delete from public.persone where id in (pa, pb); delete from public.cerchie where id = ch2;
   end;
 
+  -- ---- 054: le cerchie dei Clienti, separate da quelle della Lista ----
+  declare
+    cl uuid; li uuid;
+  begin
+    perform growup_test.come(u5);  -- A
+    insert into public.cerchie (nome) values ('Bellezza') returning id into li;
+    insert into public.cerchie (nome, tipo) values ('Bellezza', 'clienti') returning id into cl;
+    perform growup_test.ok((select tipo from public.cerchie where id = li) = 'lista' and (select tipo from public.cerchie where id = cl) = 'clienti',
+                           '054: lo stesso nome in una cerchia della Lista e in una dei Clienti');
+    perform growup_test.deve_fallire($q$insert into public.cerchie (nome, tipo) values (' bellezza', 'clienti')$q$, '054: due cerchie dei Clienti con lo stesso nome no');
+    perform growup_test.deve_fallire($q$insert into public.cerchie (nome, tipo) values ('Altro', 'segreta')$q$, '054: solo i tipi lista e clienti');
+    perform growup_test.deve_fallire(format('update public.cerchie set tipo = %L where id = %L', 'lista', cl), '054: il tipo non si cambia');
+    perform growup_test.come(u4);  -- C
+    perform growup_test.ok(not exists (select 1 from public.cerchie where id = cl), '054: le cerchie dei Clienti di A non le vede nessun altro');
+    execute 'reset role';
+    delete from public.cerchie where id in (cl, li);
+  end;
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),
