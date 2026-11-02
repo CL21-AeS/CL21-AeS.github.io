@@ -102,6 +102,10 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
   `clienti`, fisso; il nome è unico per tipo. «Aggiungi clienti», «+ Cliente» con la cerchia aperta già spuntata, la scheda
   del cliente mostra le sue cerchie dei Clienti. Un cliente che veniva dalla Lista tiene le sue cerchie della Lista (non si
   vedono nei Clienti). Niente cerchie già pronte al primo uso (Stefano: no). App v79.
+- **Cerchie, ritocco** (2 novembre, dopo la prova di Stefano): la cerchia appena creata non si accende più da sola (si
+  vedevano solo zeri e non si trovava la lista). Dopo la creazione si apre «Aggiungi nomi» e poi si torna alla lista
+  completa; la cerchia filtra solo quando la si tocca. Primo pulsante della riga: «Tutti i nomi» («Tutti i clienti»).
+  Una cerchia scelta vuota lo dice, con «Aggiungi nomi» e «Mostra tutta la lista». App v80.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 

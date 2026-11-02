@@ -3107,13 +3107,21 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.click("button[data-act=vista-persone]");
   check(await page.locator(".cerchie-lista button[data-act=cerchia-nuova]").isVisible()
     && !await page.locator(".cerchie-lista button[data-act=filtro-cerchia]").count(), "Lista: la riga delle cerchie con «+ Cerchia» (le cerchie degli altri non si vedono)");
-  // una nuova cerchia: diventa subito il filtro scelto
+  // una nuova cerchia: si apre subito «Aggiungi nomi»; la lista resta completa (la cerchia non si accende da sola)
   await page.click("button[data-act=cerchia-nuova]");
   await page.fill(".sheet input[name=nome]", "Palestra");
   await page.click(".sheet button:has-text('Salva')");
   await page.getByText("Cerchia «Palestra» creata").waitFor();
-  check(await page.locator(".cerchie-lista button.on", { hasText:"Palestra · 0" }).isVisible()
-    && await page.locator(".cerchia-barra").getByText("Palestra").isVisible() && await page.getByText("Nessun nome qui.").isVisible(), "la cerchia nuova è scelta, vuota");
+  check(await page.locator(".sheet h2", { hasText:"Aggiungi a «Palestra»" }).isVisible(), "cerchia creata: si apre subito «Aggiungi nomi»");
+  await page.click(".sheet [data-act=chiudi]");
+  check(await page.locator(".cerchie-lista button.on", { hasText:"Tutti i nomi · 3" }).isVisible()
+    && !await page.locator(".cerchie-lista button.on", { hasText:"Palestra" }).count() && !await page.locator(".cerchia-barra").count()
+    && (await page.locator(".persone button[data-act=apri-persona]").count()) === 2, "dopo la cerchia nuova si vede la lista completa");
+  // una cerchia vuota scelta lo dice, con il modo di tornare a tutta la lista
+  await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Palestra')");
+  check(await page.getByText("La cerchia «Palestra» è ancora vuota.").isVisible(), "cerchia vuota: lo dice invece dei soli zeri");
+  await page.click(".cerchia-vuota button:has-text('Mostra tutta la lista')");
+  check(await page.locator(".cerchie-lista button.on", { hasText:"Tutti i nomi" }).isVisible() && !await page.locator(".cerchia-vuota").count(), "«Mostra tutta la lista» torna a tutti");
   // stesso nome (maiuscole diverse): rifiutato
   await page.click("button[data-act=cerchia-nuova]");
   await page.fill(".sheet input[name=nome]", " palestra ");
@@ -3122,9 +3130,10 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.fill(".sheet input[name=nome]", "Colleghi");
   await page.click(".sheet button:has-text('Salva')");
   await page.getByText("Cerchia «Colleghi» creata").waitFor();
+  await page.click(".sheet [data-act=chiudi]");
   // «Aggiungi nomi» con le spunte, da dentro la cerchia
   await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Palestra')");
-  await page.click("button[data-act=cerchia-aggiungi]");
+  await page.click(".cerchia-barra button[data-act=cerchia-aggiungi]");
   check(await page.locator(".sheet h2", { hasText:"Aggiungi a «Palestra»" }).isVisible()
     && await page.locator(".sheet .scelte-cerchia label").count() === 3 && !await page.locator(".sheet").getByText("Di Altri").count(), "Aggiungi nomi: i nomi della mia lista, con le spunte");
   await page.click(".sheet button:has-text('Aggiungi')");
@@ -3161,10 +3170,13 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.getByText("Dati salvati").waitFor();
   check((await page.locator(".cerchie-persona").innerText()).replace(/\s+/g, " ").trim() === "Cerchie: Palestra", "togliendo la spunta esce dalla cerchia");
   await page.click("button[data-act=torna-lista]");
-  check(await page.locator(".cerchie-lista button.on", { hasText:"Colleghi · 0" }).isVisible() && await page.getByText("Nessun nome qui.").isVisible(), "Colleghi ora è vuota");
+  check(await page.locator(".cerchie-lista button.on", { hasText:"Colleghi · 0" }).isVisible() && await page.getByText("La cerchia «Colleghi» è ancora vuota.").isVisible(), "Colleghi ora è vuota");
   // toccando di nuovo la cerchia scelta si torna a tutti
   await page.click(".cerchie-lista button.on");
   check((await nomiLista()).length === 3 && !await page.locator(".cerchia-barra").count(), "ritoccando la cerchia si torna a tutta la lista");
+  await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Palestra')");
+  await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Tutti i nomi')");
+  check((await nomiLista()).length === 3, "«Tutti i nomi» torna a tutta la lista");
   // Importa: più nomi insieme dentro una cerchia
   await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Colleghi')");
   await page.click("button[data-act=persone-tante]");
@@ -3197,12 +3209,14 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.fill(".sheet input[name=nome]", "Palestra");
   await page.click(".sheet button:has-text('Salva')");
   await page.getByText("Cerchia «Palestra» creata").waitFor();
-  check(await page.locator(".cerchie-lista button.on", { hasText:"Palestra · 0" }).isVisible(), "lo stesso nome della Lista va bene nei Clienti (sono separate)");
+  check(await page.locator(".sheet h2", { hasText:"Aggiungi a «Palestra»" }).isVisible(), "lo stesso nome della Lista va bene nei Clienti (sono separate)");
+  await page.click(".sheet [data-act=chiudi]");
+  await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Palestra')");
   await page.click("button[data-act=cerchia-rinomina]");
   await page.fill(".sheet input[name=nome]", "Bellezza");
   await page.click(".sheet button:has-text('Salva')");
   await page.getByText("Cerchia rinominata").waitFor();
-  await page.click("button[data-act=cerchia-aggiungi]");
+  await page.click(".cerchia-barra button[data-act=cerchia-aggiungi]");
   check(await page.locator(".sheet .scelte-cerchia label").count() === 2 && !await page.locator(".sheet").getByText("Anna Palestra").count(),
     "Aggiungi clienti: solo i clienti");
   await page.locator(".sheet .scelte-cerchia label", { hasText:"Gina Cliente" }).click();
