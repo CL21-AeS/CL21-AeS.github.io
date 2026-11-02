@@ -97,6 +97,11 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
   «Rinomina», «Elimina» (le persone restano). Le cerchie si scelgono anche in «+ Nome» (già spuntata quella aperta), nella
   modifica dei dati (toglierla la fa uscire) e in «Importa». La scheda dice «Cerchie: …». Solo del proprietario, come la
   Lista: l'upline non le vede. App v78.
+- **Cerchie nei Clienti** (2 novembre, migrazione **054**): stessa cosa in Persone → Clienti (es. Bellezza, Casa,
+  Nutrizione), con cerchie **separate** da quelle della Lista (scelta di Stefano): ogni cerchia ha un tipo, `lista` o
+  `clienti`, fisso; il nome è unico per tipo. «Aggiungi clienti», «+ Cliente» con la cerchia aperta già spuntata, la scheda
+  del cliente mostra le sue cerchie dei Clienti. Un cliente che veniva dalla Lista tiene le sue cerchie della Lista (non si
+  vedono nei Clienti). Niente cerchie già pronte al primo uso (Stefano: no). App v79.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 

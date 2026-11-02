@@ -3097,6 +3097,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.persone.push({ id:"cp1", proprietario:"ce53", nome:"Anna Palestra", fase:"lista", esito:null, origine:"palestra", creato_il:ieri },
     { id:"cp2", proprietario:"ce53", nome:"Bea Ufficio", fase:"lista", esito:null, creato_il:ieri },
     { id:"cp3", proprietario:"ce53", nome:"Ciro Chiuso", fase:"piano", esito:"no", creato_il:ieri },
+    { id:"cc1", proprietario:"ce53", nome:"Gina Cliente", fase:"chiusura", esito:"cliente", creato_il:ieri },
+    { id:"cc2", proprietario:"ce53", nome:"Ugo Cliente", fase:"chiusura", esito:"cliente", creato_il:ieri },
     { id:"cpx", proprietario:"R", nome:"Di Altri", fase:"lista", esito:null, creato_il:ieri });
   DB.cerchie = (DB.cerchie || []).concat([{ id:"cxR", proprietario:"R", nome:"Non mia", creato_il:ieri }]);
   ({ ctx, page } = await apri({}, "#chiave=" + "c5".repeat(16)));
@@ -3185,6 +3187,56 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(!await page.locator(".cerchie-lista button", { hasText:"Ufficio" }).count() && (await nomiLista()).length === 5, "eliminando la cerchia le persone restano");
   await sync(page);
   check(DB.cerchie.some(c => c.id === "cxR") && DB.pc.every(x => x.proprietario === "ce53"), "le cerchie degli altri non si toccano");
+  // 054: le cerchie dei Clienti, separate da quelle della Lista
+  await page.click("button[data-sez=clienti]");
+  const nomiClienti = async () => (await page.locator(".persone button[data-act=apri-cliente] b").allInnerTexts()).map(t => t.trim());
+  check(await page.locator(".cerchie-lista button[data-act=cerchia-nuova]").isVisible()
+    && !await page.locator(".cerchie-lista button[data-act=filtro-cerchia]").count(), "Clienti: la riga delle cerchie, senza quelle della Lista");
+  await page.click("button[data-act=cerchia-nuova]");
+  check(await page.locator(".sheet h2", { hasText:"Una nuova cerchia di clienti" }).isVisible(), "Clienti: il foglio della cerchia dei clienti");
+  await page.fill(".sheet input[name=nome]", "Palestra");
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Cerchia «Palestra» creata").waitFor();
+  check(await page.locator(".cerchie-lista button.on", { hasText:"Palestra · 0" }).isVisible(), "lo stesso nome della Lista va bene nei Clienti (sono separate)");
+  await page.click("button[data-act=cerchia-rinomina]");
+  await page.fill(".sheet input[name=nome]", "Bellezza");
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Cerchia rinominata").waitFor();
+  await page.click("button[data-act=cerchia-aggiungi]");
+  check(await page.locator(".sheet .scelte-cerchia label").count() === 2 && !await page.locator(".sheet").getByText("Anna Palestra").count(),
+    "Aggiungi clienti: solo i clienti");
+  await page.locator(".sheet .scelte-cerchia label", { hasText:"Gina Cliente" }).click();
+  await page.click(".sheet button:has-text('Aggiungi')");
+  await page.getByText("1 cliente aggiunto alla cerchia").waitFor();
+  check(JSON.stringify(await nomiClienti()) === JSON.stringify(["Gina Cliente"]) && await page.getByText("Tutti · 1").isVisible(),
+    "Clienti: il filtro della cerchia si combina con gli altri, con i conteggi");
+  await page.locator(".card", { hasText:"I miei clienti" }).screenshot({ path: S + "/e2e/56-cerchie-clienti.png" });
+  // + Cliente dentro la cerchia: già spuntata; ci sono solo le cerchie dei clienti
+  await page.click("button[data-act=cliente-nuovo]");
+  check(await page.locator(".sheet .cerchie-scelta label", { hasText:"Bellezza" }).locator("input").isChecked()
+    && await page.locator(".sheet .cerchie-scelta label").count() === 1, "+ Cliente: solo le cerchie dei clienti, quella aperta già spuntata");
+  await page.fill(".sheet input[name=nome]", "Lia Nuova");
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Lia Nuova tra i tuoi clienti").waitFor();
+  check(await page.locator(".cerchie-persona").getByText("Bellezza").isVisible(), "la scheda del cliente: «Cerchie: Bellezza»");
+  await page.click("button[data-act=torna-clienti]");
+  check((await nomiClienti()).sort().join() === "Gina Cliente,Lia Nuova", "il cliente nuovo è nella cerchia");
+  // un cliente che era nella Lista: modificando i dati restano le sue cerchie della Lista
+  await sync(page);
+  DB.pc.push({ persona_id:"cc2", cerchia_id:DB.cerchie.find(c => c.proprietario === "ce53" && (c.tipo || "lista") === "lista").id, proprietario:"ce53" });
+  await ctx.close();
+  ({ ctx, page } = await apri({}, "#chiave=" + "c5".repeat(16)));
+  await page.getByText("Ciao Cerchia").waitFor(); await apriTappa(page);
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
+  await page.click("button[data-act=apri-cliente]:has-text('Ugo Cliente')");
+  check(!await page.locator(".cerchie-persona").count(), "nella scheda del cliente non compaiono le cerchie della Lista");
+  await page.click("button.nome-modifica");
+  await page.locator(".sheet .cerchie-scelta label", { hasText:"Bellezza" }).click();
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Dati salvati").waitFor();
+  await sync(page);
+  check(DB.pc.filter(x => x.persona_id === "cc2").length === 2, "modificando un cliente le sue cerchie della Lista restano");
   // a 360 px la riga delle cerchie scorre, senza andare a capo
   await page.setViewportSize({ width:360, height:780 });
   check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "a 360 px niente scorrimento laterale della pagina");
