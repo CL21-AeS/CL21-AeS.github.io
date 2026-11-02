@@ -3117,14 +3117,13 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.getByText("Cerchia «Palestra» creata").waitFor();
   check(await page.locator(".sheet h2", { hasText:"Aggiungi a «Palestra»" }).isVisible(), "cerchia creata: si apre subito «Aggiungi nomi»");
   await page.click(".sheet [data-act=chiudi]");
-  check(await page.locator(".cerchie-lista button.on", { hasText:"Tutti i nomi · 3" }).isVisible()
-    && !await page.locator(".cerchie-lista button.on", { hasText:"Palestra" }).count() && !await page.locator(".cerchia-barra").count()
+  check(!await page.locator(".cerchie-lista button.on").count() && !await page.getByText("Tutti i nomi").count() && !await page.locator(".cerchia-barra").count()
     && (await page.locator(".persone button[data-act=apri-persona]").count()) === 3, "dopo la cerchia nuova si vede la lista completa");
   // una cerchia vuota scelta lo dice, con il modo di tornare a tutta la lista
   await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Palestra')");
   check(await page.getByText("La cerchia «Palestra» è ancora vuota.").isVisible(), "cerchia vuota: lo dice invece dei soli zeri");
   await page.click(".cerchia-vuota button:has-text('Mostra tutta la lista')");
-  check(await page.locator(".cerchie-lista button.on", { hasText:"Tutti i nomi" }).isVisible() && !await page.locator(".cerchia-vuota").count(), "«Mostra tutta la lista» torna a tutti");
+  check(!await page.locator(".cerchie-lista button.on").count() && !await page.locator(".cerchia-vuota").count(), "«Mostra tutta la lista» torna a tutti");
   // stesso nome (maiuscole diverse): rifiutato
   await page.click("button[data-act=cerchia-nuova]");
   await page.fill(".sheet input[name=nome]", " palestra ");
@@ -3180,9 +3179,6 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   // toccando di nuovo la cerchia scelta si torna a tutti
   await page.click(".cerchie-lista button.on");
   check((await nomiLista()).length === 3 && !await page.locator(".cerchia-barra").count(), "ritoccando la cerchia si torna a tutta la lista");
-  await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Palestra')");
-  await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Tutti i nomi')");
-  check((await nomiLista()).length === 3, "«Tutti i nomi» torna a tutta la lista");
   await page.click("button[data-filtro=tutti]");
   check((await nomiLista()).length === 4 && await page.getByText("Tutti · 4").isVisible(), "Lista: il filtro «Tutti» mostra anche i chiusi");
   await page.click("button[data-filtro=lista]");

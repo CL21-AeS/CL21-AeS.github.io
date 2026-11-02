@@ -108,6 +108,8 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
   Una cerchia scelta vuota lo dice, con «Aggiungi nomi» e «Mostra tutta la lista». App v80.
 - **Lista: «Tutti» al posto di «Aperti»** (2 novembre, Stefano: «Aperti» = In lista + In corso, non serviva). La Lista si
   apre su «Tutti» (anche Da riprendere e Chiusi); filtri: Tutti, In lista, In corso, Da riprendere, Chiusi. App v81.
+- **Lista: tolto «Tutti i nomi»** dalla riga delle cerchie (Stefano: doppione di «Tutti»); da una cerchia si torna
+  ritoccandola. Nei Clienti «Tutti i clienti» resta (compare quando c'è almeno una cerchia dei clienti). App v82.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 
