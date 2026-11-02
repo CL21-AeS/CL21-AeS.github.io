@@ -3089,6 +3089,108 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
 }
 
+// 55. Persone → Lista: le cerchie (053). Gruppi della lista, una persona in più cerchie, filtro combinato con lo stato
+{
+  DB.partners.push({ id:"ce53", nome:"Cerchia Prova", sponsor_id:"R", stato:"attivo", chiave:"c5".repeat(16), codice_invito:"CE53CE",
+    confermato_il:new Date().toISOString(), privacy_accettata_il:"2026-10-01T00:00:00Z", partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() });
+  const ieri = new Date(Date.now() - 86400000).toISOString();
+  DB.persone.push({ id:"cp1", proprietario:"ce53", nome:"Anna Palestra", fase:"lista", esito:null, origine:"palestra", creato_il:ieri },
+    { id:"cp2", proprietario:"ce53", nome:"Bea Ufficio", fase:"lista", esito:null, creato_il:ieri },
+    { id:"cp3", proprietario:"ce53", nome:"Ciro Chiuso", fase:"piano", esito:"no", creato_il:ieri },
+    { id:"cpx", proprietario:"R", nome:"Di Altri", fase:"lista", esito:null, creato_il:ieri });
+  DB.cerchie = (DB.cerchie || []).concat([{ id:"cxR", proprietario:"R", nome:"Non mia", creato_il:ieri }]);
+  ({ ctx, page } = await apri({}, "#chiave=" + "c5".repeat(16)));
+  await page.getByText("Ciao Cerchia").waitFor(); await apriTappa(page);
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]");
+  check(await page.locator(".cerchie-lista button[data-act=cerchia-nuova]").isVisible()
+    && !await page.locator(".cerchie-lista button[data-act=filtro-cerchia]").count(), "Lista: la riga delle cerchie con «+ Cerchia» (le cerchie degli altri non si vedono)");
+  // una nuova cerchia: diventa subito il filtro scelto
+  await page.click("button[data-act=cerchia-nuova]");
+  await page.fill(".sheet input[name=nome]", "Palestra");
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Cerchia «Palestra» creata").waitFor();
+  check(await page.locator(".cerchie-lista button.on", { hasText:"Palestra · 0" }).isVisible()
+    && await page.locator(".cerchia-barra").getByText("Palestra").isVisible() && await page.getByText("Nessun nome qui.").isVisible(), "la cerchia nuova è scelta, vuota");
+  // stesso nome (maiuscole diverse): rifiutato
+  await page.click("button[data-act=cerchia-nuova]");
+  await page.fill(".sheet input[name=nome]", " palestra ");
+  await page.click(".sheet button:has-text('Salva')");
+  check(await page.locator(".sheet").getByText("Hai già una cerchia con questo nome.").isVisible(), "due cerchie con lo stesso nome: no");
+  await page.fill(".sheet input[name=nome]", "Colleghi");
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Cerchia «Colleghi» creata").waitFor();
+  // «Aggiungi nomi» con le spunte, da dentro la cerchia
+  await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Palestra')");
+  await page.click("button[data-act=cerchia-aggiungi]");
+  check(await page.locator(".sheet h2", { hasText:"Aggiungi a «Palestra»" }).isVisible()
+    && await page.locator(".sheet .scelte-cerchia label").count() === 3 && !await page.locator(".sheet").getByText("Di Altri").count(), "Aggiungi nomi: i nomi della mia lista, con le spunte");
+  await page.click(".sheet button:has-text('Aggiungi')");
+  check(await page.locator(".sheet").getByText("Spunta almeno un nome.").isVisible(), "senza spunte non si aggiunge niente");
+  await page.locator(".sheet .scelte-cerchia label", { hasText:"Anna Palestra" }).click();
+  await page.locator(".sheet .scelte-cerchia label", { hasText:"Ciro Chiuso" }).click();
+  await page.click(".sheet button:has-text('Aggiungi')");
+  await page.getByText("2 nomi aggiunti alla cerchia").waitFor();
+  // filtro combinato: Aperti + Palestra = solo Anna; Chiusi + Palestra = solo Ciro
+  const nomiLista = async () => (await page.locator(".persone button[data-act=apri-persona]").allInnerTexts()).map(t => t.split("\n")[0].trim());
+  check(JSON.stringify(await nomiLista()) === JSON.stringify(["Anna Palestra"]) && await page.getByText("Chiusi · 1").isVisible(),
+    "cerchia + Aperti: solo chi è in tutte e due; i conteggi degli stati contano nella cerchia");
+  await page.click("button[data-filtro=chiusi]");
+  check(JSON.stringify(await nomiLista()) === JSON.stringify(["Ciro Chiuso"]), "cerchia + Chiusi");
+  await page.click("button[data-filtro=aperti]");
+  await page.locator(".card", { hasText:"La mia lista" }).screenshot({ path: S + "/e2e/55-cerchie.png" });
+  // un nome nuovo da dentro la cerchia: la cerchia è già spuntata; si può mettere anche in un'altra
+  await page.click("button[data-act=persona-nuova]");
+  check(await page.locator(".sheet .cerchie-scelta label", { hasText:"Palestra" }).locator("input").isChecked()
+    && !await page.locator(".sheet .cerchie-scelta label", { hasText:"Colleghi" }).locator("input").isChecked(), "+ Nome dentro una cerchia: la cerchia è già spuntata");
+  await page.fill(".sheet input[name=nome]", "Dino Due");
+  await page.locator(".sheet .cerchie-scelta label", { hasText:"Colleghi" }).click();
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Dino Due nella tua lista").waitFor();
+  check(JSON.stringify(await nomiLista()) === JSON.stringify(["Dino Due", "Anna Palestra"]), "il nome nuovo è nella cerchia, in cima");
+  await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Colleghi')");
+  check(JSON.stringify(await nomiLista()) === JSON.stringify(["Dino Due"]), "una persona in più cerchie");
+  // la scheda dice le cerchie; dalla modifica si toglie da una cerchia
+  await page.click("button[data-act=apri-persona]:has-text('Dino Due')");
+  check((await page.locator(".cerchie-persona").innerText()).replace(/\s+/g, " ").trim() === "Cerchie: Colleghi Palestra", "la scheda: «Cerchie:» con i nomi");
+  await page.click("button.nome-modifica");
+  await page.locator(".sheet .cerchie-scelta label", { hasText:"Colleghi" }).click();
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Dati salvati").waitFor();
+  check((await page.locator(".cerchie-persona").innerText()).replace(/\s+/g, " ").trim() === "Cerchie: Palestra", "togliendo la spunta esce dalla cerchia");
+  await page.click("button[data-act=torna-lista]");
+  check(await page.locator(".cerchie-lista button.on", { hasText:"Colleghi · 0" }).isVisible() && await page.getByText("Nessun nome qui.").isVisible(), "Colleghi ora è vuota");
+  // toccando di nuovo la cerchia scelta si torna a tutti
+  await page.click(".cerchie-lista button.on");
+  check((await nomiLista()).length === 3 && !await page.locator(".cerchia-barra").count(), "ritoccando la cerchia si torna a tutta la lista");
+  // Importa: più nomi insieme dentro una cerchia
+  await page.click(".cerchie-lista button[data-act=filtro-cerchia]:has-text('Colleghi')");
+  await page.click("button[data-act=persone-tante]");
+  check(await page.locator(".sheet select[name=cerchia]").inputValue() !== "", "Importa: la cerchia scelta è già nel menu");
+  await page.fill(".sheet textarea[name=righe]", "Elsa Uno\nFabio Due");
+  await page.click(".sheet button:has-text('Aggiungi')");
+  await page.getByText("2 nomi aggiunti").waitFor();
+  check(JSON.stringify(await nomiLista()) === JSON.stringify(["Elsa Uno", "Fabio Due"]) || JSON.stringify(await nomiLista()) === JSON.stringify(["Fabio Due", "Elsa Uno"]),
+    "Importa dentro una cerchia: i nomi entrano nella cerchia");
+  // rinomina
+  await page.click("button[data-act=cerchia-rinomina]");
+  check(await page.inputValue(".sheet input[name=nome]") === "Colleghi", "Rinomina: il nome di adesso");
+  await page.fill(".sheet input[name=nome]", "Ufficio");
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Cerchia rinominata").waitFor();
+  check(await page.locator(".cerchie-lista button.on", { hasText:"Ufficio · 2" }).isVisible(), "la cerchia rinominata resta scelta");
+  // elimina: le persone restano nella lista
+  await page.click("button[data-act=cerchia-elimina]");
+  await page.getByText("Cerchia «Ufficio» eliminata").waitFor();
+  check(!await page.locator(".cerchie-lista button", { hasText:"Ufficio" }).count() && (await nomiLista()).length === 5, "eliminando la cerchia le persone restano");
+  await sync(page);
+  check(DB.cerchie.some(c => c.id === "cxR") && DB.pc.every(x => x.proprietario === "ce53"), "le cerchie degli altri non si toccano");
+  // a 360 px la riga delle cerchie scorre, senza andare a capo
+  await page.setViewportSize({ width:360, height:780 });
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "a 360 px niente scorrimento laterale della pagina");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

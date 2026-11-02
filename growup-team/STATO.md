@@ -91,6 +91,12 @@ Principio di Stefano: **la mappa Amway fa fede**, per struttura e dati; Growup l
   intero. Il percorso si aggiunge solo durante la ricerca (nessun ridisegno: il campo resta com'è). App v76.
 - **«Chiudi ▴» nel percorso** (2 novembre): il percorso intero aperto con «…» si richiude e torna come prima. Reso il test dei
   pagamenti indipendente dalla data (usava luglio 2026 fisso). App v77.
+- **Cerchie nella Lista** (2 novembre, migrazione **053**): in Persone → Lista si creano gruppi di nomi («Cerchie»: palestra,
+  colleghi, famiglia…). Una persona può stare in più cerchie. Seconda riga di filtri sotto gli stati, combinabile (es.
+  Aperti + Palestra); ritoccando la cerchia scelta si torna a tutta la lista. Dentro una cerchia: «Aggiungi nomi» (spunte),
+  «Rinomina», «Elimina» (le persone restano). Le cerchie si scelgono anche in «+ Nome» (già spuntata quella aperta), nella
+  modifica dei dati (toglierla la fa uscire) e in «Importa». La scheda dice «Cerchie: …». Solo del proprietario, come la
+  Lista: l'upline non le vede. App v78.
 
 ## Import delle mappe Amway (29 ottobre 2026, una PR per punto)
 
