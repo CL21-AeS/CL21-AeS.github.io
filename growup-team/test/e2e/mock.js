@@ -419,7 +419,24 @@
       db.passi = (db.passi || []).filter(y => y.persona_id !== id);
       (db.inviti || []).forEach(y => { if(y.persona_id === id) y.persona_id = null; });
       const ord = (db.ordini || []).filter(y => y.persona_id === id).map(y => y.id);
-      db.ordini = (db.ordini || []).filter(y => y.persona_id !== id); db.righe = (db.righe || []).filter(y => !ord.includes(y.ordine_id)); salva(); },
+      db.ordini = (db.ordini || []).filter(y => y.persona_id !== id); db.righe = (db.righe || []).filter(y => !ord.includes(y.ordine_id)); db.pc = (db.pc || []).filter(y => y.persona_id !== id); salva(); },
+    /* le cerchie (053): solo mie, nome unico (senza maiuscole e spazi ai bordi), una persona in più cerchie */
+    cerchie: async () => (db.cerchie || []).filter(x => x.proprietario === mio().id).map(x => ({ id:x.id, nome:x.nome, creato_il:x.creato_il })),
+    personeCerchie: async () => (db.pc || []).filter(x => x.proprietario === mio().id).map(x => ({ persona_id:x.persona_id, cerchia_id:x.cerchia_id })),
+    nuovaCerchia: async (id, nome) => { const k = nome.trim().toLowerCase();
+      if((db.cerchie || []).some(x => x.proprietario === mio().id && x.nome.trim().toLowerCase() === k)) throw new Error("duplicate key value violates unique constraint");
+      db.cerchie = (db.cerchie || []).concat([{ id, nome, proprietario:mio().id, creato_il:new Date().toISOString() }]); salva(); },
+    rinominaCerchia: async (id, nome) => { const x = (db.cerchie || []).find(y => y.id === id && y.proprietario === mio().id);
+      if(x) x.nome = nome; salva(); },
+    cancellaCerchia: async id => { db.cerchie = (db.cerchie || []).filter(y => !(y.id === id && y.proprietario === mio().id));
+      db.pc = (db.pc || []).filter(y => y.cerchia_id !== id); salva(); },
+    inCerchia: async righe => { for(const r of righe){
+        const pe = (db.persone || []).find(y => y.id === r.persona_id && y.proprietario === mio().id);
+        const c = (db.cerchie || []).find(y => y.id === r.cerchia_id && y.proprietario === mio().id);
+        if(!pe || !c) throw new Error("new row violates row-level security policy");
+        if((db.pc || []).some(y => y.persona_id === r.persona_id && y.cerchia_id === r.cerchia_id)) throw new Error("duplicate key value violates unique constraint"); }
+      db.pc = (db.pc || []).concat(righe.map(r => ({ persona_id:r.persona_id, cerchia_id:r.cerchia_id, proprietario:mio().id }))); salva(); },
+    fuoriCerchia: async (persona, cerchia) => { db.pc = (db.pc || []).filter(y => !(y.persona_id === persona && y.cerchia_id === cerchia && y.proprietario === mio().id)); salva(); },
     nuoviPassi: async righe => {
       for(const r of righe){
         const pe = (db.persone || []).find(y => y.id === r.persona_id);

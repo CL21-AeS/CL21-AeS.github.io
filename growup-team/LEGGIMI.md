@@ -134,6 +134,7 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     scaricata dopo; il blocco dell'admin resta anche se si rientra nella mappa
 41j. `supabase/052_platino.sql` — il gruppo di un Platino senza app: inviti dell'admin sotto il Platino o in mezzo, e
     import subito per chi entra così
+41k. `supabase/053_cerchie.sql` — le cerchie della Lista: gruppi di nomi solo miei, una persona in più cerchie
 42. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 21. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**

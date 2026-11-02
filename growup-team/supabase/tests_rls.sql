@@ -1657,6 +1657,36 @@ begin
     delete from public.partners where codice_amway like '89000%';
   end;
 
+  -- ---- 053: le cerchie della Lista: solo di chi le crea ----
+  declare
+    ch uuid; ch2 uuid; pa uuid; pb uuid;
+  begin
+    perform growup_test.come(u5);  -- A
+    insert into public.cerchie (nome) values ('Palestra') returning id into ch;
+    insert into public.persone (nome) values ('Nome In Cerchia') returning id into pa;
+    insert into public.persone_cerchie (persona_id, cerchia_id) values (pa, ch);
+    perform growup_test.deve_fallire($q$insert into public.cerchie (nome) values ('  palestra ')$q$, '053: due cerchie con lo stesso nome no');
+    insert into public.cerchie (nome) values ('Colleghi') returning id into ch2;
+    insert into public.persone_cerchie (persona_id, cerchia_id) values (pa, ch2);
+    perform growup_test.ok((select count(*) from public.persone_cerchie where persona_id = pa) = 2, '053: una persona in più cerchie');
+    perform growup_test.come(u4);  -- C, un'altra persona
+    perform growup_test.ok(not exists (select 1 from public.cerchie where id = ch) and not exists (select 1 from public.persone_cerchie where cerchia_id = ch),
+                           '053: le cerchie di A non le vede nessun altro');
+    insert into public.persone (nome) values ('Nome Di B') returning id into pb;
+    perform growup_test.deve_fallire(format('insert into public.persone_cerchie (persona_id, cerchia_id) values (%L, %L)', pb, ch),
+                                     '053: non si mette una persona nella cerchia di un altro');
+    perform growup_test.ok(growup_test.righe(format('delete from public.cerchie where id = %L', ch)) = 0, '053: un altro non cancella la cerchia di A');
+    perform growup_test.come(u1);  -- R, admin
+    perform growup_test.ok(not exists (select 1 from public.cerchie where id = ch), '053: nemmeno l''admin vede le cerchie degli altri');
+    perform growup_test.come(u5);  -- A cancella la cerchia: la persona resta nella Lista
+    delete from public.cerchie where id = ch;
+    perform growup_test.ok(exists (select 1 from public.persone where id = pa)
+                           and (select count(*) from public.persone_cerchie where persona_id = pa) = 1,
+                           '053: cancellando una cerchia la persona resta nella Lista (e nelle altre cerchie)');
+    execute 'reset role';
+    delete from public.persone where id in (pa, pb); delete from public.cerchie where id = ch2;
+  end;
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),
