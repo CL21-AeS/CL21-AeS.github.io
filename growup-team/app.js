@@ -218,6 +218,7 @@ const st = {
   cerchie: [], pc: [],     // le mie cerchie (gruppi della lista) e chi ci sta dentro (053)
   cerchiaLista: null,     // la cerchia scelta nei filtri della Lista
   cerchiaClienti: null,   // la cerchia scelta nei filtri dei Clienti (054: cerchie separate)
+  cerchiaAggiungi: null,  // la cerchia del foglio «Aggiungi nomi» (anche appena creata, senza sceglierla nei filtri)
   personaId: null, filtroLista: "aperti", cercaLista: "", passoTipo: null,
   numeriLista: {},
   schedaPila: [],          // le schede aperte scendendo lungo le linee, per "Indietro"
@@ -3882,13 +3883,22 @@ function personeSezione(){ return tipoCerchie() === "clienti" ? clientiTutti() :
 /* la riga delle cerchie sotto i filtri e, con una cerchia scelta, i suoi pulsanti */
 function rigaCerchie(base){
   const t = tipoCerchie(), cerchia = cerchiaScelta();
-  return `<div class="row filtri cerchie-lista" style="gap:6px;margin-top:6px">${cerchieTipo(t).map(c => { const on = cerchia && cerchia.id === c.id;
+  const tutti = cerchieTipo(t).length ? `<button class="btn small cerchia${cerchia ? "" : " on"}" data-act="filtro-cerchia" data-id="" aria-pressed="${!cerchia}">${t === "clienti" ? "Tutti i clienti" : "Tutti i nomi"} · ${base.length}</button>` : "";
+  return `<div class="row filtri cerchie-lista" style="gap:6px;margin-top:6px">${tutti}${cerchieTipo(t).map(c => { const on = cerchia && cerchia.id === c.id;
       return `<button class="btn small cerchia${on ? " on" : ""}" data-act="filtro-cerchia" data-id="${esc(c.id)}" aria-pressed="${!!on}">${esc(c.nome)} · ${base.filter(p => inCerchia(p.id, c.id)).length}</button>`; }).join("")}
       <button class="btn small ghost" data-act="cerchia-nuova">+ Cerchia</button></div>
     ${cerchia ? `<div class="cerchia-barra"><span class="small">Cerchia <b>${esc(cerchia.nome)}</b></span>
       <span class="row" style="gap:4px"><button class="btn link small" data-act="cerchia-aggiungi">${t === "clienti" ? "Aggiungi clienti" : "Aggiungi nomi"}</button>
       <button class="btn link small" data-act="cerchia-rinomina">Rinomina</button>
       <button class="btn link small" data-act="cerchia-elimina">Elimina</button></span></div>` : ""}`;
+}
+/* una cerchia scelta ancora vuota: lo si dice, invece di mostrare solo zeri */
+function cerchiaVuota(base){
+  const c = cerchiaScelta();
+  if(!c || base.some(p => inCerchia(p.id, c.id))) return "";
+  return `<div class="cerchia-vuota"><p class="small" style="margin:10px 0 6px">La cerchia «${esc(c.nome)}» è ancora vuota.</p>
+    <div class="row" style="gap:6px"><button class="btn small primary" data-act="cerchia-aggiungi">${tipoCerchie() === "clienti" ? "Aggiungi clienti" : "Aggiungi nomi"}</button>
+    <button class="btn small ghost" data-act="filtro-cerchia" data-id="">${tipoCerchie() === "clienti" ? "Mostra tutti i clienti" : "Mostra tutta la lista"}</button></div></div>`;
 }
 /* «Cerchie: …» nella scheda (solo quelle della sezione) */
 function cerchiePersona(p, t){
@@ -3978,7 +3988,7 @@ function vPersone(){
       const n = nellaLista.filter(x.ok).filter(p => !cerchia || inCerchia(p.id, cerchia.id)).length;
       return `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-lista" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${n}</button>`; }).join("")}</div>
     ${rigaCerchie(nellaLista)}
-    ${l.length ? `<ul class="persone">${l.map(p => rigaPersona(p)).join("")}</ul>` : `<p class="muted" style="margin:10px 0 0">Nessun nome qui.</p>`}`
+    ${cerchiaVuota(nellaLista) || (l.length ? `<ul class="persone">${l.map(p => rigaPersona(p)).join("")}</ul>` : `<p class="muted" style="margin:10px 0 0">Nessun nome qui.</p>`)}`
     : `<p class="muted" style="margin:8px 0 0">La tua lista è vuota. Scrivi i nomi delle persone che conosci: amici, parenti,
         colleghi, vicini. Basta il nome; il resto lo aggiungi quando serve.</p>`}
     ${st.persone.length ? `<p class="nota"><button class="btn link small" data-act="scarica-persone" style="min-height:0;padding:0">Scarica una copia della mia lista</button></p>` : ""}
@@ -4129,7 +4139,7 @@ function vSheetPersone(s){
     </form>`;
   }
   if(s === "cerchia-aggiungi"){
-    const c = cerchiaScelta(), cl = tipoCerchie() === "clienti";
+    const cl = tipoCerchie() === "clienti", c = cerchieTipo(tipoCerchie()).find(x => x.id === st.cerchiaAggiungi);
     if(!c) return "";
     const fuori = personeSezione().filter(p => !inCerchia(p.id, c.id)).sort((a, b) => a.nome.localeCompare(b.nome, "it"));
     return `<h2>Aggiungi a «${esc(c.nome)}»</h2>
@@ -4212,10 +4222,10 @@ Object.assign(AZIONI, {
   async "senza-nome"(el){ const tipo = el.dataset.tipo; st.rapido = null; st.sheet = null; render(); await registra(tipo); },
   "persone-tante"(){ st.errore = ""; st.sheet = "persone-tante"; render(); },
   /* 053: le cerchie della Lista */
-  "filtro-cerchia"(el){ scegliCerchia(idCerchia() === el.dataset.id ? null : el.dataset.id); render(); },
+  "filtro-cerchia"(el){ scegliCerchia(!el.dataset.id || idCerchia() === el.dataset.id ? null : el.dataset.id); render(); },
   "cerchia-nuova"(){ st.errore = ""; st.sheet = "cerchia-nuova"; render(); focusSheet(); },
   "cerchia-rinomina"(){ st.errore = ""; st.sheet = "cerchia-rinomina"; render(); focusSheet(); },
-  "cerchia-aggiungi"(){ st.errore = ""; st.sheet = "cerchia-aggiungi"; render(); },
+  "cerchia-aggiungi"(){ st.errore = ""; st.cerchiaAggiungi = idCerchia(); st.sheet = "cerchia-aggiungi"; render(); },
   async "cerchia-elimina"(){
     const c = cerchiaScelta();
     if(!c || !confirm(`Eliminare la cerchia «${c.nome}»?\n\nLe persone restano nella tua lista: escono solo da questa cerchia.`)) return;
@@ -4312,15 +4322,17 @@ Object.assign(MODULI, {
     if(cerchieTipo(t).some(c => c.id !== ora && senzaAccenti(c.nome) === senzaAccenti(nome))){ mostraErroreForm(f, "Hai già una cerchia con questo nome."); return; }
     try{
       if(ora) await api.rinominaCerchia(ora, nome);
-      else { const id = uuid(); await api.nuovaCerchia(id, nome, t); scegliCerchia(id); }
+      else { const id = uuid(); await api.nuovaCerchia(id, nome, t); st.cerchiaAggiungi = id; }
       await dopoPersone(ora ? "Cerchia rinominata" : `Cerchia «${nome}» creata`);
+      /* una cerchia nuova è vuota: si apre subito la scelta dei nomi; la lista resta completa (la cerchia si sceglie toccandola) */
+      if(!ora && personeSezione().length){ st.sheet = "cerchia-aggiungi"; render(); }
     }catch(e){ mostraErroreForm(f, /duplicate|unique/i.test(messaggio(e)) ? "Hai già una cerchia con questo nome." : messaggio(e)); }
   },
   async "cerchia-aggiungi"(f){
     const scelti = [...f.querySelectorAll("input[name=persona]:checked")].map(i => i.value);
     if(!scelti.length){ mostraErroreForm(f, "Spunta almeno un nome."); return; }
     try{
-      for(let i = 0; i < scelti.length; i += 200) await api.inCerchia(scelti.slice(i, i + 200).map(p => ({ persona_id:p, cerchia_id:idCerchia() })));
+      for(let i = 0; i < scelti.length; i += 200) await api.inCerchia(scelti.slice(i, i + 200).map(p => ({ persona_id:p, cerchia_id:st.cerchiaAggiungi })));
       await dopoPersone(tipoCerchie() === "clienti" ? plur(scelti.length, "cliente aggiunto alla cerchia", "clienti aggiunti alla cerchia")
         : plur(scelti.length, "nome aggiunto alla cerchia", "nomi aggiunti alla cerchia"));
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
@@ -5027,11 +5039,11 @@ function vClienti(){
     ${tutti.length ? `<div class="row filtri scelte-rapide" style="gap:6px;margin-top:10px">${FILTRI_CLIENTI.map(x =>
       `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-clienti" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${tutti.filter(x.ok).filter(inC).length}</button>`).join("")}</div>
     ${rigaCerchie(tutti)}
-    ${l.length ? `<ul class="persone">${l.map(p => { const s = statoCliente(p);
+    ${cerchiaVuota(tutti) || (l.length ? `<ul class="persone">${l.map(p => { const s = statoCliente(p);
       return `<li><button class="persona" data-act="apri-cliente" data-id="${esc(p.id)}">
         <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${s.primo && s.key !== "fermo" ? (s.primo.codice ? `${esc(s.primo.nome)} · finisce il ${dataIt(s.primo.finisce)}` : `prossimo ordine atteso il ${dataIt(s.primo.finisce)}`) : esc(abitudine(p) || "nessun ordine")}</span></span>
         <span class="etichette">${etichetteOrdini(p)}<span class="pill ${s.cl}">${esc(s.txt)}</span></span></button></li>`; }).join("")}</ul>`
-      : `<p class="muted" style="margin:10px 0 0">${filtro.id === "sentire" && !cerchia ? "Nessuno da sentire adesso." : "Nessun cliente qui."}</p>`}`
+      : `<p class="muted" style="margin:10px 0 0">${filtro.id === "sentire" && !cerchia ? "Nessuno da sentire adesso." : "Nessun cliente qui."}</p>`)}`
     : `<p class="muted" style="margin:8px 0 0">Ancora nessun cliente. Entrano da qui con "+ Cliente", oppure dalla Lista quando chiudi una persona come Cliente.</p>`}
   </div>`;
 }
