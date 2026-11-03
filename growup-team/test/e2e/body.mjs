@@ -1023,6 +1023,17 @@ check(await page.evaluate(() => window.__xss === undefined) && await page.locato
   "un nome con codice HTML si vede come testo e non viene eseguito");
 check(/script-src 'self' https:\/\/cdn\.jsdelivr\.net https:\/\/challenges\.cloudflare\.com; frame-src https:\/\/challenges\.cloudflare\.com;/.test(await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content")),
   "la pagina ha la Content Security Policy");
+/* privacy (controllo del 3 novembre): i font stanno nell'app, nessuna richiesta a Google */
+check(!/googleapis|gstatic/.test(await page.content()) && /font-src 'self';/.test(await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content")),
+  "nessun font da Google: la pagina non nomina googleapis/gstatic e la CSP permette solo font dell'app");
+check(await page.evaluate(async () => { await document.fonts.ready;
+    return document.fonts.check("700 16px Manrope") && document.fonts.check("700 20px 'Cormorant Garamond'") &&
+      [...document.fonts].some(f => f.family.replace(/["']/g, "") === "Manrope" && f.status === "loaded"); }),
+  "i font Manrope e Cormorant Garamond arrivano dall'app");
+check(await page.evaluate(() => !!(window.supabase && window.supabase.createClient)) &&
+    await page.locator('script[src="lib/supabase-2.117.2.js"][integrity^="sha384-"]').count() === 1 &&
+    await page.locator('script[src*="jsdelivr"]').count() === 0,
+  "la libreria Supabase arriva dall'app (con controllo d'integrità), non da jsDelivr");
 await ctx.close();
 
 // 21. Captcha al primo ingresso: il gettone arriva a Supabase; se il controllo fallisce, un messaggio chiaro

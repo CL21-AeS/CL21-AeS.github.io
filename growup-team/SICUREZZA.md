@@ -3,6 +3,74 @@
 Controllo approfondito del 17 ottobre 2026 (app, Supabase, GitHub). Da ripetere dopo ogni modifica importante
 al database e prima del lancio a tutto il gruppo.
 
+## Controllo sicurezza e privacy — 3 novembre 2026
+Livello: completo (skill `sicurezza-privacy-app`). Fatto su database vero, codice, storia di GitHub e privacy.
+
+### In sintesi
+Sicurezza solida: nessun problema grave o medio. Nessuno, da fuori o da un'altra linea, può leggere o modificare dati
+che non deve. Le cose da sistemare riguardano la **privacy** (informativa, persone della mappa senza app, cancellazione
+dei contatti dopo 24 mesi): servono decisioni di Stefano.
+
+### Problemi trovati
+**🟠 Medio — Le persone della mappa senza app non ricevono l'informativa.** Chi importa la mappa porta nel database
+nome, codice, VP e percentuale di tutto il suo gruppo; chi non usa l'app non sa che i suoi dati sono in Growup. Rischio:
+una persona che si lamenta col Garante. Proposta: informativa anche in una pagina pubblica dell'app e un avviso a chi
+importa («informa il tuo gruppo»). *Da decidere con Stefano.*
+
+**🟠 Medio — Informativa incompleta.** Quella dell'app è chiara ma mancano: nomi dei titolari e contatto, basi giuridiche,
+tempi di conservazione, fornitori (Supabase, GitHub, Cloudflare, servizi di notifica), diritto di reclamo al Garante,
+diritto di scaricare i propri dati, solo maggiorenni. Bozza dei contenuti in `PRIVACY.md`. *Testo da approvare.*
+
+**🟠 Medio — La regola dei 24 mesi per i contatti non c'è ancora.** Decisa da Stefano il 3 novembre: un contatto si
+cancella 24 mesi dopo l'ultimo passo, il conteggio riparte a ogni passo. Oggi Lista, Target e Clienti restano per sempre.
+Da realizzare con una migrazione (cancellazione notturna con pg_cron, avviso 30 giorni prima). *Da decidere: i clienti.*
+
+**🟡 Basso — Font da Google e libreria Supabase da jsDelivr.** Ogni apertura dell'app mandava l'indirizzo IP a Google
+(in Germania un tribunale ha condannato un sito per questo) e a jsDelivr. **Corretto**: font (`fonti/`, licenza OFL) e libreria
+(`lib/supabase-2.117.2.js`, stesso controllo d'integrità SRI) ora stanno nell'app; la CSP non permette più font
+esterni. Verificato con i test (697 controlli) e con la CSP vera: nessuna richiesta a Google o jsDelivr. Resta jsDelivr
+solo per il lettore PDF del listino, usato dall'admin.
+
+**🟡 Basso — Note libere senza avviso sui dati sulla salute.** Note della Lista, dei passi e «Perché» dell'obiettivo
+sono testo libero: in un'attività di prodotti per il benessere ci possono finire peso o malattie. Proposta: una riga
+sotto i campi («Non scrivere dati sulla salute»). *Testo da approvare.*
+
+**🟡 Basso — Ancora aperti dal 17 ottobre:** verifica in due passaggi su GitHub, Supabase e Google; copie in una cartella
+privata di Drive (e per quanto tenerle). Da fare a Stefano.
+
+### Privacy
+| Punto | Stato | Cosa fare |
+|---|---|---|
+| Titolari | Da sistemare | Stefano e Alessia, persone fisiche: nomi e contatto nell'informativa |
+| Fornitori | Da sistemare | Citarli nell'informativa; controllare DPA di Supabase |
+| Informativa | Da sistemare | Completare (bozza in `PRIVACY.md`) |
+| Base giuridica e consenso | In linea | Consenso con casella non spuntata e data salvata |
+| Dati inseriti da altri | In linea per chi entra (vede l'informativa al primo ingresso); da sistemare per la mappa | Vedi primo problema |
+| Contatti esterni | In linea | Solo del proprietario, nessun dato inutile |
+| Minimizzazione | In linea | Niente email, telefono e indirizzo dalla mappa |
+| Dati sulla salute | Da sistemare | Avviso vicino alle note |
+| Diritti | In linea | Su richiesta; Lista scaricabile |
+| Conservazione | Da sistemare | 24 mesi per i contatti (da realizzare); clienti e copie da decidere |
+| Cookie | In linea | Solo memoria tecnica, niente statistiche: niente banner; citarla nell'informativa |
+| Minori | Da sistemare | Scrivere «solo maggiorenni» |
+| Registro e violazioni | Fatto | `PRIVACY.md` (bozza) |
+| Regole Amway | Da verificare | Stefano |
+
+### Cosa è già a posto
+- Advisor di Supabase: nessun avviso nuovo; quelli presenti sono voluti (funzioni che controllano chi le chiama) o già
+  noti (`pg_net` in public). «Leaked password protection» non serve: niente password, provider Email spento.
+- RLS attiva su tutte le tabelle, nessuna regola aperta a tutti, nessuna vista, nessun file caricato; da fuori si
+  chiamano solo `invito_aperto` e `invito_target_aperto`; tutte le funzioni hanno `search_path` fisso.
+- Tutte le migrazioni fino alla 054 sono sul database vero; `tests_rls.sql`: TUTTI I CONTROLLI SUPERATI.
+- Testi degli utenti sempre «sterilizzati», CSP senza script in linea, cache del telefono senza dati.
+- Storia di GitHub: nessuna chiave segreta (solo la publishable e la Site Key del captcha, pubbliche).
+
+### Da decidere con Stefano
+1. Informativa per le persone della mappa senza app: pagina pubblica + avviso a chi importa (consigliato), oppure solo
+   l'avviso a chi importa.
+2. Clienti: cancellare 24 mesi dopo l'ultimo ordine o passo (consigliato), o tenerli finché sono clienti.
+3. Copie di sicurezza: tenere le ultime 12 mensili (consigliato) e cancellare le più vecchie.
+
 ## Come sono protetti i dati
 
 | Dove | Protezione |
@@ -11,7 +79,7 @@ al database e prima del lancio a tutto il gruppo.
 | **Captcha** | Cloudflare Turnstile al primo ingresso di un telefono: niente programmi che creano accessi finti a migliaia. La Site Key (pubblica) è in `config.js`; la Secret Key solo in Supabase → Authentication → Attack Protection. Limite di 30 accessi anonimi all'ora per indirizzo; provider Email spento. |
 | **Accesso** | Niente password: link personale con una chiave casuale di 128 bit (nel database solo l'impronta sha256, non reversibile). Il link si toglie dalla barra degli indirizzi appena letto. Il link personale serve solo per rientrare: chi non è mai entrato non ne ha uno (041). |
 | **Solo su invito (041)** | Si entra solo con un **invito personale**: chi invita (già nella mappa, o un admin) scrive nome e codice Amway del nuovo partner; il link ha solo un codice casuale di 128 bit (nel database l'impronta), quindi nome e codice non si vedono e non si cambiano. Vale **una volta** e **7 giorni**; chi l'ha creato lo annulla o lo rigenera (il vecchio smette di funzionare). Se il codice è già nella mappa l'invito lo crea solo chi sta sopra quella persona, e chi entra prende subito il suo posto; altrimenti resta «in attesa» sotto chi l'ha invitato (vede solo sé stesso) finché una mappa importata da chi l'ha invitato o dalla sua upline non contiene il suo codice. Gli inviti (`inviti`) li legge solo chi li crea; si creano, annullano e rigenerano solo con le funzioni. Il vecchio link generico (codice di 6 lettere), l'«invito sopra» degli admin e il link personale per chi non è mai entrato non esistono più. Gli avvisi (a chi invita quando il nuovo entra e quando va al suo posto; allo sponsor vero se è un altro) sono in `notifiche_eventi`, solo per il server, senza nomi. |
-| **App (GitHub Pages)** | Content Security Policy: il browser esegue solo il codice dell'app, la libreria Supabase (con controllo di integrità) e il captcha di Cloudflare, e si collega solo al nostro progetto. Ogni testo che viene dal database è "sterilizzato" prima di essere mostrato (provato con un nome contenente codice HTML). La cache del telefono tiene solo l'app, mai i dati. `no-referrer`: i link non rivelano da dove si arriva. |
+| **App (GitHub Pages)** | Font e libreria Supabase stanno nell'app (3 novembre 2026): aprendo Growup nessun indirizzo IP va a Google o a jsDelivr. Content Security Policy: il browser esegue solo il codice dell'app, la libreria Supabase (con controllo di integrità) e il captcha di Cloudflare, e si collega solo al nostro progetto. Ogni testo che viene dal database è "sterilizzato" prima di essere mostrato (provato con un nome contenente codice HTML). La cache del telefono tiene solo l'app, mai i dati. `no-referrer`: i link non rivelano da dove si arriva. |
 | **Report Amway (CSV)** | Si legge sul telefono, non viene caricato da nessuna parte; al database arrivano solo nome, codice e numeri di chi si importa. |
 | **GitHub (pubblico)** | Contiene solo codice: nessuna chiave segreta (in `config.js` c'è solo la chiave pubblica, fatta per stare nel browser), nessun dato reale nei file (i test usano nomi e codici inventati). |
 | **La Lista (pagina Persone)** | Nomi, telefoni e passi delle persone della lista li legge e scrive **solo chi li ha inseriti**: né sponsor, né upline, né admin (RLS "solo mio", controllata in `tests_rls.sql`). All'upline arrivano solo i numeri (`numeri_persone`). La copia degli admin non contiene le liste; ognuno scarica la propria. |
@@ -44,6 +112,7 @@ al database e prima del lancio a tutto il gruppo.
 
 ## Controlli fatti
 
+- 3 novembre 2026: terzo controllo completo, con la privacy (vedi in cima). Font e libreria Supabase portati nell'app.
 - 28 ottobre 2026: secondo controllo completo (codice, RLS sul database vero, interfaccia) e gruppi A-D di correzioni (041-043).
   Resta l'avviso «pg_net nello schema public»: spostarlo vuol dire toglierlo e rimetterlo, con il rischio di fermare le
   notifiche, e non espone niente.
