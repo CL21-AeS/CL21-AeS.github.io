@@ -411,6 +411,7 @@
     /* la Lista: solo mia; i passi contano le attività e aggiornano fase ed esito, come i trigger del database */
     persone: async () => (db.persone || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
     passi: async () => (db.passi || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
+    contattiInScadenza: async () => (db.scadenze || []).filter(x => (db.persone || []).some(p => p.id === x.persona_id && p.proprietario === mio().id)),
     nuovePersone: async righe => { db.persone = (db.persone || []).concat(righe.map(r => Object.assign({ fase:"lista", esito:null,
       proprietario:mio().id, creato_il:new Date().toISOString(), prossima_data:null, prossima_nota:null }, r))); salva(); },
     modificaPersona: async (id, campi) => { const x = (db.persone || []).find(y => y.id === id && y.proprietario === mio().id);

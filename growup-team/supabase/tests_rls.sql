@@ -1705,6 +1705,53 @@ begin
     delete from public.cerchie where id in (cl, li);
   end;
 
+  -- ---- 055: i contatti si cancellano 24 mesi dopo l'ultimo passo o ordine ----
+  declare
+    vec uuid; avv uuid; nuo uuid; cli uuid; pas uuid; dic uuid; tv text; tn text; n int;
+  begin
+    perform growup_test.come(u5);  -- A
+    insert into public.persone (nome) values ('Contatto Vecchio') returning id into vec;
+    insert into public.persone (nome) values ('Contatto Quasi') returning id into avv;
+    insert into public.persone (nome) values ('Contatto Nuovo') returning id into nuo;
+    insert into public.persone (nome) values ('Cliente Che Compra') returning id into cli;
+    insert into public.persone (nome) values ('Contatto Ripreso') returning id into pas;
+    insert into public.ordini (persona_id, data) values (cli, (now() - interval '3 months')::date);
+    insert into public.inviti_target (id, nome) values ('VECCHI', 'Target Vecchio'), ('NUOVO1', 'Target Nuovo');
+    perform growup_test.come(u4);  -- C
+    insert into public.persone (nome) values ('Contatto Di C') returning id into dic;
+    execute 'reset role';
+    -- si finge che il tempo sia passato (i trigger rimettono le date: qui si saltano)
+    perform set_config('session_replication_role', 'replica', true);
+    update public.persone set creato_il = now() - interval '25 months', aggiornato_il = now() - interval '25 months'
+     where id in (vec, cli, pas, dic);
+    update public.persone set creato_il = now() - interval '23 months 20 days', aggiornato_il = now() - interval '23 months 20 days'
+     where id = avv;
+    update public.inviti_target set creato_il = now() - interval '25 months' where id = 'VECCHI';
+    perform set_config('session_replication_role', 'origin', true);
+    perform growup_test.come(u5);  -- A fa un passo sul contatto ripreso: i 24 mesi ripartono
+    insert into public.passi (persona_id, tipo) values (pas, 'contatto');
+    perform growup_test.ok((select array_agg(persona_id order by si_cancella_il) from public.contatti_in_scadenza()) = array[vec, avv],
+                           '055: nell''avviso solo le mie persone che si cancellano entro 30 giorni (non i clienti che comprano, non chi ha un passo nuovo)');
+    perform growup_test.come(u4);  -- C
+    perform growup_test.ok((select array_agg(persona_id) from public.contatti_in_scadenza()) = array[dic],
+                           '055: ognuno vede solo le scadenze delle sue persone');
+    perform growup_test.deve_fallire('select public.pulisci_contatti_scaduti()', '055: la cancellazione la fa solo il server');
+    perform growup_test.deve_fallire('select * from public.contatti_scadenze()', '055: le scadenze di tutti non si leggono dall''app');
+    perform growup_test.come(null);  -- chi non è entrato
+    perform growup_test.deve_fallire('select * from public.contatti_in_scadenza()', '055: anon non legge le scadenze');
+    execute 'reset role';
+    n := public.pulisci_contatti_scaduti();
+    perform growup_test.ok(n = 2 and not exists (select 1 from public.persone where id in (vec, dic))
+                           and (select count(*) from public.persone where id in (avv, nuo, cli, pas)) = 4,
+                           '055: la pulizia della notte cancella solo chi è fermo da 24 mesi; restano chi compra e chi ha un passo nuovo');
+    perform growup_test.ok(not exists (select 1 from public.inviti_target where id = 'VECCHI')
+                           and exists (select 1 from public.inviti_target where id = 'NUOVO1'),
+                           '055: anche gli inviti del Target vecchi di 24 mesi si cancellano, i recenti restano');
+    delete from public.inviti_target where id = 'NUOVO1';
+    delete from public.ordini where persona_id = cli;
+    delete from public.persone where id in (avv, nuo, cli, pas);
+  end;
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),
