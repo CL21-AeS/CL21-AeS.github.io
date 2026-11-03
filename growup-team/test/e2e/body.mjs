@@ -3277,6 +3277,31 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
 }
 
+// 57. I contatti si cancellano 24 mesi dopo l'ultimo passo o ordine (055): l'avviso 30 giorni prima, solo per le mie persone
+{
+  const tra = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  DB.scadenze = [{ persona_id:"cp2", si_cancella_il:tra(12) }, { persona_id:"cc1", si_cancella_il:tra(0) }, { persona_id:"cpx", si_cancella_il:tra(3) }];
+  ({ ctx, page } = await apri({}, "#chiave=" + "c5".repeat(16)));
+  await page.getByText("Ciao Cerchia").waitFor(); await apriTappa(page);
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]");
+  const riga = page.locator("button[data-act=apri-persona]", { hasText:"Bea Ufficio" });
+  check(await riga.locator(".scade").textContent() === "si cancella tra 12 giorni"
+    && !await page.locator("button[data-act=apri-persona]", { hasText:"Anna Palestra" }).locator(".scade").count(),
+    "Lista: «si cancella tra 12 giorni» solo su chi scade entro 30 giorni");
+  await riga.click();
+  check(await page.locator("p.scade").textContent().then(t => t.startsWith("Si cancella tra 12 giorni: nessun passo né ordine da quasi 24 mesi")),
+    "scheda: l'avviso dice quando si cancella e perché");
+  await page.click("button[data-act=torna-lista]");
+  await page.click("button[data-sez=clienti]");
+  check(await page.locator("button[data-act=apri-cliente]", { hasText:"Gina Cliente" }).locator(".scade").textContent() === "si cancella stanotte",
+    "Clienti: anche un cliente senza ordini da 24 mesi è segnato");
+  await page.screenshot({ path: S + "/e2e/57-scadenze.png" });
+  check(!errori.length, "scadenze: nessun errore nella pagina");
+  await ctx.close();
+  DB.scadenze = [];
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

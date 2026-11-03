@@ -136,6 +136,8 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
     import subito per chi entra così
 41k. `supabase/053_cerchie.sql` — le cerchie della Lista: gruppi di nomi solo miei, una persona in più cerchie
 41l. `supabase/054_cerchie_clienti.sql` — le cerchie anche nei Clienti, separate da quelle della Lista (tipo della cerchia)
+41m. `supabase/055_contatti_24_mesi.sql` — i contatti di Lista, Target e Clienti si cancellano 24 mesi dopo l'ultimo passo o ordine; avviso 30 giorni prima
+41n. `supabase/055b_contatti_cron.sql` — l'attività pianificata della cancellazione, ogni notte (solo su Supabase, come la 050b)
 42. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
 21. `supabase/tests_rls.sql` — controlla i permessi. Deve finire con **TUTTI I CONTROLLI SUPERATI**

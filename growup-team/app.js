@@ -170,6 +170,7 @@ function creaApi(){
       if(!r || !r.length) await q(sb.from("durate").insert({ codice, giorni }));
     },
     numeriPersone: pid => q(sb.rpc("numeri_persone", { p_partner:pid })),
+    contattiInScadenza: () => q(sb.rpc("contatti_in_scadenza")),
     mostraTanti:  (io, ids) => q(sb.from("nascosti").delete().eq("partner_id", io).in("nascosto_id", ids)),
     stages:       () => q(sb.from("stage_requirements").select("*").order("ordine")),
     settings:     () => q(sb.from("settings").select("chiave,valore")),
@@ -1261,7 +1262,8 @@ function testoPrivacy(){
       <p><b>A cosa servono.</b> A pianificare la tua settimana e a farti aiutare da chi ti segue.</p>
       <p><b>Dove stanno.</b> In un database ospitato nell'Unione Europea (Supabase).</p>
       <p><b>Per quanto.</b> Il tuo profilo resta finché sei nella mappa Amway del gruppo; se ne esci, i tuoi dati si
-        cancellano da soli dopo 12 mesi. I nomi della lista e dei clienti restano finché non li togli tu.</p>
+        cancellano da soli dopo 12 mesi. I nomi della lista e dei clienti si cancellano da soli 24 mesi dopo l'ultimo passo
+        o ordine (ogni passo nuovo fa ripartire il conteggio), o prima se li togli tu.</p>
       <p><b>Chi ci aiuta.</b> Supabase (il database, nell'Unione Europea), GitHub (ospita l'app), Cloudflare (il
         controllo anti-robot al primo ingresso) e, se attivi le notifiche, il servizio del tuo telefono (Google, Apple):
         ognuno riceve solo quello che gli serve, mai i nomi della tua lista. Niente pubblicità e niente statistiche.</p>
@@ -3869,6 +3871,9 @@ async function caricaPersone(){
     const [persone, passi] = await Promise.all([api.persone(), api.passi()]);
     st.persone = persone || []; st.passi = passi || [];
   }catch(e){ st.persone = st.persone || []; st.passi = st.passi || []; }
+  /* 055: chi si cancella entro 30 giorni (24 mesi senza passi né ordini); lo calcola il database */
+  try{ st.scadenze = Object.fromEntries((await api.contattiInScadenza() || []).map(x => [x.persona_id, x.si_cancella_il])); }
+  catch(e){ st.scadenze = st.scadenze || {}; }
   try{
     const [c, pc] = await Promise.all([api.cerchie(), api.personeCerchie()]);
     st.cerchie = (c || []).sort((a, b) => a.nome.localeCompare(b.nome, "it")); st.pc = pc || [];
@@ -3876,6 +3881,11 @@ async function caricaPersone(){
   if(st.cerchiaLista && !st.cerchie.some(c => c.id === st.cerchiaLista)) st.cerchiaLista = null;
   if(st.cerchiaClienti && !st.cerchie.some(c => c.id === st.cerchiaClienti)) st.cerchiaClienti = null;
 }
+/* 055: «si cancella tra N giorni» per chi è fermo da quasi 24 mesi (null se non scade entro 30 giorni) */
+function scadenzaDi(pid){ const d = (st.scadenze || {})[pid]; return d ? Math.max(0, giorniTra(oggi(), d)) : null; }
+function testoScadenza(n){ return n === 0 ? "si cancella stanotte" : n === 1 ? "si cancella domani" : `si cancella tra ${n} giorni`; }
+function avvisoScadenza(p){ const n = scadenzaDi(p.id); return n === null ? "" :
+  `<p class="small scade" style="margin:6px 0 0">${testoScadenza(n).replace(/^s/, "S")}: nessun passo né ordine da quasi 24 mesi. Un passo o un ordine nuovo la tiene.</p>`; }
 /* le cerchie di una persona (id) e chi sta in una cerchia */
 function cerchieDi(pid){ return (st.pc || []).filter(x => x.persona_id === pid).map(x => x.cerchia_id); }
 function inCerchia(pid, cid){ return (st.pc || []).some(x => x.persona_id === pid && x.cerchia_id === cid); }
@@ -3966,7 +3976,7 @@ function rigaPersona(p, suIo){
   return `<li class="${suIo ? "su-io" : ""}"><button class="persona" data-act="apri-persona" data-id="${esc(p.id)}">
       <span class="grow"><b>${esc(p.nome)}</b>${maiComprato(p) ? ` <span class="pill g mini">Mai comprato</span>` : ""}${p.origine
         ? `<br><span class="small origine">${esc(p.origine)}</span>` : ""}<br><span class="small">${p.esito ? ESITI[p.esito] : f.nome}${p.prossima_data ? " · " + esc(testoProssima(p))
-        : fermo >= 14 ? ` · nessun passo da ${fermo} giorni` : ""}</span></span>
+        : fermo >= 14 ? ` · nessun passo da ${fermo} giorni` : ""}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
       <span class="punti" aria-hidden="true">${FASI.map((x, i) => `<i class="${i <= indiceFase(p.fase) ? "on" : ""}"></i>`).join("")}</span>
     </button>${suIo ? `<button class="x" data-act="togli-da-io" data-id="${esc(p.id)}" aria-label="Togli ${esc(p.nome)} da Io">×</button>` : ""}</li>`;
 }
@@ -3989,7 +3999,8 @@ function vPersone(){
       <span class="pulsanti"><button class="btn small" data-act="persone-tante">Importa</button>
       <button class="btn small primary" data-act="persona-nuova">+ Nome</button></span></div>
     ${aiutoTesto("lista", `Qui scrivi i nomi delle persone che conosci e segui ogni contatto passo per passo. I nomi li vedi solo tu:
-      alla tua upline arrivano solo i numeri (quanti contatti, quanti piani).`)}
+      alla tua upline arrivano solo i numeri (quanti contatti, quanti piani). Un nome senza passi da 24 mesi si cancella da solo:
+      30 giorni prima lo trovi segnato «si cancella tra…», e un passo nuovo lo tiene.`)}
     ${st.persone.length ? `
     <input type="search" id="cerca-lista" class="cerca" placeholder="Cerca un nome…" autocomplete="off" aria-label="Cerca un nome" value="${esc(st.cercaLista || "")}">
     <div class="row filtri scelte-rapide" style="gap:6px;margin-top:8px">${FILTRI_LISTA.map(x => {
@@ -4013,6 +4024,7 @@ function vPersona(){
     <div class="spread"><h2><button class="nome-modifica" data-act="persona-modifica" aria-label="Modifica i dati di ${esc(p.nome)}">${esc(p.nome)} <span aria-hidden="true">✎</span></button></h2>${maiComprato(p) ? `<span class="pill g">Mai comprato</span>` : ""}${p.esito ? `<span class="pill ${p.esito === "partner" || p.esito === "cliente" ? "v" : p.esito === "no" ? "r" : "g"}">${ESITI[p.esito]}</span>` : ""}</div>
     ${p.contatto || p.origine ? `<p class="small" style="margin:2px 0 0">${[p.contatto, p.origine].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
     ${cerchiePersona(p, "lista")}
+    ${avvisoScadenza(p)}
     ${(() => { const x = p.invito_target_id && st.inviti.find(y => y.id === p.invito_target_id);
       return x ? `<p class="small" style="margin:6px 0 0">Target: <b>${esc(statoInvito(x).txt)}</b>
         <button class="btn link small" data-act="apri-invito" data-id="${esc(x.id)}" style="min-height:0;padding:0 4px">${x.risposte ? "Vedi le risposte" : "Apri l'invito"}</button></p>`
@@ -5043,13 +5055,14 @@ function vClienti(){
       <span class="pulsanti">${btnAmway("Importa", "small")}
       <button class="btn small primary" data-act="cliente-nuovo">+ Cliente</button></span></div>
     ${aiutoTesto("clienti", `I tuoi clienti e i loro ordini: l'app ti avvisa quando un prodotto sta per finire o è ora di risentirli. Li vedi
-      solo tu. Gli ordini scritti qui servono per i riordini e non cambiano i tuoi VP: i VP arrivano dal report Amway.`)}
+      solo tu. Gli ordini scritti qui servono per i riordini e non cambiano i tuoi VP: i VP arrivano dal report Amway. Un cliente
+      senza ordini né passi da 24 mesi si cancella da solo (30 giorni prima lo trovi segnato).`)}
     ${tutti.length ? `<div class="row filtri scelte-rapide" style="gap:6px;margin-top:10px">${FILTRI_CLIENTI.map(x =>
       `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-clienti" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${tutti.filter(x.ok).filter(inC).length}</button>`).join("")}</div>
     ${rigaCerchie(tutti)}
     ${cerchiaVuota(tutti) || (l.length ? `<ul class="persone">${l.map(p => { const s = statoCliente(p);
       return `<li><button class="persona" data-act="apri-cliente" data-id="${esc(p.id)}">
-        <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${s.primo && s.key !== "fermo" ? (s.primo.codice ? `${esc(s.primo.nome)} · finisce il ${dataIt(s.primo.finisce)}` : `prossimo ordine atteso il ${dataIt(s.primo.finisce)}`) : esc(abitudine(p) || "nessun ordine")}</span></span>
+        <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${s.primo && s.key !== "fermo" ? (s.primo.codice ? `${esc(s.primo.nome)} · finisce il ${dataIt(s.primo.finisce)}` : `prossimo ordine atteso il ${dataIt(s.primo.finisce)}`) : esc(abitudine(p) || "nessun ordine")}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
         <span class="etichette">${etichetteOrdini(p)}<span class="pill ${s.cl}">${esc(s.txt)}</span></span></button></li>`; }).join("")}</ul>`
       : `<p class="muted" style="margin:10px 0 0">${filtro.id === "sentire" && !cerchia ? "Nessuno da sentire adesso." : "Nessun cliente qui."}</p>`)}`
     : `<p class="muted" style="margin:8px 0 0">Ancora nessun cliente. Entrano da qui con "+ Cliente", oppure dalla Lista quando chiudi una persona come Cliente.</p>`}
@@ -5067,6 +5080,7 @@ function vCliente(){
     <div class="spread"><h2><button class="nome-modifica" data-act="persona-modifica" aria-label="Modifica i dati di ${esc(p.nome)}">${esc(p.nome)} <span aria-hidden="true">✎</span></button></h2><span class="etichette">${etichetteOrdini(p)}<span class="pill ${s.cl}">${esc(s.txt)}</span></span></div>
     <p class="small" style="margin:2px 0 0">${[p.contatto, abitudine(p), c ? `compleanno ${c.testo}` : "", p.codice_cliente ? `codice cliente ${p.codice_cliente}` : ""].filter(Boolean).map(esc).join(" · ")}</p>
     ${cerchiePersona(p, "clienti")}
+    ${avvisoScadenza(p)}
     ${tel ? `<div class="row" style="gap:6px;margin-top:8px">
       <a class="btn small" href="tel:+${esc(tel)}">Chiama</a>
       <a class="btn small wa" target="_blank" rel="noopener" href="https://wa.me/${esc(tel)}">WhatsApp</a></div>` : ""}

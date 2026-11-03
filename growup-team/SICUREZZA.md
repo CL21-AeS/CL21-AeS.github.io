@@ -21,9 +21,9 @@ copia in Growup è un trattamento nuovo, con titolari diversi da Amway; da ricon
 conservazione, fornitori, diritto di scaricare i dati, reclamo al Garante, solo maggiorenni, niente pubblicità né
 statistiche (test e2e). **In attesa di Stefano:** nomi dei titolari e contatto.
 
-**🟠 Medio — La regola dei 24 mesi per i contatti non c'è ancora.** Decisa da Stefano il 3 novembre: un contatto si
-cancella 24 mesi dopo l'ultimo passo, il conteggio riparte a ogni passo. Oggi Lista, Target e Clienti restano per sempre.
-Da realizzare con una migrazione (cancellazione notturna con pg_cron, avviso 30 giorni prima). *Da decidere: i clienti.*
+**🟠 Medio — La regola dei 24 mesi per i contatti non c'era.** **Corretto** (migrazione 055, app v85): un contatto si
+cancella 24 mesi dopo l'ultimo passo o ordine (clienti: scelta A di Stefano, chi compra resta), il conteggio riparte a ogni
+passo, avviso «si cancella tra…» 30 giorni prima. L'attività della notte (055b) si accende dopo l'ok di Stefano.
 
 **🟡 Basso — Font da Google e libreria Supabase da jsDelivr.** Ogni apertura dell'app mandava l'indirizzo IP a Google
 (in Germania un tribunale ha condannato un sito per questo) e a jsDelivr. **Corretto**: font (`fonti/`, licenza OFL) e libreria
@@ -48,7 +48,7 @@ Amway.
 | Minimizzazione | In linea | Niente email, telefono e indirizzo dalla mappa |
 | Dati sulla salute | Scelta di Stefano | Regola già nota in Amway |
 | Diritti | In linea | Su richiesta; Lista scaricabile |
-| Conservazione | Da sistemare | 24 mesi per i contatti (da realizzare); clienti e copie da decidere |
+| Conservazione | In linea | Contatti e clienti: 24 mesi dall'ultimo passo o ordine (055); copie da decidere |
 | Cookie | In linea | Solo memoria tecnica, niente statistiche: niente banner |
 | Minori | In linea | «Solo maggiorenni» nell'informativa |
 | Registro e violazioni | Fatto | `PRIVACY.md` (bozza) |
@@ -65,8 +65,7 @@ Amway.
 
 ### Da decidere con Stefano
 1. Nomi e contatto dei titolari nell'informativa (Stefano sta valutando).
-2. Clienti: cancellare 24 mesi dopo l'ultimo ordine o passo (consigliato), o tenerli finché sono clienti.
-3. Copie di sicurezza: tenere le ultime 12 mensili (consigliato) e cancellare le più vecchie.
+2. Copie di sicurezza: tenere le ultime 12 mensili (consigliato) e cancellare le più vecchie.
 
 ## Come sono protetti i dati
 
@@ -101,6 +100,7 @@ Amway.
 | **Gruppo di un Platino senza app (052)** | `crea_invito_platino` solo per un admin, solo nella sua downline e solo nel gruppo di un Platino «nascosto» (senza app, linee nascoste nella mappa); chi è già nella mappa usa l'invito di sempre. Chi entra così (`area_platino`) può importare la sua mappa anche se in attesa; la regola del codice della riga 1 (048) e il perimetro (049) valgono anche per lui. Le funzioni di appoggio non si chiamano dall'app. |
 | **Cerchie della Lista (053)** | `cerchie` e `persone_cerchie` si vedono e si cambiano solo dal proprietario (RLS su `proprietario = my_partner_id()`); per mettere una persona in una cerchia persona e cerchia devono essere tutte e due mie. Né l'upline né gli admin le vedono. Colonne scrivibili limitate (`nome`; `persona_id`, `cerchia_id`); nome da 1 a 40 caratteri, unico per proprietario. Cancellando la cerchia o la persona si cancella solo il legame. |
 | **Cerchie dei Clienti (054)** | Stesse regole della 053. In più la colonna `tipo` (`lista` o `clienti`, controllata nel database) si sceglie solo creando la cerchia: non è tra le colonne aggiornabili. |
+| **Contatti dopo 24 mesi (055)** | Le persone di Lista, Target e Clienti si cancellano 24 mesi dopo l'ultima cosa fatta su di loro (inserimento, modifica, passo, ordine: la più recente); ogni passo fa ripartire il conteggio. La cancellazione la fa solo il server ogni notte (`pulisci_contatti_scaduti`, 055b, non chiamabile dall'app); `contatti_scadenze` (le scadenze di tutti) non si legge dall'app; `contatti_in_scadenza` restituisce solo le **mie** persone che scadono entro 30 giorni, per l'avviso nella Lista. I numeri già contati restano. |
 | **Niente cancellazioni** | Dall'app nessuno può cancellare persone (neanche gli admin): si possono solo nascondere. Eccezione: la pulizia della notte cancella chi è fuori dalla mappa da 12 mesi (050). La cancellazione per diritto all'oblio si fa dall'SQL Editor (`ADMIN.md`). |
 | **GitHub, storia** | 17 ottobre 2026: la storia del repository è stata riscritta per togliere ogni dato reale (nomi, codici Amway, numeri, codice d'invito, email dell'autore dei commit). |
 | **Tabelle nuove** | Da ottobre 2026 Supabase non dà più permessi automatici alle tabelle nuove: in Growup ogni tabella nasce con `revoke all` e i `grant` espliciti nella stessa migrazione, più la RLS. |
