@@ -3,6 +3,13 @@
 Ultimo aggiornamento: 28 ottobre 2026 (sera). Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Controllo sicurezza e privacy (3 novembre 2026)
+
+Controllo completo con la skill `sicurezza-privacy-app`: sicurezza a posto; font e libreria Supabase portati nell'app
+(niente IP a Google e jsDelivr), app v83. Da decidere con Stefano: informativa completa (bozza in `PRIVACY.md`), persone
+della mappa senza app, cancellazione dei contatti 24 mesi dopo l'ultimo passo (decisa, da realizzare), clienti e copie.
+Dettagli in `SICUREZZA.md`.
+
 ## Ripartire da qui (fermi la sera del 28 ottobre 2026)
 
 **Dove siamo** (aggiornato il 30 ottobre): migrazioni applicate su Supabase fino alla **046** (044b, 045 e 046 applicate
