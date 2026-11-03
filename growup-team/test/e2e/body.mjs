@@ -1034,6 +1034,16 @@ check(await page.evaluate(async () => { await document.fonts.ready;
     return document.fonts.check("700 16px Manrope") && document.fonts.check("700 20px 'Cormorant Garamond'") &&
       [...document.fonts].some(f => f.family.replace(/["']/g, "") === "Manrope" && f.status === "loaded"); }),
   "i font Manrope e Cormorant Garamond arrivano dall'app");
+/* consegna 1 (3 novembre): numeri in Source Serif, pesca solo per l'azione, pagina scelta avorio, pulsanti in basso bianchi */
+check(await page.evaluate(async () => { await document.fonts.ready;
+    const num = document.querySelector(".num"), cs = el => el ? getComputedStyle(el) : null;
+    const prim = document.querySelector(".btn.primary"), on = document.querySelector(".schede button.on"), giu = document.querySelector(".azioni .btn");
+    return document.fonts.check("700 20px 'Source Serif 4'")
+      && (!num || /Source Serif 4/.test(cs(num).fontFamily))
+      && (!prim || cs(prim).backgroundColor === "rgb(240, 138, 75)")
+      && (!on || cs(on).backgroundColor === "rgb(247, 240, 227)")
+      && (!giu || cs(giu).backgroundColor !== "rgb(240, 138, 75)"); }),
+  "grafica di base: numeri in Source Serif, pesca sul pulsante principale, pagina scelta avorio, pulsanti in basso non pesca");
 check(await page.evaluate(() => !!(window.supabase && window.supabase.createClient)) &&
     await page.locator('script[src="lib/supabase-2.117.2.js"][integrity^="sha384-"]').count() === 1 &&
     await page.locator('script[src*="jsdelivr"]').count() === 0,

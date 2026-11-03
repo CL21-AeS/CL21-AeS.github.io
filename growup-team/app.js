@@ -2413,9 +2413,11 @@ function etichettaDi(p){
 /* ---- Preferiti: le persone da seguire da vicino, con i loro numeri rispetto ai loro obiettivi ---- */
 function vPreferiti(){
   const l = alberoSotto(st.profilo.id, 0).map(x => x.p).filter(p => st.preferiti.has(p.id));
-  const vuoto = `<p class="small" style="margin:6px 0 0">Segna le persone che vuoi seguire da vicino: apri la loro scheda e tocca
-    <b>☆</b> accanto al nome. Qui vedi i loro numeri delle ultime 4 settimane rispetto ai loro obiettivi.</p>`;
-  if(!l.length) return `<div class="card"><span class="eyebrow">Preferiti</span>${vuoto}</div>`;
+  /* consegna 1 (3 novembre): una riga in vista, la spiegazione nel «?» */
+  const vuoto = `<p class="small" style="margin:6px 0 0">Segna le persone che vuoi seguire da vicino con <b>☆</b> nella loro scheda.</p>
+    ${aiutoTesto("preferiti", `Apri la scheda di una persona del tuo gruppo e tocca ☆ accanto al nome. Qui vedi i suoi numeri delle
+      ultime 4 settimane rispetto ai suoi obiettivi.`)}`;
+  if(!l.length) return `<div class="card"><span class="con-aiuto"><span class="eyebrow">Preferiti</span>${aiutoBtn("preferiti")}</span>${vuoto}</div>`;
   const schede = l.map(p => {
     const n = numeri4(p.id), o = obiettiviDi(p.id), sp = statoDi(p), r = rigaDi(st.riep, p.id) || {};
     const e = p.stato === "gestito" ? null : etichettaDi(p);
@@ -2620,14 +2622,14 @@ function vScheda(){
   ${vAccessoScheda(p)}
   ${vPlatinoScheda(p)}
   <div class="card">
-    <span class="eyebrow">Struttura</span>
+    <span class="con-aiuto"><span class="eyebrow">Struttura</span>${aiutoBtn("nascondi")}</span>
+    ${aiutoTesto("nascondi", `Nascosta sparisce solo per te, e solo lei: chi sta sotto di lei resta visibile. I suoi VP contano lo stesso
+      nei numeri personali e di gruppo. La rimetti quando vuoi da «Nascoste». Nell'app nessuno si cancella: la struttura
+      rispecchia il report Amway.`)}
     ${p.fuori_report_dal ? `<p class="small" style="margin:6px 0 0"><span class="pill g">non più nel report</span> da ${nomeMese(meseDi(p.fuori_report_dal))}</p>` : ""}
     ${st.nascosti.has(p.id)
       ? `<button class="btn wide" style="margin-top:10px" data-act="mostra" data-id="${esc(p.id)}">Mostra di nuovo nella mia struttura</button>`
       : `<button class="btn wide" style="margin-top:10px" data-act="nascondi" data-id="${esc(p.id)}">Nascondi dalla mia struttura</button>`}
-    <p class="nota">Nascosta sparisce solo per te, e solo lei: chi sta sotto di lei resta visibile. I suoi VP contano lo stesso
-      nei numeri personali e di gruppo.
-      La rimetti quando vuoi da «Nascoste». Nell'app nessuno si cancella: la struttura rispecchia il report Amway.</p>
   </div>`}`;
 }
 
@@ -2719,9 +2721,10 @@ function rigaInvito(x){
 function vInvita(){
   const miei = st.invitiMiei || [];
   return `<div class="card invita">
-    <span class="eyebrow">Invita un nuovo partner</span>
-    ${possoInvitare() ? `<p class="small" style="margin:4px 0 0">In Growup si entra solo su invito. Scrivi nome e codice Amway Partner della
-      persona: l'app ti dà un link solo per lei, che vale una volta e per 7 giorni.</p>
+    <span class="con-aiuto"><span class="eyebrow">Invita un nuovo partner</span>${aiutoBtn("invita")}</span>
+    ${aiutoTesto("invita", `In Growup si entra solo su invito. Scrivi nome e codice Amway Partner della persona: l'app ti dà un link
+      solo per lei, che vale una volta e per 7 giorni.`)}
+    ${possoInvitare() ? `
     <button class="btn primary wide" style="margin-top:10px" data-act="invita">Invita</button>`
       : `<p class="small" style="margin:4px 0 0">Potrai invitare quando una mappa importata ti avrà messo al tuo posto nella struttura.</p>`}
     ${miei.length ? `<h3 style="margin:16px 0 4px">I tuoi inviti</h3><ul class="oggi inviti">${miei.slice(0, 30).map(rigaInvito).join("")}</ul>` : ""}
@@ -6604,7 +6607,7 @@ function controllaTraguardi(){
 }
 
 /* I coriandoli: disegnati qui, senza librerie, nei colori dell'app; con un "tic" del telefono (Android) */
-const COLORI_FESTA = ["#13795b", "#34c08f", "#c26a3d", "#e08a5a", "#e2a46f", "#f3d9a8", "#0a3a2c"];
+const COLORI_FESTA = ["#13795b", "#34c08f", "#c26a3d", "#e08a5a", "#f08a4b", "#f3d9a8", "#0a3a2c"];
 function festeggia(tipo, titolo, sotto){
   const f = FESTE[tipo] || FESTE.piccola;
   const avviso = document.createElement("div");

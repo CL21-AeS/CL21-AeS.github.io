@@ -3,6 +3,13 @@
 Ultimo aggiornamento: 28 ottobre 2026 (sera). Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Piano «nuova Io» (approvato il 3 novembre 2026, sera)
+
+Il piano completo, con le decisioni e le 9 consegne, è in **`PIANO_IO.md`**: si riparte da lì. Consegna 1 (grafica di
+base: pesca `#f08a4b` solo per l'azione, selezione verde scuro / avorio, numeri in Source Serif 4 ospitato nell'app,
+spiegazioni di Preferiti, Invita e Nascondi nel «?», caselle nei colori dell'app, pulsanti in basso bianchi) in PR,
+app v86. Prossima: consegna 2, «Il mio giorno» nuova (proposta D).
+
 ## Controllo sicurezza e privacy (3 novembre 2026)
 
 **Contatti dopo 24 mesi** (migrazione **055**, app v85, scelta A per i clienti): Lista, Target e Clienti si cancellano 24
