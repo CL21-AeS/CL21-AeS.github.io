@@ -29,8 +29,8 @@ email, indirizzo e Paesi esteri non arrivano mai al database.
 
 - Partner che usano l'app: **consenso** dato al primo ingresso (casella non spuntata, salvato in
   `partners.privacy_accettata_il`).
-- Persone della mappa senza app: **interesse legittimo** dell'organizzazione del gruppo. Queste persone oggi **non
-  ricevono l'informativa**: vedi «Da fare».
+- Persone della mappa senza app: **interesse legittimo** dell'organizzazione del gruppo. Non ricevono un'informativa
+  da Growup: scelta di Stefano (3 novembre), perché chi importa vede già gli stessi dati nel sito Amway.
 - Persone della Lista e Clienti: interesse legittimo del partner a ricontattare chi conosce; niente dati che non
   servono.
 
@@ -39,9 +39,9 @@ email, indirizzo e Paesi esteri non arrivano mai al database.
 | Fornitore | Cosa fa | Dove | Da fare |
 |---|---|---|---|
 | Supabase | Database e accessi | UE (Francoforte) | Controllare che l'accordo DPA sia accettato (Organization → Legal) |
-| GitHub Pages | Ospita il codice dell'app; registra l'indirizzo IP di chi apre la pagina | USA (Data Privacy Framework) | Citarlo nell'informativa |
-| Cloudflare Turnstile | Captcha al primo ingresso | USA (Data Privacy Framework) | Citarlo nell'informativa |
-| Google, Apple, Mozilla, Microsoft | Consegnano le notifiche (contenuto cifrato, senza nomi) | USA | Citarli nell'informativa |
+| GitHub Pages | Ospita il codice dell'app; registra l'indirizzo IP di chi apre la pagina | USA (Data Privacy Framework) | Citato nell'informativa |
+| Cloudflare Turnstile | Captcha al primo ingresso | USA (Data Privacy Framework) | Citato nell'informativa |
+| Google, Apple, Mozilla, Microsoft | Consegnano le notifiche (contenuto cifrato, senza nomi) | USA | Citati nell'informativa |
 | jsDelivr | Solo per l'admin che importa il listino Amway (lettore PDF) | CDN mondiale | Nessuno |
 
 Dal 3 novembre 2026 font e libreria Supabase stanno nell'app: aprendo Growup nessun indirizzo IP arriva a Google o a
@@ -62,8 +62,8 @@ un admin dall'SQL Editor (`ADMIN.md`). La Lista si scarica dall'app («Scarica u
 
 ## Da fare
 
-- [ ] Informativa completa nell'app e in una pagina pubblica (proposta nel controllo del 3 novembre).
-- [ ] Informare le persone della mappa senza app (pagina pubblica dell'informativa + chi importa avvisa il suo gruppo).
+- [x] Informativa con conservazione, fornitori, reclamo al Garante e solo maggiorenni (3 novembre, v84).
+- [ ] Nomi e contatto dei titolari nell'informativa (in attesa di Stefano).
 - [ ] Cancellazione automatica dei contatti dopo 24 mesi dall'ultimo passo, con avviso 30 giorni prima.
 - [ ] Decidere per quanto tenere i clienti e le copie di sicurezza.
 - [ ] Verificare con le regole Amway per gli incaricati l'uso dei dati del gruppo e delle mappe.

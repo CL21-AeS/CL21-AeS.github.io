@@ -1260,8 +1260,15 @@ function testoPrivacy(){
         che conosci, con i dati che servono a ricontattarle; le togli quando vuoi.</p>
       <p><b>A cosa servono.</b> A pianificare la tua settimana e a farti aiutare da chi ti segue.</p>
       <p><b>Dove stanno.</b> In un database ospitato nell'Unione Europea (Supabase).</p>
-      <p><b>I tuoi diritti.</b> Puoi chiedere in qualsiasi momento di vedere, correggere o cancellare il tuo
-        profilo e tutti i tuoi dati: scrivi a Stefano e Alessia (A&amp;S).</p>
+      <p><b>Per quanto.</b> Il tuo profilo resta finché sei nella mappa Amway del gruppo; se ne esci, i tuoi dati si
+        cancellano da soli dopo 12 mesi. I nomi della lista e dei clienti restano finché non li togli tu.</p>
+      <p><b>Chi ci aiuta.</b> Supabase (il database, nell'Unione Europea), GitHub (ospita l'app), Cloudflare (il
+        controllo anti-robot al primo ingresso) e, se attivi le notifiche, il servizio del tuo telefono (Google, Apple):
+        ognuno riceve solo quello che gli serve, mai i nomi della tua lista. Niente pubblicità e niente statistiche.</p>
+      <p><b>I tuoi diritti.</b> Puoi chiedere in qualsiasi momento di vedere, correggere, scaricare o cancellare il tuo
+        profilo e tutti i tuoi dati: scrivi a Stefano e Alessia (A&amp;S). Se pensi che i tuoi dati non siano trattati
+        bene, puoi fare reclamo al Garante per la protezione dei dati personali (garanteprivacy.it).</p>
+      <p><b>Solo maggiorenni.</b> Growup è riservata a chi ha almeno 18 anni.</p>
     </div>`;
 }
 

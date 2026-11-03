@@ -12,14 +12,14 @@ che non deve. Le cose da sistemare riguardano la **privacy** (informativa, perso
 dei contatti dopo 24 mesi): servono decisioni di Stefano.
 
 ### Problemi trovati
-**🟠 Medio — Le persone della mappa senza app non ricevono l'informativa.** Chi importa la mappa porta nel database
-nome, codice, VP e percentuale di tutto il suo gruppo; chi non usa l'app non sa che i suoi dati sono in Growup. Rischio:
-una persona che si lamenta col Garante. Proposta: informativa anche in una pagina pubblica dell'app e un avviso a chi
-importa («informa il tuo gruppo»). *Da decidere con Stefano.*
+**Scelta di Stefano — Persone della mappa senza app.** Chi importa la mappa porta nel database nome, codice, VP e
+percentuale del suo gruppo; chi non usa l'app non riceve l'informativa. Stefano (3 novembre): non si aggiunge niente,
+perché chi importa vede già gli stessi dati nel sito Amway e Growup ne è solo una copia. Rischio noto: per la legge la
+copia in Growup è un trattamento nuovo, con titolari diversi da Amway; da riconsiderare se cambia l'uso delle mappe.
 
-**🟠 Medio — Informativa incompleta.** Quella dell'app è chiara ma mancano: nomi dei titolari e contatto, basi giuridiche,
-tempi di conservazione, fornitori (Supabase, GitHub, Cloudflare, servizi di notifica), diritto di reclamo al Garante,
-diritto di scaricare i propri dati, solo maggiorenni. Bozza dei contenuti in `PRIVACY.md`. *Testo da approvare.*
+**🟠 Medio — Informativa incompleta.** **Corretto in parte** (3 novembre, v84, ok di Stefano): aggiunti tempi di
+conservazione, fornitori, diritto di scaricare i dati, reclamo al Garante, solo maggiorenni, niente pubblicità né
+statistiche (test e2e). **In attesa di Stefano:** nomi dei titolari e contatto.
 
 **🟠 Medio — La regola dei 24 mesi per i contatti non c'è ancora.** Decisa da Stefano il 3 novembre: un contatto si
 cancella 24 mesi dopo l'ultimo passo, il conteggio riparte a ogni passo. Oggi Lista, Target e Clienti restano per sempre.
@@ -31,28 +31,26 @@ Da realizzare con una migrazione (cancellazione notturna con pg_cron, avviso 30 
 esterni. Verificato con i test (697 controlli) e con la CSP vera: nessuna richiesta a Google o jsDelivr. Resta jsDelivr
 solo per il lettore PDF del listino, usato dall'admin.
 
-**🟡 Basso — Note libere senza avviso sui dati sulla salute.** Note della Lista, dei passi e «Perché» dell'obiettivo
-sono testo libero: in un'attività di prodotti per il benessere ci possono finire peso o malattie. Proposta: una riga
-sotto i campi («Non scrivere dati sulla salute»). *Testo da approvare.*
+**Scelta di Stefano — Note libere.** Nessun avviso sui dati sulla salute vicino alle note: è una regola già nota in
+Amway.
 
-**🟡 Basso — Ancora aperti dal 17 ottobre:** verifica in due passaggi su GitHub, Supabase e Google; copie in una cartella
-privata di Drive (e per quanto tenerle). Da fare a Stefano.
+**Fatto da Stefano:** verifica in due passaggi su GitHub, Supabase e Google; copie in una cartella privata di Drive.
 
 ### Privacy
 | Punto | Stato | Cosa fare |
 |---|---|---|
-| Titolari | Da sistemare | Stefano e Alessia, persone fisiche: nomi e contatto nell'informativa |
-| Fornitori | Da sistemare | Citarli nell'informativa; controllare DPA di Supabase |
-| Informativa | Da sistemare | Completare (bozza in `PRIVACY.md`) |
+| Titolari | In attesa di Stefano | Stefano e Alessia, persone fisiche: nomi e contatto nell'informativa |
+| Fornitori | In linea | Citati nell'informativa; controllare che il DPA di Supabase sia accettato |
+| Informativa | Quasi | Mancano solo titolari e contatto |
 | Base giuridica e consenso | In linea | Consenso con casella non spuntata e data salvata |
-| Dati inseriti da altri | In linea per chi entra (vede l'informativa al primo ingresso); da sistemare per la mappa | Vedi primo problema |
+| Dati inseriti da altri | In linea per chi entra; mappa: scelta di Stefano | Vedi sopra |
 | Contatti esterni | In linea | Solo del proprietario, nessun dato inutile |
 | Minimizzazione | In linea | Niente email, telefono e indirizzo dalla mappa |
-| Dati sulla salute | Da sistemare | Avviso vicino alle note |
+| Dati sulla salute | Scelta di Stefano | Regola già nota in Amway |
 | Diritti | In linea | Su richiesta; Lista scaricabile |
 | Conservazione | Da sistemare | 24 mesi per i contatti (da realizzare); clienti e copie da decidere |
-| Cookie | In linea | Solo memoria tecnica, niente statistiche: niente banner; citarla nell'informativa |
-| Minori | Da sistemare | Scrivere «solo maggiorenni» |
+| Cookie | In linea | Solo memoria tecnica, niente statistiche: niente banner |
+| Minori | In linea | «Solo maggiorenni» nell'informativa |
 | Registro e violazioni | Fatto | `PRIVACY.md` (bozza) |
 | Regole Amway | Da verificare | Stefano |
 
@@ -66,8 +64,7 @@ privata di Drive (e per quanto tenerle). Da fare a Stefano.
 - Storia di GitHub: nessuna chiave segreta (solo la publishable e la Site Key del captcha, pubbliche).
 
 ### Da decidere con Stefano
-1. Informativa per le persone della mappa senza app: pagina pubblica + avviso a chi importa (consigliato), oppure solo
-   l'avviso a chi importa.
+1. Nomi e contatto dei titolari nell'informativa (Stefano sta valutando).
 2. Clienti: cancellare 24 mesi dopo l'ultimo ordine o passo (consigliato), o tenerli finché sono clienti.
 3. Copie di sicurezza: tenere le ultime 12 mensili (consigliato) e cancellare le più vecchie.
 

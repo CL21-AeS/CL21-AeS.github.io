@@ -301,6 +301,10 @@ await sync(page); await ctx.close();
 // 7. Radice (privacy non ancora accettata) entra con il link personale
 ({ ctx, page } = await apri({ colorScheme:"dark" }, "#chiave=" + "a".repeat(32)));
 await page.getByText("Il tuo profilo è già pronto").waitFor();
+/* informativa (3 novembre): conservazione, fornitori, reclamo al Garante, solo maggiorenni */
+check(await page.evaluate(() => { const t = document.querySelector("form[data-form=privacy-primo]").textContent;
+    return ["Per quanto.", "dopo 12 mesi", "Supabase", "GitHub", "Cloudflare", "Garante per la protezione dei dati personali", "almeno 18 anni"].every(x => t.includes(x)); }),
+  "l'informativa dice per quanto si tengono i dati, chi aiuta, il reclamo al Garante e solo maggiorenni");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);

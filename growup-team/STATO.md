@@ -6,8 +6,9 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 ## Controllo sicurezza e privacy (3 novembre 2026)
 
 Controllo completo con la skill `sicurezza-privacy-app`: sicurezza a posto; font e libreria Supabase portati nell'app
-(niente IP a Google e jsDelivr), app v83. Da decidere con Stefano: informativa completa (bozza in `PRIVACY.md`), persone
-della mappa senza app, cancellazione dei contatti 24 mesi dopo l'ultimo passo (decisa, da realizzare), clienti e copie.
+(niente IP a Google e jsDelivr); informativa con conservazione, fornitori, reclamo al Garante e solo maggiorenni, app v84.
+In attesa di Stefano: nomi e contatto dei titolari. Prossimo lavoro: cancellazione dei contatti 24 mesi dopo l'ultimo
+passo (decisa). Scelte di Stefano: nessuna informativa extra per la mappa, nessun avviso sulle note.
 Dettagli in `SICUREZZA.md`.
 
 ## Ripartire da qui (fermi la sera del 28 ottobre 2026)
