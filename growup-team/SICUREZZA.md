@@ -23,7 +23,7 @@ statistiche (test e2e). **In attesa di Stefano:** nomi dei titolari e contatto.
 
 **🟠 Medio — La regola dei 24 mesi per i contatti non c'era.** **Corretto** (migrazione 055, app v85): un contatto si
 cancella 24 mesi dopo l'ultimo passo o ordine (clienti: scelta A di Stefano, chi compra resta), il conteggio riparte a ogni
-passo, avviso «si cancella tra…» 30 giorni prima. L'attività della notte (055b) si accende dopo l'ok di Stefano.
+passo, avviso «si cancella tra…» 30 giorni prima. Attività della notte (055b) accesa il 3 novembre con l'ok di Stefano.
 
 **🟡 Basso — Font da Google e libreria Supabase da jsDelivr.** Ogni apertura dell'app mandava l'indirizzo IP a Google
 (in Germania un tribunale ha condannato un sito per questo) e a jsDelivr. **Corretto**: font (`fonti/`, licenza OFL) e libreria
