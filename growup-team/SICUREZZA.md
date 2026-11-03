@@ -65,7 +65,7 @@ Amway.
 
 ### Da decidere con Stefano
 1. Nomi e contatto dei titolari nell'informativa (Stefano sta valutando).
-2. Copie di sicurezza: tenere le ultime 12 mensili (consigliato) e cancellare le più vecchie.
+2. ~~Copie di sicurezza~~: le gestisce Stefano su Drive.
 
 ## Come sono protetti i dati
 
