@@ -64,5 +64,6 @@ Ogni consegna: schermate chiaro/scuro se cambia la grafica, test database e inte
 - 4 novembre 2026: consegna 5 pronta (PR #164, unita).
 - 4 novembre 2026: consegna 6 pronta (PR #165, unita; 058 applicata). Scelte: perché obbligatorio, «Per iniziare» anche per chi c'è già,
   nomi nuovi senza obiettivo, punto con l'upline generico.
-- 4 novembre 2026: consegna 7 pronta (PR, migrazione 059 da applicare). Scelte: il percorso resta finché non è finito; binario
+- 4 novembre 2026: consegna 7 pronta (PR #166, unita; 059 applicata). Scelte: il percorso resta finché non è finito; binario
   Prodotto con i soli clienti.
+- 4 novembre 2026: consegna 8 pronta (PR, migrazione 060 da applicare).

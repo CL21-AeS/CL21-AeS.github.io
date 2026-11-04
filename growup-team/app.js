@@ -172,6 +172,11 @@ function creaApi(){
       if(!r || !r.length) await q(sb.from("durate").insert({ codice, giorni }));
     },
     numeriPersone: pid => q(sb.rpc("numeri_persone", { p_partner:pid })),
+    /* 060: i numeri della partenza (senza argomento: chi ho invitato io) e chi ho tolto con la × */
+    partenze:     pid => q(sb.rpc("partenze", pid ? { p_partner:pid } : {})),
+    partenzaTolti: () => q(sb.from("partenza_tolti").select("nuovo_id,fase")),
+    togliPartenza: (nuovo_id, fase) => q(sb.from("partenza_tolti").upsert({ nuovo_id, fase }, { onConflict:"partner_id,nuovo_id" })),
+    rimettiPartenza: nuovo_id => q(sb.from("partenza_tolti").delete().eq("nuovo_id", nuovo_id)),
     contattiInScadenza: () => q(sb.rpc("contatti_in_scadenza")),
     mostraTanti:  (io, ids) => q(sb.from("nascosti").delete().eq("partner_id", io).in("nascosto_id", ids)),
     stages:       () => q(sb.from("stage_requirements").select("*").order("ordine")),
@@ -215,6 +220,7 @@ const st = {
   accessi: new Map(),     // chi è da confermare o bloccato, tra chi vedo
   ingressi: new Map(),    // la data di ingresso di chi vedo (filtro «Nuovi» del Gruppo)
   filtroGruppo: "tutti",  // il filtro scelto nel Gruppo
+  partenze: [], partenzaTolti: new Map(), partenzaScheda: {},   // consegna 8: i nuovi in partenza
   linkGestito: null,      // { nome, chiave }: nuovo link personale creato dall'admin per chi l'ha perso
   nascosti: new Set(),    // persone nascoste dalla mia struttura (solo loro: chi sta sotto resta)
   persone: [], passi: [], // la mia lista (solo mia) e i suoi passi
@@ -944,6 +950,8 @@ async function caricaStruttura(){
   try{ st.nascosti = new Set((await api.nascosti() || []).map(r => r.nascosto_id)); }catch(e){}
   try{ st.prossime = new Map((await api.prossime() || []).map(r => [r.partner_id, r.prossima_qualifica])); }catch(e){ st.prossime = new Map(); }
   try{ st.inAttesa = await api.inAttesa() || []; }catch(e){ st.inAttesa = []; }
+  try{ st.partenze = await api.partenze() || []; st.partenzaTolti = new Map((await api.partenzaTolti() || []).map(r => [r.nuovo_id, Number(r.fase)])); }
+  catch(e){ st.partenze = st.partenze || []; st.partenzaTolti = st.partenzaTolti || new Map(); }
   try{ st.invitiMiei = await api.inviti() || []; }catch(e){ st.invitiMiei = []; }
 }
 
@@ -1411,6 +1419,7 @@ function vHome(){
   </div>
   ${vBarraFissa()}
   ${st.vista === "scheda" ? vScheda() : gruppo ? `
+  ${vNuoviInPartenza()}
   ${vPreferiti()}
   ${vStruttura()}
   ${vInAttesa()}
@@ -2531,7 +2540,7 @@ const FILTRI_GRUPPO = [
   { id:"con-vp", nome:"Con VP", ok:(p, r) => Number(r.vp_personali) > 0 },
   { id:"senza-vp", nome:"Senza VP", ok:(p, r) => !(Number(r.vp_personali) > 0) },
   { id:"oltre-200", nome:"Oltre 200 VP", ok:(p, r) => Number(r.vp_personali) > 200 },
-  { id:"nuovi", nome:"Nuovi", ok:p => String(st.ingressi && st.ingressi.get(p.id) || "").slice(0, 7) === meseDi(oggi()) },
+  { id:"nuovi", nome:"Nuovi", ok:p => !!nuovoDa(p.id) },
   { id:"app", nome:"Usano l'app", ok:p => p.stato !== "gestito" },
   { id:"senza-app", nome:"Senza app", ok:p => p.stato === "gestito" },
   { id:"percentuale", nome:"Percentuale", ok:(p, r) => Number(r.percentuale) > 0 }
@@ -2586,6 +2595,7 @@ function vStruttura(){
       ${quanti ? `<button class="piega" data-act="piega" data-id="${esc(p.id)}" data-quanti="${quanti}" aria-expanded="${!chiuso}"
         aria-label="${chiuso ? "Mostra" : "Nascondi"} il gruppo di ${esc(p.nome)}">${chiuso ? "▸" : "▾"} ${quanti}</button>` : ""}
       ${p.fuori_report_dal ? `<span class="pill g" title="Non più nel report Amway">fuori</span>` : ""}
+      ${etichettaNuovo(p.id)}
       ${etichetteAccesso(p)}
       ${completa ? (nascosta ? `<button class="btn small" data-act="mostra" data-id="${esc(p.id)}">Mostra</button>`
         : `<button class="btn small ghost" data-act="nascondi-qui" data-id="${esc(p.id)}">Nascondi</button>`)
@@ -2612,6 +2622,95 @@ function percorsoHtml(p){
   return `<span class="small percorso">Linea di ${frontale} › <button class="puntini" data-act="percorso-intero" aria-label="Mostra tutto il percorso">…</button><span class="intero">${mezzo.join(" › ")}</span> › ${sponsor} (sponsor)<button class="chiudi-percorso" data-act="percorso-corto" aria-label="Richiudi il percorso">Chiudi ▴</button></span>`;
 }
 
+/* ---- Consegna 8: lo sponsor e i suoi nuovi. «I tuoi nuovi in partenza» (solo chi ho invitato io e usa l'app, finché
+   non ha finito): i nuovi con la fase del percorso, gli avviati con «Per iniziare». La × li toglie solo da qui; tornano
+   se vanno avanti di fase. Nella struttura «Nuovo · N gg» (i giorni per il primo ordine) o «ordine ✓». Solo numeri. ---- */
+/* un nuovo nella struttura (iscritto da meno di 30 giorni): i giorni che restano e se il primo ordine è fatto */
+function nuovoDa(id){
+  const d = st.ingressi && st.ingressi.get(id);
+  if(!d) return null;
+  const g = giorniTra(String(d).slice(0, 10), oggi());
+  if(g < 0 || g >= GIORNI_NUOVO) return null;
+  const x = (st.partenze || []).find(y => y.id === id), r = rigaDi(st.riep, id) || {};
+  const vp = x ? Number(x.vp_dal_ingresso) || 0 : Number(r.vp_personali) || 0;
+  return { restano:GIORNI_NUOVO - g, ordine:vp >= PRIMO_ORDINE_VP, vp };
+}
+const PRIMO_ORDINE_VP = 50;
+function etichettaNuovo(id){
+  const n = nuovoDa(id);
+  return n ? `<span class="pill nuovo">${n.ordine ? "Nuovo · ordine ✓" : `Nuovo · ${n.restano} gg`}</span>` : "";
+}
+/* le fasi di una partenza vista dallo sponsor: dai soli numeri */
+function partenzaDi(x){
+  const ingresso = String(x.ingresso || "").slice(0, 10), isc = String(x.data_iscrizione || "").slice(0, 10);
+  const nuovo = isc && ingresso && giorniTra(isc, ingresso) <= GIORNI_NUOVO;
+  if(nuovo){
+    if(x.partenza_completata_il) return null;
+    const nomi = Number(x.nomi_lista) || 0, vp = Number(x.vp_dal_ingresso) || 0, restano = GIORNI_NUOVO - giorniTra(isc, oggi());
+    const fasi = [
+      { nome:"Il suo perché", fatto:!!x.ha_perche, sotto:x.ha_perche ? "obiettivo scritto" : "obiettivo da scrivere" },
+      { nome:"Partenza con te", fatto:!!x.incontro_sponsor && nomi >= NOMI_PARTENZA,
+        sotto:`Incontro: ${x.incontro_sponsor ? riassuntoAgenda(String(x.incontro_sponsor).slice(0, 10)) : "data da fissare"} · Lista ${num(Math.min(nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}` },
+      { nome:"Il primo ordine", fatto:vp >= PRIMO_ORDINE_VP,
+        sotto:vp >= PRIMO_ORDINE_VP ? `fatto · ${num(vp)} VP` : `${num(vp)} / ${PRIMO_ORDINE_VP} VP · ${restano >= 0 ? `restano ${restano} giorni` : "oltre i 30 giorni"}` },
+      { nome:"I due binari", fatto:Number(x.piani) > 0 && Number(x.clienti) > 0,
+        sotto:`${Number(x.piani) > 0 ? "primo piano fatto" : "primo piano"} · ${Number(x.clienti) > 0 ? "primo cliente fatto" : "primo cliente"}` },
+      { nome:"Partenza completata", fatto:false, sotto:"poi il Seguimi" }];
+    const qui = fasi.findIndex(f => !f.fatto);
+    const manca = fasi.slice(0, 4).filter(f => !f.fatto);
+    return { tipo:"nuovo", fase:qui + 1, tot:5, fasi, qui,
+      manca:manca.length ? `Manca: ${manca[0].nome === "Partenza con te" ? (x.incontro_sponsor ? "" : "la data del vostro primo incontro · ") + `Lista ${num(Math.min(nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}`
+        : manca[0].nome === "I due binari" ? fasi[3].sotto : manca[0].sotto}` : "" };
+  }
+  /* avviato: «Per iniziare» (il perché, il punto con l'upline, la mappa se ha un gruppo) */
+  const fasi = [{ nome:"Il suo perché", fatto:!!x.ha_perche, sotto:"" },
+    { nome:"Il punto con la sua upline", fatto:!!x.punto_upline_fatto, sotto:x.punto_upline && !x.punto_upline_fatto ? `fissato per ${riassuntoAgenda(String(x.punto_upline).slice(0, 10))}` : "" }];
+  if(x.ha_gruppo) fasi.push({ nome:"Importa la sua mappa", fatto:!!x.mappa_importata, sotto:"" });
+  const fatti = fasi.filter(f => f.fatto).length;
+  if(fatti === fasi.length) return null;
+  return { tipo:"avviato", fase:fatti, tot:fasi.length, fasi, qui:fasi.findIndex(f => !f.fatto),
+    manca:`Manca: ${fasi.filter(f => !f.fatto).map(f => f.nome.toLowerCase()).join(" · ")}` };
+}
+function vNuoviInPartenza(){
+  const l = (st.partenze || []).map(x => ({ x, z:partenzaDi(x) })).filter(({ x, z }) => z && !(st.partenzaTolti.has(x.id) && st.partenzaTolti.get(x.id) >= z.fase));
+  if(!l.length) return "";
+  return `<div class="card nuovi-partenza">
+    <div class="spread"><span class="eyebrow">I tuoi nuovi in partenza</span><span class="small">invitati da te · × per toglierli</span></div>
+    <ul class="partenze-l">${l.map(({ x, z }) => { const apri = st.struttura.some(y => y.id === x.id), g = giorniTra(String(x.ingresso).slice(0, 10), oggi());
+      const fase = z.tipo === "nuovo" ? `Fase ${z.fase} di ${z.tot}` : `Per iniziare ${z.fase} di ${z.tot}`;
+      return `<li data-id="${esc(x.id)}">
+        <div class="spread"><span><b>${esc(x.nome)}</b> <span class="small">· ${g <= 0 ? "da oggi" : g === 1 ? "da 1 giorno" : `da ${num(g)} giorni`}</span></span>
+          <span class="row" style="gap:4px;align-items:center">${apri ? `<button class="btn link small" data-act="apri-scheda" data-id="${esc(x.id)}">${fase} ›</button>` : `<span class="small">${fase}</span>`}
+            <button class="x" data-act="togli-partenza" data-id="${esc(x.id)}" data-fase="${z.fase}" aria-label="Togli ${esc(x.nome)} dai nuovi in partenza">×</button></span></div>
+        <div class="barre-partenza" aria-hidden="true">${z.fasi.map((f, i) => `<i class="${f.fatto ? "fatta" : i === z.qui ? "qui" : ""}"></i>`).join("")}</div>
+        ${z.manca ? `<span class="small">${esc(z.manca)}</span>` : ""}</li>`; }).join("")}</ul>
+  </div>`;
+}
+/* nella scheda: il percorso del nuovo (con l'app) o il primo ordine dalla mappa (senza app) */
+function vPartenzaScheda(p){
+  if(p.stato === "gestito"){
+    const n = nuovoDa(p.id);
+    if(!n) return "";
+    const pct = Math.min(100, Math.round(n.vp / PRIMO_ORDINE_VP * 100));
+    return `<div class="card partenza-scheda">
+      <span class="eyebrow">Il primo ordine</span>
+      <div class="spread" style="align-items:baseline"><b class="num grande">${num(n.vp)}<small> / ${PRIMO_ORDINE_VP} VP</small></b>
+        <b class="${n.ordine ? "ok" : "pesca-t"}">${n.ordine ? "fatto ✓" : `restano ${n.restano} giorni`}</b></div>
+      <div class="bar" role="progressbar" aria-label="VP del primo ordine" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+      <p class="small" style="margin:0">Dalla mappa importata. Non usa Growup: il suo percorso si vede quando entra con il suo invito.</p>
+      ${possoInvitare() ? `<button class="btn primary wide" data-act="invita" data-nome="${esc(p.nome)}">Invitalo in Growup</button>` : ""}
+    </div>`;
+  }
+  const x = st.partenzaScheda[p.id], z = x && partenzaDi(x);
+  if(!z) return "";
+  return `<div class="card partenza-scheda">
+    <span class="eyebrow">${z.tipo === "nuovo" ? `Percorso di partenza · fase ${z.fase} di ${z.tot}` : `Per iniziare · ${z.fase} di ${z.tot}`}</span>
+    <ul class="percorso-scheda">${z.fasi.map((f, i) => `<li class="${f.fatto ? "fatto" : i === z.qui ? "qui" : ""}"><span class="segno" aria-hidden="true">${f.fatto ? "✓" : ""}</span>
+      <span class="grow"><b>${esc(f.nome)}</b>${f.sotto ? `<br><span class="small">${esc(f.sotto)}</span>` : ""}</span></li>`).join("")}</ul>
+    <p class="nota" style="margin:0">Vedi solo i numeri della sua Lista, mai i nomi.</p>
+  </div>`;
+}
+
 /* l'elenco di un filtro: una riga per persona, con livello e sponsor; «Percentuale» va dalla più alta */
 function vElencoFiltrato(righe, filtro){
   const pos = posizioni();
@@ -2628,7 +2727,8 @@ function vElencoFiltrato(righe, filtro){
         <span>${esc(p.nome)}</span>
         <span class="small">${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${x ? ` · sotto ${esc(x.sponsor)}` : ""}${ingresso}</span>
       </button></div>
-      ${filtro.id === "percentuale" ? `<span class="pill v">${Number(r.percentuale) || 0}%</span>` : `<span class="pill ${sp.cl}">${sp.txt}</span>`}</li>`; }).join("")}</ul>`;
+      ${etichettaNuovo(p.id)}${filtro.id === "percentuale" ? `<span class="pill v">${Number(r.percentuale) || 0}%</span>` : `<span class="pill ${sp.cl}">${sp.txt}</span>`}</li>`; }).join("")}</ul>
+    ${filtro.id === "nuovi" ? `<p class="small" style="margin:6px 0 0">Nuovi = iscritti da meno di 30 giorni, il tempo per il primo ordine. Sull'etichetta i giorni che restano, o ✓ se il primo ordine è fatto.</p>` : ""}`;
 }
 
 /* ---- Blocco 3: imbuto del gruppo ed etichette (ultime 4 settimane) ---- */
@@ -2866,6 +2966,7 @@ function vScheda(){
     <p class="small" style="margin:10px 0 0">Punto di partenza dichiarato: <b>${esc(testoPartenza(p))}</b></p>
     ${gestito ? "" : vNumeriLista(p.id)}
   </div>
+  ${vPartenzaScheda(p)}
   ${vComeArrivarci(p.id, "lui")}
   ${vConfronto(p)}
   <button class="btn wide" style="margin-top:4px" data-act="apri-analisi" data-id="${esc(p.id)}">Analisi di ${esc(nomeSaluto(p.nome))} ›</button>
@@ -3767,6 +3868,7 @@ const AZIONI = {
     try{ st.attScheda = (await api.activities(p.id, primaDataAperta()) || []).filter(a => a.data >= primaDataAperta()); render(); }
     catch(e){ toast(messaggio(e)); }
     if(p.stato !== "gestito") api.numeriPersone(p.id).then(n => { st.numeriLista[p.id] = n; render(); }).catch(() => {});
+    if(p.stato !== "gestito") api.partenze(p.id).then(l => { st.partenzaScheda[p.id] = (l || [])[0] || null; render(); }).catch(() => {});
     if(p.stato !== "gestito") api.seguimiDi(p.id).then(g => { st.seguimiScheda[p.id] = g || []; render(); }).catch(() => {});
     api.mesiReport(p.id).then(m => { st.mesiScheda[p.id] = m || []; render(); }).catch(() => {});
   },
@@ -4499,6 +4601,17 @@ Object.assign(AZIONI, {
   async "festa-fine"(){
     try{ await salvaPunto({ partenza_completata_il:new Date().toISOString() }, "Partenza completata!"); festeggia("grande", "Si parte!", "Partenza completata");
       if(!st.seguimi.attivo) await AZIONI["seguimi-attivo"](); window.scrollTo(0, 0); }catch(e){ toast(messaggio(e)); }
+  }
+});
+Object.assign(AZIONI, {
+  async "togli-partenza"(el){
+    const id = el.dataset.id, fase = Number(el.dataset.fase) || 1, x = (st.partenze || []).find(y => y.id === id);
+    try{
+      await api.togliPartenza(id, Math.min(5, Math.max(1, fase)));
+      st.partenzaTolti.set(id, fase); render();
+      toast(`${x ? nomeSaluto(x.nome) : "Tolto"} non è più tra i nuovi in partenza`, async () => {
+        try{ await api.rimettiPartenza(id); st.partenzaTolti.delete(id); render(); }catch(e){ toast(messaggio(e)); } });
+    }catch(e){ toast(messaggio(e)); }
   }
 });
 const AGENDA_VUOTA = { prossima_data:null, prossima_ora:null, prossima_nota:null, prossima_per:null, prossima_come:null };

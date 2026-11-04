@@ -49,7 +49,15 @@ primo piano; clienti → primo cliente), poi la festa a tutto schermo una volta 
 Seguimi si accende da solo e si toglie dal Profilo (scelta di Stefano). Fasi dopo quella in corso con il lucchetto, il resto dell'app usabile. La prossima cosa del percorso:
 «Fissa l'incontro con il tuo sponsor». 059: `partners.incontro_sponsor`, `partenza_completata_il` (solo la propria riga):
 da applicare su Supabase con l'ok di Stefano. Nei test e2e chi entra ha la partenza già completata, salvo `conPercorso`.
-Prossima: consegna 8, Gruppo per lo sponsor.
+Consegna 7 unita (PR #166), 059 applicata il 4 novembre; la festa ha un solo pulsante «Vai al cruscotto» e il Seguimi si
+accende da solo (scelta di Stefano).
+Consegna 8 (Gruppo per lo sponsor, migrazione **060**) in PR, app v94: in cima al Gruppo «I tuoi nuovi in partenza»
+(solo chi ho invitato e usa l'app, finché non ha finito: nuovi «Fase N di 5» con barra e «Manca: …», avviati «Per
+iniziare N di M»), × con Annulla, tornano se vanno avanti di fase; «Nuovo · N gg» / «Nuovo · ordine ✓» nella struttura
+e filtro Nuovi = iscritti da meno di 30 giorni; scheda del nuovo con l'app (percorso, solo numeri) e senza app (primo
+ordine dalla mappa, «Invitalo in Growup»). 060: `partenza_tolti` (righe solo mie), `partenze(p_partner)` (solo numeri e
+date: mai nomi della Lista, mai il testo del perché), `invitato_da_me(uuid)`: da applicare con l'ok di Stefano.
+Prossima: consegna 9, Ingresso che accoglie e traguardi a tutto schermo.
 
 ## Nuovi iscritti dalla mappa (4 novembre 2026, migrazione 056)
 

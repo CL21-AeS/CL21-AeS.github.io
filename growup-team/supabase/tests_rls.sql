@@ -916,6 +916,21 @@ begin
   perform public.entra_con_invito(k_a2);
   perform growup_test.come(u5);
   perform growup_test.ok((public.guida_conteggi(current_date)->>'personali')::int = att_prima + 1, '035: chi entra con il link di A conta tra i suoi nuovi iscritti');
+  -- 060: i nuovi in partenza di A (solo numeri) e la ×
+  perform growup_test.ok((select count(*) from public.partenze() pz where pz.nome = 'Nuovo Guida' and pz.invitato_da_me and not pz.ha_perche and pz.nomi_lista = 0) = 1,
+                         '060: A vede il suo nuovo in partenza, solo numeri');
+  insert into public.partenza_tolti (nuovo_id, fase) select pz.id, 2 from public.partenze() pz where pz.nome = 'Nuovo Guida';
+  perform growup_test.ok((select count(*) from public.partenza_tolti) = 1, '060: A toglie il suo nuovo con la ×');
+  select pz.id into pq from public.partenze() pz where pz.nome = 'Nuovo Guida';
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.ok(not exists (select 1 from public.partenze() pz where pz.nome = 'Nuovo Guida'), '060: un''altra linea non vede i nuovi di A');
+  perform growup_test.ok(not exists (select 1 from public.partenza_tolti), '060: un''altra linea non vede le × di A');
+  perform growup_test.deve_fallire(format('select * from public.partenze(%L)', pq),
+                                   '060: un''altra linea non apre la partenza del nuovo di A');
+  perform growup_test.deve_fallire(format($q$insert into public.partenza_tolti (nuovo_id, fase) values (%L, 1)$q$, a), '060: non si toglie chi non si vede');
+  perform growup_test.come(null);
+  perform growup_test.deve_fallire('select * from public.partenze()', '060: anon non legge le partenze');
+  perform growup_test.come(u5);
   execute 'reset role';
   update public.partners set sponsor_id = b where codice_amway = '8000001';  -- l'import lo sposta in profondità
   perform growup_test.come(u5);

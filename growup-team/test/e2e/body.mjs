@@ -3622,6 +3622,78 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.activities = DB.activities.filter(a => a.partner_id !== "np7");
 }
 
+// 62. Consegna 8: lo sponsor e i suoi nuovi (in partenza, etichetta Nuovo, filtro, scheda con e senza app)
+{
+  const giorniFa = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10), ora = new Date().toISOString();
+  DB.partners.push({ id:"sp8n", nome:"Sara Nuova", sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:"e8".repeat(16), codice_invito:"SP8NNN", codice_amway:"7920001",
+    data_iscrizione:giorniFa(3), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true });
+  DB.partners.push({ id:"sp8a", nome:"Aldo Avviato", sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:"f8".repeat(16), codice_invito:"SP8AAA", codice_amway:"7920002",
+    data_iscrizione:giorniFa(200), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true });
+  DB.partners.push({ id:"sp8g", nome:"Gino Mappa", sponsor_id:"R", stato:"gestito", gestore_id:"R", codice_invito:"SP8GGG", codice_amway:"7920003",
+    data_iscrizione:giorniFa(6), creato_il:ora, conPercorso:true });
+  DB.obiettivi = (DB.obiettivi || []).filter(o => !["sp8n", "sp8a"].includes(o.partner_id))
+    .concat(["sp8n", "sp8a"].map(id => ({ partner_id:id, cifra_mese:300, entro:"2027-06-01", perche:"Segreto suo" })));
+  DB.persone = (DB.persone || []).concat(Array.from({ length:12 }, (_, i) => ({ id:"sp8p" + i, proprietario:"sp8n", nome:"Nome Sara " + i, fase:"lista", esito:null, creato_il:ora })));
+  DB.partenzaTolti = [];
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-gruppo]");
+  const np = page.locator(".card.nuovi-partenza");
+  await np.waitFor();
+  const riga = n => np.locator(".partenze-l li", { hasText:n });
+  check(await riga("Sara Nuova").count() === 1 && await riga("Aldo Avviato").count() === 1 && !(await riga("Gino Mappa").count()),
+    "sponsor: i nuovi in partenza, solo chi ha invitato e usa l'app");
+  check((await riga("Sara Nuova").innerText()).includes("Fase 2 di 5") && (await riga("Sara Nuova").innerText()).includes("Manca: la data del vostro primo incontro · Lista 12 / 30"),
+    "il nuovo: fase 2 di 5 e cosa manca");
+  check((await riga("Aldo Avviato").innerText()).includes("Per iniziare 1 di 2"), "l'avviato: per iniziare 1 di 2");
+  check(!(await np.innerText()).includes("Segreto suo") && !(await np.innerText()).includes("Nome Sara"), "mai il perché né i nomi della sua Lista");
+  await page.screenshot({ path: S + "/e2e/62-sponsor.png", fullPage:true });
+  // la × con Annulla, poi di nuovo
+  await riga("Aldo Avviato").locator("button[data-act=togli-partenza]").click();
+  await page.locator("#toast button[data-act=annulla]").click();
+  await riga("Aldo Avviato").waitFor(); check(true, "×: Annulla lo rimette");
+  await riga("Aldo Avviato").locator("button[data-act=togli-partenza]").click();
+  await page.getByText("non è più tra i nuovi in partenza").waitFor();
+  check(!(await riga("Aldo Avviato").count()), "× lo toglie dai nuovi in partenza");
+  await sync(page);
+  check(DB.partenzaTolti.some(x => x.partner_id === "R" && x.nuovo_id === "sp8a" && x.fase === 1), "nel database: chi è stato tolto e a che punto era");
+  // l'etichetta Nuovo e il filtro Nuovi
+  const struttura = page.locator(".albero.struttura").first();
+  check((await struttura.locator("li", { hasText:"Sara Nuova" }).locator(".pill.nuovo").innerText()).trim() === "Nuovo · 27 gg"
+    && (await struttura.locator("li", { hasText:"Gino Mappa" }).locator(".pill.nuovo").innerText()).trim() === "Nuovo · 24 gg"
+    && !(await struttura.locator("li", { hasText:"Aldo Avviato" }).locator(".pill.nuovo").count()), "struttura: «Nuovo · N gg» per gli iscritti da meno di 30 giorni");
+  await page.click("button[data-act=filtro-gruppo][data-filtro=nuovi]");
+  check((await page.locator(".elenco-filtro li").allInnerTexts()).filter(t => /Sara Nuova|Gino Mappa|Aldo Avviato/.test(t)).length === 2, "filtro Nuovi: gli iscritti da meno di 30 giorni");
+  await page.click("button[data-act=filtro-gruppo][data-filtro=tutti]");
+  // la scheda del nuovo con l'app: il percorso
+  await np.locator("button[data-act=apri-scheda][data-id=sp8n]").click();
+  const ps = page.locator(".card.partenza-scheda");
+  await ps.waitFor();
+  check((await ps.locator(".eyebrow").innerText()).toLowerCase().includes("fase 2 di 5") && await ps.locator(".percorso-scheda li").count() === 5
+    && await ps.locator(".percorso-scheda li.fatto", { hasText:"Il suo perché" }).count() === 1, "scheda del nuovo: il percorso, fase per fase");
+  await page.screenshot({ path: S + "/e2e/62-scheda-nuovo.png", fullPage:true });
+  // la scheda del nuovo senza app: il primo ordine dalla mappa e l'invito
+  await page.click("button[data-act=vista-gruppo]");
+  await page.locator(".albero.struttura li", { hasText:"Gino Mappa" }).locator("button[data-act=apri-scheda]").click();
+  await ps.waitFor();
+  check((await ps.innerText()).includes("0 / 50 VP") && (await ps.innerText()).includes("restano 24 giorni") && await ps.locator("button[data-act=invita]").isVisible(),
+    "scheda senza app: il primo ordine e «Invitalo in Growup»");
+  check(!errori.length, "sponsor: nessun errore nella pagina");
+  await ctx.close();
+  // l'avviato tolto torna se va avanti (fa il punto con l'upline)
+  Object.assign(DB.partners.find(p => p.id === "sp8a"), { punto_upline:giorniFa(0), punto_upline_fatto:giorniFa(0) });
+  DB.partners.find(p => p.id === "sp8n").incontro_sponsor = giorniFa(-1);
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-gruppo]");
+  check(!(await page.locator(".nuovi-partenza li", { hasText:"Aldo Avviato" }).count()), "l'avviato che ha finito «Per iniziare» non c'è più");
+  check((await page.locator(".nuovi-partenza li", { hasText:"Sara Nuova" }).innerText()).includes("Manca: Lista 12 / 30"), "incontro fissato: manca solo la Lista");
+  await ctx.close();
+  DB.partners = DB.partners.filter(p => !["sp8n", "sp8a", "sp8g"].includes(p.id)); DB.persone = DB.persone.filter(x => x.proprietario !== "sp8n");
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

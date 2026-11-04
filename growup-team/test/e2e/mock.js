@@ -497,6 +497,24 @@
     cancellaOrdine: async id => { db.ordini = (db.ordini || []).filter(y => y.id !== id); db.righe = (db.righe || []).filter(y => y.ordine_id !== id); salva(); },
     salvaDurata: async (codice, giorni) => { db.durate = (db.durate || []).filter(y => !(y.proprietario === mio().id && y.codice === codice))
       .concat([{ proprietario:mio().id, codice, giorni }]); salva(); },
+    /* 060: i numeri della partenza (solo numeri e date) e la × dei nuovi in partenza */
+    partenze: async pid => { const io = mio(); if(!io) throw new Error("non_autenticato");
+      if(pid){ const t = db.partners.find(p => p.id === pid); if(!t || (!vedo(io, t) && t.invitato_da !== io.id)) throw new Error("non_autorizzato"); }
+      const somma = (id, tipi, campo, dal) => (db.activities || []).filter(a => a.partner_id === id && tipi.includes(a.tipo) && (!dal || a.data >= dal))
+        .reduce((t, a) => t + (Number(a[campo]) || 0), 0);
+      return db.partners.filter(p => p.stato !== "gestito" && (pid ? p.id === pid : p.invitato_da === io.id)).map(p => ({
+        id:p.id, nome:p.nome, stato:p.stato, data_iscrizione:p.data_iscrizione || null, ingresso:String(p.privacy_accettata_il || p.creato_il || "").slice(0, 10),
+        incontro_sponsor:p.incontro_sponsor || null, partenza_completata_il:p.partenza_completata_il || null, punto_upline:p.punto_upline || null,
+        punto_upline_fatto:p.punto_upline_fatto || null, ha_perche:(db.obiettivi || []).some(o => o.partner_id === p.id && String(o.perche || "").trim()),
+        nomi_lista:(db.persone || []).filter(x => x.proprietario === p.id && x.esito !== "cliente").length,
+        vp_dal_ingresso:somma(p.id, ["ordine", "rettifica"], "vp", p.data_iscrizione || "2000-01-01"), contatti:somma(p.id, ["contatto"], "quantita"),
+        invitati:(db.passi || []).filter(x => x.proprietario === p.id && x.tipo === "invito").length, piani:somma(p.id, ["piano"], "quantita"),
+        clienti:somma(p.id, ["cliente"], "quantita"), ha_gruppo:db.partners.some(f => f.sponsor_id === p.id),
+        mappa_importata:(db.numeri || []).some(n => n.visto_da === p.id), invitato_da_me:p.invitato_da === io.id })); },
+    partenzaTolti: async () => (db.partenzaTolti || []).filter(x => x.partner_id === (mio() || {}).id).map(x => ({ nuovo_id:x.nuovo_id, fase:x.fase })),
+    togliPartenza: async (nuovo_id, fase) => { const io = mio();
+      db.partenzaTolti = (db.partenzaTolti || []).filter(x => !(x.partner_id === io.id && x.nuovo_id === nuovo_id)).concat([{ partner_id:io.id, nuovo_id, fase }]); salva(); },
+    rimettiPartenza: async nuovo_id => { const io = mio(); db.partenzaTolti = (db.partenzaTolti || []).filter(x => !(x.partner_id === io.id && x.nuovo_id === nuovo_id)); salva(); },
     numeriPersone: async pid => { const io = mio(), t = db.partners.find(p => p.id === pid);
       if(!t || !vedo(io, t)) throw new Error("non_autorizzato");
       const l = (db.persone || []).filter(x => x.proprietario === pid), m = new Date().toISOString().slice(0, 7);
