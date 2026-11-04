@@ -68,6 +68,10 @@ const apriRiga = async (pg, act) => { const b = pg.locator(`button[data-act=${ac
   if(await pg.locator(".sheet").count()) return;
   if(await b.getAttribute("aria-expanded") === "false") await b.click(); };
 const apriTappa = pg => apriRiga(pg, "apri-tappa");
+/* consegna 2: «Il mio mese» e «Prossimi giorni e in corso» sono righe che si aprono */
+const apriMese = async pg => { const b = pg.locator("button[data-act=apri-mese]").first();   // anche con un foglio aperto sopra
+  if(await b.count() && await b.getAttribute("aria-expanded") === "false") await b.evaluate(x => x.click()); };
+const apriDopo = pg => apriRiga(pg, "apri-dopo");
 const apriDiario = pg => apriRiga(pg, "apri-diario");
 const apriOrdini = async (pg, scelta) => { await pg.click(".azioni button[data-act=ordini]");
   if(scelta) await pg.click(`.sheet button[data-act=${scelta}]`); };

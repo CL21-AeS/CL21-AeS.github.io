@@ -1,14 +1,19 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 28 ottobre 2026 (sera). Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 4 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
 ## Piano «nuova Io» (approvato il 3 novembre 2026, sera)
 
 Il piano completo, con le decisioni e le 9 consegne, è in **`PIANO_IO.md`**: si riparte da lì. Consegna 1 (grafica di
 base: pesca `#f08a4b` solo per l'azione, selezione verde scuro / avorio, numeri in Source Serif 4 ospitato nell'app,
-spiegazioni di Preferiti, Invita e Nascondi nel «?», caselle nei colori dell'app, pulsanti in basso bianchi) in PR,
-app v86. Prossima: consegna 2, «Il mio giorno» nuova (proposta D).
+spiegazioni di Preferiti, Invita e Nascondi nel «?», caselle nei colori dell'app, pulsanti in basso bianchi) unita
+(PR #159), app v86. Consegna 2 («Il mio giorno» nuova, proposta D) in PR, app v87: cruscotto in cima (obiettivo,
+anello dei VP personali del mese, tappa con i requisiti che si apre, contatti e piani della settimana), poi «La prossima
+cosa» con la lista unica di oggi (Lista e Clienti insieme, etichetta e motivo; «Prossimi giorni e in corso» in una riga
+che si apre). «Più tardi»: per la Lista si sceglie quando risentirlo, un cliente passa in fondo alla lista di oggi
+(fino all'agenda, consegna 4). «Il mio mese» è una riga che si apre. Database non toccato. Serie e agenda arrivano
+nelle consegne 4 e 5. Prossima: consegna 3, Verifica (ex Guida).
 
 ## Controllo sicurezza e privacy (3 novembre 2026)
 

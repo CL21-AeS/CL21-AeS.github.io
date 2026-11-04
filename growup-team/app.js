@@ -1414,10 +1414,12 @@ function vHome(){
   ${vStoricoGruppo()}
   ${vInvita()}` : st.sezIo === "guida" ? vGuida() : `
   ${vDomandaNotifiche()}
-  ${vPrimiPassi()}
+  ${linkDaSalvare() ? vPrimiPassi() : ""}
+  ${vCruscotto()}
+  ${st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : vOggiLista()}
+  ${linkDaSalvare() ? "" : vPrimiPassi()}
+  ${vMioMese()}
   ${vPromemoriaImport()}
-  ${st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : `${vDaFare()}${vClientiDaSentire()}`}
-  ${vMieiNumeri()}
   ${vOggi()}`}
   `;
 }
@@ -1583,6 +1585,8 @@ function aggiornaPreviste(){
     try{ await api.salvaPreviste(righe); ultimePreviste = j; }catch(e){}
   }, 1500);
 }
+/* il link personale non ancora salvato: i Primi passi restano in cima (consegna 2) */
+function linkDaSalvare(){ return primiPassi().some(x => x.k === "link" && !x.fatto); }
 function vPrimiPassi(){
   const l = primiPassi(), fatti = l.filter(x => x.fatto).length, linkDaSalvare = l.some(x => x.k === "link" && !x.fatto);
   const attesa = !st.profilo.is_admin && !st.profilo.confermato_il;
@@ -1980,31 +1984,57 @@ function datiTappa(){
     ${attuale.guadagno_mese ? `<p class="nota">* ${notaGuadagni()}</p>` : ""}` };
 }
 
-/* «I miei numeri» (ottimizzazione 1): obiettivo, tappa, settimana e mese in un solo riquadro. Gli ordini stanno nel
-   foglio «Ordini» (+ Ordine nella barra in basso), l'import in Gruppo. */
-function vMieiNumeri(){
-  const o = st.obiettivo, t = datiTappa(), aperta = !!st.tappaAperta;
-  const g = st.goal, m = meseDi(oggi()), c = clientiMese(m), nm = numeriMese(m);
-  return `<div class="card miei-numeri">
-    <span class="eyebrow">I miei numeri</span>
-    ${o ? `<button class="riga-apri prima" data-act="vista-obiettivo"><span class="grow"><b class="num">${euro(o.cifra_mese)}</b> al mese
+/* ---- Consegna 2 (4 novembre 2026): «Il mio giorno» nuova (PIANO_IO.md, proposta D) ----
+   In cima il cruscotto (scuro, la classe resta «miei-numeri»): obiettivo, VP personali del mese nell'anello, la tappa
+   con i requisiti, contatti e piani della settimana. Sotto «La prossima cosa» con la lista unica di oggi (Lista e
+   Clienti), poi le righe che si aprono: Primi passi, Il mio mese, il promemoria dell'import, il diario. */
+const GIRO_ANELLO = 2 * Math.PI * 46;
+function vCruscotto(){
+  const o = st.obiettivo, t = datiTappa(), aperta = !!st.tappaAperta, g = st.goal;
+  const m = meseDi(oggi()), fatto = vpMese(m), obj = Number(st.goalMese.obiettivo_vp) || 0;
+  const pct = obj ? Math.min(100, Math.round(fatto / obj * 100)) : 0;
+  const [aa, mm] = m.split("-").map(Number), giorni = new Date(aa, mm, 0).getDate();
+  const { attuale, indice } = percorso();
+  const tot = (st.stages.findIndex(s => s.chiave === "platino") + 1) || st.stages.length;
+  const req = attuale ? requisiti(attuale) : [];
+  const riga = attuale ? `<span class="small">Tappa ${indice + 1} di ${tot}</span><b>${esc(attuale.nome)}</b>
+      <span class="small">${req.filter(r => r.ok).length} su ${req.length} ${req.length === 1 ? "requisito" : "requisiti"}</span>` : t.riga;
+  const tessera = (nome, f, ob) => { ob = Number(ob) || 0; const x = ob ? Math.min(100, Math.round(f / ob * 100)) : 0;
+    return `<div class="tessera"><span>${nome}</span><b class="num">${num(f)}<small> / ${num(ob)}</small></b>
+      <div class="bar${ob && f >= ob ? " fatto" : ""}" role="progressbar" aria-label="${nome}" aria-valuenow="${x}" aria-valuemin="0" aria-valuemax="100"><i style="width:${x}%"></i></div></div>`; };
+  return `<div class="card miei-numeri cruscotto">
+    <span class="eyebrow">${esc(nomeMese(m).split(" ")[0].toUpperCase())} · GIORNO ${Number(oggi().slice(8))} DI ${giorni}</span>
+    ${o ? `<button class="riga-apri prima obiettivo-riga" data-act="vista-obiettivo"><span class="grow"><b class="num">${euro(o.cifra_mese)}</b> al mese
       <span class="small">· ${esc(testoTraguardo(o.entro))}</span></span><span class="fr" aria-hidden="true">›</span></button>` : ""}
-    <button class="riga-apri${o ? "" : " prima"}" data-act="apri-tappa" aria-expanded="${aperta}"><span class="grow">${t.riga}</span>
-      <span class="fr" aria-hidden="true">${aperta ? "▴" : "▾"}</span></button>
+    <div class="cruscotto-cima">
+      <div class="anello" role="img" aria-label="VP personali: ${num(fatto)} su ${num(obj)}">
+        <svg viewBox="0 0 112 112" aria-hidden="true"><circle cx="56" cy="56" r="46" class="traccia"></circle>
+          ${pct ? `<circle cx="56" cy="56" r="46" class="pieno" stroke-dasharray="${(GIRO_ANELLO * pct / 100).toFixed(1)} ${GIRO_ANELLO.toFixed(1)}"></circle>` : ""}</svg>
+        <span><b class="num">${num(fatto)}</b><small>di ${num(obj)} VP</small></span>
+      </div>
+      <button class="riga-apri tappa-riga" data-act="apri-tappa" aria-expanded="${aperta}"><span class="grow">${riga}</span>
+        <span class="fr" aria-hidden="true">${aperta ? "▴" : "▾"}</span></button>
+    </div>
     ${t.sempre}
     ${aperta ? `<div class="tappa-aperta">${t.corpo}</div>` : ""}
-    <div class="blocco-numeri">
-      <div class="spread"><h3>La mia settimana <span class="small">${dataIt(settimana())} – ${dataIt(piuGiorni(settimana(), 6))}</span></h3>
-        <button class="btn small ghost" data-act="obiettivi">Modifica</button></div>
-      ${g.salvato && st.goalMese.salvato ? "" : `<p class="small" style="margin:6px 0 0">Ti proponiamo questi obiettivi per iniziare. Vanno bene?
-        <button class="btn link small" data-act="conferma-obiettivi">Sì, confermo</button></p>`}
-      ${barra("Nuovi contatti", fattoSettimana("contatto"), g.obiettivo_contatti)}
-      ${barra("Piani mostrati", fattoSettimana("piano"), g.obiettivo_piani)}
-    </div>
-    <div class="blocco-numeri">
-      <div class="spread"><h3>Il mio mese <span class="small">${nomeMese(m).replace(/^./, x => x.toUpperCase())}</span></h3>
-        <span class="row" style="gap:6px"><button class="btn small ghost" data-act="storico">Storico</button>
-        <button class="btn small ghost" data-act="obiettivo-mese">Obiettivo</button></span></div>
+    <div class="tessere">${tessera("Nuovi contatti", fattoSettimana("contatto"), g.obiettivo_contatti)}${tessera("Piani mostrati", fattoSettimana("piano"), g.obiettivo_piani)}</div>
+    <p class="small settimana-riga">Settimana ${dataIt(settimana())} – ${dataIt(piuGiorni(settimana(), 6))} ·
+      <button class="btn link small" data-act="obiettivi">Modifica gli obiettivi</button></p>
+    ${g.salvato && st.goalMese.salvato ? "" : `<p class="small proposta-obiettivi">Ti proponiamo questi obiettivi per iniziare. Vanno bene?
+      <button class="btn link small" data-act="conferma-obiettivi">Sì, confermo</button></p>`}
+  </div>`;
+}
+
+/* «Il mio mese»: una riga che si apre, con i VP (report e ordini scritti dopo), il gruppo, i nuovi clienti, storico e obiettivo */
+function vMioMese(){
+  const m = meseDi(oggi()), c = clientiMese(m), nm = numeriMese(m), aperto = !!st.meseAperto;
+  const riassunto = [nm.gruppo > nm.personali || nm.linee.length ? `VP di gruppo ${num(nm.gruppo)}` : "", `nuovi clienti ${num(c)}`].filter(Boolean).join(" · ");
+  return `<div class="card mio-mese">
+    <button class="riga-apri prima" data-act="apri-mese" aria-expanded="${aperto}"><span class="grow"><span class="eyebrow">Il mio mese</span>
+      <span class="small">${esc(nomeMese(m).replace(/^./, x => x.toUpperCase()))} · ${riassunto}</span></span><span class="fr" aria-hidden="true">${aperto ? "▴" : "▾"}</span></button>
+    ${aperto ? `<div class="blocco-numeri">
+      <div class="row" style="gap:6px;justify-content:flex-end"><button class="btn small ghost" data-act="storico">Storico</button>
+        <button class="btn small ghost" data-act="obiettivo-mese">Obiettivo</button></div>
       ${barraVp(m)}
       ${rigaVp(m)}
       ${nm.gruppo > nm.personali || nm.linee.length
@@ -2014,9 +2044,51 @@ function vMieiNumeri(){
         <button class="btn small" data-act="cliente" style="white-space:nowrap">+ Cliente</button>
       </div>
       ${clientiTotali() >= 3 ? "" : `<p class="small" style="margin:4px 0 0">I tuoi primi 3 clienti (anche in mesi diversi) completano la tappa «Primi clienti»: ${num(clientiTotali())} su 3.</p>`}
-    </div>
+    </div>` : ""}
   </div>
   ${vReportDaImportare()}`;
+}
+
+/* La lista unica di oggi: dalla Lista chi è in ritardo o ha la data oggi, poi i clienti da sentire. Chi ha la data nei
+   prossimi giorni o è in corso senza data sta sotto, in una riga che si apre. La prima è «La prossima cosa». */
+function vociOggi(){
+  const d = daFare();
+  return { oggi:d.ritardo.concat(d.oggi).map(p => ({ k:"lista", p })).concat(clientiDaSentire().map(x => ({ k:"cliente", p:x.p, motivo:x.motivo }))),
+    presto:d.presto, corso:d.corso };
+}
+function motivoVoce(x){
+  if(x.k === "cliente") return x.motivo;
+  const p = x.p, ritardo = p.prossima_data < oggi();
+  return `${ritardo ? `In ritardo dal ${dataIt(p.prossima_data)}` : esc(testoProssima(p))} · ${TIPI_PASSO[passoProposto(p)].nome}`;
+}
+function rigaCliente(x){
+  return `<li class="su-io"><button class="persona" data-act="apri-cliente" data-id="${esc(x.p.id)}">
+      <span class="grow"><b>${esc(x.p.nome)}</b> <span class="pill mini tag tag-cliente">Cliente</span><br><span class="small">${esc(x.motivo)}</span></span></button>
+      <button class="x" data-act="togli-da-io" data-id="${esc(x.p.id)}" aria-label="Togli ${esc(x.p.nome)} da Io">×</button></li>`;
+}
+function vOggiLista(){
+  const v = vociOggi(), altri = v.presto.length + v.corso.length, aperto = !!st.dopoAperto;
+  if(!v.oggi.length && !altri) return "";
+  const dopo = st.rimandati || [], pos = x => dopo.indexOf(x.p.id);
+  const [prima, ...poi] = v.oggi.filter(x => pos(x) < 0).concat(v.oggi.filter(x => pos(x) >= 0).sort((a, b) => pos(a) - pos(b)));
+  const testa = prima ? `<div class="spread"><span class="eyebrow pesca">La prossima cosa</span>
+      <span class="row" style="gap:6px;align-items:center"><span class="small">1 di ${v.oggi.length} oggi</span>
+      <button class="x" data-act="togli-da-io" data-id="${esc(prima.p.id)}" aria-label="Togli ${esc(prima.p.nome)} da Io">×</button></span></div>
+    <button class="prossima-titolo" data-act="${prima.k === "cliente" ? "apri-cliente" : "apri-persona"}" data-id="${esc(prima.p.id)}">${esc(prima.p.nome)}
+      <span class="pill mini tag tag-${prima.k}">${prima.k === "cliente" ? "Cliente" : "Lista"}</span></button>
+    <p class="small" style="margin:0">${prima.k === "cliente" ? esc(motivoVoce(prima)) : motivoVoce(prima)}</p>
+    <div class="prossima-azioni">
+      <button class="btn primary" data-act="prossima-fatto" data-k="${prima.k}" data-id="${esc(prima.p.id)}">${prima.k === "cliente" ? "Apri" : "Segna il passo"}</button>
+      <button class="btn" data-act="prossima-dopo" data-k="${prima.k}" data-id="${esc(prima.p.id)}">Più tardi</button></div>`
+    : `<span class="eyebrow">Oggi</span><p class="small" style="margin:6px 0 0">Niente in programma per oggi.</p>`;
+  return `<div class="card oggi-lista">
+    ${testa}
+    ${poi.length ? `<ul class="persone oggi-poi">${poi.map(x => x.k === "cliente" ? rigaCliente(x) : rigaPersona(x.p, true, "Lista")).join("")}</ul>` : ""}
+    ${altri ? `<button class="riga-apri" data-act="apri-dopo" aria-expanded="${aperto}"><span class="grow">Prossimi giorni e in corso · ${num(altri)}</span>
+      <span class="fr" aria-hidden="true">${aperto ? "▴" : "▾"}</span></button>
+    ${aperto ? [["Prossimi giorni", v.presto], ["In corso", v.corso]].filter(([, l]) => l.length).map(([t, l]) => `<p class="small da-fare-t">${t}</p>
+      <ul class="persone">${l.map(p => rigaPersona(p, true)).join("")}</ul>`).join("") : ""}` : ""}
+  </div>`;
 }
 
 /* Il promemoria dell'import (solo per chi ha un gruppo e ha già importato): l'ultimo report ha più di 7 giorni */
@@ -3959,25 +4031,12 @@ function daFare(){
   };
 }
 
-function vDaFare(){
-  const d = daFare(), gruppi = [["In ritardo", d.ritardo], ["Oggi", d.oggi], ["Prossimi giorni", d.presto], ["In corso", d.corso]]
-    .filter(([, l]) => l.length);
-  if(!gruppi.length) return "";
-  return `<div class="card">
-    <span class="con-aiuto"><span class="eyebrow">Il tuo percorso con la lista</span>${aiutoBtn("lista-io")}</span>
-    ${aiutoTesto("lista-io", `Le persone della tua Lista da risentire: prima chi è in ritardo, poi chi ha la data oggi o nei prossimi giorni.
-      Con × togli una persona solo da qui (resta nella Lista): ricompare quando segni un passo o fissi una nuova data, oppure
-      dalla sua scheda con «Rimetti in Io».`)}
-    ${gruppi.map(([t, l]) => `<p class="small da-fare-t">${t}</p>
-      <ul class="persone">${l.map(p => rigaPersona(p, true)).join("")}</ul>`).join("")}
-  </div>`;
-}
 /* registrato come cliente sul sito Amway (ha il codice cliente) ma senza nessun ordine */
 function maiComprato(p){ return !!p.codice_cliente && p.esito !== "cliente" && !st.ordini.some(o => o.persona_id === p.id); }
-function rigaPersona(p, suIo){
+function rigaPersona(p, suIo, tag){
   const f = FASI[indiceFase(p.fase)], fermo = !p.prossima_data && !p.esito && p.fase !== "lista" ? giorniTra(ultimoPasso(p), oggi()) : 0;
   return `<li class="${suIo ? "su-io" : ""}"><button class="persona" data-act="apri-persona" data-id="${esc(p.id)}">
-      <span class="grow"><b>${esc(p.nome)}</b>${maiComprato(p) ? ` <span class="pill g mini">Mai comprato</span>` : ""}${p.origine
+      <span class="grow"><b>${esc(p.nome)}</b>${tag ? ` <span class="pill mini tag tag-lista">${esc(tag)}</span>` : ""}${maiComprato(p) ? ` <span class="pill g mini">Mai comprato</span>` : ""}${p.origine
         ? `<br><span class="small origine">${esc(p.origine)}</span>` : ""}<br><span class="small">${p.esito ? ESITI[p.esito] : f.nome}${p.prossima_data ? " · " + esc(testoProssima(p))
         : fermo >= 14 ? ` · nessun passo da ${fermo} giorni` : ""}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
       <span class="punti" aria-hidden="true">${FASI.map((x, i) => `<i class="${i <= indiceFase(p.fase) ? "on" : ""}"></i>`).join("")}</span>
@@ -5035,17 +5094,6 @@ function clientiDaSentire(){
   }
   return out.sort((a, b) => a.ordine - b.ordine);
 }
-function vClientiDaSentire(){
-  const l = clientiDaSentire();
-  if(!l.length) return "";
-  return `<div class="card">
-    <span class="eyebrow">I tuoi clienti da sentire</span>
-    <ul class="persone">${l.map(x => `<li class="su-io"><button class="persona" data-act="apri-cliente" data-id="${esc(x.p.id)}">
-      <span class="grow"><b>${esc(x.p.nome)}</b><br><span class="small">${esc(x.motivo)}</span></span></button>
-      <button class="x" data-act="togli-da-io" data-id="${esc(x.p.id)}" aria-label="Togli ${esc(x.p.nome)} da Io">×</button></li>`).join("")}</ul>
-  </div>`;
-}
-
 function vClienti(){
   if(st.personaId) return vCliente();
   const filtro = FILTRI_CLIENTI.find(x => x.id === st.filtroClienti) || FILTRI_CLIENTI[0];
@@ -5878,6 +5926,18 @@ Object.assign(AZIONI, {
   "apri-miei"(){ st.errore = null; st.sheet = "miei"; render(); },
   "apri-tappa"(){ st.tappaAperta = !st.tappaAperta; render(); },
   "apri-diario"(){ st.diarioAperto = !st.diarioAperto; render(); },
+  "apri-mese"(){ st.meseAperto = !st.meseAperto; render(); },
+  "apri-dopo"(){ st.dopoAperto = !st.dopoAperto; render(); },
+  /* «La prossima cosa»: Lista → la scheda con «Segna un passo» aperto; cliente → la sua scheda. «Più tardi» → nuova data */
+  "prossima-fatto"(el){ const cli = el.dataset.k === "cliente";
+    st.vista = "persone"; st.sezPersone = cli ? "clienti" : "lista"; st.invitoId = null; st.personaId = el.dataset.id;
+    if(!cli){ st.passoTipo = null; st.errore = ""; st.sheet = "passo"; }
+    render(); window.scrollTo(0, 0); },
+  /* «Più tardi»: chi è in Lista sceglie quando risentirlo; un cliente passa in fondo alla lista di oggi (fino all'agenda) */
+  "prossima-dopo"(el){
+    if(el.dataset.k === "cliente"){ st.rimandati = (st.rimandati || []).filter(x => x !== el.dataset.id).concat(el.dataset.id); render(); return; }
+    st.vista = "persone"; st.sezPersone = "lista"; st.invitoId = null;
+    st.personaId = el.dataset.id; st.errore = ""; st.sheet = "prossima"; render(); window.scrollTo(0, 0); },
   async "mio-aggiungi"(el){
     const r = st.listino.find(x => x.codice === el.dataset.codice);
     if(!r) return;
