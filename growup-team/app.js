@@ -2137,7 +2137,7 @@ function vSerie(){
       hai segnato almeno una cosa: un contatto, un invito, un piano, un follow-up o un altro passo, un cliente o un suo ordine,
       la formazione o la chiamata con lo sponsor. La serie conta le settimane valide una dopo l'altra; il record è la serie più
       lunga dell'ultimo anno.`)}
-    <div class="serie-giorni" role="list" aria-label="I giorni di questa settimana">${s.giorni.map(x => `<span role="listitem" class="${x.si ? "si" : ""}${x.oggi ? " oggi" : ""}${x.dopo ? " dopo" : ""}"
+    <div class="serie-giorni" role="list" aria-label="I giorni di questa settimana">${s.giorni.map(x => `<span role="listitem" class="${x.si ? "si" : ""}${x.oggi ? " adesso" : ""}${x.dopo ? " dopo" : ""}"
       aria-label="${esc(x.nome)} ${x.n}: ${x.si ? "attivo" : x.dopo ? "deve ancora venire" : "non attivo"}"><b>${x.n}</b><small>${x.d}</small></span>`).join("")}</div>
     <p class="small" style="margin:0">Questa settimana: <b>${s.ora === 1 ? "1 giorno attivo" : `${num(s.ora)} giorni attivi`} su ${SERIE_GIORNI}</b>.
       ${mancano ? (s.fila ? `La serie continua se arrivi a ${SERIE_GIORNI} entro domenica.` : `Con ${SERIE_GIORNI} entro domenica inizia la serie.`) : "Settimana valida."}</p>
@@ -6299,7 +6299,7 @@ function vGuidaAbitudini(){
         k === "formazione" ? " giorni" : ""}</small></b></div>
       <div class="bar${daLista ? " lista" : ""}${obj && fatto >= obj ? " fatto" : ""}" role="progressbar" aria-label="${esc(nome)}" aria-valuenow="${x}" aria-valuemin="0" aria-valuemax="100"><i style="width:${x}%"></i></div>
       ${spiega ? `<p class="small">${esc(spiega)}</p>` : ""}${extra || ""}</div>`; };
-  const giorni = k => `<div class="giorni-guida">${sett.map((g, i) => `<button class="${fattoIl(k, g) ? "si" : ""}${g === oggi() ? " oggi" : ""}" data-act="guida-spunta" data-k="${k}" data-giorno="${g}"
+  const giorni = k => `<div class="giorni-guida">${sett.map((g, i) => `<button class="${fattoIl(k, g) ? "si" : ""}${g === oggi() ? " adesso" : ""}" data-act="guida-spunta" data-k="${k}" data-giorno="${g}"
       ${g > oggi() ? "disabled" : ""} aria-pressed="${fattoIl(k, g)}" aria-label="${esc(GIORNI_SETT[(i + 1) % 7])}">${"LMMGVSD"[i]}</button>`).join("")}</div>`;
   const fatti = k => sett.filter(g => fattoIl(k, g)).length;
   return `<div class="card guida-abitudini">

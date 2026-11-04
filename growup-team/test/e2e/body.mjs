@@ -2394,7 +2394,9 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await page.locator(".guida-abitudini").innerText()).includes("Risentire chi ha visto il piano"), "follow-up con la spiegazione");
   check(await page.locator(".guida-abitudini .abitudine .bar[role=progressbar]").count() === 5 && await page.locator(".guida-abitudini .bar.lista").count() === 3,
     "abitudini: una barra per ognuna, pesca per quelle dalla Lista");
-  check(await page.locator(`.guida-abitudini [data-k=sponsor] button.oggi[data-giorno="${oggiG}"]`).count() === 1, "abitudini: oggi segnato nei cerchi dei giorni");
+  check(await page.locator(`.guida-abitudini [data-k=sponsor] button.adesso[data-giorno="${oggiG}"]`).count() === 1, "abitudini: oggi segnato nei cerchi dei giorni");
+  check(await page.evaluate(() => { const b = [...document.querySelectorAll(".guida-abitudini [data-k=sponsor] .giorni-guida button")].map(x => x.getBoundingClientRect().top);
+    return Math.max(...b) - Math.min(...b) < 1; }), "abitudini: i cerchi dei giorni sono tutti alla stessa altezza, anche oggi");
   await page.screenshot({ path: S + "/e2e/41-guida.png", fullPage:true });
   await sync(page);
   check(DB.guidaFatti.length === 1 && DB.guidaObiettivi.some(x => x.chiave === "formazione" && x.a_settimana === 3)
@@ -3461,7 +3463,9 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await serie.waitFor();
   check((await serie.locator(".serie-titolo").innerText()).trim() === "2 settimane di fila", "serie: 2 settimane valide di fila (" + (await serie.locator(".serie-titolo").innerText()).trim() + ")");
   check((await serie.locator(".serie-record").innerText()).trim() === "record: 3", "serie: il record è la serie più lunga dell'ultimo anno");
-  check(await serie.locator(".serie-giorni > span").count() === 7 && await serie.locator(".serie-giorni .oggi").count() === 1, "serie: i 7 cerchi della settimana, con oggi");
+  check(await serie.locator(".serie-giorni > span").count() === 7 && await serie.locator(".serie-giorni .adesso").count() === 1, "serie: i 7 cerchi della settimana, con oggi");
+  check(await page.evaluate(() => { const b = [...document.querySelectorAll(".serie-giorni b")].map(x => x.getBoundingClientRect().top);
+    return Math.max(...b) - Math.min(...b) < 1; }), "serie: i cerchi sono tutti alla stessa altezza, anche oggi");
   check((await serie.innerText()).includes("La serie continua se arrivi a 5 entro domenica"), "serie: dice cosa serve questa settimana");
   const ordine = await page.evaluate(() => [...document.querySelectorAll("#app .card")].map(c => c.classList.contains("cruscotto") ? "cruscotto"
     : c.classList.contains("oggi-lista") ? "oggi" : c.classList.contains("serie") ? "serie" : c.classList.contains("mio-mese") ? "mese" : "").filter(Boolean).join(","));

@@ -26,7 +26,7 @@ Piano fissato = un invito e subito «Quando è il piano?»; Piano → Piano most
 Non risponde / Rimandato → un altro giorno, nessun passo). «Più tardi» apre l'agenda. Nella scheda «Prossima cosa»
 diventa «In agenda». 057 aggiunge solo due colonne con i valori ammessi (`prossima_per`, `prossima_come`): da applicare
 su Supabase dopo l'ok di Stefano. Consegna 4 unita (PR #163), 057 applicata su Supabase il 4 novembre.
-Consegna 5 (Serie) in PR, app v90, database non toccato: in «Il mio giorno», sotto la lista di oggi, la card della serie
+Consegna 5 (Serie) in PR, app v91, database non toccato: in «Il mio giorno», sotto la lista di oggi, la card della serie
 («N settimane di fila», record dell'ultimo anno, i 7 cerchi della settimana con oggi, «Questa settimana: N giorni attivi
 su 5»). Settimana valida = almeno 5 giorni attivi su 7 (lunedì-domenica); giorno attivo = almeno un contatto, invito,
 piano, follow-up o altro passo, un cliente o un suo ordine scritto a mano, la formazione o la chiamata con lo sponsor.
