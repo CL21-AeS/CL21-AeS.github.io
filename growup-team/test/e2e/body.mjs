@@ -3937,6 +3937,57 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
 }
 
+// 66. Leggibilità (grafica 7, punto 2): a 360 px nessun pulsante, filtro o etichetta va a capo, in tutte le pagine
+{
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  /* un pulsante (o un'etichetta) va a capo se il suo testo sta su più righe; i pulsanti fatti di più righe di proposito
+     (nome + numeri sotto) hanno un <br> o un figlio a blocco e non contano */
+  const aCapo = async dove => page.evaluate(dove => {
+    const vis = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== "hidden"; };
+    const out = [];
+    for(const e of document.querySelectorAll("#app button, #app .btn, #app .pill, .barra button, nav button")){
+      if(!vis(e) || e.closest(".sheet") || e.querySelector("br, .small, small, b + span, span.grow, div")) continue;
+      if([...e.children].some(c => ["block", "flex", "grid"].includes(getComputedStyle(c).display))) continue;
+      const rg = document.createRange(); rg.selectNodeContents(e);
+      /* le righe del testo: un pezzo che inizia sotto la fine del precedente è una riga nuova */
+      const rr = [...rg.getClientRects()].filter(r => r.width > 1).sort((x, y) => x.top - y.top);
+      let righe = rr.length ? 1 : 0, fondo = rr.length ? rr[0].bottom : 0;
+      for(const r of rr){ if(r.top >= fondo - 2){ righe++; fondo = r.bottom; } else fondo = Math.max(fondo, r.bottom); }
+      if(righe > 1) out.push(dove + ": «" + e.textContent.replace(/\s+/g, " ").trim().slice(0, 40) + "»");
+    }
+    if(document.documentElement.scrollWidth > 360) out.push(dove + ": la pagina scorre di lato");
+    /* il nome nelle righe della struttura e degli inviti non si stringe sotto i 100 px */
+    for(const n of document.querySelectorAll("#app .albero li .nome, #app .oggi.inviti li>.grow"))
+      if(vis(n) && n.getBoundingClientRect().width < 100) out.push(dove + ": nome stretto «" + n.textContent.replace(/\s+/g, " ").trim().slice(0, 30) + "»");
+    return out; }, dove);
+  const trovati = [];
+  const giro = async (dove, fai) => { await fai(); await page.waitForTimeout(150); const t = await aCapo(dove); trovati.push(...t);
+    if(t.length || /^(Gruppo|Persone · Target|Io · il mio giorno)$/.test(dove)) await page.screenshot({ path: S + "/e2e/66-" + dove.replace(/[^a-z]+/gi, "-") + ".png", fullPage:true }); };
+  await giro("Io · il mio giorno", async () => {});
+  { const xs = await page.locator("#app button.x").evaluateAll(l => l.map(b => { const c = getComputedStyle(b); return c.borderRadius + " " + c.width; }));
+    check(!xs.length || xs.every(x => x === "50% 38px"), "le × sono tutte rotonde e uguali (" + [...new Set(xs)].join(", ") + ")"); }
+  await giro("Io · Verifica", async () => page.click(".sezioni-io button[data-sez=guida]"));
+  await giro("Obiettivo", async () => page.click("button[data-act=vista-obiettivo]"));
+  await giro("Persone · Lista", async () => { await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]"); });
+  if(await page.locator("button[data-act=apri-persona]").count())
+    await giro("Persone · scheda", async () => page.locator("button[data-act=apri-persona]").first().click());
+  await giro("Persone · Clienti", async () => { if(await page.locator("button[data-act=torna-lista]").count()) await page.click("button[data-act=torna-lista]");
+    await page.click("button[data-sez=clienti]"); });
+  if(await page.locator("button[data-act=apri-cliente]").count())
+    await giro("Clienti · scheda", async () => page.locator("button[data-act=apri-cliente]").first().click());
+  await giro("Persone · Target", async () => { if(await page.locator("button[data-act=torna-clienti]").count()) await page.click("button[data-act=torna-clienti]");
+    await page.click("button[data-sez=target]"); });
+  await giro("Gruppo", async () => page.locator("button[data-act=vista-gruppo]").first().click());
+  if(await page.locator("button[data-act=apri-scheda]").count())
+    await giro("Gruppo · scheda", async () => page.locator("button[data-act=apri-scheda]").first().click());
+  await giro("Profilo", async () => page.click("button[data-act=vista-profilo]"));
+  console.log("A CAPO A 360 PX:\n" + [...new Set(trovati)].join("\n"));
+  check(!trovati.length, "a 360 px niente va a capo (" + [...new Set(trovati)].length + ")");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

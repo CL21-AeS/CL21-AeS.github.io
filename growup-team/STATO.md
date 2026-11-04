@@ -3,6 +3,14 @@
 Ultimo aggiornamento: 4 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Leggibilità, punti 2 e 3: niente a capo a 360 px, la × rotonda (4 novembre 2026, sera, app v100, database non toccato)
+
+I pulsanti piccoli non vanno più a capo: se in una riga non c'è posto va a capo la riga (il pulsante scende sotto, a
+destra), non il testo del pulsante («Importa da Amway», «Leggi una risposta», «+ Nuovo invito», «Per iniziare 1 di 2 ›»).
+Nella struttura e negli inviti il nome non si stringe più: le etichette («Da confermare», «attivo», «Nuovo · ordine ✓»)
+scendono sotto, a destra. La × è rotonda e uguale ovunque, anche in «Primi passi». Un controllo automatico (sezione 66
+dei test) gira tutte le pagine a 360 px e segnala ogni pulsante, filtro o etichetta che va a capo e ogni nome stretto.
+
 ## Leggibilità, punto 1: i colori dei testi (4 novembre 2026, sera, app v99, database non toccato)
 
 Testi grigi, ambra e verde almeno 4,5:1 (WCAG AA) su tutti i fondi (pagina, scheda, caselle chiare, verde chiaro) nei
@@ -40,7 +48,7 @@ nuovo c'è anche nella chiusura normale. I promemoria usano l'agenda (057): ness
    «Cambia le cerchie»): si spuntano le cerchie che ci sono (della Lista o dei Clienti, separate) e se ne crea una nuova
    con dentro la persona.
 
-Ancora da fare (detto da Stefano): nessun pulsante che va a capo a 360 px; i campi dei moduli che si svuotano quando la pagina si ridisegna. In attesa di
+Ancora da fare (detto da Stefano): i campi dei moduli che si svuotano quando la pagina si ridisegna. In attesa di
 Stefano: nomi e contatto dei titolari nell'informativa.
 
 ## Piano «nuova Io» (approvato il 3 novembre 2026, sera)
