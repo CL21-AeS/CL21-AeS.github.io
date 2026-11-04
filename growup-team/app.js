@@ -2134,7 +2134,7 @@ function vPercorso(){
         `<button class="btn small" data-act="incontro-fissa">${p.incontro_sponsor ? "Cambia" : "Fissa ›"}</button>`)}
       ${riga(x.nomi >= NOMI_PARTENZA, `${NOMI_PARTENZA} nomi nella Lista`, `${num(Math.min(x.nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}${x.nomi < NOMI_PARTENZA ? ` · entro ${esc(riassuntoAgenda(entro < oggi() ? oggi() : entro))}` : ""}`,
         x.nomi < NOMI_PARTENZA ? `<button class="btn small" data-act="guida-vai" data-dove="lista">Lista ›</button>` : "")}</ul>`;
-  else if(f.k === "ordine"){ const o = x.ord, pct = Math.min(100, Math.round(o.vp / o.min * 100));
+  else if(f.k === "ordine"){ const o = x.ord, pct = pctOk(Math.round(o.vp / o.min * 100));
     corpo = `<div class="percorso-ordine"><b class="num">${num(o.vp)}<small> / ${num(o.min)} VP</small></b>
       <span class="small">${o.restano >= 0 ? `restano ${o.restano === 1 ? "1 giorno" : `${o.restano} giorni`} (entro il ${dataIt(o.fine)})` : "oltre i 30 giorni: il percorso aspetta il tuo primo ordine"}</span></div>
       <div class="bar" role="progressbar" aria-label="VP del primo ordine" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
@@ -2189,14 +2189,14 @@ function nomiNuoviSettimana(){
 function vCruscotto(){
   const o = st.obiettivo, t = datiTappa(), aperta = !!st.tappaAperta, g = st.goal;
   const m = meseDi(oggi()), fatto = vpMese(m), obj = Number(st.goalMese.obiettivo_vp) || 0;
-  const pct = obj ? Math.min(100, Math.round(fatto / obj * 100)) : 0;
+  const pct = obj ? pctOk(Math.round(fatto / obj * 100)) : 0;
   const [aa, mm] = m.split("-").map(Number), giorni = new Date(aa, mm, 0).getDate();
   const { attuale, indice } = percorso();
   const tot = (st.stages.findIndex(s => s.chiave === "platino") + 1) || st.stages.length;
   const req = attuale ? requisiti(attuale) : [];
   const riga = attuale ? `<span class="small">Tappa ${indice + 1} di ${tot}</span><b>${esc(attuale.nome)}</b>
       <span class="small">${req.filter(r => r.ok).length} su ${req.length} ${req.length === 1 ? "requisito" : "requisiti"}</span>` : t.riga;
-  const tessera = (nome, f, ob) => { ob = Number(ob) || 0; const x = ob ? Math.min(100, Math.round(f / ob * 100)) : 0;
+  const tessera = (nome, f, ob) => { ob = Number(ob) || 0; const x = ob ? pctOk(Math.round(f / ob * 100)) : 0;
     return `<div class="tessera"><span>${nome}</span><b class="num">${num(f)}<small> / ${num(ob)}</small></b>
       <div class="bar${ob && f >= ob ? " fatto" : ""}" role="progressbar" aria-label="${nome}" aria-valuenow="${x}" aria-valuemin="0" aria-valuemax="100"><i style="width:${x}%"></i></div></div>`; };
   return `<div class="card miei-numeri cruscotto">
@@ -2410,7 +2410,7 @@ function vReportDaImportare(){
 
 function barra(nome, fatto, obj){
   obj = Number(obj) || 0;
-  const pct = obj ? Math.min(100, Math.round(fatto / obj * 100)) : 0;
+  const pct = obj ? pctOk(Math.round(fatto / obj * 100)) : 0;
   return `<div class="obiettivo"><div class="spread"><span>${nome}</span>
     <span class="num">${num(fatto)} <span class="faint">/ ${num(obj)}</span></span></div>
     <div class="bar ${obj && fatto >= obj ? "fatto" : ""}" role="progressbar" aria-label="${nome}" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div></div>`;
@@ -2423,8 +2423,8 @@ function barraVp(m){
   const fatto = vpMese(m), obj = Number(st.goalMese.obiettivo_vp) || 0;
   /* oltre l'obiettivo la barra si divide in proporzione al totale, così la parte scritta dopo il report si vede sempre */
   const scala = Math.max(obj, fatto);
-  const w = v => scala ? Math.min(100, Math.round(v / scala * 100)) : 0, wRep = w(Math.max(0, Math.min(rep, fatto)));
-  const pct = obj ? Math.min(100, Math.round(fatto / obj * 100)) : 0, piena = w(fatto);
+  const w = v => scala ? pctOk(Math.round(v / scala * 100)) : 0, wRep = w(Math.max(0, Math.min(rep, fatto)));
+  const pct = obj ? pctOk(Math.round(fatto / obj * 100)) : 0, piena = w(fatto);
   return `<div class="obiettivo"><div class="spread"><span>VP personali</span>
     <span class="num">${num(fatto)} <span class="faint">/ ${num(obj)}</span></span></div>
     <div class="bar doppia ${obj && fatto >= obj ? "fatto" : ""}" role="progressbar" aria-label="VP personali" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i class="rep" style="width:${wRep}%"></i><i style="width:${Math.max(0, piena - wRep)}%"></i></div></div>`;
@@ -2626,7 +2626,7 @@ function vStruttura(){
   const rigaIo = `<li class="liv io" style="--rientro:0px" data-id="${esc(io)}" data-path="" data-nome="${esc(senzaAccenti(st.profilo.nome))}">
       <span class="livello l0" title="Livello 1">1</span>
       <div class="nome"><span>${esc(st.profilo.nome)}</span>
-        <span class="small">${num(rIo.vp_personali)} VP · gruppo ${num(rIo.vp_gruppo)}${rIo.linee_attive ? ` · ${rIo.linee_attive} ${rIo.linee_attive === 1 ? "linea" : "linee"}` : ""}</span></div>
+        <span class="small">${testoVp(rIo.vp_personali)} · gruppo ${num(rIo.vp_gruppo)}${rIo.linee_attive ? ` · ${rIo.linee_attive} ${rIo.linee_attive === 1 ? "linea" : "linee"}` : ""}</span></div>
       <button class="piega" data-act="piega" data-id="${esc(io)}" data-quanti="${righe.length}" aria-expanded="${!chiusoIo}"
         aria-label="${chiusoIo ? "Mostra" : "Nascondi"} il tuo gruppo">${chiusoIo ? "▸" : "▾"} ${righe.length}</button></li>`;
   return `<div class="card">
@@ -2656,7 +2656,7 @@ function vStruttura(){
       <span class="livello l${livello % 5 + 1}" title="Livello ${livello + 2}">${livello + 2}</span>
       <div class="nome"><button class="nome-apri" data-act="apri-scheda" data-id="${esc(p.id)}">
         <span>${esc(p.nome)}${pallinoApp(p)}</span>
-        <span class="small">${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${r.linee_attive ? ` · ${r.linee_attive} ${r.linee_attive === 1 ? "linea" : "linee"}` : ""}</span>
+        <span class="small">${testoVp(r.vp_personali)} · gruppo ${num(r.vp_gruppo)}${r.linee_attive ? ` · ${r.linee_attive} ${r.linee_attive === 1 ? "linea" : "linee"}` : ""}</span>
       </button></div>
       ${quanti ? `<button class="piega" data-act="piega" data-id="${esc(p.id)}" data-quanti="${quanti}" aria-expanded="${!chiuso}"
         aria-label="${chiuso ? "Mostra" : "Nascondi"} il gruppo di ${esc(p.nome)}">${chiuso ? "▸" : "▾"} ${quanti}</button>` : ""}
@@ -2757,7 +2757,7 @@ function vPartenzaScheda(p){
   if(p.stato === "gestito"){
     const n = nuovoDa(p.id);
     if(!n) return "";
-    const pct = Math.min(100, Math.round(n.vp / PRIMO_ORDINE_VP * 100));
+    const pct = pctOk(Math.round(n.vp / PRIMO_ORDINE_VP * 100));
     return `<div class="card partenza-scheda">
       <span class="eyebrow">Il primo ordine</span>
       <div class="spread" style="align-items:baseline"><b class="num grande">${num(n.vp)}<small> / ${PRIMO_ORDINE_VP} VP</small></b>
@@ -2791,7 +2791,7 @@ function vElencoFiltrato(righe, filtro){
       <span class="livello l${livello % 5 + 1}" title="Livello ${livello + 2}">${livello + 2}</span>
       <div class="nome"><button class="nome-apri" data-act="apri-scheda" data-id="${esc(p.id)}">
         <span>${esc(p.nome)}${pallinoApp(p)}</span>
-        <span class="small">${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${x ? ` · sotto ${esc(x.sponsor)}` : ""}${ingresso}</span>
+        <span class="small">${testoVp(r.vp_personali)} · gruppo ${num(r.vp_gruppo)}${x ? ` · sotto ${esc(x.sponsor)}` : ""}${ingresso}</span>
       </button></div>
       ${etichettaNuovo(p.id)}${filtro.id === "percentuale" ? `<span class="pill v">${Number(r.percentuale) || 0}%</span>` : pillStato(p)}</li>`; }).join("")}</ul>
     ${filtro.id === "nuovi" ? `<p class="small" style="margin:6px 0 0">Nuovi = iscritti da meno di 30 giorni, il tempo per il primo ordine. Sull'etichetta i giorni che restano, o ✓ se il primo ordine è fatto.</p>` : ""}`;
@@ -3217,9 +3217,14 @@ function righeCsv(testo){
 }
 /* i valori del report hanno spesso un apostrofo davanti; i numeri sono "9.500,00" oppure "20996.38" */
 function pulito(v){ return String(v == null ? "" : v).trim().replace(/^'/, "").trim(); }
+/* una percentuale per le barre: mai sotto 0 (VP negativi dalla mappa) né sopra 100 */
+/* «-489,17 VP da recuperare»: i VP negativi del mese dopo una chiusura con la tolleranza */
+function testoVp(v){ v = Number(v) || 0; return v < 0 ? `${num(v)} VP da recuperare` : `${num(v)} VP`; }
+function pctOk(v){ return Math.max(0, Math.min(100, Number(v) || 0)); }
 function numReport(v){
-  v = pulito(v).replace(/\s/g, "");
-  if(!v) return 0;
+  /* il meno può essere «−» (segno tipografico); un trattino da solo o «N/D» vuol dire nessun valore */
+  v = pulito(v).replace(/\s/g, "").replace(/\u2212/g, "-");
+  if(!v || /^(-|–|n\/?d)$/i.test(v)) return 0;
   if(v.includes(",")) v = v.replace(/\./g, "").replace(",", ".");
   const n = Number(v);
   return isFinite(n) ? n : NaN;
@@ -3264,14 +3269,16 @@ function leggiReport(testo){
     if(!codice) continue;
     if(!/^(italia|italy|it)$/i.test(pulito(r[c.paese]))){
       esteri.push({ codice, sponsor:soloCifre(pulito(r[c.sponsor])), livello:c.livello >= 0 ? Number(pulito(r[c.livello])) || 0 : 0 }); continue; }
+    /* i VPP possono essere negativi: dopo un mese chiuso con la tolleranza (per esempio Argento a 9.500 VPG invece di
+       10.000) Amway fa partire il mese dopo da meno i VP che mancavano. Si salvano così come sono: la mappa fa fede. */
     const vpp = numReport(r[c.vpp]);
-    if(!(vpp >= 0)) return { errore:`I VPP di ${nomeReport(r[c.nome])} non sono un numero: scarica di nuovo il file.` };
+    if(!isFinite(vpp)) return { errore:`Nel file i VPP di ${nomeReport(r[c.nome])} sono «${pulito(r[c.vpp]).slice(0, 20)}»: non è un numero. Scarica di nuovo il file.` };
     const vpg = c.vpg >= 0 ? numReport(r[c.vpg]) : NaN, perc = c.perc >= 0 ? parseInt(soloCifre(pulito(r[c.perc])), 10) : NaN;
     const ingresso = c.ingresso >= 0 ? dataLunga(r[c.ingresso]) : null;
     righe.push({ codice, livello:c.livello >= 0 ? Number(pulito(r[c.livello])) || 0 : 0,
       ingresso:ingresso && ingresso >= "2000-01-01" && ingresso <= oggi() ? ingresso : null,
       sponsor:c.sponsor >= 0 ? soloCifre(pulito(r[c.sponsor])) : "", nome:nomeReport(r[c.nome]), vpp:Math.round(vpp * 100) / 100,
-      vpg:vpg >= 0 ? Math.round(vpg * 100) / 100 : null, perc:isFinite(perc) ? perc : null,
+      vpg:isFinite(vpg) ? Math.round(vpg * 100) / 100 : null, perc:isFinite(perc) ? perc : null,
       dimensione:c.dimensione >= 0 ? Number(soloCifre(pulito(r[c.dimensione]))) || 0 : null });
   }
   if(esteri.some(r => r.livello === 1)) return { errore:"Questo file è di un codice di un altro Paese: si importano solo le mappe italiane." };
@@ -6767,7 +6774,7 @@ function vGuidaStabilita(){
 function vGuidaAbitudini(){
   const sp = st.guidaSett || 0, sett = settimanaGiorni(sp), pp = (st.passi || []).filter(x => !x.importato && x.tipo === "followup" && x.data >= settimana());
   /* contatti, piani e follow-up vengono dalla Lista (barra pesca); formazione e sponsor li spunti tu (barra verde) */
-  const riga = (nome, fatto, obj, spiega, extra, k) => { obj = Number(obj) || 0; const x = obj ? Math.min(100, Math.round(fatto / obj * 100)) : 0;
+  const riga = (nome, fatto, obj, spiega, extra, k) => { obj = Number(obj) || 0; const x = obj ? pctOk(Math.round(fatto / obj * 100)) : 0;
     const daLista = k === "contatti" || k === "piani" || k === "followup";
     return `<div class="abitudine" data-k="${esc(k)}">
       <div class="spread"><span>${esc(nome)}</span><b class="num">${num(fatto)}<small> / ${k === "contatti" || k === "piani"

@@ -3,6 +3,15 @@
 Ultimo aggiornamento: 4 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## VPP negativi nella mappa (4 novembre 2026, notte, app v102, database non toccato)
+
+Spiegato da Stefano: dopo la prima qualifica Argento (10.000 VPG), per sei mesi Amway chiude il mese come qualificato
+anche a 9.500 VPG; lo chiude a 10.000 e il mese dopo fa partire da meno i VP che mancavano (chiuso a 9.510,83 → il
+mese dopo parte da -489,17). L'import rifiutava questi VPP («non sono un numero»). Ora i VPP (e i VPG) negativi si
+leggono, anche con il segno «−», e si salvano così come sono (la mappa fa fede); un trattino o «N/D» valgono 0. Nella
+struttura: «-489,17 VP da recuperare». Le barre non vanno mai sotto 0. Se un valore non è un numero, l'avviso dice cosa
+c'è scritto nel file.
+
 ## I campi non si svuotano più (4 novembre 2026, sera, app v101, database non toccato)
 
 Quando l'app ridisegna lo schermo (tornando sull'app da WhatsApp, dati che arrivano dopo, una scelta nel foglio) quello
