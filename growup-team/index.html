@@ -556,6 +556,23 @@ input.mini.prezzo{width:68px;text-align:right}
 .cal.on{background:var(--scelta-wash);border-color:var(--progresso);color:var(--progresso)}
 .agenda-testo{color:var(--progresso);font-weight:800}
 .risposte-agenda{display:grid;gap:8px;margin-top:12px}
+/* avviati (consegna 6): «Per iniziare», i nomi nuovi nel cruscotto, il link da salvare in «Da dove parti?» */
+.card.per-iniziare{display:flex;flex-direction:column;gap:8px}
+.per-iniziare-l{list-style:none;margin:0;padding:0}
+.per-iniziare-l li{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.per-iniziare-l li:first-child{border-top:0}
+.per-iniziare-l .segno{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--ink3);display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:800;color:#fff}
+.per-iniziare-l li.fatto .segno{background:var(--progresso);border-color:var(--progresso)}
+.per-iniziare-l li.fatto b{color:var(--ink2)}
+.tessere.tre{grid-template-columns:repeat(3,minmax(0,1fr))}
+.tessere.tre{gap:8px}
+.tessere.tre .tessera{padding:10px}
+.tessere.tre .tessera>span{font-size:12px;line-height:1.25}
+.tessera.nomi-nuovi{background:rgba(240,138,75,.14);border:1px solid rgba(240,138,75,.5)}
+.tessera.nomi-nuovi small{font-size:11px;opacity:.8}
+.fonti-riga{margin:0;color:var(--linguetta)}
+.link-da-salvare{margin-top:14px;padding:12px;border-radius:14px;background:var(--traccia)}
 /* la serie (consegna 5): i cerchi dei giorni della settimana */
 .card.serie{display:flex;flex-direction:column;gap:10px}
 .serie-titolo{display:inline-flex;align-items:center;gap:6px;font-weight:800;color:var(--serie)}

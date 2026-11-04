@@ -1103,6 +1103,24 @@ begin
     perform growup_test.ok((select prossima_ora from public.persone where id = pp) = time '10:30', '040: B salva l''ora del prossimo passo');
     perform growup_test.come(u4);  -- C
     perform growup_test.ok(not exists (select 1 from public.persone where id = pp), '040: C non vede la persona di B');
+    -- 058: la fonte del nome solo con i valori ammessi
+    perform growup_test.come(u3);  -- B
+    update public.persone set fonte = 'dal_vivo' where id = pp;
+    perform growup_test.ok((select fonte from public.persone where id = pp) = 'dal_vivo', '058: B segna la fonte del suo nome');
+    perform growup_test.deve_fallire(format($q$update public.persone set fonte = 'instagram' where id = %L$q$, pp), '058: fonte solo tra Conoscenza, Dal vivo, Social');
+    -- 058: il punto con l'upline lo scrive solo il partner stesso
+    update public.partners set punto_upline = oggi40 + 2 where id = b;
+    perform growup_test.ok((select punto_upline from public.partners where id = b) = oggi40 + 2, '058: B fissa il suo punto con l''upline');
+    update public.partners set punto_upline_fatto = oggi40 where id = b;
+    perform growup_test.ok((select punto_upline_fatto from public.partners where id = b) = oggi40, '058: B segna il punto fatto');
+    perform growup_test.come(u1);  -- R, upline di B: legge ma non scrive
+    update public.partners set punto_upline = null, punto_upline_fatto = null where id = b;
+    perform growup_test.come(u4);  -- C, altra linea
+    update public.partners set punto_upline = null where id = b;
+    execute 'reset role';
+    perform growup_test.ok((select punto_upline = oggi40 + 2 and punto_upline_fatto = oggi40 from public.partners where id = b),
+                           '058: né l''upline né un''altra linea cambiano il punto di B');
+    perform growup_test.come(u3);
     -- 057: l'agenda (per cosa, come) solo con i valori ammessi e solo sulle proprie persone
     perform growup_test.come(u3);  -- B
     update public.persone set prossima_per = 'fissare_piano', prossima_come = 'whatsapp' where id = pp;

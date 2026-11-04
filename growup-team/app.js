@@ -53,6 +53,7 @@ function creaApi(){
     join:         args => q(sb.rpc("entra_con_invito", args)),
     cambiaChiave: () => q(sb.rpc("cambia_chiave")),
     accettaPrivacy: pid => q(sb.from("partners").update({ privacy_accettata_il:new Date().toISOString() }).eq("id", pid)),
+    puntoUpline: (pid, campi) => q(sb.from("partners").update(campi).eq("id", pid)),
     /* io e tutta la mia downline: la RLS restituisce solo quella */
     /* io e chi vedo, ognuno sotto il primo sopra di lui che vedo (struttura "ricucita" nel database) */
     struttura:    () => q(sb.rpc("struttura_visibile")),
@@ -917,7 +918,7 @@ async function vaiHome(profilo){
   salvaLocale(CHIAVE_INVITO, null); st.invito = null; st.invitoRiserva = null;
   await caricaTutto();
   /* chi è stato aggiunto a mano, la prima volta che entra, legge e accetta la privacy */
-  st.fase = profilo.privacy_accettata_il ? "home" : "privacy_primo";
+  st.fase = !profilo.privacy_accettata_il ? "privacy_primo" : senzaPerche() ? "obiettivo_primo" : "home";
   if(st.fase === "home") setTimeout(riconosciPlatino, 0);
   if(st.fase === "home") statoNotifiche().then(() => { render(); aggiornaPreviste(); });
   /* la scorciatoia sull'icona (pressione lunga): «Importa da Amway» */
@@ -1416,6 +1417,7 @@ function vHome(){
   ${vInvita()}` : st.sezIo === "guida" ? vGuida() : `
   ${vDomandaNotifiche()}
   ${linkDaSalvare() ? vPrimiPassi() : ""}
+  ${vPerIniziare()}
   ${vCruscotto()}
   ${st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : vOggiLista()}
   ${vSerie()}
@@ -1649,26 +1651,32 @@ function rigaObiettivoDi(pid){
   const t = tappaPerCifra(o.cifra_mese);
   return `Obiettivo: <b>${euro(o.cifra_mese)}/mese</b> ${esc(testoTraguardo(o.entro))}${t && !prossima ? ` · ${esc(t.tappa.nome)}` : ""}${prossima ? "<br>" + prossima : ""}`;
 }
-function campiObiettivo(o){
+function campiObiettivo(o, primo){
   o = o || {};
   const min = meseDi(oggi());
   return `<label class="field"><span>Quanto vorresti guadagnare al mese? (€)</span>
       <input name="cifra" type="text" inputmode="numeric" autocomplete="off" value="" placeholder="${o.cifra_mese ? esc(String(Number(o.cifra_mese))) : "0"}" data-vuoto></label>
     <label class="field"><span>Entro quando?</span>
       <input name="entro" type="month" min="${min}" value="${o.entro ? meseDi(o.entro) : ""}"></label>
-    <label class="field"><span>Perché è importante per te? <span class="faint">(lo vedi solo tu)</span></span>
-      <textarea name="perche" rows="3" maxlength="1000">${esc(o.perche || "")}</textarea></label>`;
+    <label class="field"><span>${primo ? "Perché lo fai?" : "Perché è importante per te?"} <span class="faint">(lo vedi solo tu)</span></span>
+      <textarea name="perche" rows="3" maxlength="1000" required>${esc(o.perche || "")}</textarea></label>`;
 }
+/* «Da dove parti?» (consegna 6): il perché per tutti, blocco vero. Senza obiettivo con il suo perché le altre pagine
+   non si aprono; chi è già nell'app senza perché la vede una volta. Sotto, per chi è appena entrato, il link da salvare. */
+function senzaPerche(){ return !st.obiettivo || !String(st.obiettivo.perche || "").trim(); }
 function vObiettivoPrimo(){
   return `<div>
     ${marchio()}
-    <h1 style="margin-top:6px">Il tuo primo obiettivo</h1>
-    <p class="muted">Da dove vuoi partire? Scrivi quanto vorresti guadagnare al mese e per quando: l'app ti mostra la tappa
-      che vale quella cifra e il percorso per arrivarci. Puoi cambiarlo quando vuoi.</p>
+    <h1 style="margin-top:6px">Da dove parti?</h1>
+    <p class="muted">Tutto parte da qui: cosa vuoi ottenere, per quando e perché. Lo rivedrai ogni giorno e puoi cambiarlo quando vuoi.</p>
     <form data-form="obiettivo" class="card" novalidate>
-      ${campiObiettivo()}
-      <button class="btn primary wide" style="margin-top:16px">Salva il mio obiettivo</button>
-      <button type="button" class="btn ghost wide" style="margin-top:8px" data-act="obiettivo-dopo">Lo scrivo dopo</button>
+      ${campiObiettivo(st.obiettivo, true)}
+      ${st.chiave && leggiLocale(CHIAVE_SALVATA) !== "1" ? `<div class="link-da-salvare">
+        <b>Salva il tuo link personale</b>
+        <p class="small" style="margin:2px 0 8px">È la tua chiave per rientrare. Mandalo <b>a te stesso</b>.</p>
+        ${bottoniChiave()}</div>` : ""}
+      <button class="btn primary wide" style="margin-top:16px">Inizia il mio percorso</button>
+      <p class="nota" style="text-align:center">Le altre pagine si aprono dopo questo passo.</p>
     </form>
   </div>`;
 }
@@ -1992,6 +2000,38 @@ function datiTappa(){
    con i requisiti, contatti e piani della settimana. Sotto «La prossima cosa» con la lista unica di oggi (Lista e
    Clienti), poi le righe che si aprono: Primi passi, Il mio mese, il promemoria dell'import, il diario. */
 const GIRO_ANELLO = 2 * Math.PI * 46;
+/* ---- Avviati (consegna 6): iscritti da più di 30 giorni. «Per iniziare» senza scadenze: il perché, il punto con la
+   propria upline (generico: sceglie lui con chi; si segnano il giorno e quando è fatto) e l'import della mappa se ha un
+   gruppo. Sparisce quando è fatto. I nuovi (30 giorni o meno) avranno il loro percorso di partenza (consegna 7). ---- */
+const GIORNI_NUOVO = 30;
+function avviato(){ const d = st.profilo && st.profilo.data_iscrizione; return !d || giorniTra(String(d).slice(0, 10), oggi()) > GIORNI_NUOVO; }
+function conUpline(){ return !!(st.profilo && st.profilo.sponsor_id); }
+function puntoDaFare(){ const p = st.profilo; return avviato() && conUpline() && p.punto_upline && !p.punto_upline_fatto && p.punto_upline <= oggi(); }
+function perIniziare(){
+  const p = st.profilo, io = p.id, l = [{ k:"perche", nome:"Il mio perché", fatto:!senzaPerche() }];
+  if(conUpline()) l.push({ k:"punto", nome:"Il punto con la tua upline", fatto:!!p.punto_upline_fatto,
+    sotto:p.punto_upline_fatto ? `fatto il ${dataIt(String(p.punto_upline_fatto).slice(0, 10))}` : p.punto_upline ? `fissato per ${riassuntoAgenda(String(p.punto_upline).slice(0, 10))}` : "",
+    azione:p.punto_upline_fatto ? "" : `<button class="btn small" data-act="punto-fissa">${p.punto_upline ? "Cambia" : "Fissa ›"}</button>` });
+  if(figli(io).length) l.push({ k:"mappa", nome:"Importa la tua mappa", fatto:[...(st.mioReport || new Map()).values()].some(r => r.importato_da === io),
+    azione:btnAmway("Importa ›", "small") });
+  return l;
+}
+function vPerIniziare(){
+  if(!avviato()) return "";
+  const l = perIniziare(), fatti = l.filter(x => x.fatto).length;
+  if(fatti === l.length) return "";
+  return `<div class="card per-iniziare">
+    <div class="spread"><span class="eyebrow">Per iniziare · ${fatti} di ${l.length}</span><span class="small">sparisce quando è fatto</span></div>
+    <ul class="per-iniziare-l">${l.map(x => `<li class="${x.fatto ? "fatto" : ""}" data-k="${x.k}"><span class="segno" aria-hidden="true">${x.fatto ? "✓" : ""}</span>
+      <span class="grow"><b>${esc(x.nome)}</b>${x.sotto ? `<br><span class="small">${esc(x.sotto)}</span>` : ""}</span>${x.fatto ? "" : x.azione || ""}</li>`).join("")}</ul>
+  </div>`;
+}
+/* i nomi nuovi della settimana (solo avviati): i nomi messi in Lista da lunedì, con la loro fonte */
+const FONTI = [["conoscenza", "Conoscenza"], ["dal_vivo", "Dal vivo"], ["social", "Social"]];
+function nomiNuoviSettimana(){
+  const l = st.persone.filter(p => p.esito !== "cliente" && String(p.creato_il || "").slice(0, 10) >= settimana());
+  return { n:l.length, fonti:FONTI.map(([k, t]) => [t.toLowerCase(), l.filter(p => p.fonte === k).length]).filter(x => x[1]) };
+}
 function vCruscotto(){
   const o = st.obiettivo, t = datiTappa(), aperta = !!st.tappaAperta, g = st.goal;
   const m = meseDi(oggi()), fatto = vpMese(m), obj = Number(st.goalMese.obiettivo_vp) || 0;
@@ -2020,7 +2060,10 @@ function vCruscotto(){
     </div>
     ${t.sempre}
     ${aperta ? `<div class="tappa-aperta">${t.corpo}</div>` : ""}
-    <div class="tessere">${tessera("Nuovi contatti", fattoSettimana("contatto"), g.obiettivo_contatti)}${tessera("Piani mostrati", fattoSettimana("piano"), g.obiettivo_piani)}</div>
+    ${(() => { const nn = avviato() ? nomiNuoviSettimana() : null;
+      return `<div class="tessere${nn ? " tre" : ""}">${tessera("Nuovi contatti", fattoSettimana("contatto"), g.obiettivo_contatti)}${tessera("Piani mostrati", fattoSettimana("piano"), g.obiettivo_piani)}${
+        nn ? `<div class="tessera nomi-nuovi"><span>Nomi nuovi</span><b class="num">${num(nn.n)}</b><small>questa settimana</small></div>` : ""}</div>
+      ${nn && nn.fonti.length ? `<p class="small fonti-riga">Nomi nuovi questa settimana: ${nn.fonti.map(([t, n]) => `${num(n)} ${t}`).join(" · ")}</p>` : ""}`; })()}
     <p class="small settimana-riga">Settimana ${dataIt(settimana())} – ${dataIt(piuGiorni(settimana(), 6))} ·
       <button class="btn link small" data-act="obiettivi">Modifica gli obiettivi</button></p>
     ${g.salvato && st.goalMese.salvato ? "" : `<p class="small proposta-obiettivi">Ti proponiamo questi obiettivi per iniziare. Vanno bene?
@@ -2076,11 +2119,18 @@ function rigaCliente(x){
       <button class="x" data-act="togli-da-io" data-id="${esc(x.p.id)}" aria-label="Togli ${esc(x.p.nome)} da Io">×</button></li>`;
 }
 function vOggiLista(){
-  const v = vociOggi(), altri = v.presto.length + v.corso.length, aperto = !!st.dopoAperto;
-  if(!v.oggi.length && !altri) return "";
-  const [prima, ...poi] = v.oggi;
-  const testa = prima ? `<div class="spread"><span class="eyebrow pesca">La prossima cosa</span>
-      <span class="row" style="gap:6px;align-items:center"><span class="small">1 di ${v.oggi.length} oggi</span>
+  const v = vociOggi(), altri = v.presto.length + v.corso.length, aperto = !!st.dopoAperto, punto = puntoDaFare();
+  if(!v.oggi.length && !altri && !punto) return "";
+  const [prima, ...poi] = punto ? [null].concat(v.oggi) : v.oggi;
+  const totale = v.oggi.length + (punto ? 1 : 0);
+  const testa = punto ? `<div class="spread"><span class="eyebrow pesca">La prossima cosa</span><span class="small">per iniziare · 1 di ${totale} oggi</span></div>
+    <span class="prossima-titolo" role="heading" aria-level="3">Il punto con la tua upline</span>
+    <p class="small" style="margin:0">${String(st.profilo.punto_upline).slice(0, 10) < oggi() ? `Era fissato per il ${dataIt(String(st.profilo.punto_upline).slice(0, 10))}` : "Fissato per oggi"} · per impostare il mese</p>
+    <div class="prossima-azioni">
+      <button class="btn primary" data-act="punto-fatto">Fatto</button>
+      <button class="btn" data-act="punto-fissa">Scegli il giorno</button></div>`
+    : prima ? `<div class="spread"><span class="eyebrow pesca">La prossima cosa</span>
+      <span class="row" style="gap:6px;align-items:center"><span class="small">1 di ${totale} oggi</span>
       <button class="x" data-act="togli-da-io" data-id="${esc(prima.p.id)}" aria-label="Togli ${esc(prima.p.nome)} da Io">×</button></span></div>
     <button class="prossima-titolo" data-act="${prima.k === "cliente" ? "apri-cliente" : "apri-persona"}" data-id="${esc(prima.p.id)}">${esc(prima.p.nome)}
       <span class="pill mini tag tag-${prima.k}">${prima.k === "cliente" ? "Cliente" : "Lista"}</span></button>
@@ -3277,7 +3327,7 @@ function toastImport(e){
 /* ---- 10. Fogli in basso ---- */
 function vSheet(){
   const s = st.sheet;
-  const sp = vSheetAgenda(s) || vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s) || vSheetListino(s) || vSheetMiei(s) || vSheetGuida(s);
+  const sp = vSheetAgenda(s) || vSheetPunto(s) || vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s) || vSheetListino(s) || vSheetMiei(s) || vSheetGuida(s);
   if(sp) return sp;
   if(s === "codici-tolti") return `<h2>Codici Amway tolti</h2>
     <p class="small">Le persone tolte dalla struttura prima della conferma: con questi codici non si entra finché non li sblocchi.</p>
@@ -3578,7 +3628,6 @@ const AZIONI = {
   "profilo-indietro"(){ if(!tornaIndietro()){ st.vista = "io"; render(); window.scrollTo(0, 0); } },
   "primi-passi-si"(){ salvaLocale(chiavePrimiPassiNo(), null); st.vista = "io"; st.sezIo = "giorno"; render(); window.scrollTo(0, 0); },
   "obiettivo-modifica"(){ st.errore = ""; st.sheet = "obiettivo"; render(); },
-  "obiettivo-dopo"(){ st.fase = "home"; render(); },
   async "copia-dati"(){
     try{
       const dati = await api.copiaDati();
@@ -3849,12 +3898,14 @@ const MODULI = {
     if(!(cifra > 0)) return mostraErroreForm(f, "Scrivi quanto vorresti guadagnare al mese, per esempio 400.");
     if(!/^\d{4}-\d{2}$/.test(entro)) return mostraErroreForm(f, "Scegli il mese entro cui vuoi arrivarci.");
     if(entro < meseDi(oggi())) return mostraErroreForm(f, "Il mese è già passato: scegline uno da adesso in avanti.");
+    if(!perche) return mostraErroreForm(f, "Scrivi perché lo fai: è quello che ti fa andare avanti.");
     const o = { partner_id:st.profilo.id, cifra_mese:cifra, entro:entro + "-01", perche:perche || null, aggiornato_il:new Date().toISOString() };
     try{
       await api.salvaObiettivo(o);
       st.obiettivo = { cifra_mese:cifra, entro:o.entro, perche:o.perche };
-      if(st.fase === "obiettivo_primo") st.fase = "home";
-      st.sheet = null; st.vista = "obiettivo"; render(); window.scrollTo(0, 0);
+      const primo = st.fase === "obiettivo_primo";
+      if(primo){ st.fase = "home"; setTimeout(riconosciPlatino, 0); }
+      st.sheet = null; st.vista = primo ? "io" : "obiettivo"; if(primo) st.sezIo = "giorno"; render(); window.scrollTo(0, 0);
       toast("Obiettivo salvato");
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
@@ -3863,7 +3914,7 @@ const MODULI = {
     try{
       await api.accettaPrivacy(st.profilo.id);
       st.profilo.privacy_accettata_il = new Date().toISOString();
-      st.fase = st.obiettivo ? "home" : "obiettivo_primo"; render();
+      st.fase = senzaPerche() ? "obiettivo_primo" : "home"; render();
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
   chiamata(f){
@@ -3916,7 +3967,7 @@ const MODULI = {
       salvaLocale(CHIAVE_SALVATA, null);
       if(q.prossima){ try{ r.profilo = await api.impostaProssima(q.prossima); }catch(e){} }
       await vaiHome(r.profilo);
-      if(st.fase === "home" && !st.obiettivo) st.fase = "obiettivo_primo";
+      if(st.fase === "home" && senzaPerche()) st.fase = "obiettivo_primo";
       st.occupato = false; render();
     }catch(e){
       st.occupato = false; f.querySelector("button.primary").disabled = false;
@@ -4297,6 +4348,44 @@ function vSheetAgenda(s){
       ${p.prossima_data ? `<button type="button" class="btn ghost wide" style="margin-top:8px" data-act="agenda-togli" data-id="${esc(p.id)}">Togli dall'agenda</button>` : ""}
     </form>`;
 }
+/* il punto con l'upline (consegna 6): si sceglie solo il giorno; con chi lo decide il partner */
+function vSheetPunto(s){
+  if(s !== "punto-upline") return "";
+  const p = st.profilo, scelto = p.punto_upline && String(p.punto_upline).slice(0, 10) >= oggi() ? String(p.punto_upline).slice(0, 10) : "";
+  const giorni = [0, 1, 2].map(i => piuGiorni(oggi(), i));
+  const etichetta = (d, i) => i === 0 ? "Oggi" : i === 1 ? "Domani" : GIORNI_SETT[new Date(d + "T12:00:00").getDay()].replace(/^./, x => x.toUpperCase());
+  return `<h2>Il punto con la tua upline</h2>
+    <p class="small">Una chiamata o un incontro con chi ti segue, per impostare il mese. Scegli tu con chi: qui segni solo il giorno.</p>
+    <form data-form="punto" novalidate>
+      <fieldset class="field"><legend>Quando</legend><div class="opzioni">${giorni.map((d, i) =>
+        `<label class="chip"><input type="radio" name="quando" value="${d}"${d === scelto ? " checked" : ""}><span>${etichetta(d, i)}</span></label>`).join("")}</div>
+        <label class="giorno-scelto"><span class="small">Oppure scegli il giorno</span><input type="date" name="giorno" min="${oggi()}" value="${giorni.includes(scelto) ? "" : esc(scelto)}"></label></fieldset>
+      ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
+      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button><button class="btn primary grow">Salva</button></div>
+      ${p.punto_upline ? `<button type="button" class="btn ghost wide" style="margin-top:8px" data-act="punto-fatto">L'ho già fatto</button>` : ""}
+    </form>`;
+}
+async function salvaPunto(campi, msg){
+  await api.puntoUpline(st.profilo.id, campi);
+  st.profilo = Object.assign({}, st.profilo, campi);
+  st.sheet = null; render(); toast(msg);
+}
+Object.assign(AZIONI, {
+  "punto-fissa"(){ st.errore = ""; st.sheet = "punto-upline"; render(); },
+  async "punto-fatto"(){
+    try{ await salvaPunto({ punto_upline:st.profilo.punto_upline || oggi(), punto_upline_fatto:oggi() }, "Punto con l'upline fatto"); }
+    catch(e){ toast(messaggio(e)); }
+  }
+});
+Object.assign(MODULI, {
+  async punto(f){
+    const giorno = f.giorno.value || (f.querySelector("input[name=quando]:checked") || {}).value;
+    if(!giorno){ mostraErroreForm(f, "Scegli il giorno."); return; }
+    if(giorno < oggi()){ mostraErroreForm(f, "Scegli oggi o un giorno che deve ancora venire."); return; }
+    try{ await salvaPunto({ punto_upline:giorno, punto_upline_fatto:null }, `Punto con l'upline: ${riassuntoAgenda(giorno)}`); }
+    catch(e){ mostraErroreForm(f, messaggio(e)); }
+  }
+});
 const AGENDA_VUOTA = { prossima_data:null, prossima_ora:null, prossima_nota:null, prossima_per:null, prossima_come:null };
 Object.assign(AZIONI, {
   "agenda"(el){ st.agendaId = el.dataset.id || st.personaId; st.agendaPer = null; st.agendaTitolo = null; st.errore = ""; st.sheet = "agenda"; render(); },
@@ -4372,6 +4461,8 @@ function vSheetPersone(s){
       <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc(m.nome || "")}" autocomplete="off"></label>
       <label class="field"><span>Telefono o contatto <i>(facoltativo)</i></span><input name="contatto" maxlength="80" inputmode="tel" value="${esc(m.contatto || "")}"></label>
       <label class="field"><span>Come lo conosci <i>(facoltativo)</i></span><input name="origine" maxlength="80" placeholder="es. collega, palestra, cugino" value="${esc(m.origine || "")}"></label>
+      ${avviato() && !st.nuovoCliente && m.esito !== "cliente" ? `<fieldset class="field"><legend>Fonte <i>(facoltativa)</i></legend><div class="opzioni">${FONTI.map(([k, t]) =>
+        `<label class="chip"><input type="radio" name="fonte" value="${k}"${m.fonte === k ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>` : ""}
       ${m.id && (m.esito === "cliente" || m.codice_cliente) ? (() => { const [mm, gg] = (m.compleanno || "-").split("-");
         return `<label class="field"><span>Codice cliente Amway <i>(facoltativo)</i></span><input name="codice_cliente" inputmode="numeric" maxlength="15" value="${esc(m.codice_cliente || "")}"></label>
         <div class="row" style="gap:8px">
@@ -4551,6 +4642,7 @@ Object.assign(AZIONI, {
 
 Object.assign(MODULI, {
   async "persona-nuova"(f){
+    const fonteScelta = x => (x.querySelector("input[name=fonte]:checked") || {}).value || null;
     const nome = f.nome.value.trim();
     if(!nome){ mostraErroreForm(f, "Scrivi il nome."); return; }
     try{
@@ -4558,7 +4650,7 @@ Object.assign(MODULI, {
          se il nome è già nella lista il contatto si segna su di lei */
       if(st.rapido === "contatto"){
         const gia = st.persone.find(p => senzaAccenti(p.nome) === senzaAccenti(nome)), pid = gia ? gia.id : uuid();
-        if(!gia) await api.nuovePersone([{ id:pid, nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null }]);
+        if(!gia) await api.nuovePersone([{ id:pid, nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null, fonte:fonteScelta(f) }]);
         await api.nuoviPassi([{ id:uuid(), persona_id:pid, tipo:"contatto", data:oggi() }]);
         if(gia && gia.nascosta_io) await api.modificaPersona(pid, { nascosta_io:false });
         st.rapido = null;
@@ -4566,7 +4658,7 @@ Object.assign(MODULI, {
         return;
       }
       const id = uuid();
-      await api.nuovePersone([{ id, nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null }]);
+      await api.nuovePersone([{ id, nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null, fonte:st.nuovoCliente ? null : fonteScelta(f) }]);
       const scelte = [...f.querySelectorAll("input[name=cerchia]:checked")].map(i => i.value);
       if(scelte.length) await api.inCerchia(scelte.map(c => ({ persona_id:id, cerchia_id:c })));
       st.vista = "persone";
@@ -4616,6 +4708,7 @@ Object.assign(MODULI, {
     const nome = f.nome.value.trim();
     if(!nome){ mostraErroreForm(f, "Scrivi il nome."); return; }
     const campi = { nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null, note:f.note.value.trim() || null };
+    if(f.querySelector("input[name=fonte]")) campi.fonte = (f.querySelector("input[name=fonte]:checked") || {}).value || null;
     if(f.codice_cliente){
       const cod = f.codice_cliente.value.replace(/\D/g, "");
       if(cod && !/^\d{4,15}$/.test(cod)){ mostraErroreForm(f, "Il codice cliente sono solo cifre (da 4 a 15)."); return; }

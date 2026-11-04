@@ -30,7 +30,16 @@ Consegna 5 (Serie) in PR, app v91, database non toccato: in «Il mio giorno», s
 («N settimane di fila», record dell'ultimo anno, i 7 cerchi della settimana con oggi, «Questa settimana: N giorni attivi
 su 5»). Settimana valida = almeno 5 giorni attivi su 7 (lunedì-domenica); giorno attivo = almeno un contatto, invito,
 piano, follow-up o altro passo, un cliente o un suo ordine scritto a mano, la formazione o la chiamata con lo sponsor.
-Prossima: consegna 6, Perché per tutti, avviati, nomi nuovi e fonti (con il database).
+Consegna 5 unita (PR #164, v91 con il cerchio di oggi allineato).
+Consegna 6 (migrazione **058**) in PR, app v92. Scelte di Stefano del 4 novembre: il perché è obbligatorio («Da dove
+parti?»: cifra, mese e perché, con il link da salvare; niente «Lo scrivo dopo»; chi è nell'app senza perché la vede una
+volta); «Per iniziare» anche per chi c'è già; nomi nuovi senza obiettivo settimanale; punto con l'upline generico (si
+segna solo il giorno, con chi lo sceglie il partner). Avviati = iscritti da più di 30 giorni (o senza data): «Per
+iniziare · N di M» (il mio perché, il punto con la tua upline se ha uno sponsor, importa la mappa se ha un gruppo), che
+sparisce quando è fatto; il giorno del punto è la prossima cosa con «Fatto»; nel cruscotto la tessera «Nomi nuovi» e la
+riga delle fonti; la fonte (Conoscenza, Dal vivo, Social) nel nome nuovo. 058: `partners.punto_upline`,
+`punto_upline_fatto` (solo la propria riga) e `persone.fonte`: da applicare su Supabase con l'ok di Stefano.
+Prossima: consegna 7, Percorso dei nuovi.
 
 ## Nuovi iscritti dalla mappa (4 novembre 2026, migrazione 056)
 

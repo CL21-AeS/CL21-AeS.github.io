@@ -58,6 +58,10 @@ async function apri(ctxOpts, hash){
   page.on("pageerror", e => errori.push(String(e)));
   fileMancanti(page);
   page.on("dialog", d => d.accept());
+  /* consegna 6: «Da dove parti?» blocca chi non ha l'obiettivo con il perché. Nei test chi entra già con il suo link (privacy
+     accettata) ha un obiettivo di prova, salvo DB.senzaObiettivo o p.senzaObiettivo; chi entra con un invito lo scrive (perche()). */
+  if(!DB.senzaObiettivo) for(const p of DB.partners) if(p.chiave && p.privacy_accettata_il && !p.senzaObiettivo && !(DB.obiettivi || []).some(o => o.partner_id === p.id))
+    DB.obiettivi = (DB.obiettivi || []).concat([{ partner_id:p.id, cifra_mese:300, entro:(new Date().getFullYear() + 1) + "-06-01", perche:"Per la famiglia" }]);
   await page.addInitScript(([db, m]) => { window.__DB = db; eval(m); }, [DB, mock]);
   await page.goto(BASE + (hash || ""));
   return { ctx, page };
@@ -72,6 +76,15 @@ const apriTappa = pg => apriRiga(pg, "apri-tappa");
 const apriMese = async pg => { const b = pg.locator("button[data-act=apri-mese]").first();   // anche con un foglio aperto sopra
   if(await b.count() && await b.getAttribute("aria-expanded") === "false") await b.evaluate(x => x.click()); };
 const apriDopo = pg => apriRiga(pg, "apri-dopo");
+/* consegna 6: «Da dove parti?» è un blocco vero: cifra, mese e perché, poi «Inizia il mio percorso» */
+const perche = async pg => {
+  await pg.getByText("Da dove parti?").waitFor();
+  await pg.fill("form[data-form=obiettivo] input[name=cifra]", "300");
+  await pg.fill("form[data-form=obiettivo] input[name=entro]", (new Date().getFullYear() + 1) + "-06");
+  await pg.fill("form[data-form=obiettivo] textarea[name=perche]", "Per la famiglia");
+  await pg.click("form[data-form=obiettivo] button.primary");
+  await pg.locator("form[data-form=obiettivo]").waitFor({ state:"detached" });
+};
 const apriDiario = pg => apriRiga(pg, "apri-diario");
 const apriOrdini = async (pg, scelta) => { await pg.click(".azioni button[data-act=ordini]");
   if(scelta) await pg.click(`.sheet button[data-act=${scelta}]`); };
