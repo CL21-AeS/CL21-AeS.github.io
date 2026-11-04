@@ -3489,11 +3489,11 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const giorniFa = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
   const ora = new Date().toISOString();
   DB.partners.push({ id:"av6", nome:"Ada Avviata", sponsor_id:"R", stato:"attivo", chiave:"a6".repeat(16), codice_invito:"AV6AV6", codice_amway:"7900001",
-    data_iscrizione:giorniFa(60), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora });
+    data_iscrizione:giorniFa(60), privacy_accettata_il:ora, conPercorso:true, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora });
   DB.partners.push({ id:"nu6", nome:"Nino Nuovo", sponsor_id:"R", stato:"attivo", chiave:"b6".repeat(16), codice_invito:"NU6NU6", codice_amway:"7900002",
-    data_iscrizione:giorniFa(5), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora });
+    data_iscrizione:giorniFa(5), privacy_accettata_il:ora, conPercorso:true, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora });
   DB.partners.push({ id:"pe6", nome:"Pia Senzaperche", sponsor_id:"R", stato:"attivo", chiave:"c6".repeat(16), codice_invito:"PE6PE6", codice_amway:"7900003",
-    data_iscrizione:giorniFa(90), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora });
+    data_iscrizione:giorniFa(90), privacy_accettata_il:ora, conPercorso:true, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora });
   DB.obiettivi = (DB.obiettivi || []).filter(o => o.partner_id !== "pe6").concat([{ partner_id:"pe6", cifra_mese:500, entro:(new Date().getFullYear() + 1) + "-03-01", perche:"" }]);
   // chi è già nell'app con l'obiettivo ma senza perché vede «Da dove parti?» una volta, con i suoi numeri già scritti
   ({ ctx, page } = await apri({}, "#chiave=" + "c6".repeat(16)));
@@ -3554,6 +3554,70 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(!(await page.locator(".sheet input[name=fonte]").count()), "nuovo: nessuna fonte nel nome");
   await ctx.close();
   DB.partners = DB.partners.filter(p => !["av6", "nu6", "pe6"].includes(p.id));
+}
+
+// 61. Consegna 7: il percorso di partenza di un nuovo, fase per fase, fino alla festa
+{
+  const giorniFa = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10), ora = new Date().toISOString();
+  DB.partners.push({ id:"np7", nome:"Nora Partenza", sponsor_id:"R", stato:"attivo", chiave:"d7".repeat(16), codice_invito:"NP7NP7", codice_amway:"7910001",
+    data_iscrizione:giorniFa(3), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true });
+  DB.seguimi = (DB.seguimi || []).filter(x => x.partner_id !== "np7");
+  const entra = async () => { ({ ctx, page } = await apri({}, "#chiave=" + "d7".repeat(16)));
+    await page.getByText("Ciao Nora").waitFor(); if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]"); };
+  await entra();
+  const pc = page.locator(".card.percorso-partenza");
+  check(await pc.isVisible() && !(await page.locator(".card.cruscotto:not(.percorso-partenza)").count()) && !(await page.locator(".primi-passi").count()),
+    "nuovo: il percorso al posto del cruscotto e dei Primi passi");
+  check((await pc.locator(".spread .small").first().innerText()).trim() === "Fase 2 di 5" && (await pc.locator(".fase-titolo").innerText()).trim() === "Partenza con lo sponsor",
+    "fase 2: Partenza con lo sponsor");
+  check(await pc.locator("ol.fasi li.poi .lucchetto").count() === 3, "le fasi dopo hanno il lucchetto");
+  check((await page.locator(".oggi-lista .prossima-titolo").innerText()).trim() === "Fissa l'incontro con il tuo sponsor", "la prossima cosa viene dal percorso");
+  await page.screenshot({ path: S + "/e2e/61-percorso.png", fullPage:true });
+  await page.click(".oggi-lista button[data-act=incontro-fissa]");
+  await page.locator(".sheet h2", { hasText:"Il primo incontro con il tuo sponsor" }).waitFor();
+  const domaniG = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  await page.check(`.sheet input[name=quando][value="${domaniG}"]`, { force:true });
+  await page.click(".sheet button.primary");
+  await page.getByText("Primo incontro con lo sponsor: domani").waitFor();
+  check(await pc.locator(".percorso-l li.fatto", { hasText:"Primo incontro con il tuo sponsor" }).isVisible(), "incontro fissato: la riga è spuntata");
+  check((await pc.locator(".percorso-l li", { hasText:"30 nomi" }).innerText()).includes("0 / 30"), "i 30 nomi: il contatore");
+  await sync(page); await ctx.close();
+  check(DB.partners.find(p => p.id === "np7").incontro_sponsor === domaniG, "nel database il giorno del primo incontro");
+  // 30 nomi → fase 3, il primo ordine
+  DB.persone = (DB.persone || []).concat(Array.from({ length:30 }, (_, i) => ({ id:"np7n" + i, proprietario:"np7", nome:"Nome Nora " + (i + 1), fase:"lista", esito:null, creato_il:ora })));
+  await entra();
+  check((await page.locator(".percorso-partenza .fase-titolo").innerText()).trim() === "Il primo ordine" && (await page.locator(".percorso-ordine").innerText()).includes("0 / 50 VP"),
+    "fase 3: il primo ordine, 0 su 50 VP");
+  check((await page.locator(".percorso-ordine").innerText()).includes("restano 27 giorni"), "fase 3: i giorni che restano dei 30");
+  await ctx.close();
+  // l'ordine da 60 VP → fase 4, i due binari
+  DB.activities.push({ id:"np7o", partner_id:"np7", tipo:"ordine", quantita:1, vp:60, data:giorniFa(1), inserito_il:ora, inserito_da:"np7" });
+  await entra();
+  check((await page.locator(".percorso-partenza .fase-titolo").innerText()).trim() === "I due binari" && (await page.locator(".percorso-partenza").innerText()).includes("✓ primo ordine · 60 VP"),
+    "fase 4: i due binari, con il primo ordine fatto");
+  check(await page.locator(".binari .binario:not(.ok)").count() === 2, "fase 4: primo piano e primo cliente ancora da fare");
+  await ctx.close();
+  // primo piano e primo cliente → la festa, una volta sola
+  DB.activities.push({ id:"np7p", partner_id:"np7", tipo:"piano", quantita:1, data:giorniFa(0), inserito_il:ora },
+    { id:"np7c", partner_id:"np7", tipo:"cliente", quantita:1, data:giorniFa(0), inserito_il:ora });
+  await entra();
+  const festa = page.locator(".festa");
+  await festa.waitFor();
+  check((await festa.locator("h1").innerText()).replace(/\s+/g, " ").trim() === "Si parte, Nora!" && await festa.locator(".festa-l li").count() === 3, "la festa: i tre passi che contano");
+  await page.screenshot({ path: S + "/e2e/61-festa.png" });
+  await festa.locator("button[data-act=festa-seguimi]").click();
+  await festa.waitFor({ state:"detached" });
+  await page.getByText("Seguimi attivo").waitFor();
+  check(await page.locator(".card.cruscotto:not(.percorso-partenza)").isVisible() && !(await page.locator(".percorso-partenza").count()), "dopo la festa: il cruscotto di tutti");
+  await sync(page);
+  check(!!DB.partners.find(p => p.id === "np7").partenza_completata_il && DB.seguimi.some(x => x.partner_id === "np7" && x.attivo), "nel database: partenza completata e Seguimi acceso");
+  check(!errori.length, "percorso: nessun errore nella pagina");
+  await ctx.close();
+  await entra();
+  check(!(await page.locator(".festa").count()), "la festa si vede una volta sola");
+  await ctx.close();
+  DB.partners = DB.partners.filter(p => p.id !== "np7"); DB.persone = DB.persone.filter(x => x.proprietario !== "np7");
+  DB.activities = DB.activities.filter(a => a.partner_id !== "np7");
 }
 
 await browser.close();

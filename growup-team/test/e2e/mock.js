@@ -142,7 +142,10 @@
       const dati = { nome:invito.nome, chiave:hex(), stato:"attivo", data_iscrizione:a.p_data_iscrizione,
         qualifica_iniziale:a.p_qualifica, qualifica_iniziale_mese:a.p_qualifica_mese, pagamenti_iniziali:a.p_pagamenti,
         percentuale_iniziale:a.p_percentuale, privacy_accettata_il:new Date().toISOString(),
-        partenza_confermata_il:(a.p_qualifica || a.p_percentuale) ? null : new Date().toISOString() };
+        partenza_confermata_il:(a.p_qualifica || a.p_percentuale) ? null : new Date().toISOString(),
+        /* SOLO NEI TEST: i test di prima della consegna 7 guardano il cruscotto, quindi chi entra ha già finito il percorso di
+           partenza; il test del percorso (61) mette db.conPercorso. Il database vero non scrive niente qui. */
+        partenza_completata_il:db.conPercorso ? null : new Date().toISOString() };
       const copie = db.partners.filter(p => p.codice_amway === codiceA && p.stato === "gestito");
       let p;
       if(copie.length){
@@ -163,9 +166,9 @@
       db.accessi.push({ user_id:session.user.id, partner_id:p.id }); db.joins.push(a); salva();
       return { profilo:pub(p), chiave:p.chiave };
     },
-    /* 058: il punto con l'upline, solo sulla propria riga (policy partners_modifico_me) */
-    puntoUpline: async (pid, campi) => { const p = db.partners.find(x => x.id === pid && pid === (mio() || {}).id);
-      if(p) Object.assign(p, { punto_upline:campi.punto_upline ?? p.punto_upline, punto_upline_fatto:campi.punto_upline_fatto === undefined ? p.punto_upline_fatto : campi.punto_upline_fatto }); salva(); },
+    /* 058-059: le proprie date (punto con l'upline, primo incontro, partenza completata), solo sulla propria riga */
+    aggiornaMio: async (pid, campi) => { const p = db.partners.find(x => x.id === pid && pid === (mio() || {}).id);
+      if(p) for(const k of ["punto_upline", "punto_upline_fatto", "incontro_sponsor", "partenza_completata_il"]) if(k in campi) p[k] = campi[k]; salva(); },
     accettaPrivacy: async pid => { const p = db.partners.find(x => x.id === pid); p.privacy_accettata_il = new Date().toISOString(); salva(); },
     obiettivo: async pid => (db.obiettivi || []).find(o => o.partner_id === pid) || null,
     salvaObiettivo: async o => { db.obiettivi = (db.obiettivi || []).filter(x => x.partner_id !== o.partner_id).concat([o]); salva(); },

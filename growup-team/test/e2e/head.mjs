@@ -60,6 +60,9 @@ async function apri(ctxOpts, hash){
   page.on("dialog", d => d.accept());
   /* consegna 6: «Da dove parti?» blocca chi non ha l'obiettivo con il perché. Nei test chi entra già con il suo link (privacy
      accettata) ha un obiettivo di prova, salvo DB.senzaObiettivo o p.senzaObiettivo; chi entra con un invito lo scrive (perche()). */
+  /* consegna 7, solo nei test: chi ha la data di iscrizione vicina all'ingresso seguirebbe il percorso di partenza; i test
+     di prima guardano il cruscotto, quindi lo trovano già completato (salvo DB.conPercorso o p.conPercorso) */
+  if(!DB.conPercorso) for(const p of DB.partners) if(p.data_iscrizione && !p.conPercorso && !p.partenza_completata_il) p.partenza_completata_il = "2026-01-01T00:00:00Z";
   if(!DB.senzaObiettivo) for(const p of DB.partners) if(p.chiave && p.privacy_accettata_il && !p.senzaObiettivo && !(DB.obiettivi || []).some(o => o.partner_id === p.id))
     DB.obiettivi = (DB.obiettivi || []).concat([{ partner_id:p.id, cifra_mese:300, entro:(new Date().getFullYear() + 1) + "-06-01", perche:"Per la famiglia" }]);
   await page.addInitScript(([db, m]) => { window.__DB = db; eval(m); }, [DB, mock]);
