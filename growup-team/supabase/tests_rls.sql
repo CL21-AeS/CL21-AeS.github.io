@@ -1820,6 +1820,29 @@ begin
     delete from public.persone where id in (avv, nuo, cli, pas);
   end;
 
+  -- ---- 061: «Chiuso senza risposta», un esito separato dai «No» ----
+  declare
+    sr uuid; n_no int; n_si int; ok boolean := false;
+  begin
+    perform growup_test.come(u5);  -- A
+    insert into public.persone (nome) values ('Contatto Fermo') returning id into sr;
+    insert into public.passi (persona_id, tipo) values (sr, 'contatto');
+    insert into public.passi (persona_id, tipo, esito) values (sr, 'chiusura', 'senza_risposta');
+    perform growup_test.ok((select esito from public.persone where id = sr) = 'senza_risposta',
+                           '061: chiudendo senza risposta la persona prende l''esito nuovo');
+    update public.persone set prossima_data = current_date + interval '6 months', prossima_per = 'contatto' where id = sr;
+    perform growup_test.ok((select prossima_per from public.persone where id = sr) = 'contatto',
+                           '061: il promemoria tra 6 mesi va nell''agenda');
+    begin
+      insert into public.passi (persona_id, tipo, esito) values (sr, 'chiusura', 'boh');
+    exception when check_violation then ok := true; end;
+    perform growup_test.ok(ok, '061: un esito che non esiste resta vietato');
+    perform growup_test.come(u4);  -- C non vede né tocca le persone di A
+    perform growup_test.ok(not exists (select 1 from public.persone where id = sr), '061: le persone di A restano solo di A');
+    perform growup_test.come(u5);
+    delete from public.persone where id = sr;
+  end;
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),

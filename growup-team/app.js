@@ -4230,7 +4230,18 @@ function mostraErroreForm(f, msg){
 const FASI = [
   { id:"lista", nome:"In lista" }, { id:"contattato", nome:"Contattato" }, { id:"invitato", nome:"Invitato" },
   { id:"piano", nome:"Piano fatto" }, { id:"followup", nome:"Follow-up" }];
-const ESITI = { partner:"Partner", cliente:"Cliente", non_ora:"Non ora", no:"No" };
+const ESITI = { partner:"Partner", cliente:"Cliente", non_ora:"Non ora", no:"No", senza_risposta:"Chiuso senza risposta" };
+/* «Da riprendere» (061): un contatto avviato (da Contattato in poi, senza esito) senza passi da 14 giorni e senza una data
+   in agenda da oggi in avanti è fermo; i nomi mai contattati non lo sono mai. «Ricordamelo» e il promemoria dopo la
+   chiusura senza risposta usano l'agenda (057): niente colonne nuove. */
+const FERMO_LISTA = 14, RICORDA_GIORNI = 30, RICORDA_CHIUSO_MESI = 6;
+function giorniFermo(p){
+  if(!p || p.esito || p.fase === "lista" || (p.prossima_data && p.prossima_data >= oggi())) return 0;
+  const g = giorniTra(ultimoPasso(p), oggi());
+  return g >= FERMO_LISTA ? g : 0;
+}
+/* chiuso senza risposta con il promemoria arrivato: torna in «Da riprendere» */
+function daRisentire(p){ return p.esito === "senza_risposta" && !!p.prossima_data && p.prossima_data <= oggi(); }
 const TIPI_PASSO = {
   contatto: { nome:"Contatto", come:["Telefono", "Messaggio", "Di persona", "Social"],
     reazione:["Aperto, incuriosito", "Gentile ma tiepido", "Dice che ha poco tempo", "Non ha risposto"], prossima:"Quando ci ritorni sopra" },
@@ -4295,7 +4306,7 @@ const FILTRI_LISTA = [
   { id:"tutti", nome:"Tutti", ok:() => true },
   { id:"lista", nome:"In lista", ok:p => !p.esito && p.fase === "lista" },
   { id:"corso", nome:"In corso", ok:p => !p.esito && p.fase !== "lista" },
-  { id:"riprendere", nome:"Da riprendere", ok:p => p.esito === "non_ora" },
+  { id:"riprendere", nome:"Da riprendere", ok:p => p.esito === "non_ora" || giorniFermo(p) > 0 || daRisentire(p) },
   { id:"chiusi", nome:"Chiusi", ok:p => p.esito && p.esito !== "non_ora" }];
 
 function uuid(){ return crypto.randomUUID ? crypto.randomUUID()
@@ -4382,7 +4393,7 @@ function testoProssima(p){
 function ultimoPasso(p){ const s = passiDi(p.id)[0]; return s ? s.data : String(p.creato_il || oggi()).slice(0, 10); }
 function daFare(){
   /* chi è ancora «In lista» entra solo se l'ho messo in agenda (057) */
-  const l = st.persone.filter(p => !p.nascosta_io && (p.fase !== "lista" || p.prossima_data) && (!p.esito || (p.esito === "non_ora" && p.prossima_data)));
+  const l = st.persone.filter(p => !p.nascosta_io && (p.fase !== "lista" || p.prossima_data) && (!p.esito || ((p.esito === "non_ora" || p.esito === "senza_risposta") && p.prossima_data)));
   const conData = l.filter(p => p.prossima_data).sort((a, b) => a.prossima_data < b.prossima_data ? -1 : 1);
   return {
     ritardo: conData.filter(p => p.prossima_data < oggi()),
@@ -4396,11 +4407,11 @@ function daFare(){
 /* registrato come cliente sul sito Amway (ha il codice cliente) ma senza nessun ordine */
 function maiComprato(p){ return !!p.codice_cliente && p.esito !== "cliente" && !st.ordini.some(o => o.persona_id === p.id); }
 function rigaPersona(p, suIo, tag){
-  const f = FASI[indiceFase(p.fase)], fermo = !p.prossima_data && !p.esito && p.fase !== "lista" ? giorniTra(ultimoPasso(p), oggi()) : 0;
-  return `<li class="${suIo ? "su-io" : "con-cal"}"><button class="persona" data-act="apri-persona" data-id="${esc(p.id)}">
+  const f = FASI[indiceFase(p.fase)], fermo = giorniFermo(p);
+  return `<li class="${suIo ? "su-io" : "con-cal"}${fermo ? " fermo" : ""}"><button class="persona" data-act="apri-persona" data-id="${esc(p.id)}">
       <span class="grow"><b>${esc(p.nome)}</b>${tag ? ` <span class="pill mini tag tag-lista">${esc(tag)}</span>` : ""}${maiComprato(p) ? ` <span class="pill g mini">Mai comprato</span>` : ""}${p.origine
         ? `<br><span class="small origine">${esc(p.origine)}</span>` : ""}<br><span class="small">${p.esito ? ESITI[p.esito] : f.nome}${p.prossima_data ? ` · <span class="${inAgenda(p) ? "agenda-testo" : ""}">${esc(testoProssima(p))}</span>`
-        : fermo >= 14 ? ` · nessun passo da ${fermo} giorni` : ""}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
+        : fermo ? ` · <span class="fermo-testo">fermo da ${fermo} giorni</span>` : ""}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
       <span class="punti" aria-hidden="true">${FASI.map((x, i) => `<i class="${i <= indiceFase(p.fase) ? "on" : ""}"></i>`).join("")}</span>
     </button>${suIo ? `<button class="x" data-act="togli-da-io" data-id="${esc(p.id)}" aria-label="Togli ${esc(p.nome)} da Io">×</button>` : btnAgenda(p)}</li>`;
 }
@@ -4449,6 +4460,7 @@ function vPersona(){
     ${p.contatto || p.origine ? `<p class="small" style="margin:2px 0 0">${[p.contatto, p.origine].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
     ${cerchiePersona(p, "lista")}
     ${avvisoScadenza(p)}
+    ${vFermo(p)}
     ${(() => { const x = p.invito_target_id && st.inviti.find(y => y.id === p.invito_target_id);
       return x ? `<p class="small" style="margin:6px 0 0">Target: <b>${esc(statoInvito(x).txt)}</b>
         <button class="btn link small" data-act="apri-invito" data-id="${esc(x.id)}" style="min-height:0;padding:0 4px">${x.risposte ? "Vedi le risposte" : "Apri l'invito"}</button></p>`
@@ -4488,6 +4500,29 @@ function vPersona(){
   </div>`;
 }
 
+/* il riquadro ambra nella scheda di un contatto fermo: ricordamelo più avanti o chiudi */
+function campoRicordaChiuso(){
+  const quando = piuMesi(oggi(), RICORDA_CHIUSO_MESI);
+  return `<fieldset class="field"><legend>Te lo ricordo tra ${RICORDA_CHIUSO_MESI} mesi?</legend>
+    <div class="opzioni"><label class="chip"><input type="radio" name="ricorda" value="si" checked><span>Sì, ${esc(MESI[Number(quando.slice(5, 7)) - 1])}</span></label>
+      <label class="chip"><input type="radio" name="ricorda" value="no"><span>Non serve</span></label></div>
+    <p class="nota">Il ${esc(dataIt(quando))} te lo trovi in agenda e torna in «Da riprendere».</p></fieldset>`;
+}
+/* chiudere senza risposta: il passo di chiusura e, se lo voglio, il promemoria tra 6 mesi in agenda */
+function prossimaChiuso(ricorda){
+  return ricorda ? { prossima_data:piuMesi(oggi(), RICORDA_CHIUSO_MESI), prossima_per:"contatto", prossima_come:null, prossima_ora:null, prossima_nota:null }
+    : { prossima_data:null, prossima_per:null, prossima_come:null, prossima_ora:null, prossima_nota:null };
+}
+function vFermo(p){
+  const g = giorniFermo(p);
+  if(!g) return "";
+  const u = passiDi(p.id).find(s => TIPI_PASSO[s.tipo] && s.tipo !== "nota");
+  return `<div class="fermo-box"><p class="small" style="margin:0"><b>Nessun passo da ${g} giorni.</b>${u
+      ? ` L'ultimo è «${esc(TIPI_PASSO[u.tipo].nome)}» del ${esc(dataIt(u.data))}.` : ""}</p>
+    <div class="row" style="gap:8px;margin-top:10px">
+      <button class="btn small grow" data-act="ricordamelo">Ricordamelo tra ${RICORDA_GIORNI} giorni</button>
+      <button class="btn small grow" data-act="chiudi-contatto">Chiudi contatto</button></div></div>`;
+}
 /* I numeri della lista di chi è nei Preferiti: si chiedono una volta sola, poi si ridisegna */
 const numeriChiesti = new Set();
 function chiediNumeriLista(pid){
@@ -4786,11 +4821,18 @@ function vSheetPersone(s){
         <fieldset class="field" data-per-esito="non_ora" hidden><legend>Tra quanto lo risenti</legend>
           <div class="opzioni">${RISENTI.map(([v, t]) => `<label class="chip"><input type="radio" name="risenti" value="${v}"${v === "3" ? " checked" : ""}><span>${t}</span></label>`).join("")}</div>
           <input type="date" name="risenti_data" min="${piuGiorni(oggi(), 3)}" aria-label="Oppure scegli il giorno">
-          <p class="nota">Te lo ricordo 2 giorni prima.</p></fieldset>`
+          <p class="nota">Te lo ricordo 2 giorni prima.</p></fieldset>
+        <div data-per-esito="senza_risposta" hidden>${campoRicordaChiuso()}</div>`
         : campiProssima(t.prossima, null)}
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
     </form>`}`;
   }
+  if(s === "chiudi-contatto" && p) return `<h2>Chiudi il contatto con ${esc(nomeSaluto(p.nome))}</h2>
+    <p class="small">Va in «Chiusi» come <b>Chiuso senza risposta</b>: non è un «No» e non conta tra i no. I suoi passi restano.</p>
+    <form data-form="chiudi-contatto" novalidate>
+      ${campoRicordaChiuso()}
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Chiudi contatto</button></div>
+    </form>`;
   if(s === "prossima" && p) return `<h2>Prossima cosa con ${esc(nomeSaluto(p.nome))}</h2>
     <form data-form="prossima" novalidate>
       ${campiProssima("Quando", p)}
@@ -4834,6 +4876,16 @@ Object.assign(AZIONI, {
   "cerchia-nuova"(){ st.errore = ""; st.sheet = "cerchia-nuova"; render(); focusSheet(); },
   "cerchia-rinomina"(){ st.errore = ""; st.sheet = "cerchia-rinomina"; render(); focusSheet(); },
   "cerchia-aggiungi"(){ st.errore = ""; st.cerchiaAggiungi = idCerchia(); st.sheet = "cerchia-aggiungi"; render(); },
+  /* «Da riprendere»: il contatto fermo va in agenda tra 30 giorni, oppure si chiude senza risposta */
+  async ricordamelo(){
+    const p = st.persone.find(x => x.id === st.personaId); if(!p) return;
+    const quando = piuGiorni(oggi(), RICORDA_GIORNI);
+    try{
+      await api.modificaPersona(p.id, { prossima_data:quando, prossima_per:perProposto(p), prossima_come:null, prossima_ora:null, prossima_nota:null, nascosta_io:false });
+      await dopoPersone(`Te lo ricordo il ${dataIt(quando)}: è in agenda`);
+    }catch(e){ toast(messaggio(e)); }
+  },
+  "chiudi-contatto"(){ st.errore = ""; st.sheet = "chiudi-contatto"; render(); },
   /* dalla scheda di una persona (Lista o Clienti): in quali cerchie sta, e una nuova */
   "persona-cerchie"(el){ st.errore = ""; st.cerchieScheda = el.dataset.t === "clienti" ? "clienti" : "lista"; st.sheet = "persona-cerchie"; render(); },
   async "cerchia-elimina"(){
@@ -4939,6 +4991,15 @@ Object.assign(MODULI, {
       if(!ora && personeSezione().length){ st.sheet = "cerchia-aggiungi"; render(); }
     }catch(e){ mostraErroreForm(f, /duplicate|unique/i.test(messaggio(e)) ? "Hai già una cerchia con questo nome." : messaggio(e)); }
   },
+  async "chiudi-contatto"(f){
+    const p = st.persone.find(x => x.id === st.personaId); if(!p) return;
+    const ricorda = ((f.querySelector("input[name=ricorda]:checked") || {}).value || "si") !== "no";
+    try{
+      await api.nuoviPassi([{ id:uuid(), persona_id:p.id, tipo:"chiusura", data:oggi(), esito:"senza_risposta" }]);
+      await api.modificaPersona(p.id, prossimaChiuso(ricorda));
+      await dopoPersone(ricorda ? `Chiuso senza risposta: te lo ricordo il ${dataIt(piuMesi(oggi(), RICORDA_CHIUSO_MESI))}` : "Chiuso senza risposta");
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  },
   async "persona-cerchie"(f){
     const pid = st.personaId, t = st.cerchieScheda === "clienti" ? "clienti" : "lista", nome = f.nuova.value.trim().slice(0, 40);
     const scelte = [...f.querySelectorAll("input[name=cerchia]:checked")].map(i => i.value), prima = cerchieDi(pid).filter(id => cerchieTipo(t).some(c => c.id === id));
@@ -5038,6 +5099,7 @@ Object.assign(MODULI, {
     if(data > oggi()){ mostraErroreForm(f, "Il passo non può essere nel futuro: per quello c'è la prossima cosa."); return; }
     let pr = { prossima_data:null, prossima_ora:null, prossima_nota:null };
     if(tipo !== "chiusura" || esito === "partner") pr = leggiProssima(f);
+    if(tipo === "chiusura" && esito === "senza_risposta") pr = prossimaChiuso(scelto("ricorda") !== "no");
     if(tipo === "chiusura" && esito === "non_ora"){
       const quando = f.risenti_data.value || piuMesi(oggi(), Number(scelto("risenti") || 3));
       if(quando <= oggi()){ mostraErroreForm(f, "Scegli un giorno nel futuro."); return; }

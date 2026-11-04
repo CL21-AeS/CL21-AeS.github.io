@@ -3811,6 +3811,101 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.traguardiAperti = false;
 }
 
+// 64. «Da riprendere» (061): il contatto avviato fermo da 14 giorni, «Ricordamelo tra 30 giorni», «Chiudi contatto»
+{
+  DB.partners.push({ id:"dr61", nome:"Riprendi Prova", sponsor_id:"R", stato:"attivo", chiave:"d6".repeat(16), codice_invito:"DR61DR",
+    confermato_il:new Date().toISOString(), privacy_accettata_il:"2026-10-01T00:00:00Z", partenza_confermata_il:new Date().toISOString(), creato_il:new Date().toISOString() });
+  const giorniFa = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10), piu = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  const vecchio = new Date(Date.now() - 60 * 86400000).toISOString();
+  DB.persone.push({ id:"dr1", proprietario:"dr61", nome:"Fermo Sedici", fase:"invitato", esito:null, creato_il:vecchio },
+    { id:"dr2", proprietario:"dr61", nome:"Fresco Cinque", fase:"contattato", esito:null, creato_il:vecchio },
+    { id:"dr3", proprietario:"dr61", nome:"Mai Contattato", fase:"lista", esito:null, creato_il:vecchio },
+    { id:"dr4", proprietario:"dr61", nome:"Fermo Con Agenda", fase:"piano", esito:null, creato_il:vecchio, prossima_data:piu(3), prossima_per:"followup" },
+    { id:"dr5", proprietario:"dr61", nome:"Chiuso Da Risentire", fase:"contattato", esito:"senza_risposta", creato_il:vecchio, prossima_data:giorniFa(0), prossima_per:"contatto" });
+  DB.passi = (DB.passi || []).concat([
+    { id:"drp1", proprietario:"dr61", persona_id:"dr1", tipo:"contatto", data:giorniFa(25), creato_il:vecchio },
+    { id:"drp2", proprietario:"dr61", persona_id:"dr1", tipo:"invito", data:giorniFa(16), creato_il:vecchio },
+    { id:"drp3", proprietario:"dr61", persona_id:"dr2", tipo:"contatto", data:giorniFa(5), creato_il:vecchio },
+    { id:"drp4", proprietario:"dr61", persona_id:"dr4", tipo:"piano", data:giorniFa(30), creato_il:vecchio },
+    { id:"drp5", proprietario:"dr61", persona_id:"dr5", tipo:"contatto", data:giorniFa(200), creato_il:vecchio },
+    { id:"drp6", proprietario:"dr61", persona_id:"dr5", tipo:"chiusura", esito:"senza_risposta", data:giorniFa(183), creato_il:vecchio }]);
+  ({ ctx, page } = await apri({}, "#chiave=" + "d6".repeat(16)));
+  await page.getByText("Ciao Riprendi").waitFor(); await apriTappa(page);
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]");
+  const riga = nome => page.locator(".persone li", { has:page.locator("button[data-act=apri-persona]", { hasText:nome }) });
+  check(await riga("Fermo Sedici").evaluate(e => e.classList.contains("fermo")) && (await riga("Fermo Sedici").innerText()).includes("fermo da 16 giorni"),
+    "Lista: il contatto avviato senza passi da 16 giorni ha la riga ambra, «fermo da 16 giorni»");
+  check(!await riga("Fresco Cinque").evaluate(e => e.classList.contains("fermo")) && !await riga("Mai Contattato").evaluate(e => e.classList.contains("fermo"))
+    && !await riga("Fermo Con Agenda").evaluate(e => e.classList.contains("fermo")),
+    "Lista: non sono fermi chi ha un passo recente, chi non è mai stato contattato e chi ha una data in agenda");
+  await page.click("button[data-filtro=riprendere]");
+  const nomi = async () => (await page.locator(".persone button[data-act=apri-persona] b").allInnerTexts()).map(t => t.trim()).sort().join();
+  check(await nomi() === "Chiuso Da Risentire,Fermo Sedici", "Da riprendere: i fermi e i chiusi senza risposta con il promemoria arrivato");
+  check((await riga("Chiuso Da Risentire").innerText()).includes("Chiuso senza risposta"), "Da riprendere: il chiuso senza risposta lo dice");
+  await page.screenshot({ path: S + "/e2e/64-da-riprendere.png" });
+  // la scheda del contatto fermo: il riquadro ambra e «Ricordamelo tra 30 giorni»
+  await page.click("button[data-act=apri-persona]:has-text('Fermo Sedici')");
+  const box = page.locator(".fermo-box");
+  check((await box.innerText()).replace(/\s+/g, " ").includes("Nessun passo da 16 giorni. L'ultimo è «Invito» del"),
+    "scheda: il riquadro dice da quanti giorni è fermo e qual è l'ultimo passo");
+  await page.screenshot({ path: S + "/e2e/64-scheda-ferma.png" });
+  await box.locator("button[data-act=ricordamelo]").click();
+  await page.getByText("è in agenda").waitFor();
+  await sync(page);
+  check(DB.persone.find(x => x.id === "dr1").prossima_data === piu(30) && DB.persone.find(x => x.id === "dr1").prossima_per === "piano",
+    "Ricordamelo: in agenda tra 30 giorni, per il passo che viene dopo");
+  check(!await page.locator(".fermo-box").count() && await page.locator(".prossima .agenda-testo").isVisible(), "Ricordamelo: niente più riquadro ambra, la data è in agenda");
+  await page.click("button[data-act=torna-lista]");
+  check(await nomi() === "Chiuso Da Risentire", "Ricordamelo: esce da «Da riprendere» fino a quel giorno");
+  // chiudi contatto: senza risposta, con il promemoria tra 6 mesi
+  await page.click("button[data-filtro=tutti]");
+  DB.persone.find(x => x.id === "dr2").prossima_data = null;
+  DB.passi.find(x => x.id === "drp3").data = giorniFa(20);
+  await ctx.close();
+  ({ ctx, page } = await apri({}, "#chiave=" + "d6".repeat(16)));
+  await page.getByText("Ciao Riprendi").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=apri-dopo]");
+  check((await page.locator("#app").innerText()).includes("fermo da 20 giorni") && await page.locator(".persone li.fermo").count() >= 1, "su Io anche il contatto fermo è in ambra");
+  await page.click("button[data-act=vista-persone]");
+  await page.click("button[data-act=apri-persona]:has-text('Fresco Cinque')");
+  await page.click(".fermo-box button[data-act=chiudi-contatto]");
+  await page.locator(".sheet h2", { hasText:"Chiudi il contatto con Fresco" }).waitFor();
+  check(await page.locator(".sheet input[name=ricorda][value=si]").isChecked() && (await page.locator(".sheet").innerText()).includes("non è un «No»"),
+    "Chiudi contatto: spiega che non è un No, e propone il promemoria tra 6 mesi");
+  await page.screenshot({ path: S + "/e2e/64-chiudi.png" });
+  await page.click(".sheet button:has-text('Chiudi contatto')");
+  await page.getByText("Chiuso senza risposta: te lo ricordo il").waitFor();
+  await sync(page);
+  const sei = (() => { const d = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + 6); return d.toISOString().slice(0, 10); })();
+  const fr = DB.persone.find(x => x.id === "dr2");
+  check(fr.esito === "senza_risposta" && fr.prossima_data === sei && fr.prossima_per === "contatto"
+    && DB.passi.some(x => x.persona_id === "dr2" && x.tipo === "chiusura" && x.esito === "senza_risposta"), "Chiudi contatto: esito «senza risposta» e promemoria in agenda tra 6 mesi");
+  check(await page.locator(".card .pill", { hasText:"Chiuso senza risposta" }).isVisible() && await page.locator(".card", { hasText:"I passi" }).getByText("Chiusura · Chiuso senza risposta").isVisible(),
+    "la scheda dice «Chiuso senza risposta», anche tra i passi");
+  await page.click("button[data-act=torna-lista]");
+  await page.click("button[data-filtro=chiusi]");
+  check((await nomi()).includes("Fresco Cinque"), "il chiuso senza risposta è tra i Chiusi");
+  // anche dalla chiusura normale, senza promemoria
+  await page.click("button[data-filtro=tutti]");
+  await page.click("button[data-act=apri-persona]:has-text('Fermo Con Agenda')");
+  await page.click("button[data-act=passo]"); await page.click(".sheet button[data-tipo=chiusura]");
+  await page.click(".sheet label.chip:has-text('Chiuso senza risposta')");
+  check(await page.locator(".sheet [data-per-esito=senza_risposta]").isVisible(), "chiusura normale: con «Chiuso senza risposta» la domanda dei 6 mesi");
+  await page.click(".sheet [data-per-esito=senza_risposta] label.chip:has-text('Non serve')");
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Chiusura · Chiuso senza risposta segnato").waitFor();
+  await sync(page);
+  check(DB.persone.find(x => x.id === "dr4").esito === "senza_risposta" && !DB.persone.find(x => x.id === "dr4").prossima_data, "chiusura senza promemoria: nessuna data in agenda");
+  await page.setViewportSize({ width:360, height:780 });
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "a 360 px niente scorrimento laterale");
+  check(!errori.length, "Da riprendere: nessun errore nella pagina");
+  await ctx.close();
+  DB.partners = DB.partners.filter(p => p.id !== "dr61"); DB.persone = DB.persone.filter(x => x.proprietario !== "dr61");
+  DB.passi = DB.passi.filter(x => x.proprietario !== "dr61");
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
