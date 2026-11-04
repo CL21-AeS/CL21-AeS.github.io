@@ -2394,7 +2394,9 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await page.locator(".guida-abitudini").innerText()).includes("Risentire chi ha visto il piano"), "follow-up con la spiegazione");
   check(await page.locator(".guida-abitudini .abitudine .bar[role=progressbar]").count() === 5 && await page.locator(".guida-abitudini .bar.lista").count() === 3,
     "abitudini: una barra per ognuna, pesca per quelle dalla Lista");
-  check(await page.locator(`.guida-abitudini [data-k=sponsor] button.oggi[data-giorno="${oggiG}"]`).count() === 1, "abitudini: oggi segnato nei cerchi dei giorni");
+  check(await page.locator(`.guida-abitudini [data-k=sponsor] button.adesso[data-giorno="${oggiG}"]`).count() === 1, "abitudini: oggi segnato nei cerchi dei giorni");
+  check(await page.evaluate(() => { const b = [...document.querySelectorAll(".guida-abitudini [data-k=sponsor] .giorni-guida button")].map(x => x.getBoundingClientRect().top);
+    return Math.max(...b) - Math.min(...b) < 1; }), "abitudini: i cerchi dei giorni sono tutti alla stessa altezza, anche oggi");
   await page.screenshot({ path: S + "/e2e/41-guida.png", fullPage:true });
   await sync(page);
   check(DB.guidaFatti.length === 1 && DB.guidaObiettivi.some(x => x.chiave === "formazione" && x.a_settimana === 3)
@@ -3440,6 +3442,40 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     "Piano mostrato: un piano nel database e l'agenda libera");
   check(!errori.length, "agenda: nessun errore nella pagina");
   await ctx.close();
+}
+
+// 59. La serie (consegna 5): settimana valida con 5 giorni attivi su 7, settimane di fila e record
+{
+  const lunedi = (() => { const d = new Date(); d.setUTCHours(12, 0, 0, 0); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d; })();
+  const g = (sett, i) => { const d = new Date(lunedi); d.setUTCDate(d.getUTCDate() + 7 * sett + i); return d.toISOString().slice(0, 10); };
+  const passo = (id, data, tipo) => ({ id, proprietario:"R", persona_id:"ag1", tipo:tipo || "contatto", data, creato_il:data + "T10:00:00Z" });
+  DB.passi = (DB.passi || []).filter(x => x.proprietario !== "R").concat(
+    /* settimana scorsa: 5 giorni; due settimane fa: 5 giorni (uno con la sola formazione); tre settimane fa: 4 (non vale);
+       quattro, cinque e sei settimane fa: 5 giorni (il record è 3) */
+    [0, 1, 2, 3, 4].map(i => passo("se1" + i, g(-1, i))),
+    [0, 1, 2, 3].map(i => passo("se2" + i, g(-2, i), "piano")),
+    [0, 1, 2, 3].map(i => passo("se3" + i, g(-3, i))),
+    [-4, -5, -6].flatMap(w => [0, 2, 3, 4, 6].map(i => passo("se" + (-w) + "x" + i, g(w, i)))));
+  DB.guidaFatti = [{ partner_id:"R", chiave:"formazione", giorno:g(-2, 5) }];
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
+  const serie = page.locator(".card.serie");
+  await serie.waitFor();
+  check((await serie.locator(".serie-titolo").innerText()).trim() === "2 settimane di fila", "serie: 2 settimane valide di fila (" + (await serie.locator(".serie-titolo").innerText()).trim() + ")");
+  check((await serie.locator(".serie-record").innerText()).trim() === "record: 3", "serie: il record è la serie più lunga dell'ultimo anno");
+  check(await serie.locator(".serie-giorni > span").count() === 7 && await serie.locator(".serie-giorni .adesso").count() === 1, "serie: i 7 cerchi della settimana, con oggi");
+  check(await page.evaluate(() => { const b = [...document.querySelectorAll(".serie-giorni b")].map(x => x.getBoundingClientRect().top);
+    return Math.max(...b) - Math.min(...b) < 1; }), "serie: i cerchi sono tutti alla stessa altezza, anche oggi");
+  check((await serie.innerText()).includes("La serie continua se arrivi a 5 entro domenica"), "serie: dice cosa serve questa settimana");
+  const ordine = await page.evaluate(() => [...document.querySelectorAll("#app .card")].map(c => c.classList.contains("cruscotto") ? "cruscotto"
+    : c.classList.contains("oggi-lista") ? "oggi" : c.classList.contains("serie") ? "serie" : c.classList.contains("mio-mese") ? "mese" : "").filter(Boolean).join(","));
+  check(/cruscotto,(oggi,)?serie,mese/.test(ordine), "serie: sotto la lista di oggi, prima del mio mese (" + ordine + ")");
+  await serie.screenshot({ path: S + "/e2e/59-serie.png" });
+  await serie.locator("button[data-act=aiuto][data-k=serie]").click();
+  check((await serie.innerText()).includes("almeno 5 giorni su 7"), "serie: il «?» spiega la regola");
+  check(!errori.length, "serie: nessun errore nella pagina");
+  await ctx.close();
+  DB.passi = (DB.passi || []).filter(x => x.proprietario !== "R"); DB.guidaFatti = [];
 }
 
 await browser.close();

@@ -36,7 +36,7 @@
   --line:#e7e0d2; --accent:#0a3a2c; --accent-ink:#f7f0e3; --accent-wash:#e6efe9;
   --verde:#13795b; --giallo:#9a6a00; --rosso:#b42318; --stella:#a8742a;
   --rame:#c26a3d; --rame2:#d98b4f; --eb:#a8552b; --traccia:#efe8da;
-  --stab-ok:#dcefe4; --stab-ok-ink:#0d5c44; --stab-att:#fde4d3; --stab-att-ink:#8a3a10; --stab-sopra:#f1f6f3;
+  --stab-ok:#dcefe4; --stab-ok-ink:#0d5c44; --stab-att:#fde4d3; --stab-att-ink:#8a3a10; --stab-sopra:#f1f6f3; --serie:#b5531c;
   --head:linear-gradient(145deg,#0a3a2c 0%,#13604a 100%); --head-ink:#f7f0e3; --head-ink2:#d9c3a0; --oro:#e2a46f;
   --visione:linear-gradient(135deg,#0a3a2c,#164d3b);
   --b1:#0a3a2c; --b2:#c26a3d; --b3:#13795b;
@@ -59,7 +59,7 @@
     --line:#1f3329; --accent:#f08a4b; --accent-ink:#07130e; --accent-wash:#16291f;
     --verde:#34c08f; --giallo:#e2b45a; --rosso:#ff7b6b; --stella:#e2b45a;
     --rame:#e08a5a; --rame2:#f0a76f; --eb:#e2a46f; --traccia:#1c2e25;
-    --stab-ok:#173f30; --stab-ok-ink:#8fe0bd; --stab-att:#43271a; --stab-att-ink:#f7b98f; --stab-sopra:#13261d;
+    --stab-ok:#173f30; --stab-ok-ink:#8fe0bd; --stab-att:#43271a; --stab-att-ink:#f7b98f; --stab-sopra:#13261d; --serie:#ffb37a;
     --head:linear-gradient(145deg,#04100b 0%,#0b2c21 100%); --visione:linear-gradient(135deg,#123528,#0c2219);
     --b1:#13604a; --b2:#b8602f; --b3:#1f8a68;
     --linguetta:#f7f0e3; --linguetta-ink:#0a3a2c;
@@ -74,7 +74,7 @@
   --line:#1f3329; --accent:#f08a4b; --accent-ink:#07130e; --accent-wash:#16291f;
   --verde:#34c08f; --giallo:#e2b45a; --rosso:#ff7b6b; --stella:#e2b45a;
   --rame:#e08a5a; --rame2:#f0a76f; --eb:#e2a46f; --traccia:#1c2e25;
-    --stab-ok:#173f30; --stab-ok-ink:#8fe0bd; --stab-att:#43271a; --stab-att-ink:#f7b98f; --stab-sopra:#13261d;
+    --stab-ok:#173f30; --stab-ok-ink:#8fe0bd; --stab-att:#43271a; --stab-att-ink:#f7b98f; --stab-sopra:#13261d; --serie:#ffb37a;
   --head:linear-gradient(145deg,#04100b 0%,#0b2c21 100%); --visione:linear-gradient(135deg,#123528,#0c2219);
   --b1:#13604a; --b2:#b8602f; --b3:#1f8a68;
   --linguetta:#f7f0e3; --linguetta-ink:#0a3a2c;
@@ -409,7 +409,7 @@ ul.stabilita .tuo b,ul.stabilita .tuo .campo-cl21{font-family:var(--f-numeri);fo
 .abitudine p.small{margin:0}
 .giorni-guida{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;padding-top:2px}
 .giorni-guida button{height:36px;border-radius:99px;border:2px solid var(--line);background:none;color:var(--ink);font-weight:800;font-size:12px;cursor:pointer;padding:0}
-.giorni-guida button.oggi{border-color:var(--azione)}
+.giorni-guida button.adesso{border-color:var(--azione)}
 .giorni-guida button.si{background:var(--progresso);border-color:var(--progresso);color:#fff}
 .giorni-guida button:disabled{color:var(--ink3);opacity:.6;cursor:default}
 .analisi-link{display:flex;justify-content:center;align-items:center;gap:6px;width:100%;min-height:52px;border:1px solid var(--line);border-radius:16px;
@@ -556,6 +556,18 @@ input.mini.prezzo{width:68px;text-align:right}
 .cal.on{background:var(--scelta-wash);border-color:var(--progresso);color:var(--progresso)}
 .agenda-testo{color:var(--progresso);font-weight:800}
 .risposte-agenda{display:grid;gap:8px;margin-top:12px}
+/* la serie (consegna 5): i cerchi dei giorni della settimana */
+.card.serie{display:flex;flex-direction:column;gap:10px}
+.serie-titolo{display:inline-flex;align-items:center;gap:6px;font-weight:800;color:var(--serie)}
+.serie-record{font-weight:700}
+.serie-giorni{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.serie-giorni span{display:flex;flex-direction:column;align-items:center;gap:4px}
+.serie-giorni b{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;
+  border:2px solid var(--line);color:var(--ink)}
+.serie-giorni small{font-size:11px;font-weight:700;color:var(--ink2)}
+.serie-giorni .si b{background:var(--progresso);border-color:var(--progresso);color:#fff}
+.serie-giorni .adesso:not(.si) b{border-color:var(--azione)}
+.serie-giorni .dopo b{color:var(--ink3)}
 .giorno-scelto{display:grid;gap:4px;margin-top:8px}
 .agenda-ora input[type=time]{width:auto;min-width:120px;flex:none}
 label.check.tutti{margin:8px 0 2px;font-weight:700;color:var(--ink)}
