@@ -1221,11 +1221,29 @@ function leggiQualifica(f){
     mancaMese: conMese && !f.mese.value };
 }
 
+/* L'ingresso che accoglie (consegna 9): chi ti ha invitato, un saluto con il tuo nome (una forma che va bene per tutti),
+   cosa trovi nell'app e poi «Passo 1 di 2»: da dove parti in Amway. Il passo 2 è «Da dove parti?» (obiettivo e perché). */
+function inizialiDi(nome){
+  const p = String(nome || "").trim().split(/\s+/).filter(x => x && !/^(e|ed|&)$/i.test(x));
+  return /\s(e|ed|&)\s/i.test(String(nome)) && p.length >= 2 ? `${p[0][0]}&${p[1][0]}`.toUpperCase() : p.slice(0, 2).map(x => x[0]).join("").toUpperCase();
+}
 function vIngresso(){
-  return `<div>
-    ${marchio()}
-    <h1 style="margin-top:6px">Benvenuto in Growup</h1>
-    <p class="muted">${st.invitoInfo && st.invitoInfo.nome ? `Ciao <b>${esc(nomeSaluto(st.invitoInfo.nome))}</b>! ` : ""}${st.sponsorNome ? `Ti ha invitato <b>${esc(st.sponsorNome)}</b>. ` : ""}Due informazioni e iniziamo: servono per partire dal punto giusto del percorso.</p>
+  const chi = st.sponsorNome || "", nome = st.invitoInfo && st.invitoInfo.nome ? nomeSaluto(st.invitoInfo.nome) : "";
+  const plurale = /\s(e|ed|&)\s/i.test(chi);
+  const punti = [["Il tuo obiettivo e il percorso", "quanto vuoi guadagnare e la strada per arrivarci"],
+    ["La tua giornata", "la Lista, i clienti e la prossima cosa da fare"],
+    ["Chi ti segue, al tuo fianco", "la tua upline vede solo i numeri, mai i nomi"]];
+  return `<div class="ingresso">
+    <section class="ingresso-testa">
+      ${marchio()}
+      ${chi ? `<div class="chi-invita"><span class="iniziali" aria-hidden="true">${esc(inizialiDi(chi))}</span>
+        <span>${plurale ? "Ti hanno invitato" : "Ti ha invitato"} <b>${esc(chi)}</b></span></div>` : ""}
+      <h1>${nome ? `Ciao ${esc(nome)},<br> ` : ""}ti diamo il benvenuto in Growup</h1>
+      <p>L'app del nostro gruppo per partire bene e crescere con metodo, un giorno alla volta.</p>
+      <ul class="ingresso-punti">${punti.map(([t, d], i) => `<li><span class="n" aria-hidden="true">${i + 1}</span><span><b>${t}</b><br><span>${d}</span></span></li>`).join("")}</ul>
+    </section>
+    <div class="spread passo-ingresso"><span class="eyebrow">Passo 1 di 2 · Da dove parti in Amway</span>
+      <span class="passi-mini" aria-hidden="true"><i class="on"></i><i></i></span></div>
     <form data-form="ingresso" class="card" novalidate>
       <p class="small" style="margin-top:0">Il tuo nome e il tuo codice Amway Partner li ha già scritti chi ti ha invitato: l'app li usa
         per metterti al posto giusto nel gruppo.</p>
@@ -1234,12 +1252,13 @@ function vIngresso(){
 
       <label class="check"><input type="checkbox" name="privacy" required>
         <span>Ho letto l'<button type="button" class="btn link" data-act="privacy" style="min-height:0;padding:0">informativa privacy</button>
-        e accetto che i miei numeri (contatti, piani, VP) siano visibili a me e alla mia upline.</span></label>
+        e accetto che i miei numeri (contatti, piani, VP) li vediamo io e la mia upline, mai i nomi della mia Lista.</span></label>
 
-      <button class="btn primary wide" style="margin-top:16px" ${st.occupato ? "disabled" : ""}>Inizia</button>
+      <button class="btn primary wide" style="margin-top:16px" ${st.occupato ? "disabled" : ""}>Avanti</button>
+      <p class="nota" style="text-align:center">Poi il passo 2: il tuo obiettivo e il tuo perché.</p>
       ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
     </form>
-    <p class="small">Hai già un profilo? <button class="btn link" data-act="ho-gia">Entra con il tuo link personale</button></p>
+    <p class="small" style="text-align:center">Hai già un profilo? <button class="btn link" data-act="ho-gia">Entra con il tuo link personale</button></p>
   </div>`;
 }
 
@@ -2278,11 +2297,14 @@ function serie(){
   let chiuse = 0;
   while(chiuse < SERIE_SETTIMANE && valida(piuGiorni(lun, -7 * (chiuse + 1)))) chiuse++;
   const ora = attiviIn(lun), fila = chiuse + (ora >= SERIE_GIORNI ? 1 : 0);
-  let record = fila, run = 0;
-  for(let k = SERIE_SETTIMANE; k >= 1; k--){ if(valida(piuGiorni(lun, -7 * k))){ run++; record = Math.max(record, run); } else run = 0; }
+  let record = fila, run = 0, recordPrima = 0;
+  for(let k = SERIE_SETTIMANE; k >= 1; k--){ if(valida(piuGiorni(lun, -7 * k))){ run++; record = Math.max(record, run); if(k > chiuse + 1) recordPrima = Math.max(recordPrima, run); } else run = 0; }
+  /* le settimane della serie in corso, dalla più vecchia (per il traguardo a tutto schermo) */
+  const settimane = [];
+  for(let k = (ora >= SERIE_GIORNI ? 0 : 1); k <= chiuse; k++){ const l = piuGiorni(lun, -7 * k); settimane.unshift({ lun:l, giorni:attiviIn(l) }); }
   const giorni = [0, 1, 2, 3, 4, 5, 6].map(i => { const x = piuGiorni(lun, i);
     return { x, n:Number(x.slice(8)), d:"LMMGVSD"[i], nome:GIORNI_SETT[(i + 1) % 7], si:g.has(x), oggi:x === oggi(), dopo:x > oggi() }; });
-  return { fila, record, ora, giorni };
+  return { fila, record, recordPrima, ora, giorni, settimane };
 }
 function vSerie(){
   const s = serie(), mancano = Math.max(0, SERIE_GIORNI - s.ora);
@@ -3965,6 +3987,7 @@ const AZIONI = {
   "mia-chiave"(){ st.sheet = "mia-chiave"; render(); },
   privacy(){ st.sheet = "privacy"; render(); },
   chiudi(){ chiudiSheet(); render(); },
+  "traguardo-chiudi"(){ document.querySelectorAll(".traguardo").forEach(x => x.remove()); },
   "ho-gia"(){ st.invitoRiserva = st.fase === "ingresso" ? st.invito : null; st.invito = null; st.fase = "benvenuto"; render(); },
   "torna-invito"(){ st.invito = st.invitoRiserva; st.invitoRiserva = null; st.fase = "ingresso"; render(); },
   "copia-gestito"(){ copiaTesto(base() + "#chiave=" + st.linkGestito.chiave, "Link copiato"); },
@@ -7052,7 +7075,8 @@ function chiudiFoglioPiano(contenitore){
 let traguardiPrima = null;
 function valoriTraguardi(){
   const p = percorso(), m = meseDi(oggi());
-  return { contatti:fattoSettimana("contatto"), piani:fattoSettimana("piano"), vp:vpMese(m), tappa:p.indice, nomeTappa:(p.raggiunta || {}).nome,
+  const sr = serie();
+  return { fila:sr.fila, recordPrima:sr.recordPrima, contatti:fattoSettimana("contatto"), piani:fattoSettimana("piano"), vp:vpMese(m), tappa:p.indice, nomeTappa:(p.raggiunta || {}).nome,
     clienti:st.persone.filter(x => x.esito === "cliente").length, partner:st.persone.filter(x => x.esito === "partner").length,
     obContatti:Number(st.goal.obiettivo_contatti) || 0, obPiani:Number(st.goal.obiettivo_piani) || 0, obVp:Number(st.goalMese.obiettivo_vp) || 0, settimana:settimana(), mese:m };
 }
@@ -7067,20 +7091,75 @@ function controllaTraguardi(){
     salvaLocale(k, "1"); festeggia(tipo, titolo, sotto);
   };
   const passato = (x, y, ob) => ob > 0 && x < ob && y >= ob;
-  if(passato(a.vp, v.vp, v.obVp) && a.mese === v.mese) una(`vp.${v.mese}`, "grande", "Obiettivo VP del mese raggiunto!", `${num(v.vp)} VP personali a ${nomeMese(v.mese).split(" ")[0]}`);
-  else if(v.tappa > a.tappa && v.nomeTappa) una(`tappa.${v.tappa}`, "grande", `Nuova tappa: ${v.nomeTappa}!`, "Il tuo percorso va avanti");
-  else if(a.clienti === 0 && v.clienti > 0) una("primo-cliente", "grande", "Il tuo primo cliente!", "Dalla tua lista");
-  else if(a.partner === 0 && v.partner > 0) una("primo-partner", "grande", "Il tuo primo partner!", "Dalla tua lista");
+  /* consegna 9: i traguardi grandi a tutto schermo (con i coriandoli), i piccoli restano l'annuncio */
+  const grande = (chiave, t) => { const k = `growup-team.festa.${st.profilo.id}.${chiave}`; if(leggiLocale(k)) return; salvaLocale(k, "1"); mostraTraguardo(t); };
+  const nuovoDi = esito => st.persone.filter(x => x.esito === esito).sort((x, y) => String(x.creato_il) < String(y.creato_il) ? 1 : -1)[0];
+  if(passato(a.vp, v.vp, v.obVp) && a.mese === v.mese) grande(`vp.${v.mese}`, { tipo:"vp", v });
+  else if(v.tappa > a.tappa && v.nomeTappa) grande(`tappa.${v.tappa}`, { tipo:"tappa", v });
+  else if(a.clienti === 0 && v.clienti > 0) grande("primo-cliente", { tipo:"cliente", p:nuovoDi("cliente") });
+  else if(a.partner === 0 && v.partner > 0) grande("primo-partner", { tipo:"partner", p:nuovoDi("partner") });
+  /* la serie: a 4, 8, 12, 26 e 52 settimane di fila a tutto schermo; gli altri record e l'inizio con l'annuncio */
+  else if(v.fila > a.fila && SERIE_TAPPE.includes(v.fila)) grande(`serie.${v.fila}.${v.settimana}`, { tipo:"serie", v });
+  else if(v.fila > a.fila && v.fila >= 2 && v.fila > v.recordPrima) una(`serie-record.${v.fila}.${v.settimana}`, "piccola", `Nuovo record: ${v.fila} settimane di fila!`, "La tua serie continua");
+  else if(a.fila === 0 && v.fila === 1) una(`serie-inizio.${v.settimana}`, "piccola", "La tua serie è iniziata!", "5 giorni attivi questa settimana");
   else if(passato(a.contatti, v.contatti, v.obContatti) && a.settimana === v.settimana)
     una(`contatti.${v.settimana}`, "piccola", "Obiettivo contatti raggiunto!", `${plur(v.contatti, "contatto", "contatti")} questa settimana`);
   else if(passato(a.piani, v.piani, v.obPiani) && a.settimana === v.settimana)
     una(`piani.${v.settimana}`, "piccola", "Obiettivo piani raggiunto!", `${plur(v.piani, "piano", "piani")} questa settimana`);
 }
 
+const SERIE_TAPPE = [4, 8, 12, 26, 52];
+/* Un traguardo grande a tutto schermo (consegna 9): sopra la pagina, una volta sola, con un solo pulsante «Continua» */
+function htmlTraguardo(t){
+  const nome = esc(nomeSaluto(st.profilo.nome)), m = meseDi(oggi());
+  if(t.tipo === "tappa"){
+    const S = st.stages, { indice, attuale } = percorso(), tot = (S.findIndex(x => x.chiave === "platino") + 1) || S.length, n = numeriMese(m);
+    return `<span class="eyebrow">Tappa raggiunta · ${indice} di ${tot}</span>
+      <h1 id="traguardo-titolo">${esc(t.v.nomeTappa)}</h1>
+      <p>Il tuo percorso va avanti, ${nome}.</p>
+      <div class="numeri-traguardo"><div><span>VP personali</span><b>${num(n.personali)}</b></div><div><span>VP di gruppo</span><b>${num(n.gruppo)}</b></div></div>
+      ${attuale ? `<div class="riquadro"><span class="eyebrow">La prossima tappa</span><span><b>${esc(attuale.nome)}</b>${requisitiTesto(attuale) ? ` · ${esc(requisitiTesto(attuale))}` : ""}</span></div>` : ""}`;
+  }
+  if(t.tipo === "vp") return `<span class="eyebrow">Obiettivo del mese</span>
+      <h1 id="traguardo-titolo">Obiettivo VP<br>raggiunto!</h1>
+      <div class="numeri-traguardo"><div><span>VP personali a ${esc(nomeMese(m).split(" ")[0])}</span><b>${num(t.v.vp)}</b></div><div><span>Il tuo obiettivo</span><b>${num(t.v.obVp)}</b></div></div>
+      <p>Ce l'hai fatta, ${nome}.</p>`;
+  if(t.tipo === "cliente" || t.tipo === "partner"){
+    const cli = t.tipo === "cliente";
+    return `<span class="eyebrow">Traguardo</span>
+      <h1 id="traguardo-titolo">Il tuo primo<br>${cli ? "cliente" : "partner"}!</h1>
+      ${t.p ? `<ul class="festa-l"><li><span class="segno" aria-hidden="true">✓</span><span><b>${esc(t.p.nome)}</b><br><span class="small">dalla tua Lista · il ${dataIt(oggi())}</span></span></li></ul>` : ""}
+      <p>${cli ? "Da qui l'app ti ricorda quando un suo prodotto sta per finire e quando chiedere un parere."
+        : "Ora invitalo in Growup: avrà il suo percorso di partenza, e tu lo vedrai tra i tuoi nuovi."}</p>`;
+  }
+  if(t.tipo === "serie"){
+    const s = serie(), ultime = s.settimane.slice(-4), prima = t.v.recordPrima;
+    return `<span class="eyebrow fuoco">${ICONA_SERIE} La tua serie${t.v.fila > prima ? " · nuovo record" : ""}</span>
+      <h1 id="traguardo-titolo">${num(t.v.fila)} settimane<br>di fila</h1>
+      <p>${t.v.fila === 4 ? "Un mese intero di costanza." : t.v.fila === 52 ? "Un anno intero di costanza." : "La costanza fa la differenza."}${prima ? ` Il record di prima era ${num(prima)}.` : ""}</p>
+      <div class="settimane-serie">${ultime.map(w => `<div><i aria-hidden="true">✓</i>${esc(dataIt(w.lun).split(" ").slice(0, 2).join(" "))}<br>${w.giorni} giorni</div>`).join("")}</div>
+      ${s.settimane.length > 4 ? `<p class="small">e altre ${s.settimane.length - 4} settimane prima</p>` : ""}
+      <p class="small">Una settimana vale con almeno 5 giorni attivi su 7.</p>`;
+  }
+  return "";
+}
+function mostraTraguardo(t){
+  const corpo = htmlTraguardo(t);
+  if(!corpo) return;
+  document.querySelectorAll(".traguardo").forEach(x => x.remove());
+  const el = document.createElement("div");
+  el.className = "festa traguardo"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "traguardo-titolo");
+  el.innerHTML = `${corpo}<button class="btn primary wide" data-act="traguardo-chiudi">Continua</button>`;
+  document.body.appendChild(el);
+  festeggia("grande", "", "", true);
+  const b = el.querySelector("button"); if(b) b.focus();
+}
+
 /* I coriandoli: disegnati qui, senza librerie, nei colori dell'app; con un "tic" del telefono (Android) */
 const COLORI_FESTA = ["#13795b", "#34c08f", "#c26a3d", "#e08a5a", "#f08a4b", "#f3d9a8", "#0a3a2c"];
-function festeggia(tipo, titolo, sotto){
+function festeggia(tipo, titolo, sotto, soloCoriandoli){
   const f = FESTE[tipo] || FESTE.piccola;
+  if(!soloCoriandoli){
   const avviso = document.createElement("div");
   avviso.className = "annuncio-festa"; avviso.setAttribute("role", "status");
   avviso.innerHTML = `<b>${esc(titolo)}</b><span>${esc(sotto || "")}</span>`;
@@ -7088,6 +7167,7 @@ function festeggia(tipo, titolo, sotto){
   anima(avviso, [{ opacity:0, transform:`translate(-50%, -50%) scale(${tipo === "grande" ? .8 : .9})` }, { opacity:1, transform:"translate(-50%, -50%) scale(1)" }],
     { dur:VIVACE.dur * 1.8, ease:VIVACE.ease });
   setTimeout(() => anima(avviso, [{ opacity:1 }, { opacity:0 }], { dur:220 }).then(() => avviso.remove()), f.tempo);
+  }
   /* la vibrazione solo dopo un tocco (il Platino si può riconoscere all'apertura dell'app) */
   try{ if(navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate(tipo === "grande" ? [30, 40, 30] : 25); }catch(e){}
   if(fermo()) return;

@@ -58,6 +58,9 @@ async function apri(ctxOpts, hash){
   page.on("pageerror", e => errori.push(String(e)));
   fileMancanti(page);
   page.on("dialog", d => d.accept());
+  /* consegna 9: un traguardo grande copre la pagina a tutto schermo; nei test di prima si chiude da solo con «Continua»
+     (il test 63 lo guarda prima di chiuderlo, con DB.traguardiAperti) */
+  if(!DB.traguardiAperti) await page.addLocatorHandler(page.locator(".festa.traguardo"), async t => { await t.locator("button[data-act=traguardo-chiudi]").click(); });
   /* consegna 6: «Da dove parti?» blocca chi non ha l'obiettivo con il perché. Nei test chi entra già con il suo link (privacy
      accettata) ha un obiettivo di prova, salvo DB.senzaObiettivo o p.senzaObiettivo; chi entra con un invito lo scrive (perche()). */
   /* consegna 7, solo nei test: chi ha la data di iscrizione vicina all'ingresso seguirebbe il percorso di partenza; i test

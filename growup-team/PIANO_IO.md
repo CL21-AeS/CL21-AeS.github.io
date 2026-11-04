@@ -66,4 +66,6 @@ Ogni consegna: schermate chiaro/scuro se cambia la grafica, test database e inte
   nomi nuovi senza obiettivo, punto con l'upline generico.
 - 4 novembre 2026: consegna 7 pronta (PR #166, unita; 059 applicata). Scelte: il percorso resta finché non è finito; binario
   Prodotto con i soli clienti.
-- 4 novembre 2026: consegna 8 pronta (PR, migrazione 060 da applicare).
+- 4 novembre 2026: consegna 8 pronta (PR #167, unita; 060 applicata).
+- 4 novembre 2026: consegna 9 pronta (PR). Scelte: saluto «ti diamo il benvenuto» (va bene per tutti); traguardi della serie a
+  4, 8, 12, 26 e 52 settimane a tutto schermo, gli altri record con l'annuncio piccolo.

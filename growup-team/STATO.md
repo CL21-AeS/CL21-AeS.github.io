@@ -57,7 +57,14 @@ iniziare N di M»), × con Annulla, tornano se vanno avanti di fase; «Nuovo · 
 e filtro Nuovi = iscritti da meno di 30 giorni; scheda del nuovo con l'app (percorso, solo numeri) e senza app (primo
 ordine dalla mappa, «Invitalo in Growup»). 060: `partenza_tolti` (righe solo mie), `partenze(p_partner)` (solo numeri e
 date: mai nomi della Lista, mai il testo del perché), `invitato_da_me(uuid)`: da applicare con l'ok di Stefano.
-Prossima: consegna 9, Ingresso che accoglie e traguardi a tutto schermo.
+Consegna 8 unita (PR #167), 060 applicata il 4 novembre (dopo l'unione: nel frattempo il Gruppo era come prima).
+Consegna 9 (Ingresso che accoglie e traguardi a tutto schermo) in PR, app v95, database non toccato: l'ingresso con chi
+invita (iniziali, «Ti ha/hanno invitato»), il saluto per tutti «Ciao Nome, ti diamo il benvenuto in Growup», tre righe su
+cosa si trova e «Passo 1 di 2 · Da dove parti in Amway» con «Avanti» (il passo 2 è «Da dove parti?»); la privacy dice
+«li vediamo io e la mia upline, mai i nomi della mia Lista». Traguardi grandi a tutto schermo con i coriandoli e un solo
+«Continua», una volta sola: tappa raggiunta (con VP e la prossima tappa), obiettivo VP del mese, primo cliente, primo
+partner, e la serie a 4, 8, 12, 26 e 52 settimane di fila; annuncio piccolo per gli altri record della serie, per la
+serie che inizia e (come prima) per contatti e piani della settimana. Con questa il piano «nuova Io» è completo.
 
 ## Nuovi iscritti dalla mappa (4 novembre 2026, migrazione 056)
 
