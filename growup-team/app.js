@@ -1418,6 +1418,7 @@ function vHome(){
   ${linkDaSalvare() ? vPrimiPassi() : ""}
   ${vCruscotto()}
   ${st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : vOggiLista()}
+  ${vSerie()}
   ${linkDaSalvare() ? "" : vPrimiPassi()}
   ${vMioMese()}
   ${vPromemoriaImport()}
@@ -2096,6 +2097,50 @@ function vOggiLista(){
       <span class="fr" aria-hidden="true">${aperto ? "▴" : "▾"}</span></button>
     ${aperto ? [["Prossimi giorni", v.presto], ["In corso", v.corso]].filter(([, l]) => l.length).map(([t, l]) => `<p class="small da-fare-t">${t}</p>
       <ul class="persone">${l.map(p => rigaPersona(p, true)).join("")}</ul>`).join("") : ""}` : ""}
+  </div>`;
+}
+
+/* ---- La serie (consegna 5): una settimana vale se sei attivo almeno 5 giorni su 7 (da lunedì a domenica).
+   Un giorno è attivo se quel giorno hai segnato almeno una cosa: un contatto, un invito, un piano, un follow-up o un altro
+   passo, un cliente o un suo ordine scritto da te, la formazione o la chiamata con lo sponsor. Solo dati: niente consigli. */
+const SERIE_GIORNI = 5, SERIE_SETTIMANE = 52;
+const ICONA_SERIE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3-1-6 1-9.5z"></path></svg>`;
+function giorniAttivi(){
+  const g = new Set(), d = x => String(x || "").slice(0, 10);
+  (st.attSerie || []).concat(st.att || []).forEach(a => { if(["contatto", "piano", "cliente"].includes(a.tipo)) g.add(d(a.data)); });
+  (st.passi || []).forEach(x => { if(!x.importato && x.tipo !== "riapri") g.add(d(x.data)); });
+  (st.ordini || []).forEach(o => { if(!o.numero_amway) g.add(d(o.data)); });
+  ((st.guida || {}).fatti || []).forEach(x => g.add(d(x.giorno)));
+  return g;
+}
+function serie(){
+  const g = giorniAttivi(), lun = settimana();
+  const attiviIn = l => [0, 1, 2, 3, 4, 5, 6].filter(i => g.has(piuGiorni(l, i))).length;
+  const valida = l => attiviIn(l) >= SERIE_GIORNI;
+  /* le settimane già chiuse di fila fino a quella scorsa; quella in corso conta appena arriva a 5 giorni */
+  let chiuse = 0;
+  while(chiuse < SERIE_SETTIMANE && valida(piuGiorni(lun, -7 * (chiuse + 1)))) chiuse++;
+  const ora = attiviIn(lun), fila = chiuse + (ora >= SERIE_GIORNI ? 1 : 0);
+  let record = fila, run = 0;
+  for(let k = SERIE_SETTIMANE; k >= 1; k--){ if(valida(piuGiorni(lun, -7 * k))){ run++; record = Math.max(record, run); } else run = 0; }
+  const giorni = [0, 1, 2, 3, 4, 5, 6].map(i => { const x = piuGiorni(lun, i);
+    return { x, n:Number(x.slice(8)), d:"LMMGVSD"[i], nome:GIORNI_SETT[(i + 1) % 7], si:g.has(x), oggi:x === oggi(), dopo:x > oggi() }; });
+  return { fila, record, ora, giorni };
+}
+function vSerie(){
+  const s = serie(), mancano = Math.max(0, SERIE_GIORNI - s.ora);
+  const titolo = s.fila ? `${s.fila === 1 ? "1 settimana" : `${s.fila} settimane`} di fila` : "La tua serie";
+  return `<div class="card serie">
+    <div class="spread"><span class="con-aiuto"><span class="serie-titolo">${ICONA_SERIE}${titolo}</span>${aiutoBtn("serie")}</span>
+      ${s.record ? `<span class="small serie-record">record: ${num(s.record)}</span>` : ""}</div>
+    ${aiutoTesto("serie", `Una settimana vale se sei attivo almeno 5 giorni su 7, da lunedì a domenica. Un giorno è attivo se quel giorno
+      hai segnato almeno una cosa: un contatto, un invito, un piano, un follow-up o un altro passo, un cliente o un suo ordine,
+      la formazione o la chiamata con lo sponsor. La serie conta le settimane valide una dopo l'altra; il record è la serie più
+      lunga dell'ultimo anno.`)}
+    <div class="serie-giorni" role="list" aria-label="I giorni di questa settimana">${s.giorni.map(x => `<span role="listitem" class="${x.si ? "si" : ""}${x.oggi ? " oggi" : ""}${x.dopo ? " dopo" : ""}"
+      aria-label="${esc(x.nome)} ${x.n}: ${x.si ? "attivo" : x.dopo ? "deve ancora venire" : "non attivo"}"><b>${x.n}</b><small>${x.d}</small></span>`).join("")}</div>
+    <p class="small" style="margin:0">Questa settimana: <b>${s.ora === 1 ? "1 giorno attivo" : `${num(s.ora)} giorni attivi`} su ${SERIE_GIORNI}</b>.
+      ${mancano ? (s.fila ? `La serie continua se arrivi a ${SERIE_GIORNI} entro domenica.` : `Con ${SERIE_GIORNI} entro domenica inizia la serie.`) : "Settimana valida."}</p>
   </div>`;
 }
 
@@ -6156,10 +6201,12 @@ const ABITUDINI = {
   formazione:{ nome:"Formazione", base:5, spiega:"15 minuti, un audio o 10 pagine di un libro. Eventi e audio consigliati: apri l'app CumLaude21.", giorni:true },
   sponsor:{ nome:"Chiamata con il tuo sponsor", base:1, spiega:"", giorni:true } };
 async function caricaGuida(){
+  /* la serie (consegna 5) guarda fino a un anno indietro: le attività di prima della settimana in corso si chiedono una volta */
+  try{ st.attSerie = await api.activities(st.profilo.id, piuGiorni(settimana(), -7 * SERIE_SETTIMANE)) || []; }catch(e){ st.attSerie = st.attSerie || []; }
   st.guida = st.guida || { conteggi:{}, cl21:{}, obiettivi:new Map(), fatti:[] };
   try{
     const [c, n, o, f, mesi] = await Promise.all([api.guidaConteggi(primoDelMese()), api.numeriCl21(), api.guidaObiettivi(),
-      api.guidaFatti(piuGiorni(settimana(), -7 * SETTIMANE_INDIETRO)), api.mioReport(st.profilo.id, piuMesi(primoDelMese(), -24))]);
+      api.guidaFatti(piuGiorni(settimana(), -7 * Math.max(SETTIMANE_INDIETRO, SERIE_SETTIMANE))), api.mioReport(st.profilo.id, piuMesi(primoDelMese(), -24))]);
     /* il mese di riferimento della Stabilità: l'ultimo mese chiuso con la mappa importata; chi non ne ha guarda il mese in corso */
     const chiuso = (mesi || []).filter(r => meseDi(r.mese) < meseDi(oggi())).sort((x, y) => x.mese < y.mese ? 1 : -1)[0];
     const rif = chiuso ? { mese:meseDi(chiuso.mese), chiuso:true,
