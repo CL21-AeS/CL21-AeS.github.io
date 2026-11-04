@@ -3,6 +3,13 @@
 Ultimo aggiornamento: 4 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Gruppo: il pallino dell'app (4 novembre 2026, sera, app v98, database non toccato)
+
+Nella struttura e negli elenchi dei filtri, accanto al nome un pallino: verde usa l'app, grigio senza app. La scritta
+«senza app» in fondo alla riga non c'è più; «attivo / rallenta / fermo» resta solo per chi usa l'app. Il «?» di «La mia
+struttura» spiega i colori dei livelli con i cerchietti (1 tu, 2 blu, 3 viola, 4 petrolio, 5 rosa, 6 nocciola, poi si
+riparte dal blu), il pallino e attivo/rallenta/fermo (aggiornato entro 7 giorni, entro 14, oltre).
+
 ## «Da riprendere» (4 novembre 2026, sera: migrazione 061, app v97)
 
 Un contatto avviato (da Contattato in poi, senza esito) senza passi da 14 giorni e senza una data in agenda da oggi in
@@ -26,7 +33,7 @@ nuovo c'è anche nella chiusura normale. I promemoria usano l'agenda (057): ness
    «Cambia le cerchie»): si spuntano le cerchie che ci sono (della Lista o dei Clienti, separate) e se ne crea una nuova
    con dentro la persona.
 
-Ancora da fare (detto da Stefano): Gruppo: pallino dell'app al posto di «senza app» e «?» con i colori della profondità; contrasto AA dei testi grigi e
+Ancora da fare (detto da Stefano): contrasto AA dei testi grigi e
 nessun pulsante che va a capo a 360 px; i campi dei moduli che si svuotano quando la pagina si ridisegna. In attesa di
 Stefano: nomi e contatto dei titolari nell'informativa.
 

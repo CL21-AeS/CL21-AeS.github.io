@@ -207,7 +207,8 @@ check(!(await page.locator(".sheet input[name=nascondi], .sheet input[name=conse
 await page.screenshot({ path: S + "/e2e/26-importa.png", fullPage:true });
 await page.getByText(/2 persone aggiunte/).waitFor(); check(true, "import: 2 persone aggiunte");
 await page.click(".sheet button[data-act=chiudi]");
-check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).getByText("senza app").isVisible(), "Marco senza app nella struttura");
+check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).locator(".pallino-app.no[aria-label='senza app']").isVisible()
+  && !await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).locator(".pill", { hasText:"senza app" }).count(), "Marco senza app nella struttura: il pallino grigio, niente scritta");
 check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).getByText("0 VP · gruppo 1.234,56").isVisible(), "numeri accanto al nome: VP di gruppo dal report");
 check(await page.getByText("2 persone", { exact:true }).isVisible(), "conteggio persone del gruppo");
 await sync(page);
@@ -2686,6 +2687,15 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(!(await page.getByText("Il numero a sinistra è il livello").count()), "Struttura: la spiegazione è chiusa");
   await page.click("button[data-act=aiuto][data-k=struttura]");
   check(await page.getByText("Il numero a sinistra è il livello").isVisible(), "il «?» apre la spiegazione");
+  { const t = (await page.locator(".aiuto-testo", { hasText:"Il numero a sinistra" }).innerText()).replace(/\s+/g, " ");
+    check(t.includes("1 tu 2 blu 3 viola 4 petrolio 5 rosa 6 nocciola") && t.includes("si riparte dal blu") && t.includes("usa l'app") && t.includes("senza app")
+      && t.includes("entro 7 giorni, entro 14, oltre") && await page.locator(".aiuto-testo .legenda-livelli .livello").count() === 6,
+      "il «?» spiega i colori dei livelli (con i cerchietti), il pallino dell'app e attivo/rallenta/fermo"); }
+  { const verdi = await page.locator(".albero.struttura .pallino-app:not(.no)").count(), grigi = await page.locator(".albero.struttura .pallino-app.no").count();
+    check(verdi + grigi === await page.locator(".albero.struttura li.liv:not(.io)").count() && !await page.locator(".albero.struttura li.io .pallino-app").count(),
+      "un pallino per ogni persona del gruppo (non sulla mia riga)");
+    check(!await page.locator(".albero.struttura .pill", { hasText:"senza app" }).count(), "nessuna scritta «senza app» nella struttura"); }
+  await page.locator(".card", { hasText:"La mia struttura" }).screenshot({ path: S + "/e2e/gruppo-pallino.png" });
   await page.click("button[data-act=aiuto][data-k=struttura]");
   check(!(await page.getByText("Il numero a sinistra è il livello").count()), "toccandolo di nuovo si richiude");
   // le abitudini: il «?» si apre in alto, sotto il titolo, prima delle righe

@@ -302,6 +302,14 @@ ul.imp li:first-child{border-top:0}
 .livello.l1{--lv:#396cc4} .livello.l2{--lv:#7f59c0} .livello.l3{--lv:#19788b} .livello.l4{--lv:#b83d8b} .livello.l5{--lv:#87684c}
 :root[data-theme="dark"] .livello.l0{box-shadow:none}
 @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .livello.l0{box-shadow:none} }
+/* grafica 6: il pallino dell'app accanto al nome (verde usa l'app, grigio senza app) e la legenda nel «?» */
+.pallino-app{display:inline-block;flex:none;width:9px;height:9px;border-radius:50%;background:var(--verde);margin-left:7px;vertical-align:middle}
+.pallino-app.no{background:var(--ink3)}
+.legenda-livelli{display:flex;flex-wrap:wrap;gap:6px 10px;margin:6px 0}
+.legenda-livelli>span,.legenda-app{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.legenda-livelli .livello{width:22px;height:22px;font-size:11px}
+.legenda-app{margin:0 6px 0 2px}
+.legenda-app .pallino-app{margin-left:0}
 .piega{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:99px;
   font:inherit;font-size:12px;font-weight:700;padding:3px 9px;min-height:30px;cursor:pointer;white-space:nowrap}
 .azioni{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--bg);border-top:1px solid var(--line);

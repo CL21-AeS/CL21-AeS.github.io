@@ -2504,6 +2504,13 @@ function statoDi(p){
   const g = giorniTra(String(p.ultimo_aggiornamento || p.creato_il || oggi()).slice(0, 10), oggi());
   return g <= 7 ? { txt:"attivo", cl:"v", g } : g <= 14 ? { txt:"rallenta", cl:"g", g } : { txt:"fermo", cl:"r", g };
 }
+/* Grafica 6: accanto al nome un pallino, verde se usa l'app e grigio se no (al posto della scritta «senza app»);
+   «attivo / rallenta / fermo» solo per chi usa l'app */
+function pallinoApp(p){ const no = p.stato === "gestito";
+  return `<i class="pallino-app${no ? " no" : ""}" role="img" aria-label="${no ? "senza app" : "usa l'app"}" title="${no ? "Senza app" : "Usa l'app"}"></i>`; }
+function pillStato(p){ if(p.stato === "gestito") return ""; const sp = statoDi(p); return `<span class="pill ${sp.cl}">${sp.txt}</span>`; }
+/* i colori dei livelli, per il «?» */
+const COLORI_LIVELLI = ["blu", "viola", "petrolio", "rosa", "nocciola"];
 /* Dove sta una persona nella mia struttura: livello del report, sponsor e quante persone ha sotto */
 function posizioni(){
   const m = new Map(), perId = new Map(st.struttura.map(p => [p.id, p]));
@@ -2582,8 +2589,13 @@ function vStruttura(){
     <div class="spread"><span class="con-aiuto"><span class="eyebrow">La mia struttura</span>${tutte.length ? aiutoBtn("struttura") : ""}</span>
       ${btnAmway("Importa da Amway", "small")}</div>
     ${tutte.length ? aiutoTesto("struttura", `Il tuo gruppo come nel report Amway. Il numero a sinistra è il livello: 1 sei tu, 2 chi hai sponsorizzato tu,
-      3 chi hanno sponsorizzato loro, e così via. ▾ chiude o apre il gruppo di una persona; tocca un nome per aprire la sua
-      scheda.${completa ? " In grigio le persone nascoste, al loro posto: Mostra o Nascondi su ogni riga." : ""}`) : ""}
+      3 chi hanno sponsorizzato loro, e così via. Ogni livello ha il suo colore:
+      <span class="legenda-livelli"><span><span class="livello l0">1</span>tu</span>${COLORI_LIVELLI.map((c, i) =>
+        `<span><span class="livello l${i + 1}">${i + 2}</span>${c}</span>`).join("")}</span>
+      dopo il nocciola si riparte dal blu. Il pallino accanto al nome: <span class="legenda-app"><i class="pallino-app"></i>usa l'app</span>
+      <span class="legenda-app"><i class="pallino-app no"></i>senza app</span>. Per chi usa l'app, «attivo», «rallenta» e «fermo» dicono
+      quando ha aggiornato i suoi numeri: entro 7 giorni, entro 14, oltre. ▾ chiude o apre il gruppo di una persona; tocca un nome
+      per aprire la sua scheda.${completa ? " In grigio le persone nascoste, al loro posto: Mostra o Nascondi su ogni riga." : ""}`) : ""}
     ${righe.length > 1 ? `<input type="search" id="cerca-struttura" class="cerca" placeholder="Cerca un nome nel tuo gruppo…"
         autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Cerca un nome nel tuo gruppo" value="${esc(st.cerca || "")}">
       <p class="small" id="cerca-esito" aria-live="polite" style="margin:6px 0 0"></p>` : ""}
@@ -2592,14 +2604,14 @@ function vStruttura(){
       return `<button class="btn small${on ? " on" : ""}" data-act="filtro-gruppo" data-filtro="${f.id}" aria-pressed="${on}">${f.nome}${f.ok ? ` · ${conta(f)}` : ""}</button>`; }).join("")}</div>` : ""}
     ${tutte.length && filtro ? vElencoFiltrato(righe, filtro) : ""}
     ${tutte.length && !filtro ? `<ul class="albero struttura">${rigaIo}${righe.map(({ p, livello, path }) => {
-      const r = rigaDi(st.riep, p.id) || {}, sp = statoDi(p);
+      const r = rigaDi(st.riep, p.id) || {};
       const quanti = righe.filter(x => x.path.includes(p.id)).length, chiuso = st.chiusi.has(p.id);
       const piegato = path.some(id => st.chiusi.has(id)), nascosta = st.nascosti.has(p.id);
       return `<li class="liv${piegato ? " piegato" : ""}${nascosta ? " nascosta" : ""}" style="--rientro:${Math.min(path.length, 4) * 10}px"
         data-id="${esc(p.id)}" data-path="${esc(path.join(" "))}" data-nome="${esc(senzaAccenti(p.nome))}">
       <span class="livello l${livello % 5 + 1}" title="Livello ${livello + 2}">${livello + 2}</span>
       <div class="nome"><button class="nome-apri" data-act="apri-scheda" data-id="${esc(p.id)}">
-        <span>${esc(p.nome)}</span>
+        <span>${esc(p.nome)}${pallinoApp(p)}</span>
         <span class="small">${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${r.linee_attive ? ` · ${r.linee_attive} ${r.linee_attive === 1 ? "linea" : "linee"}` : ""}</span>
       </button></div>
       ${quanti ? `<button class="piega" data-act="piega" data-id="${esc(p.id)}" data-quanti="${quanti}" aria-expanded="${!chiuso}"
@@ -2609,7 +2621,7 @@ function vStruttura(){
       ${etichetteAccesso(p)}
       ${completa ? (nascosta ? `<button class="btn small" data-act="mostra" data-id="${esc(p.id)}">Mostra</button>`
         : `<button class="btn small ghost" data-act="nascondi-qui" data-id="${esc(p.id)}">Nascondi</button>`)
-        : `<span class="pill ${sp.cl}">${sp.txt}</span>`}</li>`; }).join("")}</ul>
+        : pillStato(p)}</li>`; }).join("")}</ul>
       <p class="small" style="margin:6px 0 0">${nascoste ? plur(nascoste, "persona nascosta", "persone nascoste") : "Nessuna persona nascosta"}
         <button class="btn link small" data-act="nascoste" style="min-height:0;padding:0 4px">${nascoste ? "Rivedi" : "Scegli chi nascondere"}</button></p>
       ${nascoste ? `<button class="btn small ghost${completa ? " on" : ""}" data-act="con-nascoste" aria-pressed="${!!completa}" style="margin-top:8px">
@@ -2729,15 +2741,15 @@ function vElencoFiltrato(righe, filtro){
     - (Number((rigaDi(st.riep, a.p.id) || {}).percentuale) || 0) || a.p.nome.localeCompare(b.p.nome, "it"));
   if(!l.length) return `<p class="muted" style="margin:10px 0 0">Nessuno qui.</p>`;
   return `<ul class="albero struttura elenco-filtro">${l.map(({ p, livello }) => {
-    const r = rigaDi(st.riep, p.id) || {}, sp = statoDi(p), x = pos.get(p.id);
+    const r = rigaDi(st.riep, p.id) || {}, x = pos.get(p.id);
     const ingresso = filtro.id === "nuovi" && st.ingressi.get(p.id) ? ` · entrato il ${dataIt(String(st.ingressi.get(p.id)).slice(0, 10))}` : "";
     return `<li class="liv" style="--rientro:0px" data-id="${esc(p.id)}" data-path="" data-nome="${esc(senzaAccenti(p.nome))}">
       <span class="livello l${livello % 5 + 1}" title="Livello ${livello + 2}">${livello + 2}</span>
       <div class="nome"><button class="nome-apri" data-act="apri-scheda" data-id="${esc(p.id)}">
-        <span>${esc(p.nome)}</span>
+        <span>${esc(p.nome)}${pallinoApp(p)}</span>
         <span class="small">${num(r.vp_personali)} VP · gruppo ${num(r.vp_gruppo)}${x ? ` · sotto ${esc(x.sponsor)}` : ""}${ingresso}</span>
       </button></div>
-      ${etichettaNuovo(p.id)}${filtro.id === "percentuale" ? `<span class="pill v">${Number(r.percentuale) || 0}%</span>` : `<span class="pill ${sp.cl}">${sp.txt}</span>`}</li>`; }).join("")}</ul>
+      ${etichettaNuovo(p.id)}${filtro.id === "percentuale" ? `<span class="pill v">${Number(r.percentuale) || 0}%</span>` : pillStato(p)}</li>`; }).join("")}</ul>
     ${filtro.id === "nuovi" ? `<p class="small" style="margin:6px 0 0">Nuovi = iscritti da meno di 30 giorni, il tempo per il primo ordine. Sull'etichetta i giorni che restano, o ✓ se il primo ordine è fatto.</p>` : ""}`;
 }
 
