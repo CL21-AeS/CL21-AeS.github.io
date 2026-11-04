@@ -455,6 +455,8 @@
       for(const r of righe){
         const pe = (db.persone || []).find(y => y.id === r.persona_id);
         if(!pe || pe.proprietario !== mio().id) throw new Error("non_autorizzato");
+        /* come il check del database (061: anche «senza_risposta») */
+        if(r.esito != null && !["partner", "cliente", "non_ora", "no", "senza_risposta"].includes(r.esito)) throw new Error("violates check constraint");
         const t = r.tipo === "contatto" ? "contatto" : r.tipo === "piano" ? "piano" : r.tipo === "chiusura" && r.esito === "cliente" ? "cliente" : null;
         const passo = Object.assign({ proprietario:pe.proprietario, creato_il:new Date().toISOString() + Math.random(), attivita_id:null }, r);
         if(t && !r.importato){ const a = { id:uid(), partner_id:pe.proprietario, tipo:t, quantita:1, data:r.data, inserito_da:pe.proprietario, inserito_il:new Date().toISOString() };

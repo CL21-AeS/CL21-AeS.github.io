@@ -3,6 +3,17 @@
 Ultimo aggiornamento: 4 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## «Da riprendere» (4 novembre 2026, sera: migrazione 061, app v97)
+
+Un contatto avviato (da Contattato in poi, senza esito) senza passi da 14 giorni e senza una data in agenda da oggi in
+avanti è **fermo**: riga ambra con la barra a sinistra, «fermo da N giorni» (anche su Io, in «In corso»). I nomi mai
+contattati non lo sono mai. Il filtro «Da riprendere» raccoglie i fermi, i «Non ora» e i chiusi senza risposta quando
+arriva il promemoria. Nella scheda del fermo, riquadro ambra («Nessun passo da N giorni. L'ultimo è …») con
+**Ricordamelo tra 30 giorni** (lo mette in agenda fra 30 giorni, per il passo che viene dopo) e **Chiudi contatto**
+(esito nuovo «Chiuso senza risposta», che non è un «No»; «Te lo ricordo tra 6 mesi?» → in agenda fra 6 mesi). L'esito
+nuovo c'è anche nella chiusura normale. I promemoria usano l'agenda (057): nessuna colonna nuova. 061 aggiunge solo
+`senza_risposta` ai check di `persone.esito` e `passi.esito`; controlli in `tests_rls.sql`. L'upline vede solo i numeri.
+
 ## Ritocchi chiesti da Stefano il 4 novembre 2026 (PR «ritocchi», app v96, database non toccato)
 
 1. **Obiettivo**: tolta «La visione». Il percorso si vede tutto, fino a Diamante (le qualifiche «Fondatore» non sono
@@ -15,9 +26,7 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
    «Cambia le cerchie»): si spuntano le cerchie che ci sono (della Lista o dei Clienti, separate) e se ne crea una nuova
    con dentro la persona.
 
-Ancora da fare (detto da Stefano): «Da riprendere» automatico (contatto avviato senza passi da 14 giorni, «Ricordamelo
-più avanti» 30 giorni, «Chiudi contatto» con esito «Chiuso senza risposta», promemoria a 6 mesi: serve una migrazione);
-Gruppo: pallino dell'app al posto di «senza app» e «?» con i colori della profondità; contrasto AA dei testi grigi e
+Ancora da fare (detto da Stefano): Gruppo: pallino dell'app al posto di «senza app» e «?» con i colori della profondità; contrasto AA dei testi grigi e
 nessun pulsante che va a capo a 360 px; i campi dei moduli che si svuotano quando la pagina si ridisegna. In attesa di
 Stefano: nomi e contatto dei titolari nell'informativa.
 
