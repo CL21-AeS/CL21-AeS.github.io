@@ -58,4 +58,5 @@ Ogni consegna: schermate chiaro/scuro se cambia la grafica, test database e inte
 ## Stato
 
 - 3 novembre 2026: consegna 1 pronta (PR #159, unita).
-- 4 novembre 2026: consegna 2 pronta (PR).
+- 4 novembre 2026: consegna 2 pronta (PR #160, unita).
+- 4 novembre 2026: consegna 3 pronta (PR).

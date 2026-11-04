@@ -8,12 +8,16 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 Il piano completo, con le decisioni e le 9 consegne, è in **`PIANO_IO.md`**: si riparte da lì. Consegna 1 (grafica di
 base: pesca `#f08a4b` solo per l'azione, selezione verde scuro / avorio, numeri in Source Serif 4 ospitato nell'app,
 spiegazioni di Preferiti, Invita e Nascondi nel «?», caselle nei colori dell'app, pulsanti in basso bianchi) unita
-(PR #159), app v86. Consegna 2 («Il mio giorno» nuova, proposta D) in PR, app v87: cruscotto in cima (obiettivo,
+(PR #159), app v86. Consegna 2 («Il mio giorno» nuova, proposta D) unita (PR #160), app v87: cruscotto in cima (obiettivo,
 anello dei VP personali del mese, tappa con i requisiti che si apre, contatti e piani della settimana), poi «La prossima
 cosa» con la lista unica di oggi (Lista e Clienti insieme, etichetta e motivo; «Prossimi giorni e in corso» in una riga
 che si apre). «Più tardi»: per la Lista si sceglie quando risentirlo, un cliente passa in fondo alla lista di oggi
 (fino all'agenda, consegna 4). «Il mio mese» è una riga che si apre. Database non toccato. Serie e agenda arrivano
-nelle consegne 4 e 5. Prossima: consegna 3, Verifica (ex Guida).
+nelle consegne 4 e 5. Consegna 3 (Verifica, ex Guida) in PR, app v88: la linguetta si chiama «Verifica»; tabella
+Stabilità CL21 con grafica nuova (livello raggiunto e rete reale, riga delle percentuali, «tu N» e 7 caselle per voce,
+legenda, «Per sostenere il X%»), abitudini con barra e cerchi dei giorni, «La mia analisi» in fondo. Tolti «Il tuo
+piano» e «Cosa fare adesso»; Seguimi e Condividi spostati nel Profilo. Database non toccato. Prossima: consegna 4,
+Agenda (con il database: per cosa, come).
 
 ## Controllo sicurezza e privacy (3 novembre 2026)
 

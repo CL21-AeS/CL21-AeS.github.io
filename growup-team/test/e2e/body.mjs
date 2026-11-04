@@ -320,6 +320,11 @@ DB.partners.find(p => p.nome === "Bea Verdi").confermato_il = new Date().toISOSt
 ({ ctx, page } = await apri({ colorScheme:"dark" }, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.screenshot({ path: S + "/e2e/46-io-scuro.png", fullPage:true });
+await page.click(".sezioni-io button[data-sez=guida]"); await page.locator(".guida-stabilita").waitFor();
+await page.screenshot({ path: S + "/e2e/47-verifica-scuro.png", fullPage:true });
+await page.click("button[data-act=vista-profilo]"); await page.locator(".guida-seguimi").waitFor();
+await page.screenshot({ path: S + "/e2e/47-profilo-scuro.png", fullPage:true });
+await page.click("button[data-act=vista-io]"); await page.click(".sezioni-io button[data-sez=giorno]");
 await page.click("button[data-act=vista-gruppo]");
 await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).locator("button[data-act=apri-scheda]").click();
 check(await page.getByText("Punto di partenza dichiarato: 12%").isVisible() && !(await page.locator("button[data-act=conferma]").count()),
@@ -2284,19 +2289,26 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
   await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   check(await page.locator(".sezioni-io button[data-sez=giorno]").getAttribute("aria-pressed") === "true", "Io: si apre su «Il mio giorno»");
-  check(await page.locator(".guida-piano").count() === 0, "la Guida non è nella pagina di tutti i giorni");
+  check(await page.locator(".guida-stabilita").count() === 0, "la Verifica non è nella pagina di tutti i giorni");
+  check((await page.locator(".sezioni-io button[data-sez=guida]").innerText()).trim() === "Verifica", "consegna 3: la linguetta si chiama «Verifica»");
   await page.click(".sezioni-io button[data-sez=guida]");
-  await page.locator(".guida-piano").waitFor();
-  check(await page.locator(".card", { hasText:"Il mio mese" }).count() === 0, "in «Guida» solo la Guida");
-  check((await page.locator(".guida-piano h2").innerText()).startsWith("Verso "), "il piano parte dalla cifra dell'obiettivo");
-  check((await page.locator(".guida-piano").innerText()).includes("Per un sì servono circa"), "il piano in attività (piani e contatti per un sì)");
+  await page.locator(".guida-stabilita").waitFor();
+  check(await page.locator(".card", { hasText:"Il mio mese" }).count() === 0, "in «Verifica» solo la Verifica");
+  check(await page.locator(".guida-piano, .guida-passi").count() === 0 && !(await page.locator("#app").innerText()).includes("Cosa fare adesso"),
+    "consegna 3: tolti «Il tuo piano» e «Cosa fare adesso»");
+  check(await page.locator("#app button[data-act=seguimi-attivo], #app button[data-act=seguimi-condividi]").count() === 0, "consegna 3: Seguimi e Condividi non sono più nella Verifica");
+  check(await page.locator(".analisi-link[data-act=apri-analisi]").isVisible(), "consegna 3: «La mia analisi» in fondo alla Verifica");
   /* Stabilità (044): chi non ha mesi chiusi guarda il mese in corso; poi l'ultimo mese chiuso delle mappe */
   const stab = page.locator(".guida-stabilita");
   const MESI_T = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
   const meseT = (k, maiusc) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + k);
     const n = MESI_T[d.getMonth()]; return { m:d.toISOString().slice(0, 7), nome:(maiusc ? n[0].toUpperCase() + n.slice(1) : n) + " " + d.getFullYear() }; };
-  check((await stab.locator("h2").innerText()).trim() === "Stabilità della tua rete", "Stabilità: il titolo");
-  check((await stab.innerText()).includes("La percentuale la raggiungi con il fatturato"), "Stabilità: dice che la percentuale viene dal fatturato");
+  const tuoDi = async (loc, k) => (await loc.locator(`li[data-k=${k}] .tuo`).innerText()).replace(/^tu\s*/, "").trim();
+  check((await stab.locator(".eyebrow").first().textContent()).trim() === "Stabilità della tua rete · tabella CL21", "Stabilità: il titolo");
+  await stab.locator("button[data-act=aiuto][data-k=stabilita]").click();
+  check((await stab.innerText()).includes("La percentuale la raggiungi con il fatturato"), "Stabilità: nel «?» dice che la percentuale viene dal fatturato");
+  await stab.locator("button[data-act=aiuto][data-k=stabilita]").click();
+  check(await stab.locator(".stab-legenda span").count() === 3, "Stabilità: la legenda (sostenuto, da rinforzare, il tuo livello)");
   const attesi = DB.partners.filter(p => p.invitato_da === "R" && String(p.invitato_il || "").slice(0, 7) === ora.slice(0, 7)).length;
   check(attesi >= 1 && (await stab.locator(".stab-personali").innerText()).replace(/\s+/g, " ").includes("I tuoi nuovi iscritti · " + meseT(0, false).nome.split(" ")[0] + " entrati con il tuo link " + attesi),
     "Stabilità: i miei nuovi iscritti (entrati con il mio link), a parte sopra la tabella");
@@ -2304,16 +2316,16 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     && await stab.locator("ul.stabilita li .cella").count() === 35, "Stabilità: 7 livelli e 5 righe con le 7 caselle di riferimento");
   check(!(await stab.innerText()).includes("Ne manca"), "Stabilità: nessuna frase «Ne manca…»");
   check((await stab.locator(".stab-mese").innerText()).trim() === meseT(0, true).nome + " · mese in corso", "Stabilità: senza mesi chiusi il mese in corso, scritto in evidenza");
-  check((await stab.locator("li[data-k=nuovi_gruppo] .tuo").innerText()).trim() === "1", "Stabilità: i nuovi nel gruppo dagli import (mese in corso)");
-  check(await stab.locator(".finora", { hasText:"Questo mese finora" }).count() === 0, "Stabilità: nel mese in corso niente «Questo mese finora»");
+  check(await tuoDi(stab, "nuovi_gruppo") === "1", "Stabilità: i nuovi nel gruppo dagli import (mese in corso)");
+  check(await stab.locator("ul.stabilita small", { hasText:"questo mese finora" }).count() === 0, "Stabilità: nel mese in corso niente «questo mese finora»");
   check((await stab.locator("li[data-k=app_cl21]").innerText()).includes("da inserire") && await stab.locator("li[data-k=app_cl21] .cella.att").count() === 0
-    && await stab.locator(".stab-lavoro li", { hasText:"CumLaude21" }).count() === 0, "Stabilità: un numero non ancora scritto resta neutro, «da inserire», fuori da «Su cosa lavorare»");
+    && await stab.locator(".stab-lavoro p", { hasText:"CumLaude21" }).count() === 0, "Stabilità: un numero non ancora scritto resta neutro, «da inserire», fuori da «Per sostenere»");
   await stab.locator("button[data-act=guida-cl21]").first().click();
   await page.locator(".sheet h2", { hasText:"I tuoi numeri Cum Laude 21" }).waitFor();
   await page.fill(".sheet input[name=app_cl21]", "9"); await page.fill(".sheet input[name=training_day]", "10"); await page.fill(".sheet input[name=convention]", "40");
   await page.click(".sheet button.primary");
   await page.getByText("Numeri salvati").waitFor();
-  check((await stab.locator("li[data-k=convention] .tuo").innerText()).trim() === "40", "Stabilità: il numero scritto a mano compare nella sua riga");
+  check(await tuoDi(stab, "convention") === "40", "Stabilità: il numero scritto a mano compare nella sua riga");
   check((await stab.locator("li[data-k=training_day]").innerText()).includes("ultimo evento"), "Stabilità: per il Training Day vale l'ultimo evento");
   await sync(page); await ctx.close();
   /* con un mese chiuso: livello e numeri del mese chiuso (qui il mese scorso al 9%) */
@@ -2329,7 +2341,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     "Stabilità: i nuovi iscritti dicono a quale mese si riferiscono");
   check(await stab2.locator(".stab-avviso").count() === 0, "Stabilità: mappa del mese scorso importata, nessun avviso");
   const dati = (await stab2.locator(".stab-dati").innerText()).replace(/\s+/g, " ");
-  check(dati.includes("Livello raggiunto 9%") && dati.includes("La tua rete reale in costruzione"), "Stabilità: livello raggiunto dal fatturato e rete reale (" + dati + ")");
+  check(dati.includes("Livello raggiunto 9%") && dati.includes("La tua rete reale in costruzione") && dati.includes("sostiene il livello? non ancora"),
+    "Stabilità: livello raggiunto dal fatturato e rete reale (" + dati + ")");
   const classi = async k => stab2.locator(`li[data-k=${k}] .cella`).evaluateAll(l => l.map(e => e.className.replace("cella", "").trim()));
   const cn = await classi("nuovi_gruppo"), cc = await classi("convention");
   check(cn.slice(0, 3).every(x => x.startsWith("att")) && cn.slice(3).every(x => x === "") && cn[2].includes("liv"),
@@ -2339,14 +2352,15 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const testi = async k => stab2.locator(`li[data-k=${k}] .cella`).allInnerTexts();
   check((await testi("convention")).every(x => x.includes("✓")) && (await testi("nuovi_gruppo")).slice(0, 3).every(x => x.includes("!"))
     && !(await testi("nuovi_gruppo")).slice(3).some(x => /[✓!]/.test(x)), "Stabilità: ✓ nelle caselle verdi, ! in quelle ambra");
-  check((await stab2.locator("li[data-k=nuovi_gruppo] .tuo").innerText()).trim() === "0"
-    && (await stab2.locator("li[data-k=nuovi_gruppo] .finora").innerText()).trim() === "Questo mese finora: 1",
+  check(await tuoDi(stab2, "nuovi_gruppo") === "0"
+    && (await stab2.locator("li[data-k=nuovi_gruppo] .nome small").innerText()).includes("questo mese finora: 1"),
     "Stabilità: il numero del mese chiuso e, sotto, quello del mese in corso");
-  check(await stab2.locator("li[data-k=oltre_200] .finora").count() === 1 && await stab2.locator("li[data-k=convention] .finora").count() === 0,
-    "Stabilità: «Questo mese finora» solo per nuovi iscritti e codici oltre 200 VP");
-  const lav = (await stab2.locator(".stab-lavoro li").allInnerTexts()).map(x => x.replace(/\s+/g, " "));
-  check(lav.length === 2 && lav[0] === "Nuovi iscritti nel gruppo del mese: hai 0, ne servono 5 per sostenere il 9%"
-    && lav[1] === "Codici che fatturano più di 200 VP: hai 1, ne servono 5 per sostenere il 9%", "Su cosa lavorare: le righe in ambra, in ordine (" + lav.join(" / ") + ")");
+  check(await stab2.locator("li[data-k=oltre_200] small", { hasText:"questo mese finora" }).count() === 1 && await stab2.locator("li[data-k=convention] small", { hasText:"questo mese finora" }).count() === 0,
+    "Stabilità: «questo mese finora» solo per nuovi iscritti e codici oltre 200 VP");
+  check((await stab2.locator(".stab-lavoro .eyebrow").textContent()).trim() === "Per sostenere il 9%", "Per sostenere il 9%: il titolo dice il livello");
+  const lav = (await stab2.locator(".stab-lavoro p").allInnerTexts()).map(x => x.replace(/\s+/g, " "));
+  check(lav.length === 2 && lav[0] === "Nuovi iscritti nel gruppo del mese: hai 0, ne servono 5"
+    && lav[1] === "Codici che fatturano più di 200 VP: hai 1, ne servono 5", "Per sostenere: le righe da rinforzare, in ordine (" + lav.join(" / ") + ")");
   await sync(page); await ctx.close();
   /* la mappa del mese appena chiuso non c'è ancora: l'ultimo mese disponibile, con l'avviso */
   DB.numeri = DB.numeri.filter(x => !(x.partner_id === "R" && x.mese === prec.m))
@@ -2355,7 +2369,6 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await page.locator(".guida-stabilita .stab-mese").innerText()).includes("mese chiuso")
     && (await page.locator(".guida-stabilita .stab-avviso").innerText()).trim() === "Importa la mappa di " + meseT(-1, false).nome + " per aggiornare",
     "Stabilità: senza la mappa del mese appena chiuso, l'ultimo mese disponibile e l'avviso");
-  check(await page.locator(".guida-passi ol.passi li").count() >= 3, "Cosa fare adesso: i passi della tappa");
   // abitudini: spunto oggi la formazione e cambio l'obiettivo
   const oggiG = new Date().toISOString().slice(0, 10);
   await page.locator(`.guida-abitudini [data-k=formazione] button[data-giorno="${oggiG}"]`).click();
@@ -2364,7 +2377,10 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.fill(".sheet input[name=n]", "3"); await page.click(".sheet button.primary");
   await page.getByText("Obiettivo salvato").waitFor();
   check((await page.locator(".guida-abitudini [data-k=formazione] .spread").innerText()).replace(/\s+/g, " ").includes("1 / 3 giorni"), "abitudini: 1 giorno su 3, obiettivo scelto da me");
-  check((await page.locator(".guida-abitudini").innerText()).includes("(risentire chi ha visto il piano"), "follow-up con la spiegazione");
+  check((await page.locator(".guida-abitudini").innerText()).includes("Risentire chi ha visto il piano"), "follow-up con la spiegazione");
+  check(await page.locator(".guida-abitudini .abitudine .bar[role=progressbar]").count() === 5 && await page.locator(".guida-abitudini .bar.lista").count() === 3,
+    "abitudini: una barra per ognuna, pesca per quelle dalla Lista");
+  check(await page.locator(`.guida-abitudini [data-k=sponsor] button.oggi[data-giorno="${oggiG}"]`).count() === 1, "abitudini: oggi segnato nei cerchi dei giorni");
   await page.screenshot({ path: S + "/e2e/41-guida.png", fullPage:true });
   await sync(page);
   check(DB.guidaFatti.length === 1 && DB.guidaObiettivi.some(x => x.chiave === "formazione" && x.a_settimana === 3)
@@ -2379,7 +2395,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const r200 = (await page.locator(".guida-stabilita li[data-k=oltre_200]").innerText()).replace(/\s+/g, " ");
   check(r200.includes("disponibile dopo l'import della mappa") && (await page.locator(".guida-stabilita li[data-k=oltre_200] .cella.att, .guida-stabilita li[data-k=oltre_200] .cella.ok").count()) === 0,
     "Stabilità: senza mappa i codici oltre 200 VP sono «disponibile dopo l'import della mappa», non 0");
-  check(await page.locator(".guida-stabilita .stab-lavoro li", { hasText:"200 VP" }).count() === 0, "Su cosa lavorare: senza mappa niente codici oltre 200 VP");
+  check(await page.locator(".guida-stabilita .stab-lavoro p", { hasText:"200 VP" }).count() === 0, "Per sostenere: senza mappa niente codici oltre 200 VP");
   await ctx.close();
   DB.numeri = numeriR;
 }
@@ -2393,13 +2409,14 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
   await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   check(await page.locator(".oggi-per-te").count() === 0, "Seguimi spento: niente «Oggi per te»");
-  await page.click(".sezioni-io button[data-sez=guida]");
+  await page.click("button[data-act=vista-profilo]");
+  check(await page.locator(".guida-seguimi button[data-act=seguimi-attivo]").isVisible(), "consegna 3: Seguimi giorno per giorno sta nel Profilo");
   await page.click("button[data-act=seguimi-attivo]");
   await page.getByText("Seguimi attivo").waitFor();
   check(await page.locator("button[data-act=seguimi-condividi]").getAttribute("aria-checked") === "false", "condividere con l'upline è spento di base");
   await page.click("button[data-act=seguimi-condividi]");
   await page.getByText("Il tuo sponsor e la tua upline vedono i tuoi dati (mai i nomi)").waitFor();
-  await page.click(".sezioni-io button[data-sez=giorno]");
+  await page.click("button[data-act=vista-io]");
   const oggiPerTe = page.locator(".oggi-per-te");
   await oggiPerTe.waitFor();
   const contatti = await oggiPerTe.locator("li", { hasText:"Contatto" }).count();
@@ -2456,15 +2473,14 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(alto >= -1 && alto < 40, "scorrendo in basso la barra resta in alto (" + Math.round(alto) + ")");
   await page.screenshot({ path: S + "/e2e/43-barra-scorsa.png" });
   check(await page.locator(".testata h1").evaluate(h => h.getBoundingClientRect().bottom < 0), "il titolo con il nome scorre via");
-  // dalla Guida alla Lista con un collegamento, e indietro con il dito
+  // dalla Verifica alla mia analisi con un collegamento, e indietro con il dito
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.click(".sezioni-io button[data-sez=guida]");
-  await page.locator(".guida-passi").waitFor();
-  await page.locator(".guida-passi button[data-act=guida-vai]").first().click();
-  await page.locator(".schede button.on", { hasText:/Persone|Gruppo/ }).waitFor();
+  await page.locator(".analisi-link").click();
+  await page.locator(".testata h1", { hasText:"La mia analisi" }).waitFor();
   await dito(60, 320);
-  await page.locator(".guida-passi").waitFor();
-  check(await page.locator(".sezioni-io button[data-sez=guida]").getAttribute("aria-pressed") === "true", "indietro con il dito: torna alla Guida da cui si era partiti");
+  await page.locator(".guida-stabilita").waitFor();
+  check(await page.locator(".sezioni-io button[data-sez=guida]").getAttribute("aria-pressed") === "true", "indietro con il dito: torna alla Verifica da cui si era partiti");
   // con le pagine principali il dito scorre come prima
   await dito(320, 60);
   await page.locator(".schede button.on", { hasText:"Persone" }).waitFor(); check(true, "dalle pagine principali il dito scorre tra le pagine");
@@ -2512,14 +2528,16 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   t = await analisiDi();
   check(!t.includes("Non li ha condivisi") && /Codici alla Convention 9/.test(t), "condividendo, l'upline vede anche i numeri scritti a mano");
   await ctx.close();
-  // la mia analisi dalla Guida, e l'interruttore unico per condividere
+  // la mia analisi dalla Verifica, e l'interruttore unico per condividere nel Profilo
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
   await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
+  await page.click("button[data-act=vista-profilo]");
+  check(await page.locator(".guida-condividi button[data-act=seguimi-condividi]").count() === 1, "nel Profilo un solo interruttore per condividere");
+  await page.click("button[data-act=vista-io]");
   await page.click(".sezioni-io button[data-sez=guida]");
-  check(await page.locator(".guida-condividi button[data-act=seguimi-condividi]").count() === 1, "nella Guida un solo interruttore per condividere");
-  await page.click(".guida-condividi button[data-act=apri-analisi]");
+  await page.click(".analisi-link");
   await page.locator(".analisi-riep").waitFor();
-  check((await page.locator(".testata h1").innerText()).trim() === "La mia analisi", "la mia analisi dalla Guida");
+  check((await page.locator(".testata h1").innerText()).trim() === "La mia analisi", "la mia analisi dalla Verifica");
   await ctx.close();
   DB.partners = DB.partners.filter(p => !["a44", "a44l"].includes(p.id));
 }

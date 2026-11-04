@@ -36,11 +36,11 @@
   --line:#e7e0d2; --accent:#0a3a2c; --accent-ink:#f7f0e3; --accent-wash:#e6efe9;
   --verde:#13795b; --giallo:#9a6a00; --rosso:#b42318; --stella:#a8742a;
   --rame:#c26a3d; --rame2:#d98b4f; --eb:#a8552b; --traccia:#efe8da;
-  --stab-ok:#13795b; --stab-ok-ink:#ffffff; --stab-att:#f2c75c; --stab-att-ink:#4a3000;
+  --stab-ok:#dcefe4; --stab-ok-ink:#0d5c44; --stab-att:#fde4d3; --stab-att-ink:#8a3a10; --stab-sopra:#f1f6f3;
   --head:linear-gradient(145deg,#0a3a2c 0%,#13604a 100%); --head-ink:#f7f0e3; --head-ink2:#d9c3a0; --oro:#e2a46f;
   --visione:linear-gradient(135deg,#0a3a2c,#164d3b);
   --b1:#0a3a2c; --b2:#c26a3d; --b3:#13795b;
-  /* la sotto-linguetta scelta nella testata (Il mio giorno/Guida, Target/Lista/Clienti): chiara e piena */
+  /* la sotto-linguetta scelta nella testata (Il mio giorno/Verifica, Target/Lista/Clienti): chiara e piena */
   --linguetta:#ffffff; --linguetta-ink:#10231c;
   /* colori con significato fisso (3 novembre 2026): pesca = solo l'azione principale (--azione); la selezione (filtri,
      scelte) è verde scuro, la pagina scelta in alto avorio; verde = fatto e progresso; ambra/terracotta = solo attenzione */
@@ -59,7 +59,7 @@
     --line:#1f3329; --accent:#f08a4b; --accent-ink:#07130e; --accent-wash:#16291f;
     --verde:#34c08f; --giallo:#e2b45a; --rosso:#ff7b6b; --stella:#e2b45a;
     --rame:#e08a5a; --rame2:#f0a76f; --eb:#e2a46f; --traccia:#1c2e25;
-    --stab-ok:#2fae82; --stab-ok-ink:#04140d; --stab-att:#f0c45a; --stab-att-ink:#2b1c00;
+    --stab-ok:#173f30; --stab-ok-ink:#8fe0bd; --stab-att:#43271a; --stab-att-ink:#f7b98f; --stab-sopra:#13261d;
     --head:linear-gradient(145deg,#04100b 0%,#0b2c21 100%); --visione:linear-gradient(135deg,#123528,#0c2219);
     --b1:#13604a; --b2:#b8602f; --b3:#1f8a68;
     --linguetta:#f7f0e3; --linguetta-ink:#0a3a2c;
@@ -74,7 +74,7 @@
   --line:#1f3329; --accent:#f08a4b; --accent-ink:#07130e; --accent-wash:#16291f;
   --verde:#34c08f; --giallo:#e2b45a; --rosso:#ff7b6b; --stella:#e2b45a;
   --rame:#e08a5a; --rame2:#f0a76f; --eb:#e2a46f; --traccia:#1c2e25;
-    --stab-ok:#2fae82; --stab-ok-ink:#04140d; --stab-att:#f0c45a; --stab-att-ink:#2b1c00;
+    --stab-ok:#173f30; --stab-ok-ink:#8fe0bd; --stab-att:#43271a; --stab-att-ink:#f7b98f; --stab-sopra:#13261d;
   --head:linear-gradient(145deg,#04100b 0%,#0b2c21 100%); --visione:linear-gradient(135deg,#123528,#0c2219);
   --b1:#13604a; --b2:#b8602f; --b3:#1f8a68;
   --linguetta:#f7f0e3; --linguetta-ink:#0a3a2c;
@@ -355,46 +355,65 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .numeri-guida div{background:var(--traccia);border-radius:12px;padding:8px;text-align:center;min-width:0}
 .numeri-guida b{display:block;font-size:22px}
 .numeri-guida span{font-size:11px;color:var(--ink2)}
-.guida-passi ol.passi{margin:8px 0 0;padding-left:20px}
-.guida-passi ol.passi li{margin-top:8px}
-.guida-stabilita .stab-mese{display:inline-block;margin:12px 0 0;padding:4px 10px;border-radius:99px;background:var(--scelta-wash);font-size:13px}
-.guida-stabilita .stab-avviso{margin:6px 0 0;color:var(--giallo);font-weight:600}
-.stab-dati{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-.stab-dati>div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:12px;background:var(--traccia)}
-.stab-dati span{font-size:12px;color:var(--ink2)}
-.stab-dati b{font-size:22px}
-.stab-personali{display:flex;align-items:center;gap:10px;margin-top:8px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;font-size:14px}
+.guida-stabilita{display:flex;flex-direction:column;gap:12px}
+.guida-stabilita .stab-mese{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin:0}
+.guida-stabilita .stab-avviso{margin:-6px 0 0;color:var(--stab-att-ink);font-weight:600}
+.stab-dati{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stab-dati>div{display:flex;flex-direction:column;gap:4px;padding:12px;border-radius:14px;min-width:0}
+.stab-dati span{font-size:12px;font-weight:700}
+.stab-dati small{font-size:11px;color:inherit}
+.stab-dati b{font-size:34px;line-height:1}
+.stab-dati .liv{background:var(--scelta);color:var(--scelta-ink)}
+.stab-dati .liv span,.stab-dati .liv small{opacity:.8}
+.stab-dati .rete{background:var(--stab-ok);color:var(--stab-ok-ink)}
+.stab-dati .rete.costruzione{background:var(--stab-att);color:var(--stab-att-ink)}
+.stab-dati b.costruzione{font-size:22px;line-height:1.15}
+.stab-personali{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;font-size:14px}
 .stab-personali>span{flex:1;min-width:0}
-.stab-personali small,ul.stabilita .nome small{display:block;font-size:12px;color:var(--ink2)}
+.stab-personali b.num{font-size:24px}
+.stab-personali small,ul.stabilita .nome small{display:block;font-size:12px;font-weight:500;color:var(--ink2)}
 .guida-stabilita .celle{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
-.guida-stabilita .celle.livelli{margin-top:14px}
-.guida-stabilita .cella{display:flex;align-items:center;justify-content:center;gap:1px;padding:5px 0;border-radius:7px;font-size:13px;
-  font-variant-numeric:tabular-nums;color:var(--ink2);background:var(--traccia);white-space:nowrap}
-.guida-stabilita .cella i{font-style:normal;font-size:10px;font-weight:800;line-height:1}
-.guida-stabilita .celle.livelli .cella{background:none;font-size:11px;font-weight:700;padding:2px 0}
-.guida-stabilita .cella.ok{background:var(--stab-ok);color:var(--stab-ok-ink);font-weight:700}
-.guida-stabilita .cella.att{background:var(--stab-att);color:var(--stab-att-ink);font-weight:700}
-.guida-stabilita .cella.sopra i{color:var(--progresso)}
-.guida-stabilita .cella.liv{outline:2px solid var(--scelta);outline-offset:1px}
-.guida-stabilita .celle.livelli .cella.liv{color:var(--ink)}
-.stab-dati b.costruzione{font-size:17px;padding-top:4px}
-ul.stabilita{list-style:none;margin:4px 0 0;padding:0}
-ul.stabilita li{padding:9px 0 10px;border-top:1px solid var(--line)}
-ul.stabilita li:first-child{border-top:0}
-ul.stabilita .voce{display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:6px}
+.guida-stabilita .cella{display:flex;flex-direction:column;align-items:center;justify-content:center;height:36px;border-radius:9px;
+  font-family:var(--f-numeri);font-variant-numeric:lining-nums tabular-nums;font-size:15px;font-weight:700;line-height:1;
+  color:var(--ink3);background:var(--traccia);white-space:nowrap}
+.guida-stabilita .cella i{font-family:var(--f-testo,inherit);font-style:normal;font-size:10px;font-weight:800;line-height:1;margin-top:2px}
+.guida-stabilita .celle.livelli .cella{height:auto;padding:6px 0;background:none;font-family:inherit;font-size:12px;font-weight:800;color:var(--ink2)}
+.guida-stabilita .celle.livelli .cella.liv{background:var(--scelta);color:var(--scelta-ink);box-shadow:none}
+.guida-stabilita .cella.ok{background:var(--stab-ok);color:var(--stab-ok-ink)}
+.guida-stabilita .cella.att{background:var(--stab-att);color:var(--stab-att-ink)}
+.guida-stabilita .cella.sopra{background:var(--stab-sopra);color:var(--progresso)}
+.guida-stabilita .cella.liv{box-shadow:inset 0 0 0 2px var(--scelta)}
+ul.stabilita{list-style:none;margin:-8px 0 0;padding:0}
+ul.stabilita li{display:flex;flex-direction:column;gap:6px;padding:12px 0 4px;border-top:1px solid var(--line)}
+ul.stabilita .voce{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:14px;font-weight:700}
 ul.stabilita .nome{flex:1;min-width:0}
-ul.stabilita .tuo{white-space:nowrap;font-variant-numeric:tabular-nums}
-ul.stabilita .finora{margin:5px 0 0;color:var(--ink2)}
-.stab-lavoro{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
-.stab-lavoro ul{margin:6px 0 0;padding-left:18px;font-size:14px}
-.stab-lavoro li{margin:3px 0}
+ul.stabilita .tuo{white-space:nowrap;font-size:12px;font-weight:500;color:var(--ink2)}
+ul.stabilita .tuo b,ul.stabilita .tuo .campo-cl21{font-family:var(--f-numeri);font-variant-numeric:lining-nums tabular-nums;font-size:24px;font-weight:700;color:var(--ink)}
+.stab-legenda{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink2)}
+.stab-legenda span{display:inline-flex;align-items:center;gap:4px}
+.stab-legenda i{width:12px;height:12px;border-radius:3px}
+.stab-legenda .l-ok{background:var(--stab-ok)}.stab-legenda .l-att{background:var(--stab-att)}.stab-legenda .l-liv{box-shadow:inset 0 0 0 2px var(--scelta)}
+.stab-lavoro{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,var(--stab-att) 55%,var(--card))}
+.stab-lavoro .eyebrow{color:var(--stab-att-ink)}
+.stab-lavoro p{margin:0;font-size:14px}
 .campo-cl21{min-width:36px;border:1px solid var(--line);border-radius:8px;padding:2px 8px;background:var(--bg);color:inherit;font:inherit;font-weight:700;cursor:pointer}
-.abitudine{border-top:1px solid var(--line);padding:10px 0 2px}
+.guida-abitudini{display:flex;flex-direction:column}
+.guida-abitudini .spread .btn{white-space:nowrap}
+.abitudine{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding:10px 0}
 .abitudine:first-of-type{border-top:0}
-.giorni-guida{display:flex;gap:4px;margin-top:6px}
-.giorni-guida button{width:32px;height:32px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--ink3);font-weight:700;font-size:12px;cursor:pointer}
-.giorni-guida button.si{background:var(--verde);border-color:var(--verde);color:#fff}
-.giorni-guida button:disabled{opacity:.4;cursor:default}
+.abitudine .spread>span{font-weight:800}
+.abitudine b.num{font-size:24px}
+.abitudine b.num small{font-size:15px;color:var(--ink2)}
+.abitudine .bar{height:6px}
+.abitudine .bar.lista>i{background:var(--azione)}
+.abitudine p.small{margin:0}
+.giorni-guida{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;padding-top:2px}
+.giorni-guida button{height:36px;border-radius:99px;border:2px solid var(--line);background:none;color:var(--ink);font-weight:800;font-size:12px;cursor:pointer;padding:0}
+.giorni-guida button.oggi{border-color:var(--azione)}
+.giorni-guida button.si{background:var(--progresso);border-color:var(--progresso);color:#fff}
+.giorni-guida button:disabled{color:var(--ink3);opacity:.6;cursor:default}
+.analisi-link{display:flex;justify-content:center;align-items:center;gap:6px;width:100%;min-height:52px;border:1px solid var(--line);border-radius:16px;
+  background:var(--card);color:var(--ink);font:inherit;font-weight:800;cursor:pointer}
 .oggi-per-te > ul{list-style:none;margin:6px 0 0;padding:0}
 .oggi-per-te > ul > li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
 .oggi-per-te > ul > li:first-child{border-top:0}

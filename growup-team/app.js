@@ -252,7 +252,7 @@ const st = {
   livelli: [],            // soglie delle percentuali
   aiuti: new Set(),       // le spiegazioni aperte con il «?» (ottimizzazione 2)
   passoAperto: null,      // la voce aperta di «Primi passi»
-  sezIo: "giorno",        // in Io: "giorno" (la pagina di sempre) o "guida" (la Guida per l'azione)
+  sezIo: "giorno",        // in Io: "giorno" (Il mio giorno) o "guida" (Verifica, ex Guida)
   guida: { conteggi:{}, cl21:{}, obiettivi:new Map(), fatti:[] },
   seguimi: { attivo:false, condividi:false }, seguimiGiorni: [], seguimiScheda: {},
   analisi: {}, condivisi: {}, analisiId: null,
@@ -1290,7 +1290,7 @@ function vPrivacyPrimo(){
 
 /* Due pagine, scelte dal selettore in alto a destra: "Io" e "Gruppo". */
 /* La barra in alto resta fissa scorrendo: le pagine principali e, sotto, i pulsanti della sezione
-   (Il mio giorno · Guida in Io; Target · Lista · Clienti in Persone). Il titolo con il nome scorre via. */
+   (Il mio giorno · Verifica in Io; Target · Lista · Clienti in Persone). Il titolo con il nome scorre via. */
 function vBarraFissa(){
   const sez = st.vista === "io" ? vSezioniIo() : st.vista === "persone" && (st.sezPersone === "target" ? !st.invitoId : !st.personaId) ? vSezioniPersone() : "";
   return `<div class="barra-fissa">${vSelettore()}${sez}</div>`;
@@ -1345,6 +1345,7 @@ function vProfilo(){
     <div class="riga-profilo"><span>Punto di partenza <b>${esc(testoPartenza(p))}</b></span>
       <button class="btn small ghost" data-act="partenza">Modifica</button></div>
   </div>
+  ${vSeguimiProfilo()}
   <div class="card voci-profilo">
     ${vNotificheProfilo()}
     ${voce("mia-chiave", "Il mio link personale")}
@@ -5998,8 +5999,9 @@ document.addEventListener("input", e => {
   }
 });
 
-/* ---- 11i. La Guida per l'azione (035): il piano dall'obiettivo, la tabella «Stabilità» di Cum Laude 21, i passi
-   della tappa e le abitudini. Sta in «Guida», in cima a Io: la pagina di tutti i giorni resta senza consigli.
+/* ---- 11i. Verifica (ex Guida per l'azione, 035): la tabella «Stabilità» di Cum Laude 21 e le abitudini, con «La mia
+   analisi» in fondo. Sta in «Verifica», in cima a Io: la pagina di tutti i giorni resta senza consigli. «Il tuo piano» e
+   «Cosa fare adesso» sono stati tolti (consegna 3 del piano Io); Seguimi e Condividi sono nel Profilo.
    I numeri vengono da quello che il partner compila nell'app; obiettivi delle abitudini e spunte sono solo suoi. */
 /* la tabella «Verifica la tua attività - Stabilità» di Cum Laude 21 (044): livelli e soglie stanno nelle impostazioni
    (chiave stabilita_cl21), così si aggiornano se Cum Laude 21 li cambia. Le ultime tre righe le scrive il partner. */
@@ -6010,62 +6012,10 @@ function stabilitaCl21(){
   return { livelli:v.livelli.map(Number), righe:v.righe.map(r => ({ k:r.k, nome:r.nome, soglie:(r.soglie || []).map(Number),
     scritto:STABILITA_SCRITTI.includes(r.k) })) };
 }
-/* i rapporti di base (Stefano): 1 piano ogni 2-3 contatti, 1 sì ogni 5 piani; con 10 piani nella Lista si usano i suoi */
-const RAPPORTI_BASE = { contatti_per_piano:2.5, piani_per_si:5 };
 const ABITUDINI = {
   followup:{ nome:"Follow-up", base:5, spiega:"(risentire chi ha visto il piano, per rispondere alle sue domande e capire se vuole partire)" },
   formazione:{ nome:"Formazione", base:5, spiega:"15 minuti, un audio o 10 pagine di un libro. Eventi e audio consigliati: apri l'app CumLaude21.", giorni:true },
   sponsor:{ nome:"Chiamata con il tuo sponsor", base:1, spiega:"", giorni:true } };
-const VAI_GUIDA = { lista:"La mia Lista ›", clienti:"I miei clienti ›", gruppo:"Il mio gruppo ›", obiettivo:"Il mio obiettivo ›" };
-/* i passi per ogni tappa (testi di Stefano, tavola «Guida per l'azione» v4) */
-const GUIDA_TAPPE = {
-  inizio:{ nome:"Inizio", passi:[
-    ["Usa i prodotti: scegli con il tuo sponsor quelli che ti servono in casa e fai il primo ordine entro i 30 giorni."],
-    ["Scrivi la tua Lista: almeno 50 nomi in 48 ore, senza decidere tu chi potrebbe essere interessato.", "lista"],
-    ["Fissa con il tuo sponsor il tuo primo piano entro due settimane e invita 3-5 persone della Lista."],
-    ["Vai al prossimo evento: è lì che si capisce dove si può arrivare."]] },
-  primi_clienti:{ nome:"Primi clienti", passi:[
-    ["Parla dei prodotti che usi a chi ti conosce meglio: 10 persone della Lista questa settimana.", "lista"],
-    ["Fai provare un prodotto e risenti la persona dopo 3 giorni per sapere come si è trovata."],
-    ["Quando qualcuno compra, segnalo in Clienti: l'app ti ricorda quando il prodotto sta finendo.", "clienti"]] },
-  path_to_bronze:{ nome:"Path to Bronze", passi:[
-    ["Tieni i tuoi 100 VP con il tuo ordine e quello dei clienti: prepara la Bozza ordine a inizio mese."],
-    ["Mostra il piano a 3 persone a settimana: le prime 3 che dicono sì sono le tue 3 linee.", "lista"],
-    ["Chi entra fa il suo primo ordine e i suoi primi clienti: sono i 100 VP della sua linea."],
-    ["Insegna a ogni nuovo partner a scrivere la sua Lista e fai il suo primo piano insieme a lui."]] },
-  foundation:{ nome:"Bronze Foundation", passi:[
-    ["Ogni linea cresce con 3-4 persone attive, ognuna con i suoi clienti.", "gruppo"],
-    ["Una sera a settimana per linea: un piano o un follow-up insieme al frontale."],
-    ["A metà mese guarda «Come arrivarci»: la linea più vicina alla soglia ha la precedenza."],
-    ["Non dimenticare di continuare a lavorare i tuoi contatti.", "lista"]] },
-  builder:{ nome:"Bronze Builder", passi:[
-    ["Aiuta i tuoi frontali a trovare i loro primi 3 frontali: la crescita adesso è in profondità.", "gruppo"],
-    ["Una volta a settimana fai il punto con il gruppo, anche online: numeri, riconoscimenti, prossimo evento."],
-    ["Porta il gruppo agli eventi: chi ci va resta e cresce."],
-    ["Non dimenticare di continuare a lavorare i tuoi contatti.", "lista"]] },
-  argento:{ nome:"Argento", passi:[
-    ["In ogni linea forte cerca una persona che punti a sua volta al 21%: è il leader di quella linea.", "gruppo"],
-    ["Entro il 15 del mese dovresti avere almeno metà dei VP: importa il report ogni lunedì e controlla."],
-    ["Ogni partner con almeno 10 clienti: la base di clienti tiene il gruppo nei mesi difficili."],
-    ["Sempre anche il tuo lavoro personale: contatti, piani e clienti tuoi.", "lista"]] },
-  argento_platino:{ nome:"Da Argento a Platino", passi:[
-    ["Ogni mese al 21%: controlla il VP di gruppo settimana per settimana, non a fine mese."],
-    ["Fai crescere un frontale verso il suo 21%: con una linea al 21% sotto di te i tuoi mesi diventano più facili.", "gruppo"],
-    ["Finché non hai 3 mesi di fila, nessun mese di pausa."],
-    ["Sempre anche il tuo lavoro personale: contatti, piani e clienti tuoi.", "lista"]] },
-  platino:{ nome:"Da Platino in su", passi:[
-    ["Scegli i frontali che possono arrivare al 21% quest'anno: per Smeraldo ne servono 3 per 6 mesi.", "gruppo"],
-    ["Con ognuno fai un piano mese per mese, e una chiamata a settimana."],
-    ["Il sistema lavora per te: eventi, formazione e riconoscimenti, ogni mese."],
-    ["Inizia a lavorare anche altri frontali personali.", "lista"]] } };
-function gruppoGuida(chiave){
-  if(!chiave) return "platino";
-  if(chiave === "primo_ordine") return "inizio";
-  if(chiave.startsWith("foundation")) return "foundation";
-  if(chiave.startsWith("builder")) return "builder";
-  if(chiave === "oro" || chiave === "platino") return "argento_platino";
-  return GUIDA_TAPPE[chiave] ? chiave : "platino";
-}
 async function caricaGuida(){
   st.guida = st.guida || { conteggi:{}, cl21:{}, obiettivi:new Map(), fatti:[] };
   try{
@@ -6090,69 +6040,19 @@ function settimanaGiorni(spost){ const l = piuGiorni(settimana(), 7 * (spost || 
 const SETTIMANE_INDIETRO = 8;   // formazione e sponsor si possono spuntare anche nelle settimane prima (mai nel futuro)
 function vSezioniIo(){
   const b = (k, t) => `<button class="btn small${(st.sezIo || "giorno") === k ? " on" : ""}" data-act="sez-io" data-sez="${k}" aria-pressed="${(st.sezIo || "giorno") === k}">${t}</button>`;
-  return `<div class="row scelte-rapide sezioni-io" style="gap:6px">${b("giorno", "Il mio giorno")}${b("guida", "Guida")}</div>`;
-}
-/* i rapporti della mia Lista (contatti → piani → sì partner), o quelli di base finché ci sono meno di 10 piani */
-function rapportiLista(){
-  const pp = (st.passi || []).filter(x => !x.importato);
-  const contatti = pp.filter(x => x.tipo === "contatto").length, piani = pp.filter(x => x.tipo === "piano").length;
-  const si = pp.filter(x => x.esito === "partner").length;
-  const miei = piani >= 10 && si > 0 && contatti > 0;
-  return { contatti, piani, si, miei,
-    cpp: miei ? Math.max(1, contatti / piani) : RAPPORTI_BASE.contatti_per_piano,
-    pps: miei ? Math.max(1, piani / si) : RAPPORTI_BASE.piani_per_si };
-}
-function vGuidaPiano(){
-  const o = st.obiettivo, t = o ? tappaPerCifra(o.cifra_mese) : null;
-  if(!t) return `<div class="card guida-piano"><span class="eyebrow">Il tuo piano</span>
-    <p style="margin:6px 0 0">Il piano parte dalla tua cifra: scrivila nella pagina Obiettivo.</p>
-    <button class="btn small" style="margin-top:8px" data-act="guida-vai" data-dove="obiettivo">${VAI_GUIDA.obiettivo}</button></div>`;
-  const tp = t.tappa, n = numeriMese(meseDi(oggi()));
-  let numeri = "";
-  if(oltreArgento(tp)){
-    const righe = oltrePlatino(tp) ? avanzamentoPY(tp.chiave).righe : requisiti(tp);
-    numeri = `<ul class="req">${righe.map(r => `<li class="${r.ok ? "ok" : ""}"><span class="mark">${r.ok ? "✓" : "○"}</span>
-      <span class="grow">${esc(r.txt)}</span><span class="num">${esc(r.val)}</span></li>`).join("")}</ul>`;
-  } else {
-    const min = Number(tp.vp_linea) || soglia(), ok = n.linee.filter(l => l.vp >= min).length;
-    const g = Math.max(0, (Number(tp.vp_gruppo) || 0) - n.gruppo), l = Math.max(0, (Number(tp.linee) || 0) - ok);
-    const vp = Math.max(0, (Number(tp.vp_personali) || 0) - n.personali);
-    numeri = `<div class="numeri-guida">
-      <div><b class="num">${num(g)}</b><span>VP di gruppo che mancano</span></div>
-      <div><b class="num">${num(l)}</b><span>${l === 1 ? `linea da ${num(min)} VP che manca` : `linee da ${num(min)} VP che mancano`}</span></div>
-      <div><b class="num">${num(vp)}</b><span>VP personali che mancano</span></div></div>`;
-  }
-  const r = rapportiLista(), piani = Math.ceil(r.pps), contatti = Math.ceil(r.pps * r.cpp);
-  const fmt = x => num(Math.round(x * 10) / 10);
-  return `<div class="card guida-piano">
-    <span class="con-aiuto"><span class="eyebrow">Il tuo piano</span>${aiutoBtn("guida-piano")}</span>
-    <h2 style="margin-top:2px">Verso ${esc(tp.nome)}</h2>
-    ${aiutoTesto("guida-piano", `Qui vedi quanto lavoro serve per arrivare alla tua cifra. Una linea nuova nasce da un sì, e per un sì servono in
-      media 5 piani; per un piano, 2-3 contatti. Sono numeri di base. Quando nella tua Lista avrai segnato almeno 10 piani,
-      l'app userà i tuoi numeri veri (oggi: ${plur(r.contatti, "contatto", "contatti")}, ${plur(r.piani, "piano", "piani")}, ${plur(r.si, "sì", "sì")}).`)}
-    <p class="small" style="margin:2px 0 0">La tua cifra: ${euro(o.cifra_mese)} al mese ${esc(testoTraguardo(o.entro))}</p>
-    ${numeri}
-    <p class="small" style="margin:10px 0 0"><b>Cosa vuol dire in attività.</b> Una linea nuova parte da un sì. ${r.miei
-      ? `Dalla tua Lista: 1 sì ogni ${fmt(r.pps)} piani e 1 piano ogni ${fmt(r.cpp)} contatti.`
-      : "Con i numeri di base (1 piano ogni 2-3 contatti, 1 sì ogni 5 piani)."} Per un sì servono circa
-      <b>${piani} piani</b> e <b>${contatti} contatti</b>.</p>
-  </div>`;
+  return `<div class="row scelte-rapide sezioni-io" style="gap:6px">${b("giorno", "Il mio giorno")}${b("guida", "Verifica")}</div>`;
 }
 function vGuidaStabilita(){
   const t = stabilitaCl21(), g = st.guida, rif = g.rif || { mese:meseDi(oggi()), chiuso:false };
-  const testa = `<span class="con-aiuto"><span class="eyebrow">Verifica la tua attività</span>${aiutoBtn("stabilita")}</span>
-    ${aiutoTesto("stabilita", `La percentuale si raggiunge solo con il fatturato (i VP). Questa è la tabella «Verifica la tua attività -
-      Stabilità» di Cum Laude 21: per ogni livello dice i numeri che servono per sostenere nel tempo la qualifica raggiunta. Non fanno
-      arrivare alla percentuale: dicono se la rete la regge. Si guarda l'ultimo mese chiuso, perché è un mese completo con i numeri
-      definitivi della mappa; chi non ha ancora un mese chiuso vede il mese in corso. Verde: il livello è sostenuto. Ambra: il livello
-      l'hai raggiunto con il fatturato, ma la rete non lo sostiene ancora. Neutro: i livelli sopra quello raggiunto. Nuovi iscritti e
-      codici oltre 200 VP vengono dalle mappe importate; app CumLaude21, Training Day e Convention li scrivi tu (tocca il numero):
-      per Training Day e Convention vale l'ultimo evento. Il tuo livello l'hai conquistato con il fatturato. La rete reale ti dice
-      quanto è solido e su cosa lavorare per tenerlo.`)}
-    <h2 style="margin:4px 0 0">Stabilità della tua rete</h2>
-    <p class="small" style="margin:4px 0 0">La percentuale la raggiungi con il fatturato. Questi numeri, frutto di 40 anni di esperienza
-      CL21, indicano cosa serve per mantenerla nel tempo.</p>`;
-  if(!t) return `<div class="card guida-stabilita">${testa}<p class="small muted" style="margin:10px 0 0">I riferimenti della tabella non sono ancora caricati.</p></div>`;
+  const testa = `<span class="con-aiuto"><span class="eyebrow">Stabilità della tua rete · tabella CL21</span>${aiutoBtn("stabilita")}</span>
+    ${aiutoTesto("stabilita", `La percentuale la raggiungi con il fatturato (i VP). Questa è la tabella «Verifica la tua attività -
+      Stabilità» di Cum Laude 21: numeri frutto di 40 anni di esperienza, che per ogni livello dicono cosa serve per mantenere
+      nel tempo la qualifica raggiunta. Non fanno arrivare alla percentuale: dicono se la rete la regge. Si guarda l'ultimo mese
+      chiuso, perché è un mese completo con i numeri definitivi della mappa; chi non ha ancora un mese chiuso vede il mese in
+      corso. Verde: il livello è sostenuto. Pesca: il livello l'hai raggiunto con il fatturato, ma la rete non lo sostiene
+      ancora. Chiaro: i livelli sopra quello raggiunto. Nuovi iscritti e codici oltre 200 VP vengono dalle mappe importate; app
+      CumLaude21, Training Day e Convention li scrivi tu (tocca il numero): per Training Day e Convention vale l'ultimo evento.`)}`;
+  if(!t) return `<div class="card guida-stabilita">${testa}<p class="small muted" style="margin:0">I riferimenti della tabella non sono ancora caricati.</p></div>`;
   const L = t.livelli, c = g.conteggiRif || g.conteggi || {}, ora = g.conteggi || {}, w = g.cl21 || {};
   const pct = rif.chiuso ? Number(rif.pct) || 0 : Number(numeriMese(rif.mese).percentuale) || 0;
   const raggiunto = L.reduce((x, l, j) => pct >= l ? j : x, -1);
@@ -6160,78 +6060,82 @@ function vGuidaStabilita(){
   /* i codici oltre 200 VP vengono solo dalle mappe: senza una mappa del mese non si contano */
   const senzaMappa = (r, x) => r.k === "oltre_200" && x.con_mappa === false;
   const ATTESA_MAPPA = "disponibile dopo l'import della mappa";
-  /* un numero che manca (mappa non ancora importata, o da scrivere a mano) resta neutro e non entra in «Su cosa lavorare» */
+  /* un numero che manca (mappa non ancora importata, o da scrivere a mano) resta neutro e non entra in «Per sostenere» */
   const daInserire = r => r.scritto && w[r.k] == null;
   const ignoto = r => senzaMappa(r, c) || daInserire(r);
   /* la rete è solida fino al livello più alto sostenuto in tutte le righe (e in tutti i livelli sotto) */
   const solida = L.reduce((x, l, j) => x === j - 1 && t.righe.every(r => val(r) >= r.soglie[j]) ? j : x, -1);
+  const regge = raggiunto >= 0 && solida >= raggiunto;
   const nomeMese = m => { const s = MESI[Number(m.slice(5)) - 1]; return s[0].toUpperCase() + s.slice(1) + " " + m.slice(0, 4); };
-  /* verde ✓ sostenuto, ambra ! raggiunto col fatturato ma non sostenuto; sopra il livello raggiunto neutro (✓ se il numero c'è già) */
+  /* verde ✓ sostenuto, pesca ! raggiunto col fatturato ma non sostenuto; sopra il livello raggiunto chiaro (✓ se il numero c'è già) */
   const stato = (r, j) => ignoto(r) ? "" : j > raggiunto ? (val(r) >= r.soglie[j] ? "sopra" : "") : val(r) >= r.soglie[j] ? "ok" : "att";
   const segno = { ok:"✓", att:"!", sopra:"✓" };
-  const tuo = r => r.scritto ? `<button class="campo-cl21" data-act="guida-cl21">${w[r.k] != null ? num(w[r.k]) : "–"}</button>`
+  const tuo = r => r.scritto ? `<button class="campo-cl21" data-act="guida-cl21" aria-label="${esc(r.nome)}: scrivi il numero">${w[r.k] != null ? num(w[r.k]) : "–"}</button>`
     : senzaMappa(r, c) ? "<b>–</b>" : `<b>${num(val(r))}</b>`;
-  const sotto = { training_day:"ultimo evento", convention:"ultimo evento" };
-  const riga = r => `<li data-k="${esc(r.k)}"><div class="voce"><span class="nome">${esc(r.nome)}${sotto[r.k] ? `<small>${sotto[r.k]}</small>` : ""}</span>
-      <span class="tuo">${tuo(r)}</span></div>
+  /* sotto il nome: da dove viene il numero e, se si guarda un mese chiuso, quanto fa il mese in corso */
+  const sotto = r => [r.k === "nuovi_gruppo" ? "del mese" : "", r.k === "training_day" || r.k === "convention" ? "ultimo evento" : "",
+    senzaMappa(r, c) ? ATTESA_MAPPA : daInserire(r) ? "da inserire" : "",
+    rif.chiuso && (r.k === "nuovi_gruppo" || r.k === "oltre_200") ? `questo mese finora: ${senzaMappa(r, ora) ? "dopo la mappa" : num(Number(ora[r.k]) || 0)}` : ""]
+    .filter(Boolean).join(" · ");
+  const riga = r => `<li data-k="${esc(r.k)}"><div class="voce"><span class="nome">${esc(r.nome)}${sotto(r) ? `<small>${sotto(r)}</small>` : ""}</span>
+      <span class="tuo">tu ${tuo(r)}</span></div>
       <div class="celle">${L.map((l, j) => `<span class="cella ${stato(r, j)}${j === raggiunto ? " liv" : ""}">${num(r.soglie[j])}${
-        segno[stato(r, j)] ? `<i aria-hidden="true">${segno[stato(r, j)]}</i>` : ""}</span>`).join("")}</div>
-      ${senzaMappa(r, c) ? `<p class="small finora">${ATTESA_MAPPA}</p>` : daInserire(r) ? `<p class="small finora">da inserire</p>` : ""}
-      ${rif.chiuso && (r.k === "nuovi_gruppo" || r.k === "oltre_200") ? `<p class="small finora">Questo mese finora: ${
-        senzaMappa(r, ora) ? ATTESA_MAPPA : num(Number(ora[r.k]) || 0)}</p>` : ""}</li>`;
+        segno[stato(r, j)] ? `<i aria-hidden="true">${segno[stato(r, j)]}</i>` : ""}</span>`).join("")}</div></li>`;
   const lavoro = raggiunto < 0 ? [] : t.righe.filter(r => !ignoto(r) && val(r) < r.soglie[raggiunto]);
   const atteso = mesePrecedente();
   return `<div class="card guida-stabilita">${testa}
-    <p class="stab-mese"><b>${nomeMese(rif.mese)}</b> · ${rif.chiuso ? "mese chiuso" : "mese in corso"}</p>
+    <p class="stab-mese"><b>${nomeMese(rif.mese)} · ${rif.chiuso ? "mese chiuso" : "mese in corso"}</b></p>
     ${rif.chiuso && rif.mese < atteso ? `<p class="small stab-avviso">Importa la mappa di ${MESI[Number(atteso.slice(5)) - 1]} ${atteso.slice(0, 4)} per aggiornare</p>` : ""}
     <div class="stab-dati">
-      <div><span>Livello raggiunto</span><b class="num">${raggiunto >= 0 ? L[raggiunto] + "%" : "–"}</b></div>
-      <div><span>La tua rete reale</span><b class="num${solida >= 0 ? "" : " costruzione"}">${solida >= 0 ? L[solida] + "%" : "in costruzione"}</b></div>
+      <div class="liv"><span>Livello raggiunto</span><b class="num">${raggiunto >= 0 ? L[raggiunto] + "%" : "–"}</b><small>con il fatturato</small></div>
+      <div class="rete${regge ? "" : " costruzione"}"><span>La tua rete reale</span><b class="num${solida >= 0 ? "" : " costruzione"}">${solida >= 0 ? L[solida] + "%" : "in costruzione"}</b>
+        <small>${raggiunto < 0 ? "sostiene il livello quando lo raggiungi" : `sostiene il livello? ${regge ? "sì" : "non ancora"}`}</small></div>
     </div>
     <div class="stab-personali"><span><b>I tuoi nuovi iscritti · ${MESI[Number(rif.mese.slice(5)) - 1]}</b><small>entrati con il tuo link${
       rif.chiuso ? ` · questo mese finora: ${num(Number(ora.personali) || 0)}` : ""}</small></span><b class="num">${num(Number(c.personali) || 0)}</b></div>
-    <div class="celle livelli">${L.map((l, j) => `<span class="cella${j === raggiunto ? " liv" : ""}">${l}%</span>`).join("")}</div>
-    <ul class="stabilita">${t.righe.map(riga).join("")}</ul>
-    ${lavoro.length ? `<div class="stab-lavoro"><span class="eyebrow">Su cosa lavorare</span><ul>${lavoro.map(r =>
-      `<li><b>${esc(r.nome)}</b>: hai ${num(val(r))}, ne servono ${num(r.soglie[raggiunto])} per sostenere il ${L[raggiunto]}%</li>`).join("")}</ul></div>` : ""}
-  </div>`;
-}
-function vGuidaPassi(){
-  const p = percorso(), k = gruppoGuida(p.attuale && p.attuale.chiave), g = GUIDA_TAPPE[k];
-  return `<div class="card guida-passi" data-tappa="${esc(k)}">
-    <span class="eyebrow">Cosa fare adesso · ${esc(g.nome)}</span>
-    <ol class="passi">${g.passi.map(([t, dove]) => `<li>${esc(t)}${dove
-      ? `<br><button class="btn link small" data-act="guida-vai" data-dove="${dove}" style="min-height:0;padding:0">${VAI_GUIDA[dove]}</button>` : ""}</li>`).join("")}</ol>
+    <div>
+      <div class="celle livelli">${L.map((l, j) => `<span class="cella${j === raggiunto ? " liv" : ""}">${l}%</span>`).join("")}</div>
+      <ul class="stabilita">${t.righe.map(riga).join("")}</ul>
+    </div>
+    <div class="stab-legenda"><span><i class="l-ok"></i>sostenuto</span><span><i class="l-att"></i>da rinforzare</span><span><i class="l-liv"></i>il tuo livello</span></div>
+    ${lavoro.length ? `<div class="stab-lavoro"><span class="eyebrow">Per sostenere il ${L[raggiunto]}%</span>${lavoro.map(r =>
+      `<p><b>${esc(r.nome)}</b>: hai ${num(val(r))}, ne servono ${num(r.soglie[raggiunto])}</p>`).join("")}</div>` : ""}
   </div>`;
 }
 function vGuidaAbitudini(){
   const sp = st.guidaSett || 0, sett = settimanaGiorni(sp), pp = (st.passi || []).filter(x => !x.importato && x.tipo === "followup" && x.data >= settimana());
-  const riga = (nome, fatto, obj, spiega, extra, k) => `<div class="abitudine" data-k="${esc(k)}">
-      <div class="spread"><span>${esc(nome)}</span><b class="num">${num(fatto)} / ${k === "contatti" || k === "piani"
-        ? num(obj) : `<button class="campo-cl21" data-act="guida-obiettivo" data-k="${esc(k)}" aria-label="Il tuo obiettivo">${num(obj)}</button>`}${
-        k === "formazione" ? " giorni" : ""}</b></div>
-      ${spiega ? `<p class="small" style="margin:2px 0 0">${esc(spiega)}</p>` : ""}${extra || ""}</div>`;
-  const giorni = k => `<div class="giorni-guida">${sett.map((g, i) => `<button class="${fattoIl(k, g) ? "si" : ""}" data-act="guida-spunta" data-k="${k}" data-giorno="${g}"
+  /* contatti, piani e follow-up vengono dalla Lista (barra pesca); formazione e sponsor li spunti tu (barra verde) */
+  const riga = (nome, fatto, obj, spiega, extra, k) => { obj = Number(obj) || 0; const x = obj ? Math.min(100, Math.round(fatto / obj * 100)) : 0;
+    const daLista = k === "contatti" || k === "piani" || k === "followup";
+    return `<div class="abitudine" data-k="${esc(k)}">
+      <div class="spread"><span>${esc(nome)}</span><b class="num">${num(fatto)}<small> / ${k === "contatti" || k === "piani"
+        ? num(obj) : `<button class="campo-cl21" data-act="guida-obiettivo" data-k="${esc(k)}" aria-label="${esc(nome)}: il tuo obiettivo">${num(obj)}</button>`}${
+        k === "formazione" ? " giorni" : ""}</small></b></div>
+      <div class="bar${daLista ? " lista" : ""}${obj && fatto >= obj ? " fatto" : ""}" role="progressbar" aria-label="${esc(nome)}" aria-valuenow="${x}" aria-valuemin="0" aria-valuemax="100"><i style="width:${x}%"></i></div>
+      ${spiega ? `<p class="small">${esc(spiega)}</p>` : ""}${extra || ""}</div>`; };
+  const giorni = k => `<div class="giorni-guida">${sett.map((g, i) => `<button class="${fattoIl(k, g) ? "si" : ""}${g === oggi() ? " oggi" : ""}" data-act="guida-spunta" data-k="${k}" data-giorno="${g}"
       ${g > oggi() ? "disabled" : ""} aria-pressed="${fattoIl(k, g)}" aria-label="${esc(GIORNI_SETT[(i + 1) % 7])}">${"LMMGVSD"[i]}</button>`).join("")}</div>`;
   const fatti = k => sett.filter(g => fattoIl(k, g)).length;
   return `<div class="card guida-abitudini">
     <div class="spread"><span class="con-aiuto"><span class="eyebrow">Le tue abitudini · ${sp ? `settimana dal ${esc(dataIt(sett[0]))}` : "questa settimana"}</span>${aiutoBtn("abitudini")}</span>
-      <span class="row" style="gap:4px">${sp > -SETTIMANE_INDIETRO ? `<button class="btn small ghost" data-act="guida-sett" data-d="-1">‹ Settimana prima</button>` : ""}${
-        sp < 0 ? `<button class="btn small ghost" data-act="guida-sett" data-d="1">Dopo ›</button>` : ""}</span></div>
+      <span class="row" style="gap:4px">${sp > -SETTIMANE_INDIETRO ? `<button class="btn small ghost" data-act="guida-sett" data-d="-1" aria-label="Settimana prima">‹ Prima</button>` : ""}${
+        sp < 0 ? `<button class="btn small ghost" data-act="guida-sett" data-d="1" aria-label="Settimana dopo">Dopo ›</button>` : ""}</span></div>
     ${aiutoTesto("abitudini", `Quante volte hai fatto ogni abitudine questa settimana, rispetto al tuo obiettivo. Contatti, piani e follow-up si
-      contano da soli da quello che segni nella Lista. Formazione e chiamata con lo sponsor le segni tu toccando il giorno.
-      Per cambiare un obiettivo tocca il numero (contatti e piani: «Modifica» in La mia settimana). Meglio un obiettivo
-      piccolo che rispetti. Lo vedi solo tu.`)}
+      contano da soli da quello che segni nella Lista (barra pesca). Formazione e chiamata con lo sponsor le segni tu toccando il
+      giorno (barra verde). Per cambiare un obiettivo tocca il numero (contatti e piani: «Modifica gli obiettivi» in Il mio giorno).
+      Meglio un obiettivo piccolo che rispetti. Lo vedi solo tu, a meno che tu non scelga di condividerlo dal Profilo.`)}
     ${sp ? `<p class="small" style="margin:6px 0 0">Contatti, piani e follow-up si vedono nella settimana in corso. Qui puoi spuntare
       formazione e chiamata con lo sponsor dei giorni che ti eri dimenticato.</p>` : `
     ${riga("Contatti nuovi", fattoSettimana("contatto"), st.goal.obiettivo_contatti, "Dalla tua Lista · consigliato 2 al giorno", "", "contatti")}
     ${riga("Piani", fattoSettimana("piano"), st.goal.obiettivo_piani, "Dalla tua Lista · consigliato 3 a settimana", "", "piani")}
-    ${riga("Follow-up", pp.length, obiettivoAbitudine("followup"), `${ABITUDINI.followup.spiega} · dalla tua Lista · consigliato 1 al giorno`, "", "followup")}`}
+    ${riga("Follow-up", pp.length, obiettivoAbitudine("followup"), "Risentire chi ha visto il piano · dalla tua Lista · consigliato 1 al giorno", "", "followup")}`}
     ${riga("Formazione", fatti("formazione"), obiettivoAbitudine("formazione"), ABITUDINI.formazione.spiega, giorni("formazione"), "formazione")}
     ${riga("Chiamata con il tuo sponsor", fatti("sponsor"), obiettivoAbitudine("sponsor"), "Consigliato 1 a settimana", giorni("sponsor"), "sponsor")}
   </div>`;
 }
-function vGuida(){ return `${vGuidaPiano()}${vGuidaStabilita()}${vGuidaPassi()}${vGuidaAbitudini()}${vGuidaSeguimi()}`; }
+/* Verifica (ex Guida): la stabilità della rete, le abitudini e, in fondo, «La mia analisi» */
+function vGuida(){ return `${vGuidaStabilita()}${vGuidaAbitudini()}
+  <button class="analisi-link" data-act="apri-analisi" data-id="${esc(st.profilo.id)}">La mia analisi <span aria-hidden="true">›</span></button>`; }
 function vSheetGuida(s){
   if(s === "guida-cl21"){ const w = st.guida.cl21 || {};
     const campo = (k, t) => `<label class="field"><span>${t}</span><input name="${k}" type="number" min="0" max="100000" inputmode="numeric" value="${w[k] != null ? w[k] : ""}"></label>`;
@@ -6384,7 +6288,8 @@ function vOggiPerTe(){
       <span class="fr" aria-hidden="true">›</span></button>` : ""}
   </div>`;
 }
-function vGuidaSeguimi(){
+/* Seguimi e condivisione con l'upline: stanno nel Profilo (dalla consegna 3 del piano Io) */
+function vSeguimiProfilo(){
   const s = st.seguimi, sw = (act, on, testo, sotto) => `<button class="interruttore" data-act="${act}" role="switch" aria-checked="${on}">
       <span class="grow" style="text-align:left">${testo}${sotto ? `<br><span class="small">${sotto}</span>` : ""}</span><span class="toggle${on ? " on" : ""}"></span></button>`;
   return `<div class="card guida-seguimi">
@@ -6396,7 +6301,6 @@ function vGuidaSeguimi(){
     <span class="eyebrow">Condividere con la tua upline</span>
     ${sw("seguimi-condividi", !!s.condividi, "Condividi i tuoi dati con il tuo sponsor e la tua upline",
       "Vedono i numeri del Seguimi, i numeri che scrivi a mano e le tue abitudini. Mai i nomi, e i VP restano quelli dei report.")}
-    <button class="btn wide" style="margin-top:10px" data-act="apri-analisi" data-id="${esc(st.profilo.id)}">La mia analisi ›</button>
   </div>`;
 }
 function vSeguimiScheda(p){
@@ -6432,7 +6336,7 @@ Object.assign(AZIONI, {
   }
 });
 
-/* ---- 11k. Analisi della persona (037): di sé (dalla Guida) e di chi è nel gruppo (dalla scheda partner). Pagina a parte,
+/* ---- 11k. Analisi della persona (037): di sé (dalla Verifica) e di chi è nel gruppo (dalla scheda partner). Pagina a parte,
    aperta solo a richiesta. Numeri dei report dell'anno fiscale: per ogni linea solo percentuale e volume VP, mese per mese
    (senza calcoli), peso sul gruppo, mesi al 21% e tendenza; poi la Stabilità Cum Laude 21 mese per mese. I numeri scritti
    a mano e le abitudini di un altro si vedono solo se li ha condivisi. */
@@ -6713,9 +6617,9 @@ document.addEventListener("click", e => {
   if(act === "chiudi-fuori"){ if(e.target === el){ chiudiSheet(); render(); } return; }
   if(AZIONI[act]){ e.preventDefault(); const prima = statoPagina(); AZIONI[act](el); ricordaRitorno(act, prima); }
 });
-/* Tornare indietro con il dito: chi arriva in una schermata da un collegamento (la Lista dalla Guida, una persona da
+/* Tornare indietro con il dito: chi arriva in una schermata da un collegamento (la Lista dalla Verifica, una persona da
    «Oggi per te», una scheda partner) trascinando verso destra torna da dove era partito, allo stesso punto della pagina.
-   Le schede principali e i pulsanti di sezione (Il mio giorno · Guida, Target · Lista · Clienti) azzerano la strada. */
+   Le schede principali e i pulsanti di sezione (Il mio giorno · Verifica, Target · Lista · Clienti) azzerano la strada. */
 const AZIONI_MENU = new Set(["vista-obiettivo", "vista-io", "vista-persone", "vista-gruppo", "sez-io", "sez-persone"]);
 const CAMPI_PAGINA = ["vista", "sezIo", "sezPersone", "personaId", "invitoId", "schedaId", "target"];
 function statoPagina(){ const f = { y:window.scrollY, schedaPila:(st.schedaPila || []).slice() }; for(const k of CAMPI_PAGINA) f[k] = st[k]; return f; }
