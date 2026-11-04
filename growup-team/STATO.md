@@ -39,7 +39,17 @@ iniziare · N di M» (il mio perché, il punto con la tua upline se ha uno spons
 sparisce quando è fatto; il giorno del punto è la prossima cosa con «Fatto»; nel cruscotto la tessera «Nomi nuovi» e la
 riga delle fonti; la fonte (Conoscenza, Dal vivo, Social) nel nome nuovo. 058: `partners.punto_upline`,
 `punto_upline_fatto` (solo la propria riga) e `persone.fonte`: da applicare su Supabase con l'ok di Stefano.
-Prossima: consegna 7, Percorso dei nuovi.
+Consegna 6 unita (PR #165), 058 applicata su Supabase il 4 novembre.
+Consegna 7 (Percorso dei nuovi, migrazione **059**) in PR, app v93. Scelte di Stefano: il percorso resta finché non è
+finito (anche oltre i 30 giorni); binario Prodotto con i soli clienti. Chi entra nell'app da nuovo (iscritto da 30 giorni o
+meno al momento dell'ingresso) vede «Percorso di partenza · Fase N di 5» al posto del cruscotto e dei Primi passi: 1 Il mio
+perché (consegna 6), 2 Partenza con lo sponsor (giorno del primo incontro + 30 nomi, «entro» 48 ore dall'ingresso), 3 Il
+primo ordine (50 VP, «restano N giorni» dei 30, poi «oltre i 30 giorni»), 4 I due binari (contattati, invitati, piani →
+primo piano; clienti → primo cliente), poi la festa a tutto schermo una volta sola, con un solo pulsante «Vai al cruscotto»: il
+Seguimi si accende da solo e si toglie dal Profilo (scelta di Stefano). Fasi dopo quella in corso con il lucchetto, il resto dell'app usabile. La prossima cosa del percorso:
+«Fissa l'incontro con il tuo sponsor». 059: `partners.incontro_sponsor`, `partenza_completata_il` (solo la propria riga):
+da applicare su Supabase con l'ok di Stefano. Nei test e2e chi entra ha la partenza già completata, salvo `conPercorso`.
+Prossima: consegna 8, Gruppo per lo sponsor.
 
 ## Nuovi iscritti dalla mappa (4 novembre 2026, migrazione 056)
 

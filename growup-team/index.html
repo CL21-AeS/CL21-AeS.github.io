@@ -573,6 +573,45 @@ input.mini.prezzo{width:68px;text-align:right}
 .tessera.nomi-nuovi small{font-size:11px;opacity:.8}
 .fonti-riga{margin:0;color:var(--linguetta)}
 .link-da-salvare{margin-top:14px;padding:12px;border-radius:14px;background:var(--traccia)}
+/* il percorso di partenza (consegna 7): la barra delle fasi sul verde del cruscotto, le righe della fase, la festa */
+.card.percorso-partenza{display:flex;flex-direction:column;gap:12px}
+.percorso-partenza .eyebrow,.percorso-partenza .small{color:#d9c3a0}
+.percorso-partenza ol.fasi{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.percorso-partenza ol.fasi li{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:700;color:#d9c3a0;min-width:0}
+.percorso-partenza ol.fasi i{height:6px;border-radius:4px;background:rgba(255,255,255,.18)}
+.percorso-partenza ol.fasi li.fatta i{background:#4fd1a3}
+.percorso-partenza ol.fasi li.fatta{color:#4fd1a3}
+.percorso-partenza ol.fasi li.qui i{background:var(--azione)}
+.percorso-partenza ol.fasi li.qui{color:#fff}
+.percorso-partenza .lucchetto{font-size:9px}
+.percorso-partenza .fase-titolo{margin:0;font-family:var(--f-titoli);font-size:26px;color:#f7f0e3}
+.percorso-l{list-style:none;margin:0;padding:0}
+.percorso-l li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid rgba(255,255,255,.14)}
+.percorso-l li:first-child{border-top:0}
+.percorso-l .segno{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#07130e}
+.percorso-l li.fatto .segno{background:#4fd1a3;border-color:#4fd1a3}
+.percorso-l .btn.small{flex:none;background:#f7f0e3;color:#0a3a2c;border:0;font-weight:800}
+.percorso-ordine{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.percorso-ordine b.num{font-size:34px}
+.percorso-ordine b small{font-size:18px;color:#d9c3a0}
+.percorso-partenza .bar{background:rgba(255,255,255,.14)}
+.percorso-partenza .bar i{background:var(--azione)}
+.binari{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.binari>div{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;background:rgba(255,255,255,.07)}
+.binari .small{line-height:1.6;color:#e8dcc6}
+.binari .small b{font-family:var(--f-numeri);font-size:16px;color:#fff}
+.binario{font-size:13px;font-weight:800;padding:6px 8px;border-radius:10px;border:1px dashed rgba(255,255,255,.35);text-align:center}
+.binario.ok{border:0;background:#4fd1a3;color:#07130e}
+.festa{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:24px 20px;
+  background:linear-gradient(150deg,#13604a 0%,#0a3a2c 100%);color:#f7f0e3;overflow:auto}
+.festa .eyebrow{color:#d9c3a0}
+.festa h1{margin:0;font-family:var(--f-titoli);font-size:42px;line-height:1.05;color:#f7f0e3}
+.festa p{margin:0}
+.festa .small{color:#e8dcc6}
+.festa-l{list-style:none;margin:6px 0;padding:0;display:grid;gap:10px}
+.festa-l li{display:flex;gap:12px;align-items:center;padding:12px;border-radius:14px;background:rgba(255,255,255,.08)}
+.festa-l .segno{flex:none;width:28px;height:28px;border-radius:50%;background:#4fd1a3;color:#07130e;display:flex;align-items:center;justify-content:center;font-weight:800}
+.festa .festa-ghost{background:none;border:1px solid rgba(255,255,255,.35);color:#f7f0e3}
 /* la serie (consegna 5): i cerchi dei giorni della settimana */
 .card.serie{display:flex;flex-direction:column;gap:10px}
 .serie-titolo{display:inline-flex;align-items:center;gap:6px;font-weight:800;color:var(--serie)}

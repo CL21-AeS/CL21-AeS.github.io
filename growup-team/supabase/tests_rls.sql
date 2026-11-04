@@ -1120,6 +1120,17 @@ begin
     execute 'reset role';
     perform growup_test.ok((select punto_upline = oggi40 + 2 and punto_upline_fatto = oggi40 from public.partners where id = b),
                            '058: né l''upline né un''altra linea cambiano il punto di B');
+    -- 059: il primo incontro con lo sponsor e la partenza completata, solo sulla propria riga
+    perform growup_test.come(u3);  -- B
+    update public.partners set incontro_sponsor = oggi40 + 1, partenza_completata_il = now() where id = b;
+    perform growup_test.ok((select incontro_sponsor = oggi40 + 1 and partenza_completata_il is not null from public.partners where id = b),
+                           '059: B fissa il primo incontro e completa la partenza');
+    perform growup_test.come(u1);  -- R, upline: legge ma non scrive
+    perform growup_test.ok((select incontro_sponsor from public.partners where id = b) = oggi40 + 1, '059: lo sponsor vede il giorno del primo incontro');
+    update public.partners set partenza_completata_il = null where id = b;
+    execute 'reset role';
+    perform growup_test.ok((select partenza_completata_il is not null from public.partners where id = b), '059: lo sponsor non cambia la partenza di B');
+    perform growup_test.come(u3);
     perform growup_test.come(u3);
     -- 057: l'agenda (per cosa, come) solo con i valori ammessi e solo sulle proprie persone
     perform growup_test.come(u3);  -- B
