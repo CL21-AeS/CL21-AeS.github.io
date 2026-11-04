@@ -3,6 +3,24 @@
 Ultimo aggiornamento: 4 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Ritocchi chiesti da Stefano il 4 novembre 2026 (PR «ritocchi», app v96, database non toccato)
+
+1. **Obiettivo**: tolta «La visione». Il percorso si vede tutto, fino a Diamante (le qualifiche «Fondatore» non sono
+   tappe a parte), con la tappa dell'obiettivo evidenziata («obiettivo») e la tappa attuale con i requisiti.
+2. **Verifica · Stabilità**: si parte sempre dal mese in corso, con i numeri di adesso. Le frecce ‹ › accanto al mese
+   portano ai mesi prima (fino a 12 mesi indietro): «dalla mappa» se la mappa di quel mese c'è (percentuale dalla mappa),
+   altrimenti «senza mappa importata». I numeri scritti a mano (app CumLaude21, Training Day, Convention) sono quelli di
+   oggi anche nei mesi prima, e lo dice. Tolti «questo mese finora» e l'avviso «Importa la mappa di…».
+3. **Cerchie dalla scheda**: nella scheda di una persona della Lista e di un cliente, «+ Aggiungi a una cerchia» (o
+   «Cambia le cerchie»): si spuntano le cerchie che ci sono (della Lista o dei Clienti, separate) e se ne crea una nuova
+   con dentro la persona.
+
+Ancora da fare (detto da Stefano): «Da riprendere» automatico (contatto avviato senza passi da 14 giorni, «Ricordamelo
+più avanti» 30 giorni, «Chiudi contatto» con esito «Chiuso senza risposta», promemoria a 6 mesi: serve una migrazione);
+Gruppo: pallino dell'app al posto di «senza app» e «?» con i colori della profondità; contrasto AA dei testi grigi e
+nessun pulsante che va a capo a 360 px; i campi dei moduli che si svuotano quando la pagina si ridisegna. In attesa di
+Stefano: nomi e contatto dei titolari nell'informativa.
+
 ## Piano «nuova Io» (approvato il 3 novembre 2026, sera)
 
 Il piano completo, con le decisioni e le 9 consegne, è in **`PIANO_IO.md`**: si riparte da lì. Consegna 1 (grafica di
