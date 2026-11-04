@@ -356,7 +356,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .numeri-guida b{display:block;font-size:22px}
 .numeri-guida span{font-size:11px;color:var(--ink2)}
 .guida-stabilita{display:flex;flex-direction:column;gap:12px}
-.guida-stabilita .stab-mese{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin:0}
+.guida-stabilita .stab-mese{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0;text-align:center}
+.freccia-mese{flex:none;width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:20px;font-weight:800;cursor:pointer}
+.freccia-mese:disabled{opacity:.35;cursor:default}
 .guida-stabilita .stab-avviso{margin:-6px 0 0;color:var(--stab-att-ink);font-weight:600}
 .stab-dati{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .stab-dati>div{display:flex;flex-direction:column;gap:4px;padding:12px;border-radius:14px;min-width:0}

@@ -1726,9 +1726,11 @@ function vObiettivo(){
     <h2 style="margin-top:4px">Quanto vorresti guadagnare al mese?</h2>
     <p class="small">Scrivi la cifra e per quando: qui vedrai la tappa che la vale e il percorso per arrivarci.</p>
     <button class="btn primary wide" style="margin-top:8px" data-act="obiettivo-modifica">Scrivi il tuo obiettivo</button>
-  </div>${vProssimaQualifica()}${vReportDaImportare()}${vComeArrivarci(st.profilo.id, "io")}${vVisione()}`;
+  </div>${vProssimaQualifica()}${vReportDaImportare()}${vComeArrivarci(st.profilo.id, "io")}`;
   const t = tappaPerCifra(o.cifra_mese), S = st.stages, { indice, attuale } = percorso();
   const fino = t ? S.findIndex(s => s.chiave === t.tappa.chiave) : -1;
+  /* il percorso si vede tutto, fino a Diamante (le qualifiche «Fondatore» valgono come la stessa senza) */
+  const finoDiamante = Math.max(fino, S.findIndex(s => s.chiave === "diamante") >= 0 ? S.findIndex(s => s.chiave === "diamante") : S.length - 1);
   const giaFatto = fino >= 0 && indice > fino;
   const mancano = fino >= indice ? fino - indice + 1 : 0;
   return `<div class="card tight visione">
@@ -1748,13 +1750,14 @@ function vObiettivo(){
     <p class="nota">* ${notaGuadagni()}</p>
   </div>
   <div class="card">
-    <span class="eyebrow">Il percorso fino all'obiettivo</span>
-    <ol class="percorso">${S.slice(0, Math.max(fino, indice - 1) + 1).map((s, i) => {
+    <span class="eyebrow">Il tuo percorso fino a Diamante</span>
+    <p class="small" style="margin:4px 0 0">Tutto il percorso, con la tappa del tuo obiettivo evidenziata.</p>
+    <ol class="percorso">${S.map((s, i) => ({ s, i })).filter(({ s, i }) => i <= finoDiamante && !/_fondatore$/.test(s.chiave)).map(({ s, i }, n) => {
       /* oltre Platino non c'è una tappa "attuale": le qualifiche si dichiarano */
       const stato = i < indice ? "fatta" : i === indice && attuale ? "attuale" : "dopo";
       const req = stato === "attuale" ? requisiti(s) : [];
       return `<li class="${stato}${i === fino ? " meta" : ""}">
-        <span class="mark">${stato === "fatta" ? "✓" : i + 1}</span>
+        <span class="mark">${stato === "fatta" ? "✓" : n + 1}</span>
         <div class="grow"><b>${esc(s.nome)}</b>${i === fino ? ` <span class="pill s">obiettivo</span>` : ""}
           ${stato === "attuale" ? `<span class="pill">tappa attuale</span>` : ""}
           ${s.guadagno_mese ? `<span class="small"> · ${euro(s.guadagno_mese)}/mese*</span>` : ""}
@@ -1764,8 +1767,7 @@ function vObiettivo(){
   </div>` : ""}
   ${vProssimaQualifica()}
   ${vReportDaImportare()}
-  ${vComeArrivarci(st.profilo.id, "io")}
-  ${vVisione()}`;
+  ${vComeArrivarci(st.profilo.id, "io")}`;
 }
 
 /* Volume Rubino del mese (da Platino in su): il VPG del report mappe importato, che non conta le linee al 21% */
@@ -1950,20 +1952,6 @@ function vComeArrivarci(pid, chi){
     ${tabella}
     <p class="nota">Calcolato sui numeri del mese fino a oggi. Sono spunti: la strada la decidete voi.</p>
   </details>`;
-}
-
-function vVisione(){
-  const a = st.stages.find(s => s.chiave === "argento");
-  if(!a) return "";
-  return `<div class="card tight visione">
-    <span class="eyebrow">La visione</span>
-    <div class="spread" style="margin-top:2px">
-      <h2>${esc(a.nome)}</h2>
-      ${a.guadagno_mese ? `<span class="num">${euro(a.guadagno_mese)}<span class="small"> /mese*</span></span>` : ""}
-    </div>
-    ${a.struttura_calcolo ? `<p class="small" style="margin:2px 0 0">Calcolato su: ${esc(a.struttura_calcolo)}</p>` : ""}
-    <p class="nota" style="margin-top:6px">* ${notaGuadagni()}</p>
-  </div>`;
 }
 
 /* La tappa del percorso, dentro «I miei numeri»: una riga (nome e requisiti fatti) che si apre su tutto il dettaglio */
@@ -4364,10 +4352,11 @@ function cerchiaVuota(base){
     <div class="row" style="gap:6px"><button class="btn small primary" data-act="cerchia-aggiungi">${tipoCerchie() === "clienti" ? "Aggiungi clienti" : "Aggiungi nomi"}</button>
     <button class="btn small ghost" data-act="filtro-cerchia" data-id="">${tipoCerchie() === "clienti" ? "Mostra tutti i clienti" : "Mostra tutta la lista"}</button></div></div>`;
 }
-/* «Cerchie: …» nella scheda (solo quelle della sezione) */
+/* «Cerchie: …» nella scheda (solo quelle della sezione), con il pulsante per metterla in una cerchia o crearne una */
 function cerchiePersona(p, t){
   const l = cerchieTipo(t).filter(c => inCerchia(p.id, c.id));
-  return l.length ? `<p class="small cerchie-persona" style="margin:4px 0 0">Cerchie: ${l.map(c => `<span class="pill">${esc(c.nome)}</span>`).join(" ")}</p>` : "";
+  return `<p class="small cerchie-persona" style="margin:6px 0 0">${l.length ? `Cerchie: ${l.map(c => `<span class="pill">${esc(c.nome)}</span>`).join(" ")} ` : ""}<button
+    class="btn link small" data-act="persona-cerchie" data-t="${t}" style="min-height:0;padding:0 4px">${l.length ? "Cambia le cerchie" : "+ Aggiungi a una cerchia"}</button></p>`;
 }
 /* le caselle delle cerchie nei fogli di una persona */
 function campoCerchie(t, scelte){
@@ -4760,6 +4749,17 @@ function vSheetPersone(s){
     </form>` : `<p class="muted">${cl ? "Tutti i tuoi clienti sono già" : "Tutti i nomi della tua lista sono già"} in questa cerchia.</p>
     <button class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`}`;
   }
+  if(s === "persona-cerchie" && p){
+    const t = st.cerchieScheda === "clienti" ? "clienti" : "lista", cc = cerchieTipo(t), mie = cerchieDi(p.id);
+    return `<h2>Le cerchie di ${esc(p.nome)}</h2>
+    <p class="small">${cc.length ? "Spunta le cerchie in cui metterla, oppure creane una nuova." : `Non hai ancora cerchie ${t === "clienti" ? "di clienti" : "nella Lista"}: creane una.`}
+      Una persona può stare in più cerchie. Le vedi solo tu.</p>
+    <form data-form="persona-cerchie" novalidate>
+      ${cc.length ? `<div class="row wrap" style="gap:6px;margin-top:4px">${cc.map(c => `<label class="chip"><input type="checkbox" name="cerchia" value="${esc(c.id)}"${mie.includes(c.id) ? " checked" : ""}><span>${esc(c.nome)}</span></label>`).join("")}</div>` : ""}
+      <label class="field" style="margin-top:12px"><span>${cc.length ? "Nuova cerchia <i>(facoltativo)</i>" : "Nome della nuova cerchia"}</span><input name="nuova" maxlength="40" autocomplete="off" placeholder="${t === "clienti" ? "es. Bellezza" : "es. Palestra"}"></label>
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
+    </form>`;
+  }
   if(s === "persone-tante") return `<h2>Più nomi insieme</h2>
     <p class="small">Uno per riga. Se vuoi, dopo una virgola il telefono e come lo conosci: <i>Mario Rossi, 333 1234567, collega</i></p>
     <form data-form="persone-tante" novalidate>
@@ -4834,6 +4834,8 @@ Object.assign(AZIONI, {
   "cerchia-nuova"(){ st.errore = ""; st.sheet = "cerchia-nuova"; render(); focusSheet(); },
   "cerchia-rinomina"(){ st.errore = ""; st.sheet = "cerchia-rinomina"; render(); focusSheet(); },
   "cerchia-aggiungi"(){ st.errore = ""; st.cerchiaAggiungi = idCerchia(); st.sheet = "cerchia-aggiungi"; render(); },
+  /* dalla scheda di una persona (Lista o Clienti): in quali cerchie sta, e una nuova */
+  "persona-cerchie"(el){ st.errore = ""; st.cerchieScheda = el.dataset.t === "clienti" ? "clienti" : "lista"; st.sheet = "persona-cerchie"; render(); },
   async "cerchia-elimina"(){
     const c = cerchiaScelta();
     if(!c || !confirm(`Eliminare la cerchia «${c.nome}»?\n\nLe persone restano nella tua lista: escono solo da questa cerchia.`)) return;
@@ -4935,6 +4937,20 @@ Object.assign(MODULI, {
       await dopoPersone(ora ? "Cerchia rinominata" : `Cerchia «${nome}» creata`);
       /* una cerchia nuova è vuota: si apre subito la scelta dei nomi; la lista resta completa (la cerchia si sceglie toccandola) */
       if(!ora && personeSezione().length){ st.sheet = "cerchia-aggiungi"; render(); }
+    }catch(e){ mostraErroreForm(f, /duplicate|unique/i.test(messaggio(e)) ? "Hai già una cerchia con questo nome." : messaggio(e)); }
+  },
+  async "persona-cerchie"(f){
+    const pid = st.personaId, t = st.cerchieScheda === "clienti" ? "clienti" : "lista", nome = f.nuova.value.trim().slice(0, 40);
+    const scelte = [...f.querySelectorAll("input[name=cerchia]:checked")].map(i => i.value), prima = cerchieDi(pid).filter(id => cerchieTipo(t).some(c => c.id === id));
+    if(!pid) return;
+    if(nome && cerchieTipo(t).some(c => senzaAccenti(c.nome) === senzaAccenti(nome))){ mostraErroreForm(f, "Hai già una cerchia con questo nome: spuntala qui sopra."); return; }
+    if(!nome && !cerchieTipo(t).length){ mostraErroreForm(f, "Scrivi il nome della cerchia."); return; }
+    try{
+      if(nome){ const id = uuid(); await api.nuovaCerchia(id, nome, t); scelte.push(id); }
+      const dentro = scelte.filter(id => !prima.includes(id)), fuori = prima.filter(id => !scelte.includes(id));
+      if(dentro.length) await api.inCerchia(dentro.map(id => ({ persona_id:pid, cerchia_id:id })));
+      for(const id of fuori) await api.fuoriCerchia(pid, id);
+      await dopoPersone(nome ? `Cerchia «${nome}» creata` : dentro.length || fuori.length ? "Cerchie aggiornate" : "Nessuna modifica");
     }catch(e){ mostraErroreForm(f, /duplicate|unique/i.test(messaggio(e)) ? "Hai già una cerchia con questo nome." : messaggio(e)); }
   },
   async "cerchia-aggiungi"(f){
@@ -6551,13 +6567,10 @@ async function caricaGuida(){
   try{
     const [c, n, o, f, mesi] = await Promise.all([api.guidaConteggi(primoDelMese()), api.numeriCl21(), api.guidaObiettivi(),
       api.guidaFatti(piuGiorni(settimana(), -7 * Math.max(SETTIMANE_INDIETRO, SERIE_SETTIMANE))), api.mioReport(st.profilo.id, piuMesi(primoDelMese(), -24))]);
-    /* il mese di riferimento della Stabilità: l'ultimo mese chiuso con la mappa importata; chi non ne ha guarda il mese in corso */
-    const chiuso = (mesi || []).filter(r => meseDi(r.mese) < meseDi(oggi())).sort((x, y) => x.mese < y.mese ? 1 : -1)[0];
-    const rif = chiuso ? { mese:meseDi(chiuso.mese), chiuso:true,
-      pct:chiuso.percentuale != null ? Number(chiuso.percentuale) : percentualeDa(Number(chiuso.vpg) || 0) } : { mese:meseDi(oggi()), chiuso:false };
-    const cRif = chiuso ? await api.guidaConteggi(rif.mese + "-01") : c;
-    st.guida = { conteggi:c || {}, conteggiRif:cRif || {}, rif, cl21:(n || [])[0] || {},
-      obiettivi:new Map((o || []).map(x => [x.chiave, Number(x.a_settimana)])), fatti:f || [] };
+    /* la Stabilità parte dal mese in corso; i mesi prima si scelgono con le frecce (i loro conteggi si chiedono allora) */
+    const m0 = meseDi(oggi()); st.verificaMese = null;
+    st.guida = { conteggi:c || {}, conteggiMesi:{ [m0]:c || {} }, reportMesi:new Map((mesi || []).map(r => [meseDi(r.mese), r])),
+      cl21:(n || [])[0] || {}, obiettivi:new Map((o || []).map(x => [x.chiave, Number(x.a_settimana)])), fatti:f || [] };
   }catch(e){}
   try{
     const [sg, gg] = await Promise.all([api.seguimi(), api.seguimiGiorni(piuGiorni(oggi(), -30))]);
@@ -6572,19 +6585,20 @@ function vSezioniIo(){
   const b = (k, t) => `<button class="btn small${(st.sezIo || "giorno") === k ? " on" : ""}" data-act="sez-io" data-sez="${k}" aria-pressed="${(st.sezIo || "giorno") === k}">${t}</button>`;
   return `<div class="row scelte-rapide sezioni-io" style="gap:6px">${b("giorno", "Il mio giorno")}${b("guida", "Verifica")}</div>`;
 }
+const STAB_MESI_INDIETRO = 12;
 function vGuidaStabilita(){
-  const t = stabilitaCl21(), g = st.guida, rif = g.rif || { mese:meseDi(oggi()), chiuso:false };
+  const t = stabilitaCl21(), g = st.guida, m0 = meseDi(oggi()), mese = st.verificaMese || m0, inCorso = mese === m0;
   const testa = `<span class="con-aiuto"><span class="eyebrow">Stabilità della tua rete · tabella CL21</span>${aiutoBtn("stabilita")}</span>
     ${aiutoTesto("stabilita", `La percentuale la raggiungi con il fatturato (i VP). Questa è la tabella «Verifica la tua attività -
       Stabilità» di Cum Laude 21: numeri frutto di 40 anni di esperienza, che per ogni livello dicono cosa serve per mantenere
-      nel tempo la qualifica raggiunta. Non fanno arrivare alla percentuale: dicono se la rete la regge. Si guarda l'ultimo mese
-      chiuso, perché è un mese completo con i numeri definitivi della mappa; chi non ha ancora un mese chiuso vede il mese in
-      corso. Verde: il livello è sostenuto. Pesca: il livello l'hai raggiunto con il fatturato, ma la rete non lo sostiene
+      nel tempo la qualifica raggiunta. Non fanno arrivare alla percentuale: dicono se la rete la regge. Si parte dal mese in corso, con i numeri di adesso; con le frecce accanto al mese guardi i mesi prima (il riepilogo di tutto l'anno è in «La mia analisi»). Verde: il livello è sostenuto. Pesca: il livello l'hai raggiunto con il fatturato, ma la rete non lo sostiene
       ancora. Chiaro: i livelli sopra quello raggiunto. Nuovi iscritti e codici oltre 200 VP vengono dalle mappe importate; app
       CumLaude21, Training Day e Convention li scrivi tu (tocca il numero): per Training Day e Convention vale l'ultimo evento.`)}`;
   if(!t) return `<div class="card guida-stabilita">${testa}<p class="small muted" style="margin:0">I riferimenti della tabella non sono ancora caricati.</p></div>`;
-  const L = t.livelli, c = g.conteggiRif || g.conteggi || {}, ora = g.conteggi || {}, w = g.cl21 || {};
-  const pct = rif.chiuso ? Number(rif.pct) || 0 : Number(numeriMese(rif.mese).percentuale) || 0;
+  const L = t.livelli, c = (g.conteggiMesi || {})[mese] || (inCorso ? g.conteggi : null) || {}, w = g.cl21 || {};
+  /* la percentuale del mese: dalla mappa del mese, se c'è; per il mese in corso anche dagli ordini scritti */
+  const rep = (g.reportMesi || new Map()).get(mese);
+  const pct = rep ? (rep.percentuale != null ? Number(rep.percentuale) : percentualeDa(Number(rep.vpg) || 0)) : inCorso ? Number(numeriMese(mese).percentuale) || 0 : 0;
   const raggiunto = L.reduce((x, l, j) => pct >= l ? j : x, -1);
   const val = r => Number(r.scritto ? w[r.k] : c[r.k]) || 0;
   /* i codici oltre 200 VP vengono solo dalle mappe: senza una mappa del mese non si contano */
@@ -6602,27 +6616,27 @@ function vGuidaStabilita(){
   const segno = { ok:"✓", att:"!", sopra:"✓" };
   const tuo = r => r.scritto ? `<button class="campo-cl21" data-act="guida-cl21" aria-label="${esc(r.nome)}: scrivi il numero">${w[r.k] != null ? num(w[r.k]) : "–"}</button>`
     : senzaMappa(r, c) ? "<b>–</b>" : `<b>${num(val(r))}</b>`;
-  /* sotto il nome: da dove viene il numero e, se si guarda un mese chiuso, quanto fa il mese in corso */
+  /* sotto il nome: da dove viene il numero; nei mesi prima, i numeri scritti a mano sono quelli di oggi */
   const sotto = r => [r.k === "nuovi_gruppo" ? "del mese" : "", r.k === "training_day" || r.k === "convention" ? "ultimo evento" : "",
-    senzaMappa(r, c) ? ATTESA_MAPPA : daInserire(r) ? "da inserire" : "",
-    rif.chiuso && (r.k === "nuovi_gruppo" || r.k === "oltre_200") ? `questo mese finora: ${senzaMappa(r, ora) ? "dopo la mappa" : num(Number(ora[r.k]) || 0)}` : ""]
+    senzaMappa(r, c) ? ATTESA_MAPPA : daInserire(r) ? "da inserire" : "", r.scritto && !inCorso && !daInserire(r) ? "il numero di oggi" : ""]
     .filter(Boolean).join(" · ");
   const riga = r => `<li data-k="${esc(r.k)}"><div class="voce"><span class="nome">${esc(r.nome)}${sotto(r) ? `<small>${sotto(r)}</small>` : ""}</span>
       <span class="tuo">tu ${tuo(r)}</span></div>
       <div class="celle">${L.map((l, j) => `<span class="cella ${stato(r, j)}${j === raggiunto ? " liv" : ""}">${num(r.soglie[j])}${
         segno[stato(r, j)] ? `<i aria-hidden="true">${segno[stato(r, j)]}</i>` : ""}</span>`).join("")}</div></li>`;
   const lavoro = raggiunto < 0 ? [] : t.righe.filter(r => !ignoto(r) && val(r) < r.soglie[raggiunto]);
-  const atteso = mesePrecedente();
+  const primo = meseDi(piuMesi(m0 + "-01", -STAB_MESI_INDIETRO));
   return `<div class="card guida-stabilita">${testa}
-    <p class="stab-mese"><b>${nomeMese(rif.mese)} · ${rif.chiuso ? "mese chiuso" : "mese in corso"}</b></p>
-    ${rif.chiuso && rif.mese < atteso ? `<p class="small stab-avviso">Importa la mappa di ${MESI[Number(atteso.slice(5)) - 1]} ${atteso.slice(0, 4)} per aggiornare</p>` : ""}
+    <div class="stab-mese">
+      <button class="freccia-mese" data-act="verifica-mese" data-d="-1" aria-label="Il mese prima"${mese <= primo ? " disabled" : ""}>‹</button>
+      <b>${nomeMese(mese)} · ${inCorso ? "mese in corso" : rep ? "dalla mappa" : "senza mappa importata"}</b>
+      <button class="freccia-mese" data-act="verifica-mese" data-d="1" aria-label="Il mese dopo"${inCorso ? " disabled" : ""}>›</button></div>
     <div class="stab-dati">
       <div class="liv"><span>Livello raggiunto</span><b class="num">${raggiunto >= 0 ? L[raggiunto] + "%" : "–"}</b><small>con il fatturato</small></div>
       <div class="rete${regge ? "" : " costruzione"}"><span>La tua rete reale</span><b class="num${solida >= 0 ? "" : " costruzione"}">${solida >= 0 ? L[solida] + "%" : "in costruzione"}</b>
         <small>${raggiunto < 0 ? "sostiene il livello quando lo raggiungi" : `sostiene il livello? ${regge ? "sì" : "non ancora"}`}</small></div>
     </div>
-    <div class="stab-personali"><span><b>I tuoi nuovi iscritti · ${MESI[Number(rif.mese.slice(5)) - 1]}</b><small>entrati con il tuo link${
-      rif.chiuso ? ` · questo mese finora: ${num(Number(ora.personali) || 0)}` : ""}</small></span><b class="num">${num(Number(c.personali) || 0)}</b></div>
+    <div class="stab-personali"><span><b>I tuoi nuovi iscritti · ${MESI[Number(mese.slice(5)) - 1]}</b><small>entrati con il tuo link</small></span><b class="num">${num(Number(c.personali) || 0)}</b></div>
     <div>
       <div class="celle livelli">${L.map((l, j) => `<span class="cella${j === raggiunto ? " liv" : ""}">${l}%</span>`).join("")}</div>
       <ul class="stabilita">${t.righe.map(riga).join("")}</ul>
@@ -6687,6 +6701,12 @@ function vSheetGuida(s){
   return "";
 }
 Object.assign(AZIONI, {
+  async "verifica-mese"(el){
+    const m0 = meseDi(oggi()), ora = st.verificaMese || m0, nuovo = meseDi(piuMesi(ora + "-01", Number(el.dataset.d) || 0));
+    if(nuovo > m0 || nuovo < meseDi(piuMesi(m0 + "-01", -STAB_MESI_INDIETRO))) return;
+    const g = st.guida; g.conteggiMesi = g.conteggiMesi || {};
+    if(!g.conteggiMesi[nuovo]){ try{ g.conteggiMesi[nuovo] = await api.guidaConteggi(nuovo + "-01") || {}; }catch(e){ toast(messaggio(e)); return; } }
+    st.verificaMese = nuovo === m0 ? null : nuovo; render(); },
   "guida-sett"(el){ st.guidaSett = Math.max(-SETTIMANE_INDIETRO, Math.min(0, (st.guidaSett || 0) + Number(el.dataset.d))); render(); },
   "sez-io"(el){ st.sezIo = el.dataset.sez; render(); window.scrollTo(0, 0); },
   "guida-vai"(el){ const d = el.dataset.dove;

@@ -72,6 +72,12 @@ check(await page.locator(".card", { hasText:"La tappa che vale la tua cifra" }).
 check(await page.getByText("Da qui: 4 tappe, compresa quella attuale.").isVisible(), "obiettivo: 4 tappe da qui");
 check(await page.locator(".percorso li.attuale", { hasText:"Primo ordine" }).isVisible() && await page.locator(".percorso li.meta", { hasText:"Bronze Foundation 9%" }).isVisible(),
   "percorso: tappa attuale e tappa obiettivo");
+check(!(await page.locator("#app").innerText()).includes("La visione"), "obiettivo: tolta «La visione»");
+{ const voci = (await page.locator(".percorso > li").allInnerTexts()).map(x => x.replace(/\s+/g, " "));
+  check(await page.getByText("Il tuo percorso fino a Diamante").isVisible() && voci[voci.length - 1].includes("Diamante") && !voci.some(x => /Fondatore/i.test(x))
+    && voci.findIndex(x => x.includes("Bronze Foundation 9%")) < voci.length - 1 && await page.locator(".percorso > li.meta").count() === 1
+    && (await page.locator(".percorso > li > .mark").allInnerTexts()).slice(-1)[0].trim() === String(voci.length),
+    "percorso: tutto fino a Diamante, la tappa dell'obiettivo evidenziata (" + voci.length + " tappe)"); }
 check(await page.getByText("«Per la famiglia»").isVisible(), "il perché si vede a chi l'ha scritto");
 await page.screenshot({ path: S + "/e2e/25-obiettivo.png", fullPage:true });
 await page.click("button[data-act=vista-io]");
@@ -2322,7 +2328,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     "consegna 3: tolti «Il tuo piano» e «Cosa fare adesso»");
   check(await page.locator("#app button[data-act=seguimi-attivo], #app button[data-act=seguimi-condividi]").count() === 0, "consegna 3: Seguimi e Condividi non sono più nella Verifica");
   check(await page.locator(".analisi-link[data-act=apri-analisi]").isVisible(), "consegna 3: «La mia analisi» in fondo alla Verifica");
-  /* Stabilità (044): chi non ha mesi chiusi guarda il mese in corso; poi l'ultimo mese chiuso delle mappe */
+  /* Stabilità: si parte sempre dal mese in corso; i mesi prima con le frecce accanto al mese */
   const stab = page.locator(".guida-stabilita");
   const MESI_T = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
   const meseT = (k, maiusc) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + k);
@@ -2331,6 +2337,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await stab.locator(".eyebrow").first().textContent()).trim() === "Stabilità della tua rete · tabella CL21", "Stabilità: il titolo");
   await stab.locator("button[data-act=aiuto][data-k=stabilita]").click();
   check((await stab.innerText()).includes("La percentuale la raggiungi con il fatturato"), "Stabilità: nel «?» dice che la percentuale viene dal fatturato");
+  check((await stab.innerText()).includes("Si parte dal mese in corso") && (await stab.innerText()).includes("La mia analisi"), "Stabilità: nel «?» il mese in corso, le frecce e il riepilogo in «La mia analisi»");
   await stab.locator("button[data-act=aiuto][data-k=stabilita]").click();
   check(await stab.locator(".stab-legenda span").count() === 3, "Stabilità: la legenda (sostenuto, da rinforzare, il tuo livello)");
   const attesi = DB.partners.filter(p => p.invitato_da === "R" && String(p.invitato_il || "").slice(0, 7) === ora.slice(0, 7)).length;
@@ -2339,9 +2346,12 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(await stab.locator(".celle.livelli .cella").count() === 7 && await stab.locator("ul.stabilita li").count() === 5
     && await stab.locator("ul.stabilita li .cella").count() === 35, "Stabilità: 7 livelli e 5 righe con le 7 caselle di riferimento");
   check(!(await stab.innerText()).includes("Ne manca"), "Stabilità: nessuna frase «Ne manca…»");
-  check((await stab.locator(".stab-mese").innerText()).trim() === meseT(0, true).nome + " · mese in corso", "Stabilità: senza mesi chiusi il mese in corso, scritto in evidenza");
+  check((await stab.locator(".stab-mese b").innerText()).trim() === meseT(0, true).nome + " · mese in corso", "Stabilità: il mese in corso, scritto in evidenza");
+  check(await stab.locator("button.freccia-mese[data-d='1']").isDisabled() && await stab.locator("button.freccia-mese[data-d='-1']").isEnabled(),
+    "Stabilità: nel mese in corso la freccia avanti è spenta, quella indietro no");
   check(await tuoDi(stab, "nuovi_gruppo") === "1", "Stabilità: i nuovi nel gruppo dagli import (mese in corso)");
-  check(await stab.locator("ul.stabilita small", { hasText:"questo mese finora" }).count() === 0, "Stabilità: nel mese in corso niente «questo mese finora»");
+  check(await stab.locator("ul.stabilita small", { hasText:"questo mese finora" }).count() === 0 && await stab.locator(".stab-avviso").count() === 0,
+    "Stabilità: niente più «questo mese finora» né avvisi");
   check((await stab.locator("li[data-k=app_cl21]").innerText()).includes("da inserire") && await stab.locator("li[data-k=app_cl21] .cella.att").count() === 0
     && await stab.locator(".stab-lavoro p", { hasText:"CumLaude21" }).count() === 0, "Stabilità: un numero non ancora scritto resta neutro, «da inserire», fuori da «Per sostenere»");
   await stab.locator("button[data-act=guida-cl21]").first().click();
@@ -2352,7 +2362,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(await tuoDi(stab, "convention") === "40", "Stabilità: il numero scritto a mano compare nella sua riga");
   check((await stab.locator("li[data-k=training_day]").innerText()).includes("ultimo evento"), "Stabilità: per il Training Day vale l'ultimo evento");
   await sync(page); await ctx.close();
-  /* con un mese chiuso: livello e numeri del mese chiuso (qui il mese scorso al 9%) */
+  /* con la mappa del mese scorso (al 9%): si parte comunque dal mese in corso, con la freccia si va al mese scorso */
   const prec = meseT(-1, true), prec2 = meseT(-2, false);
   DB.numeri = numeriR.filter(x => !(x.partner_id === "R" && x.mese < ora.slice(0, 7))).concat(DB.numeri.filter(n => n.partner_id === "g41b"))
     .concat([{ visto_da:"R", partner_id:"R", mese:prec.m, vpp:300, vpg:4000, percentuale:9, linee:[], nascoste:false, dati_al:prec.m + "-28T10:00:00Z" }]);
@@ -2360,10 +2370,14 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     await page.getByText("Ciao Stefano e Alessia").waitFor(); await page.click(".sezioni-io button[data-sez=guida]"); await page.locator(".guida-stabilita").waitFor(); };
   await aGuida();
   const stab2 = page.locator(".guida-stabilita");
-  check((await stab2.locator(".stab-mese").innerText()).trim() === prec.nome + " · mese chiuso", "Stabilità: con un mese chiuso si guarda quello, scritto in evidenza");
+  check((await stab2.locator(".stab-mese b").innerText()).trim() === meseT(0, true).nome + " · mese in corso", "Stabilità: anche con un mese chiuso si parte dal mese in corso");
+  check(await tuoDi(stab2, "nuovi_gruppo") === "1", "Stabilità: nel mese in corso i nuovi di questo mese");
+  await stab2.locator("button.freccia-mese[data-d='-1']").click();
+  await stab2.locator(".stab-mese b", { hasText:prec.nome }).waitFor();
+  check((await stab2.locator(".stab-mese b").innerText()).trim() === prec.nome + " · dalla mappa", "Stabilità: con la freccia il mese scorso, dalla mappa");
+  check(await stab2.locator("button.freccia-mese[data-d='1']").isEnabled(), "Stabilità: nel mese scorso si può tornare avanti");
   check((await stab2.locator(".stab-personali").innerText()).replace(/\s+/g, " ").includes("I tuoi nuovi iscritti · " + prec.nome.split(" ")[0].toLowerCase()),
     "Stabilità: i nuovi iscritti dicono a quale mese si riferiscono");
-  check(await stab2.locator(".stab-avviso").count() === 0, "Stabilità: mappa del mese scorso importata, nessun avviso");
   const dati = (await stab2.locator(".stab-dati").innerText()).replace(/\s+/g, " ");
   check(dati.includes("Livello raggiunto 9%") && dati.includes("La tua rete reale in costruzione") && dati.includes("sostiene il livello? non ancora"),
     "Stabilità: livello raggiunto dal fatturato e rete reale (" + dati + ")");
@@ -2376,23 +2390,32 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const testi = async k => stab2.locator(`li[data-k=${k}] .cella`).allInnerTexts();
   check((await testi("convention")).every(x => x.includes("✓")) && (await testi("nuovi_gruppo")).slice(0, 3).every(x => x.includes("!"))
     && !(await testi("nuovi_gruppo")).slice(3).some(x => /[✓!]/.test(x)), "Stabilità: ✓ nelle caselle verdi, ! in quelle ambra");
-  check(await tuoDi(stab2, "nuovi_gruppo") === "0"
-    && (await stab2.locator("li[data-k=nuovi_gruppo] .nome small").innerText()).includes("questo mese finora: 1"),
-    "Stabilità: il numero del mese chiuso e, sotto, quello del mese in corso");
-  check(await stab2.locator("li[data-k=oltre_200] small", { hasText:"questo mese finora" }).count() === 1 && await stab2.locator("li[data-k=convention] small", { hasText:"questo mese finora" }).count() === 0,
-    "Stabilità: «questo mese finora» solo per nuovi iscritti e codici oltre 200 VP");
+  check(await tuoDi(stab2, "nuovi_gruppo") === "0", "Stabilità: nel mese scorso i nuovi di quel mese");
+  check(await stab2.locator("li[data-k=training_day] small", { hasText:"il numero di oggi" }).count() === 1 && await stab2.locator("li[data-k=nuovi_gruppo] small", { hasText:"il numero di oggi" }).count() === 0,
+    "Stabilità: nei mesi prima i numeri scritti a mano dicono che sono quelli di oggi");
   check((await stab2.locator(".stab-lavoro .eyebrow").textContent()).trim() === "Per sostenere il 9%", "Per sostenere il 9%: il titolo dice il livello");
   const lav = (await stab2.locator(".stab-lavoro p").allInnerTexts()).map(x => x.replace(/\s+/g, " "));
   check(lav.length === 2 && lav[0] === "Nuovi iscritti nel gruppo del mese: hai 0, ne servono 5"
     && lav[1] === "Codici che fatturano più di 200 VP: hai 1, ne servono 5", "Per sostenere: le righe da rinforzare, in ordine (" + lav.join(" / ") + ")");
+  await page.screenshot({ path: S + "/e2e/41-stabilita-mese-scorso.png", fullPage:false });
+  await stab2.locator("button.freccia-mese[data-d='1']").click();
+  await stab2.locator(".stab-mese b", { hasText:"mese in corso" }).waitFor();
+  check(await stab2.locator("button.freccia-mese[data-d='1']").isDisabled(), "Stabilità: con la freccia avanti si torna al mese in corso");
   await sync(page); await ctx.close();
-  /* la mappa del mese appena chiuso non c'è ancora: l'ultimo mese disponibile, con l'avviso */
+  /* la mappa del mese appena chiuso non c'è ancora: quel mese lo dice, quello prima viene dalla mappa */
   DB.numeri = DB.numeri.filter(x => !(x.partner_id === "R" && x.mese === prec.m))
     .concat([{ visto_da:"R", partner_id:"R", mese:prec2.m, vpp:300, vpg:4000, percentuale:9, linee:[], nascoste:false, dati_al:prec2.m + "-28T10:00:00Z" }]);
   await aGuida();
-  check((await page.locator(".guida-stabilita .stab-mese").innerText()).includes("mese chiuso")
-    && (await page.locator(".guida-stabilita .stab-avviso").innerText()).trim() === "Importa la mappa di " + meseT(-1, false).nome + " per aggiornare",
-    "Stabilità: senza la mappa del mese appena chiuso, l'ultimo mese disponibile e l'avviso");
+  { const sm = page.locator(".guida-stabilita .stab-mese");
+    await sm.locator("button[data-d='-1']").click(); await sm.locator("b", { hasText:prec.nome }).waitFor();
+    check((await sm.locator("b").innerText()).trim() === prec.nome + " · senza mappa importata", "Stabilità: un mese senza mappa lo dice");
+    await sm.locator("button[data-d='-1']").click(); await sm.locator("b", { hasText:meseT(-2, true).nome }).waitFor();
+    check((await sm.locator("b").innerText()).trim() === meseT(-2, true).nome + " · dalla mappa"
+      && (await page.locator(".guida-stabilita .stab-dati").innerText()).replace(/\s+/g, " ").includes("Livello raggiunto 9%"), "Stabilità: due mesi fa, dalla mappa, al 9%");
+    for(let i = 0; i < 12; i++){ if(await sm.locator("button[data-d='-1']").isDisabled()) break; await sm.locator("button[data-d='-1']").click(); }
+    check(await sm.locator("button[data-d='-1']").isDisabled() && (await sm.locator("b").innerText()).includes(meseT(-12, true).nome),
+      "Stabilità: si va indietro fino a 12 mesi");
+    await sm.locator("button[data-d='1']").click(); }
   // abitudini: spunto oggi la formazione e cambio l'obiettivo
   const oggiG = new Date().toISOString().slice(0, 10);
   await page.locator(`.guida-abitudini [data-k=formazione] button[data-giorno="${oggiG}"]`).click();
@@ -3258,12 +3281,40 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(JSON.stringify(await nomiLista()) === JSON.stringify(["Dino Due"]), "una persona in più cerchie");
   // la scheda dice le cerchie; dalla modifica si toglie da una cerchia
   await page.click("button[data-act=apri-persona]:has-text('Dino Due')");
-  check((await page.locator(".cerchie-persona").innerText()).replace(/\s+/g, " ").trim() === "Cerchie: Colleghi Palestra", "la scheda: «Cerchie:» con i nomi");
+  const pillCerchie = async () => (await page.locator(".cerchie-persona .pill").allInnerTexts()).map(t => t.trim()).join(" ");
+  check(await pillCerchie() === "Colleghi Palestra" && (await page.locator(".cerchie-persona").innerText()).startsWith("Cerchie:"), "la scheda: «Cerchie:» con i nomi");
   await page.click("button.nome-modifica");
   await page.locator(".sheet .cerchie-scelta label", { hasText:"Colleghi" }).click();
   await page.click(".sheet button:has-text('Salva')");
   await page.getByText("Dati salvati").waitFor();
-  check((await page.locator(".cerchie-persona").innerText()).replace(/\s+/g, " ").trim() === "Cerchie: Palestra", "togliendo la spunta esce dalla cerchia");
+  check(await pillCerchie() === "Palestra", "togliendo la spunta esce dalla cerchia");
+  // dalla scheda: «Cambia le cerchie», spunte e una cerchia nuova
+  await page.click(".cerchie-persona button[data-act=persona-cerchie]:has-text('Cambia le cerchie')");
+  await page.locator(".sheet h2", { hasText:"Le cerchie di Dino Due" }).waitFor();
+  check(await page.locator(".sheet label.chip", { hasText:"Palestra" }).locator("input").isChecked()
+    && !await page.locator(".sheet label.chip", { hasText:"Colleghi" }).locator("input").isChecked(), "scheda: le cerchie della Lista, spuntate quelle in cui sta");
+  await page.fill(".sheet input[name=nuova]", "Palestra");
+  await page.click(".sheet button:has-text('Salva')");
+  check(await page.locator(".sheet .errore", { hasText:"Hai già una cerchia con questo nome" }).isVisible(), "scheda: un nome già usato non crea un doppione");
+  await page.fill(".sheet input[name=nuova]", "Amici");
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Cerchia «Amici» creata").waitFor();
+  check(await pillCerchie() === "Amici Palestra" && await page.locator("h2", { hasText:"Dino Due" }).isVisible(), "scheda: creata la cerchia e la persona è dentro, si resta sulla scheda");
+  await page.screenshot({ path: S + "/e2e/55-cerchie-scheda.png" });
+  await page.click(".cerchie-persona button[data-act=persona-cerchie]");
+  await page.locator(".sheet label.chip", { hasText:"Amici" }).click();
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Cerchie aggiornate").waitFor();
+  check(await pillCerchie() === "Palestra", "scheda: togliendo la spunta esce dalla cerchia");
+  await page.click(".cerchie-persona button[data-act=persona-cerchie]");
+  await page.locator(".sheet label.chip", { hasText:"Amici" }).click();
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Cerchie aggiornate").waitFor();
+  check(await pillCerchie() === "Amici Palestra", "scheda: spuntando una cerchia che c'è già ci entra");
+  await page.click(".cerchie-persona button[data-act=persona-cerchie]");
+  await page.locator(".sheet label.chip", { hasText:"Amici" }).click();
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Cerchie aggiornate").waitFor();
   await page.click("button[data-act=torna-lista]");
   check(await page.locator(".cerchie-lista button.on", { hasText:"Colleghi · 0" }).isVisible() && await page.getByText("La cerchia «Colleghi» è ancora vuota.").isVisible(), "Colleghi ora è vuota");
   // toccando di nuovo la cerchia scelta si torna a tutti
@@ -3339,7 +3390,24 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
   await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
   await page.click("button[data-act=apri-cliente]:has-text('Ugo Cliente')");
-  check(!await page.locator(".cerchie-persona").count(), "nella scheda del cliente non compaiono le cerchie della Lista");
+  check(!await page.locator(".cerchie-persona .pill").count() && await page.locator(".cerchie-persona button", { hasText:"+ Aggiungi a una cerchia" }).isVisible(),
+    "nella scheda del cliente non compaiono le cerchie della Lista; c'è «+ Aggiungi a una cerchia»");
+  await page.click(".cerchie-persona button[data-act=persona-cerchie]");
+  check(await page.locator(".sheet label.chip").count() === 1 && await page.locator(".sheet label.chip", { hasText:"Bellezza" }).isVisible(),
+    "dalla scheda del cliente: solo le cerchie dei clienti");
+  await page.fill(".sheet input[name=nuova]", "Casa");
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Cerchia «Casa» creata").waitFor();
+  check((await page.locator(".cerchie-persona .pill").allInnerTexts()).join() === "Casa", "il cliente è nella cerchia nuova");
+  await sync(page);
+  check(DB.cerchie.some(c => c.nome === "Casa" && c.tipo === "clienti" && c.proprietario === "ce53")
+    && DB.pc.filter(x => x.persona_id === "cc2").length === 2, "la cerchia nuova è dei clienti; la cerchia della Lista resta");
+  await page.click(".cerchie-persona button[data-act=persona-cerchie]");
+  await page.locator(".sheet label.chip", { hasText:"Casa" }).click();
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Cerchie aggiornate").waitFor();
+  await sync(page);
+  check(DB.pc.filter(x => x.persona_id === "cc2").length === 1, "togliendo la spunta esce solo dalla cerchia dei clienti");
   await page.click("button.nome-modifica");
   await page.locator(".sheet .cerchie-scelta label", { hasText:"Bellezza" }).click();
   await page.click(".sheet button:has-text('Salva')");
