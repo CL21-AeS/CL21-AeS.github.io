@@ -3605,12 +3605,14 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await festa.waitFor();
   check((await festa.locator("h1").innerText()).replace(/\s+/g, " ").trim() === "Si parte, Nora!" && await festa.locator(".festa-l li").count() === 3, "la festa: i tre passi che contano");
   await page.screenshot({ path: S + "/e2e/61-festa.png" });
-  await festa.locator("button[data-act=festa-seguimi]").click();
+  check(await festa.locator("button").count() === 1 && (await festa.locator("button").innerText()).trim() === "Vai al cruscotto"
+    && (await festa.innerText()).includes("lo togli dal Profilo"), "la festa: un solo pulsante, il Seguimi si toglie dal Profilo");
+  await festa.locator("button[data-act=festa-fine]").click();
   await festa.waitFor({ state:"detached" });
   await page.getByText("Seguimi attivo").waitFor();
   check(await page.locator(".card.cruscotto:not(.percorso-partenza)").isVisible() && !(await page.locator(".percorso-partenza").count()), "dopo la festa: il cruscotto di tutti");
   await sync(page);
-  check(!!DB.partners.find(p => p.id === "np7").partenza_completata_il && DB.seguimi.some(x => x.partner_id === "np7" && x.attivo), "nel database: partenza completata e Seguimi acceso");
+  check(!!DB.partners.find(p => p.id === "np7").partenza_completata_il && DB.seguimi.some(x => x.partner_id === "np7" && x.attivo), "nel database: partenza completata e Seguimi acceso da solo");
   check(!errori.length, "percorso: nessun errore nella pagina");
   await ctx.close();
   await entra();

@@ -45,8 +45,8 @@ finito (anche oltre i 30 giorni); binario Prodotto con i soli clienti. Chi entra
 meno al momento dell'ingresso) vede «Percorso di partenza · Fase N di 5» al posto del cruscotto e dei Primi passi: 1 Il mio
 perché (consegna 6), 2 Partenza con lo sponsor (giorno del primo incontro + 30 nomi, «entro» 48 ore dall'ingresso), 3 Il
 primo ordine (50 VP, «restano N giorni» dei 30, poi «oltre i 30 giorni»), 4 I due binari (contattati, invitati, piani →
-primo piano; clienti → primo cliente), poi la festa a tutto schermo una volta sola («Continua con il Seguimi» lo accende,
-«Vai al cruscotto»). Fasi dopo quella in corso con il lucchetto, il resto dell'app usabile. La prossima cosa del percorso:
+primo piano; clienti → primo cliente), poi la festa a tutto schermo una volta sola, con un solo pulsante «Vai al cruscotto»: il
+Seguimi si accende da solo e si toglie dal Profilo (scelta di Stefano). Fasi dopo quella in corso con il lucchetto, il resto dell'app usabile. La prossima cosa del percorso:
 «Fissa l'incontro con il tuo sponsor». 059: `partners.incontro_sponsor`, `partenza_completata_il` (solo la propria riga):
 da applicare su Supabase con l'ok di Stefano. Nei test e2e chi entra ha la partenza già completata, salvo `conPercorso`.
 Prossima: consegna 8, Gruppo per lo sponsor.

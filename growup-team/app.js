@@ -2115,9 +2115,9 @@ function vFesta(){
     <h1 id="festa-titolo">Si parte,<br>${esc(nomeSaluto(p.nome))}!</h1>
     <p>In ${giorni === 1 ? "1 giorno" : `${num(giorni)} giorni`} hai fatto i tre passi che contano.</p>
     <ul class="festa-l">${voci.map(([t, d]) => `<li><span class="segno" aria-hidden="true">✓</span><span><b>${t}</b>${d ? `<br><span class="small">${esc(d)}</span>` : ""}</span></li>`).join("")}</ul>
-    <p class="small">Da oggi la pagina Io è il tuo cruscotto. Il Seguimi ti accompagna giorno per giorno.</p>
-    <button class="btn primary wide" data-act="festa-seguimi">Continua con il Seguimi</button>
-    <button class="btn wide festa-ghost" data-act="festa-fine">Vai al cruscotto</button>
+    <p class="small">Da oggi la pagina Io è il tuo cruscotto e il Seguimi ti accompagna giorno per giorno, con le azioni di ogni giorno.
+      Se non lo vuoi, lo togli dal Profilo.</p>
+    <button class="btn primary wide" data-act="festa-fine">Vai al cruscotto</button>
   </div>`;
 }
 /* i nomi nuovi della settimana (solo avviati): i nomi messi in Lista da lunedì, con la loro fonte */
@@ -4495,8 +4495,8 @@ Object.assign(MODULI, {
   }
 });
 Object.assign(AZIONI, {
-  async "festa-fine"(){ try{ await salvaPunto({ partenza_completata_il:new Date().toISOString() }, "Partenza completata!"); festeggia("grande", "Si parte!", "Partenza completata"); window.scrollTo(0, 0); }catch(e){ toast(messaggio(e)); } },
-  async "festa-seguimi"(){
+  /* un solo pulsante (scelta di Stefano): la partenza è completata e il Seguimi si accende da solo; si toglie dal Profilo */
+  async "festa-fine"(){
     try{ await salvaPunto({ partenza_completata_il:new Date().toISOString() }, "Partenza completata!"); festeggia("grande", "Si parte!", "Partenza completata");
       if(!st.seguimi.attivo) await AZIONI["seguimi-attivo"](); window.scrollTo(0, 0); }catch(e){ toast(messaggio(e)); }
   }
