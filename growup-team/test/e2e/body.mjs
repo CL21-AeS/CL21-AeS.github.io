@@ -3916,6 +3916,27 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.passi = DB.passi.filter(x => x.proprietario !== "dr61");
 }
 
+// 65. Leggibilità (grafica 7, punto 1): i testi grigi, l'ambra e il verde almeno 4,5:1 nei due temi, su tutti i fondi
+{
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  const misura = async tema => page.evaluate(t => {
+    const r = document.documentElement; if(t) r.setAttribute("data-theme", t); else r.removeAttribute("data-theme");
+    const v = n => getComputedStyle(r).getPropertyValue(n).trim();
+    const lum = h => { const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(x => x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+    const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    const testi = t === "dark" ? ["--ink2", "--ink3"] : ["--ink2", "--ink3", "--giallo", "--verde"], fondi = ["--bg", "--card", "--traccia", "--accent-wash"];
+    const out = [];
+    for(const a of testi) for(const b of fondi) out.push([a, b, Math.round(cr(v(a), v(b)) * 100) / 100]);
+    r.removeAttribute("data-theme"); return out; }, tema);
+  for(const tema of [null, "dark"]){
+    const m = await misura(tema), sotto = m.filter(x => x[2] < 4.5);
+    check(!sotto.length, `tema ${tema ? "scuro" : "chiaro"}: testi grigi, ambra e verde almeno 4,5:1 su tutti i fondi${sotto.length ? " (" + sotto.map(x => x.join(" ")).join("; ") + ")" : ""}`);
+  }
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
