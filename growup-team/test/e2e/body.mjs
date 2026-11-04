@@ -3988,6 +3988,39 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
 }
 
+// 67. I campi non si svuotano più quando l'app ridisegna lo schermo (tornando sull'app, o cambiando una scelta nel foglio)
+{
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+  await page.click("button[data-act=persona-nuova]");
+  await page.fill(".sheet input[name=nome]", "Prova Campo");
+  await page.fill(".sheet input[name=contatto]", "333 1234567");
+  await page.focus(".sheet input[name=contatto]");
+  /* si va su WhatsApp e si torna: l'app ricarica i dati e ridisegna */
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await page.waitForTimeout(1200);
+  check(await page.inputValue(".sheet input[name=nome]") === "Prova Campo" && await page.inputValue(".sheet input[name=contatto]") === "333 1234567",
+    "tornando sull'app quello che si stava scrivendo resta");
+  check(await page.evaluate(() => document.activeElement && document.activeElement.name) === "contatto", "e il cursore resta nel campo dove si scriveva");
+  await page.click(".sheet [data-act=chiudi]");
+  /* nel foglio del passo: scritta la nota, cambiando il tipo di passo il foglio si ridisegna e la nota resta */
+  await page.locator("button[data-act=apri-persona]").first().click();
+  await page.click("button[data-act=passo]");
+  await page.fill(".sheet input[name=nota]", "nota che resta");
+  const tipi = await page.locator(".sheet button[data-act=tipo-passo]:not(.on)").evaluateAll(l => l.map(b => b.dataset.tipo).filter(t => t !== "nota"));
+  await page.click(`.sheet button[data-act=tipo-passo][data-tipo=${tipi[0]}]`);
+  await page.locator(`.sheet button[data-act=tipo-passo][data-tipo=${tipi[0]}].on`).waitFor();
+  check(await page.inputValue(".sheet input[name=nota]") === "nota che resta", "cambiando il tipo di passo la nota scritta resta");
+  await page.click(".sheet [data-act=chiudi]");
+  /* riaprendo il foglio, invece, è vuoto: si riparte da capo */
+  await page.click("button[data-act=passo]");
+  check(await page.inputValue(".sheet input[name=nota]") === "", "riaprendo il foglio i campi ripartono vuoti");
+  check(!errori.length, "campi: nessun errore nella pagina");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

@@ -1021,7 +1021,45 @@ async function avvio(){
 /* ---- 9. Viste ---- */
 /* #app si riscrive solo se è cambiato: così aprire un foglio (es. la privacy) non cancella
    quello che si sta scrivendo in un modulo. */
-let ultimoApp = "";
+let ultimoApp = "", ultimoFoglio = "", ultimoFoglioNome = null;
+/* I campi che si svuotavano: l'app ridisegna lo schermo quando arrivano dati nuovi (per esempio tornando sull'app da
+   WhatsApp). Prima di riscrivere una parte si segna quello che la persona ha scritto o spuntato (solo i campi che ha
+   toccato: valore diverso da quello proposto) e dove stava il cursore; dopo lo rimette nei campi uguali. */
+function chiaveCampo(el){
+  if(!el.name && !el.id) return null;
+  const f = el.form && el.form.dataset ? el.form.dataset.form || "" : "";
+  return [f, el.name || "#" + el.id, el.type === "radio" || el.type === "checkbox" ? el.value : ""].join("|");
+}
+function fotoCampi(radice){
+  const campi = [];
+  if(!radice) return { campi, fuoco:null };
+  radice.querySelectorAll("input, textarea, select").forEach(el => {
+    if(el.type === "file" || el.type === "hidden" || el.type === "submit" || el.type === "button") return;
+    const k = chiaveCampo(el); if(!k) return;
+    if(el.type === "radio" || el.type === "checkbox"){ if(el.checked !== el.defaultChecked) campi.push({ k, spunta:el.checked }); }
+    else if(el.tagName === "SELECT"){ if([...el.options].some(o => o.selected !== o.defaultSelected)) campi.push({ k, valore:el.value }); }
+    else if(el.value !== el.defaultValue) campi.push({ k, valore:el.value });
+  });
+  const a = document.activeElement, fuoco = a && radice.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) ? { k:chiaveCampo(a),
+    da:(() => { try{ return a.selectionStart; }catch(e){ return null; } })(), a:(() => { try{ return a.selectionEnd; }catch(e){ return null; } })() } : null;
+  return { campi, fuoco };
+}
+function rimettiCampi(radice, foto){
+  if(!radice || !foto || (!foto.campi.length && !foto.fuoco)) return;
+  const perChiave = new Map();
+  radice.querySelectorAll("input, textarea, select").forEach(el => { const k = chiaveCampo(el); if(k && !perChiave.has(k)) perChiave.set(k, el); });
+  /* prima le spunte (con «change», così si riaprono le parti che dipendono dalla scelta), poi i testi */
+  for(const c of foto.campi.filter(c => "spunta" in c).sort((x, y) => x.spunta - y.spunta)){
+    const el = perChiave.get(c.k); if(!el || el.checked === c.spunta) continue;
+    el.checked = c.spunta; el.dispatchEvent(new Event("change", { bubbles:true }));
+  }
+  for(const c of foto.campi.filter(c => "valore" in c)){ const el = perChiave.get(c.k); if(el && el.value !== c.valore) el.value = c.valore; }
+  if(foto.fuoco && foto.fuoco.k){
+    const el = perChiave.get(foto.fuoco.k);
+    if(el && document.activeElement !== el){ el.focus({ preventScroll:true });
+      try{ if(foto.fuoco.da != null) el.setSelectionRange(foto.fuoco.da, foto.fuoco.a); }catch(e){} }
+  }
+}
 /* Ricerca nella struttura: si filtra sulla pagina senza ridisegnarla, così la tastiera resta aperta.
    Restano visibili le persone trovate e la loro linea fino a te. */
 function senzaAccenti(s){ return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim(); }
@@ -1058,13 +1096,19 @@ function render(){
   const html = (viste[st.fase] || vAvvio)();
   const prima = fotoMovimento();
   prima.pagina = cambioPagina() ? fotoPagina(app) : null;
-  if(html !== ultimoApp){ app.innerHTML = html; ultimoApp = html; }
+  if(html !== ultimoApp){ const f = fotoCampi(app); app.innerHTML = html; ultimoApp = html; rimettiCampi(app, f); }
   const conAzioni = st.fase === "home" && st.vista === "io";
   document.body.classList.toggle("con-azioni", conAzioni);
   document.getElementById("azioni").innerHTML = conAzioni ? vAzioni() : "";
   const foglio = document.getElementById("sheet");
   if(!st.sheet) chiudiFoglioPiano(foglio);
-  foglio.innerHTML = st.sheet ? `<div class="sheet" data-act="chiudi-fuori"><div class="sheet-box" role="dialog" aria-modal="true">${vSheet()}</div></div>` : "";
+  /* il foglio aperto si riscrive solo se è cambiato, e quello che si stava scrivendo resta */
+  const fhtml = st.sheet ? `<div class="sheet" data-act="chiudi-fuori"><div class="sheet-box" role="dialog" aria-modal="true">${vSheet()}</div></div>` : "";
+  if(fhtml !== ultimoFoglio || !foglio.firstElementChild !== !fhtml){
+    const stesso = !!fhtml && !!ultimoFoglio && st.sheet === ultimoFoglioNome, f = stesso ? fotoCampi(foglio) : null;
+    foglio.innerHTML = fhtml; ultimoFoglio = fhtml; ultimoFoglioNome = st.sheet;
+    if(f) rimettiCampi(foglio, f);
+  }
   applicaRicerca();
   filtroInVista();
   muoviDopo(prima);
