@@ -2912,6 +2912,25 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.locator(".sheet .errore").waitFor();
   check((await page.locator(".sheet .errore").innerText()).includes("manca la colonna «Codice Amway Partner Sponsor»"), "senza la colonna dello sponsor: rifiutato, con il nome della colonna");
   await page.click(".sheet button[data-act=chiudi]");
+  /* VPP negativi: il mese dopo una chiusura con la tolleranza Amway fa partire da meno i VP che mancavano; si salvano così */
+  { const orig = persone51.map(x => Object.assign({}, x));
+    persone51[1]["VPP"] = "'-489,17"; persone51[3]["VPP"] = "'\u221212,50"; persone51[3]["VPG"] = "'-12,50";
+    const neg = await importa51("vpp-negativi.csv", csv51(testa17), false);
+    check(neg.p_persone.find(r => r.codice === "7600002").vpp === -489.17 && neg.p_persone.find(r => r.codice === "7600004").vpp === -12.5
+      && neg.p_persone.find(r => r.codice === "7600004").vpg === -12.5, "VPP negativi (anche con il segno «−»): letti e salvati così come sono");
+    await page.locator("button[data-act=vista-gruppo]").first().click();
+    check((await page.locator(".albero.struttura li", { hasText:"Aldo Primo" }).innerText()).includes("-489,17 VP da recuperare"),
+      "nella struttura i VP negativi dicono «da recuperare»");
+    check(!errori.length, "VPP negativi: nessun errore nella pagina");
+    /* un valore che non è un numero: l'avviso dice cosa c'è scritto nel file */
+    persone51[1]["VPP"] = "'abc";
+    await scegliFile(page, "vpp-sbagliati.csv", csv51(testa17));
+    await page.locator(".sheet .errore").waitFor();
+    check((await page.locator(".sheet .errore").innerText()).includes("Nel file i VPP di Aldo Primo sono «abc»: non è un numero"),
+      "VPP che non sono un numero: l'avviso mostra il valore del file");
+    await page.click(".sheet button[data-act=chiudi]");
+    persone51.splice(0, persone51.length, ...orig);
+    await importa51("di-nuovo.csv", csv51(testa17), false); }
 
   // 45/47. Solo Paese = Italia: le righe di altri Paesi si scartano e basta, con qualsiasi import; al database non arriva niente di loro
   const estero = (liv, sp, cod, nome, paese) => Object.assign(p51(liv, sp, cod, nome, "50,00", "50,00", 0, 1), { "Paese":"'" + paese });
