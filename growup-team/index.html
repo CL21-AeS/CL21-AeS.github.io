@@ -121,6 +121,14 @@ small,.small{font-size:13px;color:var(--ink2)}
 .testa-sezione .pulsanti{display:flex;gap:6px;margin-left:auto;flex:none}
 .testa-sezione .pulsanti .btn{white-space:nowrap}
 .spread{display:flex;gap:10px;align-items:center;justify-content:space-between}
+/* grafica 7: a 360 px i pulsanti piccoli non vanno a capo; se in una riga non c'è posto, va a capo la riga intera
+   (il pulsante scende sotto), non il testo del pulsante */
+.btn.small:not(.grow){white-space:nowrap}
+.spread{flex-wrap:wrap;row-gap:6px}
+.spread>:last-child:not(:first-child){margin-left:auto}
+.oggi.inviti li{flex-wrap:wrap;row-gap:6px}
+.oggi.inviti li>.grow{flex:1 1 170px;min-width:0}
+.oggi.inviti li>.btn{margin-left:auto}
 .grow{flex:1;min-width:0}
 .stack>*+*{margin-top:10px}
 .btn{
@@ -194,8 +202,10 @@ ul.imp li{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px 
 ul.imp li:first-child{border-top:0}
 .imp-sezione details summary{cursor:pointer;margin-top:6px}
 .scelte-rapide .btn.on{background:var(--scelta);border-color:var(--scelta);color:var(--scelta-ink)}
-.oggi .x,.persone .x,.oggi-lista .x{border:0;background:none;color:var(--ink3);font-size:20px;width:38px;height:38px;cursor:pointer;border-radius:10px}
-.oggi .x:hover,.persone .x:hover,.oggi-lista .x:hover{background:var(--bg)}
+/* la × per togliere: rotonda e uguale ovunque (anche in «Primi passi» e nell'agenda della scheda) */
+button.x{flex:none;border:0;background:none;color:var(--ink3);font-size:20px;line-height:1;width:38px;height:38px;cursor:pointer;border-radius:50%;
+  display:inline-grid;place-items:center;padding:0}
+button.x:hover{background:var(--bg)}
 .schede{display:flex;gap:2px;background:rgba(255,255,255,.10);border:1px solid rgba(217,195,160,.35);border-radius:12px;padding:3px;flex:none}
 .schede button{border:0;background:none;color:var(--head-ink2);font:inherit;font-size:14px;font-weight:700;
   padding:0 14px;min-height:38px;border-radius:9px;cursor:pointer}
@@ -273,7 +283,8 @@ ul.imp li:first-child{border-top:0}
 .griglia-azioni{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .griglia-azioni .btn:last-child:nth-child(odd){grid-column:1 / -1}
 .albero{list-style:none;margin:8px 0 0;padding:0}
-.albero li{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:15px}
+.albero li{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:15px;flex-wrap:wrap;row-gap:4px;justify-content:flex-end}
+.albero li .nome{flex:1 1 110px}
 .albero li:first-child{border-top:0}
 .albero .btn.link{min-height:32px;padding:0 2px;font-size:13px}
 .albero li.liv{padding-left:var(--rientro)}
@@ -633,7 +644,6 @@ input.mini.prezzo{width:68px;text-align:right}
 .partenze-l{list-style:none;margin:0;padding:0}
 .partenze-l li{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
 .partenze-l li:first-child{border-top:0}
-.partenze-l .x{border:0;background:none;color:var(--ink3);font-size:20px;width:38px;height:38px;cursor:pointer;border-radius:10px}
 .barre-partenza{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:4px}
 .barre-partenza i{height:5px;border-radius:4px;background:var(--traccia)}
 .barre-partenza i.fatta{background:var(--progresso)}
