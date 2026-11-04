@@ -32,9 +32,9 @@
 <style>
 :root{
   /* Stile H · Smeraldo e rame (scelto il 16 ottobre 2026; tavola in design/tavola-grafica.html) */
-  --bg:#f6f3ec; --card:#ffffff; --ink:#10231c; --ink2:#4f5f58; --ink3:#7a8781;
+  --bg:#f6f3ec; --card:#ffffff; --ink:#10231c; --ink2:#4f5f58; --ink3:#5f6c66;
   --line:#e7e0d2; --accent:#0a3a2c; --accent-ink:#f7f0e3; --accent-wash:#e6efe9;
-  --verde:#13795b; --giallo:#9a6a00; --rosso:#b42318; --stella:#a8742a;
+  --verde:#127256; --giallo:#8a5f00; --rosso:#b42318; --stella:#a8742a;
   --rame:#c26a3d; --rame2:#d98b4f; --eb:#a8552b; --traccia:#efe8da;
   --stab-ok:#dcefe4; --stab-ok-ink:#0d5c44; --stab-att:#fde4d3; --stab-att-ink:#8a3a10; --stab-sopra:#f1f6f3; --serie:#b5531c;
   --head:linear-gradient(145deg,#0a3a2c 0%,#13604a 100%); --head-ink:#f7f0e3; --head-ink2:#d9c3a0; --oro:#e2a46f;
@@ -55,7 +55,7 @@
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --bg:#07130e; --card:#0f1f18; --ink:#eef5f0; --ink2:#a7b8ae; --ink3:#7d8f85;
+    --bg:#07130e; --card:#0f1f18; --ink:#eef5f0; --ink2:#a7b8ae; --ink3:#869890;
     --line:#1f3329; --accent:#f08a4b; --accent-ink:#07130e; --accent-wash:#16291f;
     --verde:#34c08f; --giallo:#e2b45a; --rosso:#ff7b6b; --stella:#e2b45a;
     --rame:#e08a5a; --rame2:#f0a76f; --eb:#e2a46f; --traccia:#1c2e25;
@@ -70,7 +70,7 @@
   }
 }
 :root[data-theme="dark"]{
-  --bg:#07130e; --card:#0f1f18; --ink:#eef5f0; --ink2:#a7b8ae; --ink3:#7d8f85;
+  --bg:#07130e; --card:#0f1f18; --ink:#eef5f0; --ink2:#a7b8ae; --ink3:#869890;
   --line:#1f3329; --accent:#f08a4b; --accent-ink:#07130e; --accent-wash:#16291f;
   --verde:#34c08f; --giallo:#e2b45a; --rosso:#ff7b6b; --stella:#e2b45a;
   --rame:#e08a5a; --rame2:#f0a76f; --eb:#e2a46f; --traccia:#1c2e25;
@@ -143,7 +143,7 @@ input,select,textarea{
 }
 input[type=checkbox],input[type=radio]{accent-color:var(--progresso)}
 input:focus,select:focus{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);outline-offset:1px}
-input::placeholder{color:var(--ink3);opacity:.8}
+input::placeholder{color:var(--ink3);opacity:1}
 input[data-vuoto]::placeholder{color:var(--ink3);opacity:.55}
 input.codice{font-size:26px;letter-spacing:.35em;text-align:center;font-variant-numeric:tabular-nums}
 label.field{display:block;margin:14px 0 0}

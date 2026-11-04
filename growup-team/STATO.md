@@ -3,6 +3,13 @@
 Ultimo aggiornamento: 4 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Leggibilità, punto 1: i colori dei testi (4 novembre 2026, sera, app v99, database non toccato)
+
+Testi grigi, ambra e verde almeno 4,5:1 (WCAG AA) su tutti i fondi (pagina, scheda, caselle chiare, verde chiaro) nei
+due temi: chiaro `--ink3` #7a8781 → #5f6c66, `--giallo` #9a6a00 → #8a5f00, `--verde` #13795b → #127256; scuro
+`--ink3` #7d8f85 → #869890. I suggerimenti grigi dentro i campi non sono più sbiaditi. Un controllo automatico (sezione
+65 dei test) misura i contrasti a ogni consegna. Restano i punti 2 e 3 (niente a capo a 360 px, la × di «Primi passi»).
+
 ## Gruppo: il pallino dell'app (4 novembre 2026, sera, app v98, database non toccato)
 
 Nella struttura e negli elenchi dei filtri, accanto al nome un pallino: verde usa l'app, grigio senza app. La scritta
@@ -33,8 +40,7 @@ nuovo c'è anche nella chiusura normale. I promemoria usano l'agenda (057): ness
    «Cambia le cerchie»): si spuntano le cerchie che ci sono (della Lista o dei Clienti, separate) e se ne crea una nuova
    con dentro la persona.
 
-Ancora da fare (detto da Stefano): contrasto AA dei testi grigi e
-nessun pulsante che va a capo a 360 px; i campi dei moduli che si svuotano quando la pagina si ridisegna. In attesa di
+Ancora da fare (detto da Stefano): nessun pulsante che va a capo a 360 px; i campi dei moduli che si svuotano quando la pagina si ridisegna. In attesa di
 Stefano: nomi e contatto dei titolari nell'informativa.
 
 ## Piano «nuova Io» (approvato il 3 novembre 2026, sera)
