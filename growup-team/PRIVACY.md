@@ -18,7 +18,7 @@ strumento: va scritto nelle condizioni d'uso dell'app.
 |---|---|---|---|---|
 | Nome, codice Amway, data di ingresso, qualifica, numeri del mese (VP, percentuale), obiettivi, abitudini | Partner che usano l'app | Pianificare il proprio lavoro e farsi aiutare dall'upline | La persona; l'upline solo i numeri (le parti private restano sue, vedi `SICUREZZA.md`) | Finché è nella mappa Amway; fuori dalla mappa si cancella dopo 12 mesi (050) |
 | Nome, codice Amway, sponsor, data di ingresso, VP, percentuale, dimensione del gruppo | Persone della mappa Amway **senza l'app** | Mostrare all'upline la struttura del suo gruppo | Chi sta sopra di loro nella mappa | Come sopra |
-| Nome, contatto, «come lo conosci», note, passi, compleanno, ordini e codice cliente | Persone della Lista, del Target e Clienti (esterni) | Ricordarsi chi ricontattare e seguire i clienti | **Solo** il partner che li ha scritti | 24 mesi dall'ultimo passo o ordine, il conteggio riparte a ogni passo (055); avviso 30 giorni prima |
+| Nome, contatto, «come lo conosci», note, passi, agenda (giorno, ora, per cosa, come: 057), compleanno, ordini e codice cliente | Persone della Lista, del Target e Clienti (esterni) | Ricordarsi chi ricontattare e seguire i clienti | **Solo** il partner che li ha scritti | 24 mesi dall'ultimo passo o ordine, il conteggio riparte a ogni passo (055); avviso 30 giorni prima |
 | Indirizzo del telefono per le notifiche | Partner che le attivano | Mandare i promemoria | Solo il server | Finché le notifiche restano attive |
 | Indirizzo IP al primo ingresso | Chi entra | Captcha contro gli accessi automatici | Cloudflare | Secondo le regole di Cloudflare |
 
