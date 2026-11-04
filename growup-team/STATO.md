@@ -3,6 +3,14 @@
 Ultimo aggiornamento: 4 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## I campi non si svuotano più (4 novembre 2026, sera, app v101, database non toccato)
+
+Quando l'app ridisegna lo schermo (tornando sull'app da WhatsApp, dati che arrivano dopo, una scelta nel foglio) quello
+che si stava scrivendo restava perso. Ora `render()` riscrive il foglio aperto solo se è cambiato; quando una parte
+cambia davvero, prima si segnano i campi toccati dalla persona (valore diverso da quello proposto, spunte) e il cursore,
+poi si rimettono (`fotoCampi` / `rimettiCampi`). Riaprendo un foglio si riparte da vuoto. Controlli nella sezione 67
+dei test (falliscono con il codice di prima).
+
 ## Leggibilità, punti 2 e 3: niente a capo a 360 px, la × rotonda (4 novembre 2026, sera, app v100, database non toccato)
 
 I pulsanti piccoli non vanno più a capo: se in una riga non c'è posto va a capo la riga (il pulsante scende sotto, a
@@ -48,8 +56,7 @@ nuovo c'è anche nella chiusura normale. I promemoria usano l'agenda (057): ness
    «Cambia le cerchie»): si spuntano le cerchie che ci sono (della Lista o dei Clienti, separate) e se ne crea una nuova
    con dentro la persona.
 
-Ancora da fare (detto da Stefano): i campi dei moduli che si svuotano quando la pagina si ridisegna. In attesa di
-Stefano: nomi e contatto dei titolari nell'informativa.
+In attesa di Stefano: nomi e contatto dei titolari nell'informativa.
 
 ## Piano «nuova Io» (approvato il 3 novembre 2026, sera)
 
