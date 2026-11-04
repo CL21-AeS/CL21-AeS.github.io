@@ -1103,6 +1103,18 @@ begin
     perform growup_test.ok((select prossima_ora from public.persone where id = pp) = time '10:30', '040: B salva l''ora del prossimo passo');
     perform growup_test.come(u4);  -- C
     perform growup_test.ok(not exists (select 1 from public.persone where id = pp), '040: C non vede la persona di B');
+    -- 057: l'agenda (per cosa, come) solo con i valori ammessi e solo sulle proprie persone
+    perform growup_test.come(u3);  -- B
+    update public.persone set prossima_per = 'fissare_piano', prossima_come = 'whatsapp' where id = pp;
+    perform growup_test.ok((select prossima_per = 'fissare_piano' and prossima_come = 'whatsapp' from public.persone where id = pp),
+                           '057: B mette in agenda per cosa e come');
+    perform growup_test.deve_fallire(format($q$update public.persone set prossima_per = 'qualcosa' where id = %L$q$, pp), '057: per cosa solo tra i valori ammessi');
+    perform growup_test.deve_fallire(format($q$update public.persone set prossima_come = 'piccione' where id = %L$q$, pp), '057: come solo tra i valori ammessi');
+    perform growup_test.come(u4);  -- C
+    update public.persone set prossima_per = 'altro' where id = pp;
+    execute 'reset role';
+    perform growup_test.ok((select prossima_per from public.persone where id = pp) = 'fissare_piano', '057: C non cambia l''agenda di B');
+    perform growup_test.come(u4);
     execute 'reset role';
     execute 'set local role service_role';
     select titolo, corpo, url into t40, c40, u40 from public.notifiche_da_inviare(alle10) where chiave like 'passo-%';

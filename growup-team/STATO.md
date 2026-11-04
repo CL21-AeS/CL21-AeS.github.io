@@ -18,6 +18,14 @@ Stabilità CL21 con grafica nuova (livello raggiunto e rete reale, riga delle pe
 legenda, «Per sostenere il X%»), abitudini con barra e cerchi dei giorni, «La mia analisi» in fondo. Tolti «Il tuo
 piano» e «Cosa fare adesso»; Seguimi e Condividi spostati nel Profilo. Database non toccato. Prossima: consegna 4,
 Agenda (con il database: per cosa, come).
+Consegna 3 unita (PR #161). Consegna 4 (Agenda, migrazione **057**) in PR, app v89: icona calendario su ogni riga di Lista
+e Clienti → «In agenda · nome» (Per cosa, Quando: Oggi/Domani/dopodomani o un giorno, Come, Ora facoltativa con
+l'avviso 30 minuti prima, Nota); il giorno scelto la persona entra nella lista di oggi (anche chi è ancora «In lista» e
+i clienti). «Fatto» chiede com'è andata e solo la risposta segna il passo (Contatto → Contattato; Fissare il piano →
+Piano fissato = un invito e subito «Quando è il piano?»; Piano → Piano mostrato = un piano e «Quando lo risenti?»;
+Non risponde / Rimandato → un altro giorno, nessun passo). «Più tardi» apre l'agenda. Nella scheda «Prossima cosa»
+diventa «In agenda». 057 aggiunge solo due colonne con i valori ammessi (`prossima_per`, `prossima_come`): da applicare
+su Supabase dopo l'ok di Stefano. Prossima: consegna 5, Serie.
 
 ## Nuovi iscritti dalla mappa (4 novembre 2026, migrazione 056)
 
@@ -26,7 +34,7 @@ persone del gruppo con la **Data di ingresso della mappa** in quel mese solare (
 mese, anche dal primo import), contate solo se sono in almeno una mappa importata. Prima si contava chi compariva per la
 prima volta in una mappa (`in_mappa_dal`), così ottobre restava a 0. «I tuoi nuovi iscritti» (con il tuo link) non
 cambia: la persona entrata con il link è «nuova» per 30 giorni, da seguire per primo ordine e primi passi (consegna 8).
-056 in PR: da applicare su Supabase dopo l'ok di Stefano.
+056 unita (PR #162) e applicata su Supabase il 4 novembre con l'ok di Stefano.
 
 ## Controllo sicurezza e privacy (3 novembre 2026)
 

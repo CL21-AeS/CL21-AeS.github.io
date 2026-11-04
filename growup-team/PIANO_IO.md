@@ -59,4 +59,5 @@ Ogni consegna: schermate chiaro/scuro se cambia la grafica, test database e inte
 
 - 3 novembre 2026: consegna 1 pronta (PR #159, unita).
 - 4 novembre 2026: consegna 2 pronta (PR #160, unita).
-- 4 novembre 2026: consegna 3 pronta (PR).
+- 4 novembre 2026: consegna 3 pronta (PR #161, unita); 056 nuovi iscritti dalla mappa (PR #162, unita e applicata).
+- 4 novembre 2026: consegna 4 pronta (PR, migrazione 057 da applicare).

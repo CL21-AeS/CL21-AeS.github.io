@@ -1120,16 +1120,16 @@ check(!(await page.locator(".oggi-lista li", { hasText:"Luigi Verdi" }).count())
 await page.click("button[data-act=vista-persone]");
 await page.locator("button[data-act=apri-persona]", { hasText:"Luigi Verdi" }).click();
 check(await page.locator("button[data-act=rimetti-in-io]").isVisible(), "nella scheda: Rimetti in Io");
-await page.click("button[data-act=prossima]");
+await page.click(".prossima button[data-act=agenda]");
 await page.click(".sheet label.chip:has-text('Domani')");
 await page.click(".sheet button:has-text('Salva')");
-await page.getByText("Prossima cosa salvata").waitFor();
+await page.getByText("In agenda: domani").waitFor();
 check(await page.locator("button[data-act=togli-da-io]").isVisible(), "fissando una data la persona torna su Io da sola");
 await page.click("button[data-act=vista-io]");
 await apriDopo(page);
 check(await cardIo.getByText("Luigi Verdi").isVisible(), "dalla scheda si rimette in Io");
 await cardIo.locator("button[data-act=apri-persona]", { hasText:"Luigi Verdi" }).click();
-await page.getByText("Prossima cosa", { exact:true }).waitFor();
+await page.locator(".prossima").getByText("In agenda", { exact:true }).waitFor();
 await page.click("button[data-act=passo]");
 await page.click(".sheet button[data-tipo=piano]");
 await page.click(".sheet button:has-text('Salva')");
@@ -1391,17 +1391,28 @@ check((await page.locator(".tappa-riga").innerText()).includes("su 1 requisito")
 const primaCosa = async () => (await page.locator(".oggi-lista .prossima-titolo").innerText()).trim();
 const p1 = await primaCosa();
 check(p1.startsWith("Vera Verifica") && await page.locator(".oggi-lista .prossima-titolo .tag-cliente").isVisible(), "la prossima cosa: il primo di oggi con l'etichetta Cliente");
-await page.click(".oggi-lista button[data-act=prossima-dopo]");
-check(!(await primaCosa()).startsWith("Vera Verifica") && await page.locator(".oggi-lista .oggi-poi li", { hasText:"Vera Verifica" }).isVisible(),
-  "Più tardi (cliente): passa in fondo alla lista di oggi");
+check(await cardCli.getByText("Sta finendo: Prodotto Ugo").isVisible(), "Io: Ugo da sentire, il prodotto sta finendo");
+check(await cardCli.getByText("Come si è trovato con Prodotto Vera").isVisible(), "Io: Vera, come si è trovata (prodotto nuovo da 10 giorni)");
+check(await cardCli.getByText(/Compleanno il/).isVisible(), "Io: il compleanno di Bea tra 3 giorni");
+/* consegna 4: «Più tardi» apre l'agenda, con «per cosa» già scelto dal motivo */
+await page.click(".oggi-lista .prossima-azioni button[data-act=agenda]");
+await page.locator(".sheet h2", { hasText:"In agenda · Vera" }).waitFor();
+check(await page.locator(".sheet input[name=per][value=come_trovato]").isChecked(), "Più tardi (cliente): l'agenda propone «Come si è trovato»");
+check(await page.locator(".sheet input[name=per]").count() === 6 && await page.locator(".sheet input[name=per][value=consegna]").count() === 1, "agenda del cliente: i «per cosa» dei clienti");
+await page.screenshot({ path: S + "/e2e/48-agenda-cliente.png" });
+const domaniG = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+await page.check(`.sheet input[name=quando][value="${domaniG}"]`, { force:true }); await page.check(".sheet input[name=come][value=persona]", { force:true });
+await page.click(".sheet button.primary");
+await page.getByText("In agenda: domani, di persona").waitFor();
+check(!(await page.locator(".oggi-lista", { hasText:"Vera Verifica" }).count()), "in agenda per domani: oggi Vera non c'è più");
+await sync(page);
+check((() => { const v = DB.persone.find(x => x.id === "cu2"); return v.prossima_data === domaniG && v.prossima_per === "come_trovato" && v.prossima_come === "persona"; })(),
+  "nel database: giorno, per cosa e come");
 await page.click(".oggi-lista button[data-act=prossima-fatto]");
 await page.getByText("Cosa usa").waitFor();
 check(await page.locator("button[role=tab][aria-selected=true]", { hasText:"Persone" }).isVisible(), "Apri (cliente): si apre la sua scheda");
 await page.click("button[data-act=vista-io]");
 await page.locator(".card.oggi-lista").waitFor();
-check(await cardCli.getByText("Sta finendo: Prodotto Ugo").isVisible(), "Io: Ugo da sentire, il prodotto sta finendo");
-check(await cardCli.getByText("Come si è trovato con Prodotto Vera").isVisible(), "Io: Vera, come si è trovata (prodotto nuovo da 10 giorni)");
-check(await cardCli.getByText(/Compleanno il/).isVisible(), "Io: il compleanno di Bea tra 3 giorni");
 // il messaggio "sta finendo" si apre nella chat di Ugo
 await cardCli.locator("button[data-act=apri-cliente]", { hasText:"Ugo Riordino" }).click();
 await page.getByText("Cosa usa").waitFor();
@@ -2776,24 +2787,24 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.getByText("Ciao Stefano e Alessia").waitFor();
   await page.click("button[data-act=vista-persone]");
   await page.locator("button[data-act=apri-persona]", { hasText:"Prova Ora" }).click();
-  await page.click("button[data-act=prossima]");
-  check(await page.locator(".sheet input[name=prossima_ora]").isVisible() && await page.locator(".sheet").getByText("Ora (facoltativa)").isVisible(),
-    "prossimo passo: c'è l'ora facoltativa accanto al giorno");
-  await page.fill(".sheet input[name=prossima_data]", oggiG);
-  await page.fill(".sheet input[name=prossima_ora]", "18:30");
+  await page.click(".prossima button[data-act=agenda]");
+  check(await page.locator(".sheet input[name=ora]").isVisible() && await page.locator(".sheet").getByText("Ora (facoltativa)").isVisible(),
+    "agenda: c'è l'ora facoltativa accanto al giorno");
+  await page.fill(".sheet input[name=giorno]", oggiG);
+  await page.fill(".sheet input[name=ora]", "18:30");
   await page.locator(".sheet-box").screenshot({ path: S + "/e2e/50-ora.png" });
   await page.click(".sheet button.primary");
-  await page.getByText("Prossima cosa salvata").waitFor();
+  await page.getByText("In agenda: oggi alle 18:30").waitFor();
   await sync(page);
   check(String((DB.persone.find(x => x.id === pid) || {}).prossima_ora || "").startsWith("18:30"), "l'ora è salvata");
   check(await page.getByText(/Oggi · .* · 18:30/).first().isVisible(), "l'ora si vede con il giorno");
   // la × toglie giorno, ora e nota della prossima cosa
   await page.click(".prossima button[data-act=togli-prossima]");
-  await page.getByText("Prossima cosa tolta").waitFor();
+  await page.getByText("Tolto dall'agenda").waitFor();
   await sync(page);
   const tolta = DB.persone.find(x => x.id === pid) || {};
-  check(await page.locator(".prossima").getByText("Nessuna data").isVisible() && !tolta.prossima_data && !tolta.prossima_ora && !tolta.prossima_nota,
-    "la × toglie la prossima cosa (giorno, ora e nota)");
+  check(await page.locator(".prossima").getByText("Nessun giorno").isVisible() && !tolta.prossima_data && !tolta.prossima_ora && !tolta.prossima_nota && !tolta.prossima_per,
+    "la × toglie dall'agenda (giorno, ora, nota e per cosa)");
   // la riporto per il tocco sull'avviso qui sotto
   DB.persone.find(x => x.id === pid).prossima_data = oggiG;
   await ctx.close();
@@ -3352,6 +3363,83 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(!errori.length, "scadenze: nessun errore nella pagina");
   await ctx.close();
   DB.scadenze = [];
+}
+
+// 58. L'agenda (057, consegna 4): l'icona su ogni riga, «In agenda», la lista di oggi e «Fatto» che chiede com'è andata
+{
+  const oggiG = new Date().toISOString().slice(0, 10), domaniG = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  DB.persone = (DB.persone || []).filter(x => x.proprietario !== "R").concat([
+    { id:"ag1", proprietario:"R", nome:"Agenda Prova", fase:"lista", esito:null, creato_il:"2026-01-01T10:00:00Z" },
+    { id:"ag2", proprietario:"R", nome:"Agenda Seconda", fase:"lista", esito:null, creato_il:"2026-01-02T10:00:00Z" }]);
+  DB.passi = (DB.passi || []).filter(x => x.proprietario !== "R");
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
+  check(!(await page.locator(".oggi-lista", { hasText:"Agenda Prova" }).count()), "agenda: chi è solo in lista non è in Io");
+  await page.click("button[data-act=vista-persone]");
+  await page.click("button[data-sez=lista]").catch(() => {});
+  const riga = page.locator(".persone li", { hasText:"Agenda Prova" });
+  check(await riga.locator("button.cal[data-act=agenda]").count() === 1, "agenda: l'icona calendario sulla riga della Lista");
+  await riga.locator("button.cal").click();
+  await page.locator(".sheet h2", { hasText:"In agenda · Agenda" }).waitFor();
+  check(await page.locator(".sheet input[name=per][value=contatto]").isChecked() && await page.locator(".sheet input[name=per]").count() === 6,
+    "agenda: per chi è in lista propone «Contatto», con i 6 «per cosa» della Lista");
+  await page.check(".sheet input[name=per][value=fissare_piano]", { force:true });
+  await page.check(`.sheet input[name=quando][value="${oggiG}"]`, { force:true });
+  await page.fill(".sheet input[name=ora]", "21:00"); await page.check(".sheet input[name=come][value=telefono]", { force:true });
+  await page.screenshot({ path: S + "/e2e/58-agenda.png" });
+  await page.click(".sheet button.primary");
+  await page.getByText("In agenda: oggi alle 21:00, telefono").waitFor();
+  check(await riga.locator(".agenda-testo").innerText().then(t => t.includes("21:00") && t.includes("fissare il piano")),
+    "agenda: la riga dice quando, come e per cosa");
+  check(await riga.locator("button.cal.on").count() === 1, "agenda: l'icona è accesa");
+  // senza giorno non si salva
+  await page.locator(".persone li", { hasText:"Agenda Seconda" }).locator("button.cal").click();
+  await page.click(".sheet button.primary");
+  await page.locator(".sheet .errore", { hasText:"Scegli quando" }).waitFor(); check(true, "agenda: senza giorno chiede quando");
+  await page.click(".sheet button[data-act=chiudi]");
+  // in Io: entra nella lista di oggi, con «Fatto»
+  await page.click("button[data-act=vista-io]");
+  const card = page.locator(".card.oggi-lista");
+  await card.waitFor();
+  check((await card.locator(".prossima-titolo").innerText()).startsWith("Agenda Prova") && await card.locator("button[data-act=agenda-fatto]").count() === 1,
+    "Io: chi è in agenda oggi è la prossima cosa, con «Fatto»");
+  await card.locator("button[data-act=agenda-fatto]").click();
+  await page.locator(".sheet h2", { hasText:"Com'è andata con Agenda" }).waitFor();
+  check((await page.locator(".sheet .risposte-agenda button").allInnerTexts()).join("|") === "Piano fissato|Non ora|Non risponde", "Fatto: le risposte di «Fissare il piano»");
+  await page.screenshot({ path: S + "/e2e/58-com-e-andata.png" });
+  // Non risponde: nessun passo, si sceglie un altro giorno
+  await page.click(".sheet button[data-r=di_nuovo]");
+  await page.locator(".sheet h2", { hasText:"Quando lo risenti?" }).waitFor();
+  await sync(page);
+  check(!(DB.passi || []).some(x => x.persona_id === "ag1"), "Non risponde: nessun passo segnato");
+  await page.click(".sheet button[data-act=chiudi]");
+  // Piano fissato: un invito, poi subito «Quando è il piano?»
+  await card.locator("button[data-act=agenda-fatto]").click();
+  await page.click(".sheet button[data-r=piano_fissato]");
+  await page.locator(".sheet h2", { hasText:"Quando è il piano?" }).waitFor();
+  check(await page.locator(".sheet input[name=per][value=piano]").isChecked(), "Piano fissato: l'agenda del piano è già pronta");
+  await sync(page);
+  check((DB.passi || []).some(x => x.persona_id === "ag1" && x.tipo === "invito" && x.reazione === "Sì, appuntamento fissato"), "Piano fissato: nel database un invito");
+  await page.check(`.sheet input[name=quando][value="${domaniG}"]`, { force:true });
+  await page.click(".sheet button.primary");
+  await page.getByText("In agenda: domani").waitFor();
+  await sync(page);
+  check((() => { const x = DB.persone.find(y => y.id === "ag1"); return x.prossima_per === "piano" && x.prossima_data === domaniG && x.prossima_ora === null; })(),
+    "nel database: in agenda per il piano, domani");
+  // dalla scheda: Fatto → Piano mostrato
+  await page.click("button[data-act=vista-persone]");
+  await page.locator("button[data-act=apri-persona]", { hasText:"Agenda Prova" }).click();
+  check(await page.locator(".prossima .agenda-testo").innerText().then(t => t.includes("piano")), "scheda: «In agenda» con il piano");
+  await page.click(".prossima button[data-act=agenda-fatto]");
+  await page.click(".sheet button[data-r=piano_mostrato]");
+  await page.locator(".sheet h2", { hasText:"Quando lo risenti?" }).waitFor();
+  check(await page.locator(".sheet input[name=per][value=followup]").isChecked(), "Piano mostrato: propone il follow-up");
+  await page.click(".sheet button[data-act=chiudi]");
+  await sync(page);
+  check((DB.passi || []).some(x => x.persona_id === "ag1" && x.tipo === "piano") && !DB.persone.find(y => y.id === "ag1").prossima_per,
+    "Piano mostrato: un piano nel database e l'agenda libera");
+  check(!errori.length, "agenda: nessun errore nella pagina");
+  await ctx.close();
 }
 
 await browser.close();

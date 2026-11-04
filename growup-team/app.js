@@ -1569,7 +1569,8 @@ function vNotificheProfilo(){
 /* i numeri dei prossimi 14 giorni per il riepilogo del mattino: solo numeri, mai nomi */
 let ultimePreviste = "", previsteT = null;
 function calcolaPreviste(){
-  const l = st.persone.filter(p => !p.nascosta_io && p.fase !== "lista" && (!p.esito || (p.esito === "non_ora" && p.prossima_data)));
+  /* chi è ancora «In lista» entra solo se l'ho messo in agenda (057) */
+  const l = st.persone.filter(p => !p.nascosta_io && (p.fase !== "lista" || p.prossima_data) && (!p.esito || (p.esito === "non_ora" && p.prossima_data)));
   const clientiOggi = clientiDaSentire().length, m = meseDi(oggi());
   const manca = Math.max(0, Math.round(((Number(st.goalMese.obiettivo_vp) || 0) - vpMese(m)) * 100) / 100);
   return Array.from({ length:14 }, (_, i) => { const g = piuGiorni(oggi(), i);
@@ -2054,33 +2055,39 @@ function vMioMese(){
    prossimi giorni o è in corso senza data sta sotto, in una riga che si apre. La prima è «La prossima cosa». */
 function vociOggi(){
   const d = daFare();
-  return { oggi:d.ritardo.concat(d.oggi).map(p => ({ k:"lista", p })).concat(clientiDaSentire().map(x => ({ k:"cliente", p:x.p, motivo:x.motivo }))),
+  /* i clienti messi in agenda per oggi (o rimasti indietro) entrano con il loro «per cosa»; gli altri da sentire come prima */
+  const cliAgenda = clientiTutti().filter(p => !p.nascosta_io && inAgenda(p) && p.prossima_data <= oggi())
+    .sort((a, b) => a.prossima_data < b.prossima_data ? -1 : 1).map(p => ({ k:"cliente", p, motivo:testoProssima(p) }));
+  const gia = new Set(cliAgenda.map(x => x.p.id));
+  return { oggi:d.ritardo.concat(d.oggi).map(p => ({ k:"lista", p })).concat(cliAgenda)
+      .concat(clientiDaSentire().filter(x => !gia.has(x.p.id) && !(x.p.prossima_data > oggi() && inAgenda(x.p))).map(x => ({ k:"cliente", p:x.p, motivo:x.motivo }))),
     presto:d.presto, corso:d.corso };
 }
 function motivoVoce(x){
   if(x.k === "cliente") return x.motivo;
+  if(inAgenda(x.p)) return esc(testoProssima(x.p));
   const p = x.p, ritardo = p.prossima_data < oggi();
   return `${ritardo ? `In ritardo dal ${dataIt(p.prossima_data)}` : esc(testoProssima(p))} · ${TIPI_PASSO[passoProposto(p)].nome}`;
 }
 function rigaCliente(x){
   return `<li class="su-io"><button class="persona" data-act="apri-cliente" data-id="${esc(x.p.id)}">
-      <span class="grow"><b>${esc(x.p.nome)}</b> <span class="pill mini tag tag-cliente">Cliente</span><br><span class="small">${esc(x.motivo)}</span></span></button>
+      <span class="grow"><b>${esc(x.p.nome)}</b> <span class="pill mini tag tag-cliente">Cliente</span><br><span class="small${inAgenda(x.p) ? " agenda-testo" : ""}">${esc(x.motivo)}</span></span></button>
       <button class="x" data-act="togli-da-io" data-id="${esc(x.p.id)}" aria-label="Togli ${esc(x.p.nome)} da Io">×</button></li>`;
 }
 function vOggiLista(){
   const v = vociOggi(), altri = v.presto.length + v.corso.length, aperto = !!st.dopoAperto;
   if(!v.oggi.length && !altri) return "";
-  const dopo = st.rimandati || [], pos = x => dopo.indexOf(x.p.id);
-  const [prima, ...poi] = v.oggi.filter(x => pos(x) < 0).concat(v.oggi.filter(x => pos(x) >= 0).sort((a, b) => pos(a) - pos(b)));
+  const [prima, ...poi] = v.oggi;
   const testa = prima ? `<div class="spread"><span class="eyebrow pesca">La prossima cosa</span>
       <span class="row" style="gap:6px;align-items:center"><span class="small">1 di ${v.oggi.length} oggi</span>
       <button class="x" data-act="togli-da-io" data-id="${esc(prima.p.id)}" aria-label="Togli ${esc(prima.p.nome)} da Io">×</button></span></div>
     <button class="prossima-titolo" data-act="${prima.k === "cliente" ? "apri-cliente" : "apri-persona"}" data-id="${esc(prima.p.id)}">${esc(prima.p.nome)}
       <span class="pill mini tag tag-${prima.k}">${prima.k === "cliente" ? "Cliente" : "Lista"}</span></button>
-    <p class="small" style="margin:0">${prima.k === "cliente" ? esc(motivoVoce(prima)) : motivoVoce(prima)}</p>
+    <p class="small${inAgenda(prima.p) ? " agenda-testo" : ""}" style="margin:0">${prima.k === "cliente" ? esc(motivoVoce(prima)) : motivoVoce(prima)}</p>
     <div class="prossima-azioni">
-      <button class="btn primary" data-act="prossima-fatto" data-k="${prima.k}" data-id="${esc(prima.p.id)}">${prima.k === "cliente" ? "Apri" : "Segna il passo"}</button>
-      <button class="btn" data-act="prossima-dopo" data-k="${prima.k}" data-id="${esc(prima.p.id)}">Più tardi</button></div>`
+      ${inAgenda(prima.p) ? `<button class="btn primary" data-act="agenda-fatto" data-id="${esc(prima.p.id)}">Fatto</button>`
+        : `<button class="btn primary" data-act="prossima-fatto" data-k="${prima.k}" data-id="${esc(prima.p.id)}">${prima.k === "cliente" ? "Apri" : "Segna il passo"}</button>`}
+      <button class="btn" data-act="agenda" data-id="${esc(prima.p.id)}" data-dopo="1">Più tardi</button></div>`
     : `<span class="eyebrow">Oggi</span><p class="small" style="margin:6px 0 0">Niente in programma per oggi.</p>`;
   return `<div class="card oggi-lista">
     ${testa}
@@ -3225,7 +3232,7 @@ function toastImport(e){
 /* ---- 10. Fogli in basso ---- */
 function vSheet(){
   const s = st.sheet;
-  const sp = vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s) || vSheetListino(s) || vSheetMiei(s) || vSheetGuida(s);
+  const sp = vSheetAgenda(s) || vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s) || vSheetListino(s) || vSheetMiei(s) || vSheetGuida(s);
   if(sp) return sp;
   if(s === "codici-tolti") return `<h2>Codici Amway tolti</h2>
     <p class="small">Le persone tolte dalla struttura prima della conferma: con questi codici non si entra finché non li sblocchi.</p>
@@ -3932,6 +3939,50 @@ const TIPI_PASSO = {
 const PROSSIMA_CHIUSURA = { partner:"Primo passo insieme", cliente:"Quando risentirlo", non_ora:"Quando riprovare", no:"" };
 /* "Non ora": tra quanti mesi risentirlo (il promemoria arriva 2 giorni prima) */
 const RISENTI = [["1", "1 mese"], ["3", "3 mesi"], ["6", "6 mesi"], ["12", "1 anno"]], RISENTI_PRIMA = 2;
+/* L'agenda (057, consegna 4): per cosa e come si sente la persona il giorno scelto. Giorno, ora e nota sono quelli della
+   prossima cosa (prossima_data, prossima_ora, prossima_nota). «Fatto» chiede com'è andata: solo la risposta segna il passo. */
+const AGENDA_PER = {
+  lista:[["contatto", "Contatto"], ["contatto_persona", "Contatto di persona"], ["fissare_piano", "Fissare il piano"], ["piano", "Piano"],
+    ["followup", "Follow-up"], ["altro", "Altro"]],
+  cliente:[["consegna", "Consegna"], ["riordino", "Riordino"], ["come_trovato", "Come si è trovato"], ["far_provare", "Far provare"],
+    ["auguri", "Auguri"], ["altro", "Altro"]] };
+const AGENDA_COME = [["telefono", "Telefono"], ["whatsapp", "WhatsApp"], ["persona", "Di persona"]];
+/* le risposte a «com'è andata»: di_nuovo riapre l'agenda per scegliere un altro giorno */
+const RISPOSTE_AGENDA = {
+  contatto:[["contattato", "Contattato"], ["di_nuovo", "Non risponde"]],
+  contatto_persona:[["contattato", "Contattato"], ["di_nuovo", "Non l'ho visto"]],
+  fissare_piano:[["piano_fissato", "Piano fissato"], ["non_ora_piano", "Non ora"], ["di_nuovo", "Non risponde"]],
+  piano:[["piano_mostrato", "Piano mostrato"], ["di_nuovo", "Rimandato"]],
+  followup:[["followup", "Fatto"], ["di_nuovo", "Non risponde"]],
+  consegna:[["fatto", "Consegnato"], ["di_nuovo", "Rimando"]],
+  riordino:[["riordinato", "Ha riordinato"], ["fatto", "Non ora"], ["di_nuovo", "Non risponde"]],
+  come_trovato:[["come_trovato", "Fatto"], ["di_nuovo", "Non risponde"]],
+  far_provare:[["fatto", "Fatto"], ["di_nuovo", "Rimando"]],
+  auguri:[["auguri", "Fatti"]],
+  altro:[["fatto", "Fatto"], ["di_nuovo", "Rimando"]] };
+const MSG_AGENDA = { contattato:"Contatto segnato", piano_fissato:"Piano fissato: un invito in più", non_ora_piano:"Segnato: per ora no",
+  piano_mostrato:"Piano mostrato: un piano in più", followup:"Follow-up segnato", come_trovato:"Fatto: gli hai chiesto come si è trovato",
+  auguri:"Auguri fatti", riordinato:"Ha riordinato: segna l'ordine", fatto:"Fatto" };
+const COME_PASSO = { telefono:"Telefono", whatsapp:"Messaggio", persona:"Di persona" };
+function nomePer(k){ const x = AGENDA_PER.lista.concat(AGENDA_PER.cliente).find(y => y[0] === k); return x ? x[1] : ""; }
+function nomeCome(k){ const x = AGENDA_COME.find(y => y[0] === k); return x ? x[1] : ""; }
+function inAgenda(p){ return !!(p && p.prossima_data && p.prossima_per); }
+/* per cosa, se non è ancora scelto: dal prossimo passo (Lista) o dal motivo per cui è da sentire (Clienti) */
+function perProposto(p){
+  if(p.esito === "cliente"){
+    const c = compleannoDi(p);
+    return c && !c.fatto && c.tra <= COMPLEANNO_PRIMA ? "auguri" : verificaDi(p) ? "come_trovato" : "riordino";
+  }
+  return { contatto:"contatto", invito:"fissare_piano", piano:"piano", followup:"followup", chiusura:"followup" }[passoProposto(p)] || "altro";
+}
+/* «domani alle 18:30, telefono» */
+function riassuntoAgenda(d, ora, come){
+  const g = giorniTra(oggi(), d);
+  return [`${g === 0 ? "oggi" : g === 1 ? "domani" : `${GIORNI_SETT[new Date(d + "T12:00:00").getDay()]} ${Number(d.slice(8))}`}${ora ? " alle " + ora : ""}`,
+    come ? nomeCome(come).toLowerCase() : ""].filter(Boolean).join(", ");
+}
+const ICONA_CAL = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>`;
+function btnAgenda(p){ return `<button class="cal${inAgenda(p) ? " on" : ""}" data-act="agenda" data-id="${esc(p.id)}" aria-label="${inAgenda(p) ? "Cambia l'agenda di" : "Metti in agenda"} ${esc(p.nome)}">${ICONA_CAL}</button>`; }
 function piuMesi(d, m){ const x = new Date(d + "T00:00:00Z"); x.setUTCMonth(x.getUTCMonth() + m); return x.toISOString().slice(0, 10); }
 const FILTRI_LISTA = [
   { id:"tutti", nome:"Tutti", ok:() => true },
@@ -4015,13 +4066,15 @@ function passoProposto(p){
 function testoProssima(p){
   if(!p.prossima_data) return "";
   const g = giorniTra(oggi(), p.prossima_data);
-  return `${g < 0 ? "In ritardo · " : g === 0 ? "Oggi · " : g === 1 ? "Domani · " : ""}${dataIt(p.prossima_data)}${p.prossima_ora ? " · " + String(p.prossima_ora).slice(0, 5) : ""}${p.prossima_nota ? " · " + p.prossima_nota : ""}`;
+  return `${g < 0 ? "In ritardo · " : g === 0 ? "Oggi · " : g === 1 ? "Domani · " : ""}${dataIt(p.prossima_data)}${p.prossima_ora ? " · " + String(p.prossima_ora).slice(0, 5) : ""}${
+    p.prossima_come ? " · " + nomeCome(p.prossima_come).toLowerCase() : ""}${p.prossima_per ? " · " + nomePer(p.prossima_per).toLowerCase() : ""}${p.prossima_nota ? " · " + p.prossima_nota : ""}`;
 }
 /* Su Io, come promemoria: tutte le persone con cui è iniziato un percorso (da Contattato in poi), aperte o "Non ora"
    con una data, tranne quelle che ho tolto da Io. Prima chi ha una data (in ritardo, oggi, prossimi giorni), poi le altre. */
 function ultimoPasso(p){ const s = passiDi(p.id)[0]; return s ? s.data : String(p.creato_il || oggi()).slice(0, 10); }
 function daFare(){
-  const l = st.persone.filter(p => !p.nascosta_io && p.fase !== "lista" && (!p.esito || (p.esito === "non_ora" && p.prossima_data)));
+  /* chi è ancora «In lista» entra solo se l'ho messo in agenda (057) */
+  const l = st.persone.filter(p => !p.nascosta_io && (p.fase !== "lista" || p.prossima_data) && (!p.esito || (p.esito === "non_ora" && p.prossima_data)));
   const conData = l.filter(p => p.prossima_data).sort((a, b) => a.prossima_data < b.prossima_data ? -1 : 1);
   return {
     ritardo: conData.filter(p => p.prossima_data < oggi()),
@@ -4036,12 +4089,12 @@ function daFare(){
 function maiComprato(p){ return !!p.codice_cliente && p.esito !== "cliente" && !st.ordini.some(o => o.persona_id === p.id); }
 function rigaPersona(p, suIo, tag){
   const f = FASI[indiceFase(p.fase)], fermo = !p.prossima_data && !p.esito && p.fase !== "lista" ? giorniTra(ultimoPasso(p), oggi()) : 0;
-  return `<li class="${suIo ? "su-io" : ""}"><button class="persona" data-act="apri-persona" data-id="${esc(p.id)}">
+  return `<li class="${suIo ? "su-io" : "con-cal"}"><button class="persona" data-act="apri-persona" data-id="${esc(p.id)}">
       <span class="grow"><b>${esc(p.nome)}</b>${tag ? ` <span class="pill mini tag tag-lista">${esc(tag)}</span>` : ""}${maiComprato(p) ? ` <span class="pill g mini">Mai comprato</span>` : ""}${p.origine
-        ? `<br><span class="small origine">${esc(p.origine)}</span>` : ""}<br><span class="small">${p.esito ? ESITI[p.esito] : f.nome}${p.prossima_data ? " · " + esc(testoProssima(p))
+        ? `<br><span class="small origine">${esc(p.origine)}</span>` : ""}<br><span class="small">${p.esito ? ESITI[p.esito] : f.nome}${p.prossima_data ? ` · <span class="${inAgenda(p) ? "agenda-testo" : ""}">${esc(testoProssima(p))}</span>`
         : fermo >= 14 ? ` · nessun passo da ${fermo} giorni` : ""}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
       <span class="punti" aria-hidden="true">${FASI.map((x, i) => `<i class="${i <= indiceFase(p.fase) ? "on" : ""}"></i>`).join("")}</span>
-    </button>${suIo ? `<button class="x" data-act="togli-da-io" data-id="${esc(p.id)}" aria-label="Togli ${esc(p.nome)} da Io">×</button>` : ""}</li>`;
+    </button>${suIo ? `<button class="x" data-act="togli-da-io" data-id="${esc(p.id)}" aria-label="Togli ${esc(p.nome)} da Io">×</button>` : btnAgenda(p)}</li>`;
 }
 
 function vPersone(){
@@ -4097,11 +4150,12 @@ function vPersona(){
       <a class="btn small wa" target="_blank" rel="noopener" href="https://wa.me/${esc(tel.replace(/^\+/, "").replace(/^(?=3)/, "39"))}">WhatsApp</a></div>` : ""}
     <ol class="percorso-persona" aria-label="Percorso">${FASI.map((x, k) => `<li class="${k < i ? "fatta" : k === i ? "qui" : ""}"><i></i><span>${x.nome}</span></li>`).join("")}</ol>
     <div class="prossima">
-      <span class="small">Prossima cosa</span>
-      ${p.prossima_data ? `<span class="row prossima-testo" style="gap:6px;align-items:center"><b class="grow">${esc(testoProssima(p))}</b>
-        <button class="x" data-act="togli-prossima" aria-label="Togli la prossima cosa">×</button></span>` : `<b>Nessuna data</b>`}
+      <span class="small">In agenda</span>
+      ${p.prossima_data ? `<span class="row prossima-testo" style="gap:6px;align-items:center"><b class="grow${inAgenda(p) ? " agenda-testo" : ""}">${esc(testoProssima(p))}</b>
+        <button class="x" data-act="togli-prossima" aria-label="Togli dall'agenda">×</button></span>` : `<b>Nessun giorno</b>`}
       <span class="row" style="gap:6px;margin-top:6px">
-        <button class="btn small" data-act="prossima">${p.prossima_data ? "Cambia" : "Fissa una data"}</button>
+        ${inAgenda(p) ? `<button class="btn small primary" data-act="agenda-fatto" data-id="${esc(p.id)}">Fatto</button>` : ""}
+        <button class="btn small" data-act="agenda" data-id="${esc(p.id)}">${p.prossima_data ? "Cambia" : "Metti in agenda"}</button>
         ${p.prossima_data ? `<button class="btn small ghost" data-act="persona-calendario">Nel calendario</button>` : ""}</span>
     </div>
     <button class="btn primary wide" style="margin-top:12px" data-act="passo">Segna un passo · ${TIPI_PASSO[passoProposto(p)].nome}</button>
@@ -4163,6 +4217,90 @@ function leggiProssima(f){
   const ora = data && f.prossima_ora && f.prossima_ora.value ? f.prossima_ora.value.slice(0, 5) : null;
   return { prossima_data:data, prossima_ora:ora, prossima_nota:data ? f.prossima_nota.value.trim() || null : null };
 }
+
+/* ---- L'agenda (057): «In agenda · nome» e «Com'è andata?». Vale per Lista e Clienti (sono tutti in persone). ---- */
+function vSheetAgenda(s){
+  const p = st.persone.find(x => x.id === st.agendaId);
+  if(!p || (s !== "agenda" && s !== "agenda-fatto")) return "";
+  const cli = p.esito === "cliente", annulla = `<button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>`;
+  const err = st.errore ? `<p class="errore">${esc(st.errore)}</p>` : "";
+  if(s === "agenda-fatto"){
+    const r = RISPOSTE_AGENDA[p.prossima_per] || RISPOSTE_AGENDA.altro;
+    return `<h2>Com'è andata con ${esc(nomeSaluto(p.nome))}?</h2>
+    <p class="small agenda-testo">${esc(testoProssima(p))}</p>
+    <div class="risposte-agenda">${r.map(([k, t], i) => `<button class="btn wide${i === 0 ? " primary" : ""}" data-act="agenda-risposta" data-r="${k}">${esc(t)}</button>`).join("")}</div>
+    <p class="nota">Solo la risposta segna il passo: una telefonata per fissare il piano non è ancora un piano.</p>${err}
+    <button class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Annulla</button>`;
+  }
+  const per = st.agendaPer || p.prossima_per || perProposto(p), come = p.prossima_come || "";
+  const giorni = [0, 1, 2].map(i => piuGiorni(oggi(), i));
+  const etichetta = (d, i) => i === 0 ? "Oggi" : i === 1 ? "Domani" : GIORNI_SETT[new Date(d + "T12:00:00").getDay()].replace(/^./, x => x.toUpperCase());
+  const scelto = p.prossima_data && p.prossima_data >= oggi() ? p.prossima_data : "";
+  const chip = (nome, v, t, on) => `<label class="chip"><input type="radio" name="${nome}" value="${esc(v)}"${on ? " checked" : ""}><span>${esc(t)}</span></label>`;
+  return `<h2>${esc(st.agendaTitolo || `In agenda · ${nomeSaluto(p.nome)}`)}</h2>
+    <form data-form="agenda" novalidate>
+      <fieldset class="field"><legend>Per cosa</legend><div class="opzioni">${AGENDA_PER[cli ? "cliente" : "lista"].map(([k, t]) => chip("per", k, t, k === per)).join("")}</div></fieldset>
+      <fieldset class="field"><legend>Quando</legend><div class="opzioni">${giorni.map((d, i) => chip("quando", d, etichetta(d, i), d === scelto)).join("")}</div>
+        <label class="giorno-scelto"><span class="small">Oppure scegli il giorno</span><input type="date" name="giorno" min="${oggi()}" value="${giorni.includes(scelto) ? "" : esc(scelto)}"></label></fieldset>
+      <fieldset class="field"><legend>Come</legend><div class="opzioni">${AGENDA_COME.map(([k, t]) => chip("come", k, t, k === come)).join("")}</div></fieldset>
+      <label class="field agenda-ora"><span>Ora <i>(facoltativa)</i></span>
+        <span class="row" style="gap:10px;align-items:center"><input type="time" name="ora" value="${esc(p.prossima_ora ? String(p.prossima_ora).slice(0, 5) : "")}">
+        <span class="small">Ti avvisiamo 30 minuti prima</span></span></label>
+      <label class="field"><span>Nota <i>(facoltativa)</i></span><input name="nota" maxlength="200" value="${esc(p.prossima_nota || "")}"></label>
+      ${err}
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
+      ${p.prossima_data ? `<button type="button" class="btn ghost wide" style="margin-top:8px" data-act="agenda-togli" data-id="${esc(p.id)}">Togli dall'agenda</button>` : ""}
+    </form>`;
+}
+const AGENDA_VUOTA = { prossima_data:null, prossima_ora:null, prossima_nota:null, prossima_per:null, prossima_come:null };
+Object.assign(AZIONI, {
+  "agenda"(el){ st.agendaId = el.dataset.id || st.personaId; st.agendaPer = null; st.agendaTitolo = null; st.errore = ""; st.sheet = "agenda"; render(); },
+  "agenda-fatto"(el){ st.agendaId = el.dataset.id || st.personaId; st.errore = ""; st.sheet = "agenda-fatto"; render(); },
+  async "agenda-togli"(el){
+    try{ await api.modificaPersona(el.dataset.id || st.agendaId, AGENDA_VUOTA); await dopoPersone("Tolto dall'agenda"); }catch(e){ toast(messaggio(e)); }
+  },
+  /* la risposta a «com'è andata»: segna il passo che è davvero successo, libera l'agenda e, se serve, chiede il seguito */
+  async "agenda-risposta"(el){
+    const p = st.persone.find(x => x.id === st.agendaId), r = el.dataset.r;
+    if(!p) return;
+    const per = p.prossima_per;
+    if(r === "di_nuovo"){ st.agendaPer = per; st.agendaTitolo = `Quando lo risenti? · ${nomeSaluto(p.nome)}`; st.errore = ""; st.sheet = "agenda"; render(); return; }
+    const passo = (tipo, extra) => api.nuoviPassi([Object.assign({ id:uuid(), persona_id:p.id, tipo, data:oggi() }, extra || {})]);
+    const come = per === "contatto_persona" ? "Di persona" : COME_PASSO[p.prossima_come] || null;
+    try{
+      if(r === "contattato") await passo("contatto", { come });
+      if(r === "piano_fissato") await passo("invito", { reazione:"Sì, appuntamento fissato" });
+      if(r === "non_ora_piano") await passo("invito", { reazione:"Ha rimandato" });
+      if(r === "piano_mostrato") await passo("piano");
+      if(r === "followup") await passo("followup", { come:COME_PASSO[p.prossima_come] || null });
+      if(r === "come_trovato"){ const v = verificaDi(p); if(v) await api.aggiornaOrdine(v.o.id, { verificato:oggi() }); }
+      if(r === "auguri"){ const c = compleannoDi(p); await api.modificaPersona(p.id, { auguri_anno:c ? c.anno : Number(oggi().slice(0, 4)) }); }
+      await api.modificaPersona(p.id, Object.assign({}, AGENDA_VUOTA, { nascosta_io:false }));
+      await dopoPersone(MSG_AGENDA[r] || "Fatto");
+      /* il seguito: fissato il piano, quando è il piano; mostrato il piano, quando lo risenti; riordinato, l'ordine */
+      const seguito = { piano_fissato:["piano", "Quando è il piano?"], piano_mostrato:["followup", "Quando lo risenti?"] }[r];
+      if(seguito){ st.agendaId = p.id; st.agendaPer = seguito[0]; st.agendaTitolo = `${seguito[1]} · ${nomeSaluto(p.nome)}`; st.sheet = "agenda"; render(); }
+      if(r === "riordinato"){ st.vista = "persone"; st.sezPersone = "clienti"; st.invitoId = null; st.personaId = p.id; AZIONI["ordine-nuovo"](); window.scrollTo(0, 0); }
+    }catch(e){ st.errore = messaggio(e); render(); }
+  }
+});
+Object.assign(MODULI, {
+  async agenda(f){
+    const p = st.persone.find(x => x.id === st.agendaId);
+    if(!p) return;
+    const v = n => (f.querySelector(`input[name=${n}]:checked`) || {}).value || null;
+    const giorno = f.giorno.value || v("quando");
+    if(!giorno){ mostraErroreForm(f, "Scegli quando."); return; }
+    if(giorno < oggi()){ mostraErroreForm(f, "Scegli oggi o un giorno che deve ancora venire."); return; }
+    const ora = f.ora.value ? f.ora.value.slice(0, 5) : null, come = v("come");
+    try{
+      await api.modificaPersona(p.id, { prossima_data:giorno, prossima_ora:ora, prossima_nota:f.nota.value.trim() || null,
+        prossima_per:v("per") || perProposto(p), prossima_come:come, nascosta_io:false });
+      st.agendaTitolo = null; st.agendaPer = null;
+      await dopoPersone(`In agenda: ${riassuntoAgenda(giorno, ora, come)}`);
+    }catch(e){ mostraErroreForm(f, messaggio(e)); }
+  }
+});
 
 /* per + Piano: le persone ancora in percorso, prima quelle più avanti (invitate), poi per nome */
 function personePiano(q){
@@ -4345,7 +4483,7 @@ Object.assign(AZIONI, {
     catch(e){ toast(messaggio(e)); }
   },
   async "togli-prossima"(){
-    try{ await api.modificaPersona(st.personaId, { prossima_data:null, prossima_ora:null, prossima_nota:null }); await dopoPersone("Prossima cosa tolta"); }
+    try{ await api.modificaPersona(st.personaId, { prossima_data:null, prossima_ora:null, prossima_nota:null, prossima_per:null, prossima_come:null }); await dopoPersone("Tolto dall'agenda"); }
     catch(e){ toast(messaggio(e)); }
   },
   "persona-calendario"(){
@@ -5113,9 +5251,9 @@ function vClienti(){
       `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-clienti" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${tutti.filter(x.ok).filter(inC).length}</button>`).join("")}</div>
     ${rigaCerchie(tutti)}
     ${cerchiaVuota(tutti) || (l.length ? `<ul class="persone">${l.map(p => { const s = statoCliente(p);
-      return `<li><button class="persona" data-act="apri-cliente" data-id="${esc(p.id)}">
-        <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${s.primo && s.key !== "fermo" ? (s.primo.codice ? `${esc(s.primo.nome)} · finisce il ${dataIt(s.primo.finisce)}` : `prossimo ordine atteso il ${dataIt(s.primo.finisce)}`) : esc(abitudine(p) || "nessun ordine")}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
-        <span class="etichette">${etichetteOrdini(p)}<span class="pill ${s.cl}">${esc(s.txt)}</span></span></button></li>`; }).join("")}</ul>`
+      return `<li class="con-cal"><button class="persona" data-act="apri-cliente" data-id="${esc(p.id)}">
+        <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${inAgenda(p) ? `<span class="agenda-testo">${esc(testoProssima(p))}</span>` : s.primo && s.key !== "fermo" ? (s.primo.codice ? `${esc(s.primo.nome)} · finisce il ${dataIt(s.primo.finisce)}` : `prossimo ordine atteso il ${dataIt(s.primo.finisce)}`) : esc(abitudine(p) || "nessun ordine")}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
+        <span class="etichette">${etichetteOrdini(p)}<span class="pill ${s.cl}">${esc(s.txt)}</span></span></button>${btnAgenda(p)}</li>`; }).join("")}</ul>`
       : `<p class="muted" style="margin:10px 0 0">${filtro.id === "sentire" && !cerchia ? "Nessuno da sentire adesso." : "Nessun cliente qui."}</p>`)}`
     : `<p class="muted" style="margin:8px 0 0">Ancora nessun cliente. Entrano da qui con "+ Cliente", oppure dalla Lista quando chiudi una persona come Cliente.</p>`}
   </div>`;
@@ -5139,7 +5277,13 @@ function vCliente(){
     <div class="row" style="gap:8px;margin-top:12px">
       <button class="btn primary grow" data-act="ordine-nuovo">+ Ordine</button>
       ${ord.length ? `<button class="btn grow" data-act="ordine-ripeti">Ripeti l'ultimo</button>` : ""}</div>
+    ${inAgenda(p) ? `<div class="prossima" style="margin-top:12px"><span class="small">In agenda</span>
+      <span class="row prossima-testo" style="gap:6px;align-items:center"><b class="grow agenda-testo">${esc(testoProssima(p))}</b>
+        <button class="x" data-act="agenda-togli" data-id="${esc(p.id)}" aria-label="Togli dall'agenda">×</button></span>
+      <span class="row" style="gap:6px;margin-top:6px"><button class="btn small primary" data-act="agenda-fatto" data-id="${esc(p.id)}">Fatto</button>
+        <button class="btn small" data-act="agenda" data-id="${esc(p.id)}">Cambia</button></span></div>` : ""}
     <div class="row wrap" style="gap:6px;margin-top:8px">
+      ${inAgenda(p) ? "" : `<button class="btn small" data-act="agenda" data-id="${esc(p.id)}">Metti in agenda</button>`}
       <button class="btn small" data-act="messaggio-cliente">Scrivigli</button>
       <button class="btn small ghost" data-act="rimanda-cliente">Rimanda</button>
       <button class="btn small ghost" data-act="compleanno-cliente">${p.compleanno ? "Compleanno" : "+ Compleanno"}</button></div>
@@ -5934,11 +6078,6 @@ Object.assign(AZIONI, {
     st.vista = "persone"; st.sezPersone = cli ? "clienti" : "lista"; st.invitoId = null; st.personaId = el.dataset.id;
     if(!cli){ st.passoTipo = null; st.errore = ""; st.sheet = "passo"; }
     render(); window.scrollTo(0, 0); },
-  /* «Più tardi»: chi è in Lista sceglie quando risentirlo; un cliente passa in fondo alla lista di oggi (fino all'agenda) */
-  "prossima-dopo"(el){
-    if(el.dataset.k === "cliente"){ st.rimandati = (st.rimandati || []).filter(x => x !== el.dataset.id).concat(el.dataset.id); render(); return; }
-    st.vista = "persone"; st.sezPersone = "lista"; st.invitoId = null;
-    st.personaId = el.dataset.id; st.errore = ""; st.sheet = "prossima"; render(); window.scrollTo(0, 0); },
   async "mio-aggiungi"(el){
     const r = st.listino.find(x => x.codice === el.dataset.codice);
     if(!r) return;

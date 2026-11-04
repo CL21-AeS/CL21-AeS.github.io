@@ -417,6 +417,10 @@
     nuovePersone: async righe => { db.persone = (db.persone || []).concat(righe.map(r => Object.assign({ fase:"lista", esito:null,
       proprietario:mio().id, creato_il:new Date().toISOString(), prossima_data:null, prossima_nota:null }, r))); salva(); },
     modificaPersona: async (id, campi) => { const x = (db.persone || []).find(y => y.id === id && y.proprietario === mio().id);
+      /* 057: per cosa e come solo con i valori ammessi, come il check del database */
+      if(campi.prossima_per != null && !["contatto", "contatto_persona", "fissare_piano", "piano", "followup", "consegna", "riordino",
+        "come_trovato", "far_provare", "auguri", "altro"].includes(campi.prossima_per)) throw new Error("violates check constraint");
+      if(campi.prossima_come != null && !["telefono", "whatsapp", "persona"].includes(campi.prossima_come)) throw new Error("violates check constraint");
       if(x) Object.assign(x, campi); salva(); },
     cancellaPersona: async id => { db.persone = db.persone.filter(y => !(y.id === id && y.proprietario === mio().id));
       db.passi = (db.passi || []).filter(y => y.persona_id !== id);
