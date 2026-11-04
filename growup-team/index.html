@@ -188,8 +188,8 @@ ul.imp li{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px 
 ul.imp li:first-child{border-top:0}
 .imp-sezione details summary{cursor:pointer;margin-top:6px}
 .scelte-rapide .btn.on{background:var(--scelta);border-color:var(--scelta);color:var(--scelta-ink)}
-.oggi .x,.persone .x{border:0;background:none;color:var(--ink3);font-size:20px;width:38px;height:38px;cursor:pointer;border-radius:10px}
-.oggi .x:hover,.persone .x:hover{background:var(--bg)}
+.oggi .x,.persone .x,.oggi-lista .x{border:0;background:none;color:var(--ink3);font-size:20px;width:38px;height:38px;cursor:pointer;border-radius:10px}
+.oggi .x:hover,.persone .x:hover,.oggi-lista .x:hover{background:var(--bg)}
 .schede{display:flex;gap:2px;background:rgba(255,255,255,.10);border:1px solid rgba(217,195,160,.35);border-radius:12px;padding:3px;flex:none}
 .schede button{border:0;background:none;color:var(--head-ink2);font:inherit;font-size:14px;font-weight:700;
   padding:0 14px;min-height:38px;border-radius:9px;cursor:pointer}
@@ -575,6 +575,56 @@ form:has(input[name=modo][value=filtri]:checked) .imp-filtri{display:block}
   background:var(--ink);color:var(--bg);padding:10px 10px 10px 16px;border-radius:12px;font-size:14px;font-weight:600;
   display:flex;align-items:center;gap:12px;max-width:calc(100% - 32px);box-shadow:0 6px 24px rgba(0,0,0,.2)}
 .toast button{border:0;background:none;color:var(--bg);font:inherit;font-weight:800;text-decoration:underline;cursor:pointer;min-height:34px;padding:0 6px}
+/* Consegna 2: «Il mio giorno» nuova. In cima il cruscotto scuro, poi «La prossima cosa» con la lista di oggi */
+.card.cruscotto{background:var(--visione);color:#f7f0e3;border:0;box-shadow:0 8px 24px rgba(10,58,44,.18)}
+.cruscotto .eyebrow{color:#d9c3a0}
+.cruscotto .small,.cruscotto small{color:#e8dcc6}
+.cruscotto .num{color:#f7f0e3}
+.cruscotto .riga-apri{color:#f7f0e3;border-top-color:rgba(255,255,255,.16)}
+.cruscotto .riga-apri .fr{color:#d9c3a0}
+.cruscotto .obiettivo-riga{margin-top:8px}
+.cruscotto .btn.link{color:#ffb37a}
+.cruscotto .pill.g{background:rgba(240,138,75,.18);color:#ffcfa8;border-color:transparent}
+.cruscotto-cima{display:flex;gap:14px;align-items:center;margin-top:12px}
+.anello{position:relative;width:112px;height:112px;flex:none}
+.anello svg{width:112px;height:112px;transform:rotate(-90deg);display:block}
+.anello circle{fill:none;stroke-width:10}
+.anello .traccia{stroke:rgba(255,255,255,.14)}
+.anello .pieno{stroke:var(--azione);stroke-linecap:round}
+.anello>span{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.anello b.num{font-size:34px;line-height:1}
+.anello small{font-size:11px;font-weight:700;color:#d9c3a0}
+.cruscotto .tappa-riga{border-top:0;margin:0;padding:0;align-items:flex-start;text-align:left;min-width:0}
+.cruscotto .tappa-riga .grow{display:flex;flex-direction:column;gap:4px}
+.cruscotto .tappa-riga b{font-family:var(--f-titoli);font-size:23px;line-height:1.1}
+.cruscotto .tappa-aperta{background:var(--card);color:var(--ink);border-radius:14px;padding:4px 12px 12px;margin-top:12px}
+.cruscotto .tappa-aperta .small,.cruscotto .tappa-aperta small,.cruscotto .tappa-aperta .num{color:inherit}
+.cruscotto .tappa-aperta .btn.link{color:var(--accent)}
+.tessere{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+.tessera{background:rgba(255,255,255,.07);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.tessera>span{font-size:12px;font-weight:700;color:#d9c3a0}
+.tessera b.num{font-size:26px;line-height:1}
+.tessera b small{font-size:15px;color:#d9c3a0}
+.tessera .bar{background:rgba(255,255,255,.14)}
+.tessera .bar i{background:var(--azione)}
+.tessera .bar.fatto i{background:#4fd1a3}
+.settimana-riga{margin:10px 0 0}
+.settimana-riga .btn.link{min-height:0;padding:0 2px}
+.proposta-obiettivi{margin:6px 0 0}
+.card.oggi-lista{border:2px solid var(--azione);border-radius:20px}
+.eyebrow.pesca{color:var(--eb)}
+.prossima-titolo{all:unset;display:block;cursor:pointer;font-family:var(--f-titoli);font-size:30px;font-weight:700;line-height:1.05;margin:8px 0 4px;color:var(--ink)}
+.prossima-titolo:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.prossima-titolo .pill{font-family:var(--f-testo);vertical-align:middle}
+.prossima-azioni{display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-top:12px}
+.prossima-azioni .btn{min-height:50px}
+.oggi-poi{margin-top:10px;border-top:1px solid var(--line)}
+.pill.tag{font-size:11px;font-weight:800;padding:1px 8px;border-color:transparent}
+.pill.tag-cliente{background:#e3eefa;color:#1d4f86}
+.pill.tag-lista{background:var(--traccia);color:var(--ink2)}
+.mio-mese .riga-apri .small{margin-left:6px}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .pill.tag-cliente{background:#13304a;color:#9cc8f0} }
+:root[data-theme="dark"] .pill.tag-cliente{background:#13304a;color:#9cc8f0}
 /* Il movimento ("Vivace"; tra le pagine "Sobria", in app.js): i pulsanti si premono e tornano su elastici */
 @media (prefers-reduced-motion: no-preference){
   .btn,.azioni .btn,.stella,.schede button{transition:transform .28s cubic-bezier(.34,1.56,.64,1)}
