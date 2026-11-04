@@ -15,6 +15,15 @@ che si apre). «Più tardi»: per la Lista si sceglie quando risentirlo, un clie
 (fino all'agenda, consegna 4). «Il mio mese» è una riga che si apre. Database non toccato. Serie e agenda arrivano
 nelle consegne 4 e 5. Prossima: consegna 3, Verifica (ex Guida).
 
+## Nuovi iscritti dalla mappa (4 novembre 2026, migrazione 056)
+
+Scelta di Stefano: nella tabella Stabilità (Verifica) e nell'Analisi, «Nuovi iscritti nel gruppo» di un mese sono le
+persone del gruppo con la **Data di ingresso della mappa** in quel mese solare (una volta sola, anche con più import nel
+mese, anche dal primo import), contate solo se sono in almeno una mappa importata. Prima si contava chi compariva per la
+prima volta in una mappa (`in_mappa_dal`), così ottobre restava a 0. «I tuoi nuovi iscritti» (con il tuo link) non
+cambia: la persona entrata con il link è «nuova» per 30 giorni, da seguire per primo ordine e primi passi (consegna 8).
+056 in PR: da applicare su Supabase dopo l'ok di Stefano.
+
 ## Controllo sicurezza e privacy (3 novembre 2026)
 
 **Contatti dopo 24 mesi** (migrazione **055**, app v85, scelta A per i clienti): Lista, Target e Clienti si cancellano 24
