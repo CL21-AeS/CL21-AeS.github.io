@@ -16,14 +16,14 @@ await ctx.close();
 
 // 1. Ingresso dall'invito personale
 ({ ctx, page } = await apri({}, invitoPer("R", "Anna Bianchi", "2000001")));
-await page.getByText("Ti ha invitato Stefano e Alessia").waitFor();
-check(await page.getByText("Ciao Anna!").isVisible(), "041: l'ingresso saluta per nome chi è stato invitato");
+await page.getByText("Ti hanno invitato Stefano e Alessia").waitFor();
+check(await page.getByText("Ciao Anna,").isVisible(), "041: l'ingresso saluta per nome chi è stato invitato");
 check(!(await page.locator("form[data-form=ingresso] input[name=nome], form[data-form=ingresso] input[name=codice_amway]").count()),
   "041: nome e codice Amway non si scrivono all'ingresso (li ha scritti chi invita)");
 check(!(await page.evaluate(() => location.hash)), "041: il codice dell'invito non resta nella barra degli indirizzi");
 check(await page.getByText("A&S · Growup Team").first().isVisible(), "marchio A&S");
 check(!(await page.content()).includes("CumLaude21"), "niente CumLaude21");
-check(await page.getByText("Due informazioni e iniziamo").isVisible(), "nuovo testo d'ingresso");
+check(await page.getByText("ti diamo il benvenuto in Growup").isVisible(), "nuovo testo d'ingresso");
 check(!(await page.content()).includes("sei dentro"), "niente 'sei dentro'");
 check(!(await page.getByText("1° giugno").count()), "niente scelta prima/dopo giugno");
 const opzioni = await page.locator("select[name=qualifica] option").allInnerTexts();
@@ -35,13 +35,17 @@ check(opzioni.includes("Bronze Foundation 9%") && opzioni.includes("Argento 21%"
 await page.click("button[data-act=ho-gia]");
 await page.getByText("Entra in Growup").waitFor();
 await page.click("button[data-act=torna-invito]");
-await page.getByText("Due informazioni e iniziamo").waitFor(); check(true, "si torna all'invito");
+await page.getByText("ti diamo il benvenuto in Growup").waitFor(); check(true, "si torna all'invito");
 await page.click("form button.primary");
 check(await page.getByText("serve la data di iscrizione").isVisible(), "data obbligatoria per chi inizia");
 /* una data di iscrizione di 5 giorni fa: il conto alla rovescia dei 30 giorni è sempre aperto, qualunque giorno giri il test */
 await page.fill("input[name=data]", new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10));
 await page.check("input[name=privacy]");
-check(await page.locator("form button.primary").innerText() === "Inizia", "pulsante Inizia");
+check(await page.locator("form button.primary").innerText() === "Avanti", "consegna 9: pulsante Avanti (passo 1 di 2)");
+check((await page.locator(".ingresso-testa h1").innerText()).replace(/\s+/g, " ").includes("ti diamo il benvenuto in Growup")
+  && (await page.locator(".chi-invita").innerText()).replace(/\s+/g, " ").includes("Ti hanno invitato Stefano e Alessia")
+  && (await page.locator(".chi-invita .iniziali").innerText()).trim() === "S&A", "consegna 9: l'ingresso accoglie (chi invita, saluto per tutti)");
+check((await page.locator(".passo-ingresso .eyebrow").textContent()).trim() === "Passo 1 di 2 · Da dove parti in Amway", "consegna 9: passo 1 di 2");
 await page.screenshot({ path: S + "/e2e/1-ingresso.png", fullPage:true });
 await page.click("form button.primary");
 // il primo obiettivo, subito dopo l'ingresso
@@ -1005,7 +1009,7 @@ check(await page.getByText("dal report Amway").first().isVisible() && await page
 await ctx.close();
 // Nora entra con l'invito della radice: resta in attesa finché la mappa non la mette sotto Bianca
 ({ ctx, page } = await apri({}, invitoPer("R", "Nora Sotto", "4000002")));
-await page.getByText("Ti ha invitato Stefano e Alessia").waitFor();
+await page.getByText("Ti hanno invitato Stefano e Alessia").waitFor();
 await page.fill("input[name=data]", oggiStr); await page.check("input[name=privacy]"); await page.click("form button.primary");
 await page.getByText("Da dove parti?").waitFor();
 await sync(page); await ctx.close();
@@ -3066,7 +3070,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
   // Xena entra: sotto il Platino, in attesa, e importa subito la sua mappa
   ({ ctx, page } = await apri({}, linkX.slice(linkX.indexOf("#"))));
-  await page.getByText("Ciao Xena!").waitFor();
+  await page.getByText("Ciao Xena,").waitFor();
   await page.selectOption("select[name=qualifica]", "pin:3");
   await page.check("input[name=privacy]"); await page.click("form button.primary");
   await perche(page);
@@ -3107,7 +3111,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(!(await page.locator(".platino-scheda").count()), "052: fuori dal gruppo di un Platino senza app l'admin non inserisce nessuno in mezzo");
   await ctx.close();
   ({ ctx, page } = await apri({}, linkW.slice(linkW.indexOf("#"))));
-  await page.getByText("Ciao Walter!").waitFor();
+  await page.getByText("Ciao Walter,").waitFor();
   await page.selectOption("select[name=qualifica]", "pin:3");
   await page.check("input[name=privacy]"); await page.click("form button.primary");
   await page.getByText("Da dove parti?").waitFor();
@@ -3692,6 +3696,51 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await page.locator(".nuovi-partenza li", { hasText:"Sara Nuova" }).innerText()).includes("Manca: Lista 12 / 30"), "incontro fissato: manca solo la Lista");
   await ctx.close();
   DB.partners = DB.partners.filter(p => !["sp8n", "sp8a", "sp8g"].includes(p.id)); DB.persone = DB.persone.filter(x => x.proprietario !== "sp8n");
+}
+
+// 63. Consegna 9: i traguardi grandi a tutto schermo (il primo cliente e la nuova tappa, dall'app)
+{
+  DB.traguardiAperti = true;
+  const ora = new Date().toISOString();
+  DB.partners.push({ id:"tr9", nome:"Tea Traguardo", sponsor_id:"R", stato:"attivo", chiave:"a9".repeat(16), codice_invito:"TR9TR9", codice_amway:"7930001",
+    data_iscrizione:new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora });
+  ({ ctx, page } = await apri({}, "#chiave=" + "a9".repeat(16)));
+  await page.getByText("Ciao Tea").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]");
+  await page.click("button[data-sez=clienti]");
+  await page.click("button[data-act=cliente-nuovo]");
+  await page.fill(".sheet input[name=nome]", "Lucia Cliente");
+  await page.click(".sheet button.primary");
+  const tr = page.locator(".festa.traguardo");
+  await tr.waitFor();
+  check((await tr.locator("h1").innerText()).replace(/\s+/g, " ").trim() === "Il tuo primo cliente!" && (await tr.innerText()).includes("Lucia Cliente")
+    && await tr.locator("button").count() === 1, "il primo cliente: a tutto schermo, con il nome e un solo pulsante");
+  await page.screenshot({ path: S + "/e2e/63-primo-cliente.png" });
+  await tr.locator("button[data-act=traguardo-chiudi]").click();
+  await tr.waitFor({ state:"detached" }); check(true, "Continua chiude il traguardo");
+  await ctx.close();
+  ({ ctx, page } = await apri({}, "#chiave=" + "a9".repeat(16)));
+  await page.getByText("Ciao Tea").waitFor();
+  await page.waitForTimeout(400);
+  check(!(await page.locator(".festa.traguardo").count()), "il traguardo si vede una volta sola");
+  // la tappa raggiunta: il primo ordine da 60 VP chiude «Primo ordine», a tutto schermo con la prossima (Primi clienti)
+  const tr2 = page.locator(".festa.traguardo");
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await apriOrdini(page, "ordine");
+  await page.fill(".sheet input[name=vp]", "60");
+  await page.click(".sheet button:has-text('Salva')");
+  await tr2.waitFor();
+  check((await tr2.locator("h1").innerText()).trim() === "Primo ordine" && (await tr2.innerText()).includes("Il tuo percorso va avanti, Tea")
+    && (await tr2.locator(".eyebrow").first().textContent()).trim().startsWith("Tappa raggiunta") && (await tr2.innerText()).includes("Primi clienti"),
+    "la tappa raggiunta a tutto schermo, con la prossima");
+  await page.screenshot({ path: S + "/e2e/63-tappa.png" });
+  await tr2.locator("button").click();
+  await tr2.waitFor({ state:"detached" });
+  check(!errori.length, "traguardi: nessun errore nella pagina");
+  await ctx.close();
+  DB.partners = DB.partners.filter(p => p.id !== "tr9"); DB.persone = (DB.persone || []).filter(x => x.proprietario !== "tr9");
+  DB.traguardiAperti = false;
 }
 
 await browser.close();
