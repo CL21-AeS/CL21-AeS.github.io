@@ -4040,6 +4040,68 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
 }
 
+// 68. La versione di prova (prova/): l'app vera con dati inventati, senza database; l'app vera sullo stesso telefono resta intatta
+{
+  const c = await browser.newContext({ viewport:{ width:390, height:844 }, locale:"it-IT", timezoneId:"Europe/Rome", reducedMotion:"reduce" });
+  const pg = await c.newPage();
+  const fuori = [], err = [];
+  pg.on("request", r => { if(!r.url().startsWith("http://127.0.0.1:8765/")) fuori.push(r.url()); });
+  pg.on("pageerror", e => err.push(String(e))); pg.on("console", m => { if(m.type() === "error") err.push(m.text()); });
+  pg.on("dialog", d => d.accept());
+  await pg.addLocatorHandler(pg.locator(".festa.traguardo"), async t => { await t.locator("button[data-act=traguardo-chiudi]").click(); });
+  /* sullo stesso telefono c'è l'app vera: il suo link personale, la sua sessione */
+  await pg.goto(BASE + "favicon-32.png");
+  await pg.evaluate(() => { localStorage.setItem("growup-team.chiave", "f".repeat(32)); localStorage.setItem("growup-team.chiave-salvata", "1");
+    localStorage.setItem("mock.session", JSON.stringify({ user:{ id:"telefono-vero" } })); });
+  const tutte = () => pg.evaluate(() => Object.fromEntries(Object.keys(localStorage).map(k => [k, localStorage.getItem(k)])));
+  const prima = await tutte();
+  await pg.goto(BASE + "prova/");
+  await pg.locator(".prova-scelta").waitFor();
+  check(await pg.locator(".prova-scelta button.chi").count() === 4 && (await pg.locator(".prova-scelta").innerText()).includes("Dati inventati"),
+    "prova: si sceglie chi essere, con l'avviso dei dati inventati");
+  await pg.screenshot({ path: S + "/e2e/68-prova-scelta.png", fullPage:true });
+  /* Giulia, in attività da due anni */
+  await pg.click("[data-prova=come][data-k=giulia]");
+  await pg.getByText("Ciao Giulia").waitFor();
+  check(await pg.locator(".prova-barra", { hasText:"Versione di prova · dati inventati" }).isVisible(), "prova: la barra «Versione di prova» in cima");
+  check((await pg.locator("#app").innerText()).includes("Bronze Builder 18%") && await pg.locator(".primi-passi").count() === 0,
+    "prova: Giulia è alla tappa Bronze Builder 18%, senza i Primi passi");
+  await pg.click("button[data-act=vista-persone]"); await pg.click("button[data-sez=lista]");
+  check(await pg.locator(".persone li.fermo").count() >= 3, "prova: nella Lista di Giulia qualche contatto fermo, in ambra");
+  await pg.click("button[data-sez=clienti]");
+  check(await pg.locator(".persone button[data-act=apri-cliente]").count() === 9, "prova: i 9 clienti di Giulia");
+  await pg.locator("button[data-act=vista-gruppo]").first().click();
+  check(await pg.locator(".nuovi-partenza", { hasText:"Sara Conti" }).isVisible(), "prova: in Gruppo Giulia segue Sara nella partenza");
+  /* Luca entra con l'invito di Giulia */
+  await pg.click("[data-prova=scegli]"); await pg.locator(".prova-scelta").waitFor();
+  await pg.click("[data-prova=come][data-k=luca]");
+  await pg.getByText("ti diamo il benvenuto in Growup").waitFor();
+  check((await pg.locator(".chi-invita").innerText()).replace(/\s+/g, " ").includes("Ti ha invitato Giulia Martini"), "prova: Luca riceve l'invito di Giulia");
+  await pg.fill("input[name=data]", new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10));
+  await pg.check("input[name=privacy]");
+  await pg.click("form button.primary");
+  await perche(pg);
+  await pg.locator(".card.percorso-partenza").waitFor();
+  check(true, "prova: Luca entra e inizia il percorso di partenza");
+  await pg.screenshot({ path: S + "/e2e/68-prova-luca.png", fullPage:true });
+  /* rientrando come Luca si torna nel suo profilo (l'invito non si rifà) */
+  await pg.click("[data-prova=scegli]"); await pg.locator(".prova-scelta").waitFor();
+  await pg.click("[data-prova=come][data-k=luca]");
+  await pg.getByText("Ciao Luca").waitFor(); check(true, "prova: rientrando come Luca si torna nel suo profilo");
+  /* l'app vera non si tocca: le sue chiavi restano uguali, le altre sono tutte «prova.» */
+  const dopo = await tutte();
+  check(Object.entries(prima).every(([k, v]) => dopo[k] === v) && Object.keys(dopo).every(k => k in prima || k.startsWith("prova.")),
+    "prova: il link personale e la sessione dell'app vera restano intatti; la prova scrive solo chiavi «prova.»");
+  check(!fuori.length, "prova: nessuna richiesta fuori dal sito, niente database (" + fuori.slice(0, 3).join(", ") + ")");
+  /* Ricomincia: tutto da capo, l'invito di Luca torna aperto */
+  await pg.click("[data-prova=scegli]"); await pg.locator(".prova-scelta").waitFor();
+  await pg.click("[data-prova=ricomincia]"); await pg.locator(".prova-scelta").waitFor();
+  check(await pg.evaluate(() => JSON.parse(localStorage.getItem("prova.dati")).partners.find(p => p.id === "L").stato) === "gestito"
+    && Object.keys(await tutte()).filter(k => k.startsWith("prova.")).join() === "prova.dati", "prova: «Ricomincia» rimette i dati inventati come all'inizio");
+  check(!err.length, "prova: nessun errore nella pagina (" + err.slice(0, 2).join(" | ") + ")");
+  await c.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

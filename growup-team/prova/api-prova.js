@@ -1,8 +1,11 @@
-// API finta in memoria; window.__DB è condiviso tra "dispositivi" dal test
+// API finta in memoria, al posto di Supabase: la usano i test (test/e2e) e la versione di prova (prova/).
+// window.__DB sono i dati: nei test li prepara il test, nella prova li inventa dati-prova.js. Niente va mai al database.
 (function(){
   const db = window.__DB;
+  /* nella versione di prova le chiavi sul telefono hanno «prova.» davanti: l'app vera (stesso sito) non si tocca */
+  const K_SESSIONE = (window.GROWUP_PROVA ? "prova." : "") + "mock.session";
   let session = null;
-  try{ session = JSON.parse(localStorage.getItem("mock.session")); }catch(e){}
+  try{ session = JSON.parse(localStorage.getItem(K_SESSIONE)); }catch(e){}
   const uid = () => "id" + Math.random().toString(36).slice(2, 10);
   const codiceInvito = () => Array.from({length:6}, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random()*32)]).join("");
   const hex = () => Array.from({length:32}, () => "0123456789abcdef"[Math.floor(Math.random()*16)]).join("");
@@ -50,8 +53,8 @@
     signInAnon: async token => { if(db.anonDisattivo) throw new Error("Anonymous sign-ins are disabled");
       if(!token) throw new Error("captcha protection: request disallowed (no captcha response)");
       db.captcha = token;
-      session = { user:{ id:"anon-" + uid() } }; localStorage.setItem("mock.session", JSON.stringify(session)); db.anon++; salva(); },
-    signOut: async () => { session = null; localStorage.removeItem("mock.session"); },
+      session = { user:{ id:"anon-" + uid() } }; localStorage.setItem(K_SESSIONE, JSON.stringify(session)); db.anon++; salva(); },
+    signOut: async () => { session = null; localStorage.removeItem(K_SESSIONE); },
     /* 041: gli inviti personali (db.invitiP). Senza accesso: solo com'è il link e, se è aperto, i nomi */
     invitoAperto: async c => { const i = (db.invitiP || []).find(x => x.codice === String(c || "").toLowerCase());
       const da = i && db.partners.find(p => p.id === i.creato_da && !p.bloccato_il);

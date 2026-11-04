@@ -296,8 +296,11 @@ function num2(n){ const [i, d] = (Math.round((Number(n) || 0) * 100) / 100).toFi
 function prezzo(n){ return num2(n) + " €"; }
 function plur(n, uno, molti){ return n === 1 ? `${n} ${uno}` : `${num(n)} ${molti}`; }
 function numIt(v){ return Number(String(v).trim().replace(/\./g, "").replace(",", ".")); }
-function salvaLocale(k, v){ try{ v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); }catch(e){} }
-function leggiLocale(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+/* nella versione di prova (prova/) ogni chiave ha «prova.» davanti: sullo stesso telefono l'app vera (il link personale,
+   le scelte) non si tocca */
+const LOCALE_PREFISSO = window.GROWUP_PROVA ? "prova." : "";
+function salvaLocale(k, v){ k = LOCALE_PREFISSO + k; try{ v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); }catch(e){} }
+function leggiLocale(k){ try{ return localStorage.getItem(LOCALE_PREFISSO + k); }catch(e){ return null; } }
 /* "Stefano e Alessia" resta intero; "Anna Bianchi" diventa "Anna" */
 function nomeSaluto(n){ n = String(n || "").trim(); return / e /i.test(n) ? n : n.split(" ")[0]; }
 
