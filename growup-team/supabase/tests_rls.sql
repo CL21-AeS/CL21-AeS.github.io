@@ -76,7 +76,7 @@ declare
   u7 constant uuid := '00000000-0000-0000-0000-0000000000a7';  -- telefono nuovo, poi D
   u8 constant uuid := '00000000-0000-0000-0000-0000000000a8';  -- E, aggiunta a mano, poi entra
   r uuid; a uuid; b uuid; c uuid; d uuid; e uuid; f uuid; g uuid; h uuid; k uuid; x record; mese_prec date;
-  pp uuid; pq uuid; att_prima int;
+  pp uuid; pq uuid; att_prima int; att_nuovi int;
   k_r text; k_a text; k_a2 text; k_d text; k_e text;
 begin
   begin  -- tutto quello che succede qui dentro viene annullato alla fine
@@ -922,23 +922,35 @@ begin
   perform growup_test.ok((public.guida_conteggi(current_date)->>'personali')::int = att_prima + 1, '035: resta di A anche se va in profondità');
   perform growup_test.come(u3);  -- B non lo conta come suo
   perform growup_test.ok((public.guida_conteggi(current_date)->>'personali')::int = 0, '035: per B non è un nuovo iscritto personale');
-  -- nuovi nel gruppo: il primo import non conta, dal secondo sì
+  -- nuovi nel gruppo (056): chi ha la data di ingresso della mappa nel mese, anche dal primo import, una volta sola
   execute 'reset role';
   update public.partners set primo_import_il = null where id = r;
   perform growup_test.come(u1);  -- R
   att_prima := (public.guida_conteggi(current_date)->>'nuovi_gruppo')::int;
   perform public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":470}',
-    '[{"codice":"8100001","nome":"Primo Import","sponsor":"2000001","vpp":250,"vpg":250}]', '{}', '{}');
-  perform growup_test.ok((public.guida_conteggi(current_date)->>'nuovi_gruppo')::int = att_prima, '035: il primo import non porta nuovi codici');
+    format('[{"codice":"8100001","nome":"Primo Import","sponsor":"2000001","vpp":250,"vpg":250,"ingresso":"%s"},'
+           '{"codice":"8100003","nome":"Ingresso Vecchio","sponsor":"2000001","vpp":50,"vpg":50,"ingresso":"%s"}]',
+           current_date, (date_trunc('month', current_date) - interval '1 month')::date)::jsonb, '{}', '{}');
+  perform growup_test.ok((public.guida_conteggi(current_date)->>'nuovi_gruppo')::int = att_prima + 1,
+                         '056: anche dal primo import conta chi ha la data di ingresso nel mese (non chi è entrato il mese prima)');
+  perform growup_test.ok((public.guida_conteggi((date_trunc('month', current_date) - interval '1 month')::date)->>'nuovi_gruppo')::int >= 1,
+                         '056: chi è entrato il mese prima conta nel suo mese');
   execute 'reset role';
   perform growup_test.ok((select primo_import_il from public.partners where id = r) is not null, '035: il primo import di R è segnato');
   update public.partners set primo_import_il = now() - interval '1 day' where id = r;
   perform growup_test.come(u1);
   pp := null;
   att_prima := (public.guida_conteggi(current_date)->>'oltre_200')::int;
+  att_nuovi := (public.guida_conteggi(current_date)->>'nuovi_gruppo')::int;
   perform public.importa_mappa(current_date, now(), '{"codice":"1000000","vpp":120,"vpg":470}',
-    '[{"codice":"8100002","nome":"Secondo Import","sponsor":"2000001","vpp":300,"vpg":300}]', '{}', '{}');
-  perform growup_test.ok((public.guida_conteggi(current_date)->>'nuovi_gruppo')::int = 1, '035: dal secondo import il codice nuovo conta nel gruppo');
+    format('[{"codice":"8100001","nome":"Primo Import","sponsor":"2000001","vpp":260,"vpg":260,"ingresso":"%1$s"},'
+           '{"codice":"8100002","nome":"Secondo Import","sponsor":"2000001","vpp":300,"vpg":300,"ingresso":"%1$s"}]', current_date)::jsonb, '{}', '{}');
+  perform growup_test.ok((public.guida_conteggi(current_date)->>'nuovi_gruppo')::int = att_nuovi + 1,
+                         '056: un secondo import nello stesso mese aggiunge solo il codice nuovo (chi c''era già non si conta due volte)');
+  att_nuovi := (public.guida_conteggi(current_date)->>'nuovi_gruppo')::int;
+  perform growup_test.ok((select count(*) from public.analisi_persona(r) a where a.mese = date_trunc('month', current_date)::date
+                           and a.nuovi_gruppo = att_nuovi) = 1,
+                         '056: l''Analisi conta i nuovi del mese come la tabella');
   perform growup_test.ok((public.guida_conteggi(current_date)->>'oltre_200')::int = att_prima + 1, '035: i codici del gruppo oltre 200 VP');
   perform growup_test.ok((public.guida_conteggi(current_date)->>'con_mappa')::boolean
                          and not (public.guida_conteggi((current_date - interval '5 years')::date)->>'con_mappa')::boolean,

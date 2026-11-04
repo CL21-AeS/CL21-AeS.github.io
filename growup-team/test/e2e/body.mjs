@@ -2285,7 +2285,10 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.partners.push({ id:"g41a", nome:"Entrato Col Link", sponsor_id:"R", stato:"attivo", codice_invito:"G41AAA", codice_amway:"8800001",
     invitato_da:"R", invitato_il:ora, confermato_il:ora, creato_il:ora });
   DB.partners.push({ id:"g41b", nome:"Nuovo Nella Mappa", sponsor_id:"R", stato:"gestito", gestore_id:"R", codice_invito:"G41BBB", codice_amway:"8800002",
-    in_mappa_dal:ora, creato_il:ora });
+    in_mappa_dal:ora, data_iscrizione:ora.slice(0, 10), creato_il:ora });
+  /* 056: conta la data di ingresso della mappa; chi è entrato con il link e non è in nessuna mappa no */
+  DB.partners.find(p => p.id === "g41a").data_iscrizione = ora.slice(0, 10);
+  DB.numeri.push({ visto_da:"R", partner_id:"g41b", mese:ora.slice(0, 7), vpp:0, vpg:0, percentuale:0, linee:[], nascoste:false, dati_al:ora });
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
   await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   check(await page.locator(".sezioni-io button[data-sez=giorno]").getAttribute("aria-pressed") === "true", "Io: si apre su «Il mio giorno»");
@@ -2330,7 +2333,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await sync(page); await ctx.close();
   /* con un mese chiuso: livello e numeri del mese chiuso (qui il mese scorso al 9%) */
   const prec = meseT(-1, true), prec2 = meseT(-2, false);
-  DB.numeri = numeriR.filter(x => !(x.partner_id === "R" && x.mese < ora.slice(0, 7)))
+  DB.numeri = numeriR.filter(x => !(x.partner_id === "R" && x.mese < ora.slice(0, 7))).concat(DB.numeri.filter(n => n.partner_id === "g41b"))
     .concat([{ visto_da:"R", partner_id:"R", mese:prec.m, vpp:300, vpg:4000, percentuale:9, linee:[], nascoste:false, dati_al:prec.m + "-28T10:00:00Z" }]);
   const aGuida = async () => { ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
     await page.getByText("Ciao Stefano e Alessia").waitFor(); await page.click(".sezioni-io button[data-sez=guida]"); await page.locator(".guida-stabilita").waitFor(); };

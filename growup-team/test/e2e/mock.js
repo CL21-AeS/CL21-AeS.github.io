@@ -274,7 +274,8 @@
           linee:(n ? n.linee || [] : []).map(l => { const q = db.partners.find(x => x.codice_amway === l.codice), nl = q ? numeroDi(q.id, mm) : null;
             return { codice:l.codice, nome:q ? q.nome : null, vpg:l.vpg, percentuale:nl ? nl.percentuale : null }; }),
           personali:db.partners.filter(x => x.invitato_da === pid && String(x.invitato_il || "").slice(0, 7) === mm).length,
-          nuovi_gruppo:db.partners.filter(x => x.id !== pid && giu.includes(x.id) && String(x.in_mappa_dal || "").slice(0, 7) === mm).length,
+          nuovi_gruppo:db.partners.filter(x => x.id !== pid && giu.includes(x.id) && String(x.data_iscrizione || "").slice(0, 7) === mm
+            && (db.numeri || []).some(n => n.partner_id === x.id)).length,   // 056: data di ingresso della mappa nel mese
           oltre_200:giu.filter(id => { const q = numeroDi(id, mm); return q && Number(q.vpp) > 200; }).length }; }); },
     datiCondivisi: async pid => { const io = mio(); const t = db.partners.find(p => p.id === pid);
       if(!t || pid === io.id || !vedo(io, t) || !(db.seguimi || []).some(x => x.partner_id === pid && x.condividi)) return null;
@@ -301,7 +302,8 @@
     /* 035: la Guida */
     guidaConteggi: async mese => { const io = mio(); if(!io) throw new Error("non_autenticato"); const m = mese.slice(0, 7);
       return { personali:db.partners.filter(p => p.invitato_da === io.id && String(p.invitato_il || "").slice(0, 7) === m).length,
-        nuovi_gruppo:db.partners.filter(p => p.id !== io.id && String(p.in_mappa_dal || "").slice(0, 7) === m && vedo(io, p)).length,
+        nuovi_gruppo:db.partners.filter(p => p.id !== io.id && String(p.data_iscrizione || "").slice(0, 7) === m && vedo(io, p)
+          && (db.numeri || []).some(n => n.partner_id === p.id)).length,   // 056: data di ingresso della mappa nel mese
         oltre_200:(db.numeri || []).filter(x => x.mese === m && x === numeroDi(x.partner_id, m) && Number(x.vpp) > 200
           && vedo(io, db.partners.find(p => p.id === x.partner_id) || {})).length,
         con_mappa:(db.numeri || []).some(x => x.mese === m && vedo(io, db.partners.find(p => p.id === x.partner_id) || {})) }; },

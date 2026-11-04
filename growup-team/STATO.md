@@ -19,6 +19,15 @@ legenda, «Per sostenere il X%»), abitudini con barra e cerchi dei giorni, «La
 piano» e «Cosa fare adesso»; Seguimi e Condividi spostati nel Profilo. Database non toccato. Prossima: consegna 4,
 Agenda (con il database: per cosa, come).
 
+## Nuovi iscritti dalla mappa (4 novembre 2026, migrazione 056)
+
+Scelta di Stefano: nella tabella Stabilità (Verifica) e nell'Analisi, «Nuovi iscritti nel gruppo» di un mese sono le
+persone del gruppo con la **Data di ingresso della mappa** in quel mese solare (una volta sola, anche con più import nel
+mese, anche dal primo import), contate solo se sono in almeno una mappa importata. Prima si contava chi compariva per la
+prima volta in una mappa (`in_mappa_dal`), così ottobre restava a 0. «I tuoi nuovi iscritti» (con il tuo link) non
+cambia: la persona entrata con il link è «nuova» per 30 giorni, da seguire per primo ordine e primi passi (consegna 8).
+056 in PR: da applicare su Supabase dopo l'ok di Stefano.
+
 ## Controllo sicurezza e privacy (3 novembre 2026)
 
 **Contatti dopo 24 mesi** (migrazione **055**, app v85, scelta A per i clienti): Lista, Target e Clienti si cancellano 24
