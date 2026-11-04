@@ -163,6 +163,9 @@
       db.accessi.push({ user_id:session.user.id, partner_id:p.id }); db.joins.push(a); salva();
       return { profilo:pub(p), chiave:p.chiave };
     },
+    /* 058: il punto con l'upline, solo sulla propria riga (policy partners_modifico_me) */
+    puntoUpline: async (pid, campi) => { const p = db.partners.find(x => x.id === pid && pid === (mio() || {}).id);
+      if(p) Object.assign(p, { punto_upline:campi.punto_upline ?? p.punto_upline, punto_upline_fatto:campi.punto_upline_fatto === undefined ? p.punto_upline_fatto : campi.punto_upline_fatto }); salva(); },
     accettaPrivacy: async pid => { const p = db.partners.find(x => x.id === pid); p.privacy_accettata_il = new Date().toISOString(); salva(); },
     obiettivo: async pid => (db.obiettivi || []).find(o => o.partner_id === pid) || null,
     salvaObiettivo: async o => { db.obiettivi = (db.obiettivi || []).filter(x => x.partner_id !== o.partner_id).concat([o]); salva(); },

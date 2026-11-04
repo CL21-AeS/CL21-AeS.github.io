@@ -45,7 +45,10 @@ check(await page.locator("form button.primary").innerText() === "Inizia", "pulsa
 await page.screenshot({ path: S + "/e2e/1-ingresso.png", fullPage:true });
 await page.click("form button.primary");
 // il primo obiettivo, subito dopo l'ingresso
-await page.getByText("Il tuo primo obiettivo").waitFor(); check(true, "dopo l'ingresso: il primo obiettivo");
+await page.getByText("Da dove parti?").waitFor(); check(true, "dopo l'ingresso: «Da dove parti?»");
+check(!(await page.locator("button[data-act=obiettivo-dopo]").count()) && await page.locator("form[data-form=obiettivo] button.primary").innerText() === "Inizia il mio percorso",
+  "consegna 6: blocco vero, niente «Lo scrivo dopo»");
+check(await page.locator("form[data-form=obiettivo] .link-da-salvare").isVisible(), "consegna 6: sotto, il link personale da salvare");
 await page.click("form button.primary");
 check(await page.locator(".errore").innerText() === "Scrivi quanto vorresti guadagnare al mese, per esempio 400.", "obiettivo: serve la cifra");
 await page.fill("input[name=cifra]", "300");
@@ -53,9 +56,13 @@ await page.click("form button.primary");
 check((await page.locator(".errore").innerText()).startsWith("Scegli il mese entro cui"), "obiettivo: serve il mese");
 const entroAnna = (() => { const d = new Date(); return (d.getFullYear() + 1) + "-06"; })();
 await page.fill("input[name=entro]", entroAnna);
-await page.fill("textarea[name=perche]", "Per la famiglia");
-await page.screenshot({ path: S + "/e2e/24-obiettivo-primo.png" });
 await page.click("form button.primary");
+check((await page.locator(".errore").innerText()).startsWith("Scrivi perché lo fai"), "consegna 6: il perché è obbligatorio");
+await page.fill("textarea[name=perche]", "Per la famiglia");
+await page.screenshot({ path: S + "/e2e/24-obiettivo-primo.png", fullPage:true });
+await page.click("form button.primary");
+await page.getByText("Ciao Anna").waitFor(); check(true, "consegna 6: «Inizia il mio percorso» porta a Io");
+await page.click("button[role=tab][data-act=vista-obiettivo]");
 await page.getByText("La tappa che vale la tua cifra").waitFor();
 check(await page.locator(".card", { hasText:"La tappa che vale la tua cifra" }).locator("h2").innerText() === "Bronze Foundation 9%", "300 €/mese: Bronze Foundation 9%");
 check(await page.getByText("Da qui: 4 tappe, compresa quella attuale.").isVisible(), "obiettivo: 4 tappe da qui");
@@ -255,10 +262,8 @@ await page.getByText("Ti ha invitato Anna Bianchi").waitFor();
 await page.selectOption("select[name=qualifica]", "pin:6");
 await page.check("input[name=privacy]");
 await page.click("form button.primary");
-await page.getByText("Il tuo primo obiettivo").waitFor();
-await page.click("button[data-act=obiettivo-dopo]");
+await perche(page);
 await page.getByText("Ciao Marco").waitFor(); await apriTappa(page);
-check(await page.getByText("Scrivi il tuo obiettivo").isVisible(), "obiettivo rimandato: su Io l'invito a scriverlo");
 check(await page.getByText("6% raggiunto").isVisible(), "pin di Marco mostrato");
 check(await page.getByText("Path to Bronze").first().isVisible(), "pin senza Bronze -> Path to Bronze");
 await apriMese(page); check(await page.locator(".card", { hasText:"Il mio mese" }).locator(".vp-report").isVisible(), "033: Marco ha i VP del report importato da Anna (vincono su quelli scritti a mano)");
@@ -277,7 +282,7 @@ await page.getByText("Benvenuto in Growup").waitFor();
 await page.selectOption("select[name=qualifica]", "pin:12");
 check(await page.getByText("(facoltativa)").isVisible(), "data facoltativa per chi ha già un pin");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
-await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
+await perche(page);
 await page.getByText("Ciao Bea").waitFor(); await apriTappa(page);
 check(await page.getByText("12% raggiunto").isVisible(), "pin 12% mostrato");
 await sync(page); await ctx.close();
@@ -291,7 +296,7 @@ check(await page.locator("input[name=mese]").isVisible(), "campi pagamenti visib
 await page.fill("input[name=mese]", (() => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 3); return d.toISOString().slice(0, 7); })());
 await page.fill("input[name=pagamenti]", "3");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
-await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
+await perche(page);
 await page.getByText("Ciao Ciro").waitFor(); await apriTappa(page);
 check(await page.getByText("Pagamenti 3 di 12, restano 15 mesi su 18").isVisible(), "pagamenti");
 await page.screenshot({ path: S + "/e2e/5-avviato.png", fullPage:true });
@@ -306,7 +311,7 @@ check(await page.evaluate(() => { const t = document.querySelector("form[data-fo
     return ["Per quanto.", "dopo 12 mesi", "Supabase", "GitHub", "Cloudflare", "Garante per la protezione dei dati personali", "almeno 18 anni"].every(x => t.includes(x)); }),
   "l'informativa dice per quanto si tengono i dati, chi aiuta, il reclamo al Garante e solo maggiorenni");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
-await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
+await perche(page);
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 await page.click("button[data-act=vista-gruppo]");
 check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).isVisible()
@@ -852,7 +857,7 @@ check(await page.getByText("Ciao Stefano e Alessia").isVisible(), "movimento ver
 await ctx.close();
 
 // 16. Lo sponsor vede cifra, data e tappa dell'obiettivo, mai il perché
-DB.obiettivi = [{ partner_id:"cri", cifra_mese:1000, entro:(new Date().getFullYear() + 1) + "-03-01", perche:"Segreto di Cri" }];
+DB.obiettivi = (DB.obiettivi || []).filter(o => o.partner_id === "R").concat([{ partner_id:"cri", cifra_mese:1000, entro:(new Date().getFullYear() + 1) + "-03-01", perche:"Segreto di Cri" }]);
 DB.preferiti = [{ partner_id:"R", preferito_id:"cri" }];
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
@@ -1002,7 +1007,7 @@ await ctx.close();
 ({ ctx, page } = await apri({}, invitoPer("R", "Nora Sotto", "4000002")));
 await page.getByText("Ti ha invitato Stefano e Alessia").waitFor();
 await page.fill("input[name=data]", oggiStr); await page.check("input[name=privacy]"); await page.click("form button.primary");
-await page.getByText("Il tuo primo obiettivo").waitFor();
+await page.getByText("Da dove parti?").waitFor();
 await sync(page); await ctx.close();
 const nora = DB.partners.find(p => p.nome === "Nora Sotto");
 check(nora.sponsor_id === "R" && nora.stato === "attivo" && !nora.confermato_il, "041: Nora entra in attesa sotto chi l'ha invitata");
@@ -1386,7 +1391,7 @@ const cardCli = page.locator(".card.oggi-lista");
 await page.screenshot({ path: S + "/e2e/46-io-chiaro.png", fullPage:true });
 /* consegna 2: il cruscotto e «La prossima cosa» */
 check(await page.locator(".cruscotto .anello[role=img]").getAttribute("aria-label").then(t => /^VP personali: \S+ su \S+$/.test(t)), "cruscotto: l'anello dei VP ha la sua descrizione");
-check(await page.locator(".cruscotto .tessera").count() === 2 && await page.locator(".cruscotto .tessera .bar[role=progressbar]").count() === 2, "cruscotto: contatti e piani della settimana");
+check(await page.locator(".cruscotto .tessera .bar[role=progressbar]").count() === 2, "cruscotto: contatti e piani della settimana");
 check((await page.locator(".tappa-riga").innerText()).includes("su 1 requisito") && !(await page.locator(".tappa-riga").innerText()).includes("1 requisiti"), "tappa: «requisito» al singolare");
 const primaCosa = async () => (await page.locator(".oggi-lista .prossima-titolo").innerText()).trim();
 const p1 = await primaCosa();
@@ -1668,7 +1673,7 @@ await ctx.close();
 await page.getByText("Benvenuto in Growup").waitFor();
 await page.selectOption("select[name=qualifica]", "pin:6");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
-await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
+await perche(page);
 await page.getByText("Ciao Dino").waitFor(); await apriTappa(page);
 const sessDino = await page.evaluate(() => localStorage.getItem("mock.session"));
 await sync(page); await ctx.close();
@@ -1801,7 +1806,8 @@ await ctx.close();
 {
   const R = DB.partners.find(p => p.id === "R");
   Object.assign(R, { qualifica_iniziale:"path_to_bronze", codice_amway:"7000000" });
-  DB.partners = [R]; DB.activities = []; DB.numeri = []; DB.storico = []; DB.nascosti = []; DB.obiettivi = [];
+  DB.partners = [R]; DB.activities = []; DB.numeri = []; DB.storico = []; DB.nascosti = [];
+  DB.obiettivi = (DB.obiettivi || []).filter(o => o.partner_id === "R");   // consegna 6: R tiene il suo perché
   const G = (id, nome, sponsor, codice) => DB.partners.push({ id, nome, sponsor_id:sponsor, stato:"gestito", gestore_id:"R", codice_invito:id.toUpperCase() + "QQQQ", codice_amway:codice || null });
   const V = (pid, vp) => DB.activities.push({ id:"ca" + DB.activities.length, partner_id:pid, tipo:"ordine", quantita:1, vp, data:oggiStr, inserito_il:new Date().toISOString() });
   G("ca", "Linea Alfa", "R", "7000001"); G("cb", "Linea Beta", "R", "7000002"); G("cb1", "Beta Uno", "cb"); G("cb2", "Beta Due", "cb"); G("cb3", "Beta Tre", "cb");
@@ -1873,7 +1879,7 @@ check(await page.locator("[data-mostra=prossima]").isVisible()
   && await page.locator("select[name=prossima] option", { hasText:"Platino Fondatore" }).count() === 1, "con Platino: la prossima qualifica, solo quelle sopra");
 await page.selectOption("select[name=prossima]", "smeraldo");
 await page.check("input[name=privacy]"); await page.click("form button.primary");
-await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
+await perche(page);
 await page.getByText("Ciao Pia").waitFor(); await apriTappa(page);
 check(await page.getByText("Platino raggiunto 🎉").isVisible() && await page.getByText("Prossima qualifica: Smeraldo").isVisible(), "Io: Platino raggiunto e la prossima qualifica");
 check(await page.getByText("Volume Rubino questo mese: importa il report mappe per vederlo.").isVisible(), "senza report: il Volume Rubino si vede importando le mappe");
@@ -1927,7 +1933,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     "Argento: si chiede il mese della prima qualifica Argento (senza pagamenti)");
   await page.fill("input[name=mese]", mm(-3));
   await page.check("input[name=privacy]"); await page.click("form button.primary");
-  await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
+  await perche(page);
   await page.getByText("Ciao Gaia").waitFor(); await apriTappa(page);
   const reqOro = page.locator(".req li", { hasText:"Mesi da Argento (21%)" });
   check(await page.locator(".miei-numeri .riga-apri b", { hasText:/^Oro$/ }).isVisible() && (await reqOro.locator(".num").innerText()) === "0 / 3", "dopo Argento la tappa è Oro: 0 mesi su 3");
@@ -2132,7 +2138,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
 // 37. La cifra porta anche oltre Argento: sempre la qualifica senza "Fondatore", Oro mai
 {
   const obiettivoDi = async cifra => {
-    DB.obiettivi = (DB.obiettivi || []).filter(o => o.partner_id !== "R").concat([{ partner_id:"R", cifra_mese:cifra, entro:"2027-12-01", perche:null }]);
+    DB.obiettivi = (DB.obiettivi || []).filter(o => o.partner_id !== "R").concat([{ partner_id:"R", cifra_mese:cifra, entro:"2027-12-01", perche:"Per la famiglia" }]);
     ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
     await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
     await page.click("button[role=tab][data-act=vista-obiettivo]");
@@ -2154,7 +2160,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.getByText("Benvenuto in Growup").waitFor();
   await page.selectOption("select[name=qualifica]", "pin:3");
   await page.check("input[name=privacy]"); await page.click("form button.primary");
-  await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
+  await perche(page);
   await page.getByText("Ciao Quinto").waitFor(); await apriTappa(page);
   check(await page.locator(".primi-passi .stato-attesa").isVisible(), "Quinto: in attesa della mappa");
   await scegliFile(page, "quinto.csv", creaCsv(meseFile, [persona(1, "9", "7500001", "PROVA, QUINTO", "50,00")]));
@@ -2629,7 +2635,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const oggiG = new Date().toISOString().slice(0, 10);
   const nomi46 = n => Array.from({ length:n }, (_, i) => ({ id:"n46" + i, proprietario:"R", nome:"Nome " + (i + 1), fase:"lista", esito:null, creato_il:oggiG + "T09:00:00Z" }));
   DB.persone = (DB.persone || []).filter(x => x.proprietario !== "R").concat(nomi46(12));
-  DB.obiettivi = (DB.obiettivi || []).filter(o => o.partner_id !== "R").concat([{ partner_id:"R", cifra_mese:3000, entro:(Number(oggiG.slice(0, 4)) + 1) + "-06-01", perche:"" }]);
+  DB.obiettivi = (DB.obiettivi || []).filter(o => o.partner_id !== "R").concat([{ partner_id:"R", cifra_mese:3000, entro:(Number(oggiG.slice(0, 4)) + 1) + "-06-01", perche:"Per la famiglia" }]);
   DB.seguimi = (DB.seguimi || []).filter(x => x.partner_id !== "R");
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
   await page.getByText("Ciao Stefano e Alessia").waitFor();
@@ -3063,7 +3069,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.getByText("Ciao Xena!").waitFor();
   await page.selectOption("select[name=qualifica]", "pin:3");
   await page.check("input[name=privacy]"); await page.click("form button.primary");
-  await page.getByText("Il tuo primo obiettivo").waitFor(); await page.click("button[data-act=obiettivo-dopo]");
+  await perche(page);
   await page.getByText("Ciao Xena").waitFor(); await apriTappa(page);
   await sync(page);
   const xena = DB.partners.find(p => p.codice_amway === "7600061");
@@ -3104,7 +3110,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.getByText("Ciao Walter!").waitFor();
   await page.selectOption("select[name=qualifica]", "pin:3");
   await page.check("input[name=privacy]"); await page.click("form button.primary");
-  await page.getByText("Il tuo primo obiettivo").waitFor();
+  await page.getByText("Da dove parti?").waitFor();
   await sync(page);
   const walter = DB.partners.find(p => p.codice_amway === "7600063");
   check(walter.sponsor_id === "pl52" && DB.partners.find(p => p.codice_amway === "7600061").sponsor_id === walter.id,
@@ -3476,6 +3482,78 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(!errori.length, "serie: nessun errore nella pagina");
   await ctx.close();
   DB.passi = (DB.passi || []).filter(x => x.proprietario !== "R"); DB.guidaFatti = [];
+}
+
+// 60. Consegna 6: il perché per tutti, gli avviati («Per iniziare», il punto con l'upline), i nomi nuovi con la fonte
+{
+  const giorniFa = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  const ora = new Date().toISOString();
+  DB.partners.push({ id:"av6", nome:"Ada Avviata", sponsor_id:"R", stato:"attivo", chiave:"a6".repeat(16), codice_invito:"AV6AV6", codice_amway:"7900001",
+    data_iscrizione:giorniFa(60), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora });
+  DB.partners.push({ id:"nu6", nome:"Nino Nuovo", sponsor_id:"R", stato:"attivo", chiave:"b6".repeat(16), codice_invito:"NU6NU6", codice_amway:"7900002",
+    data_iscrizione:giorniFa(5), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora });
+  DB.partners.push({ id:"pe6", nome:"Pia Senzaperche", sponsor_id:"R", stato:"attivo", chiave:"c6".repeat(16), codice_invito:"PE6PE6", codice_amway:"7900003",
+    data_iscrizione:giorniFa(90), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora });
+  DB.obiettivi = (DB.obiettivi || []).filter(o => o.partner_id !== "pe6").concat([{ partner_id:"pe6", cifra_mese:500, entro:(new Date().getFullYear() + 1) + "-03-01", perche:"" }]);
+  // chi è già nell'app con l'obiettivo ma senza perché vede «Da dove parti?» una volta, con i suoi numeri già scritti
+  ({ ctx, page } = await apri({}, "#chiave=" + "c6".repeat(16)));
+  await page.getByText("Da dove parti?").waitFor();
+  check(await page.locator("form[data-form=obiettivo] input[name=entro]").inputValue() === (new Date().getFullYear() + 1) + "-03", "senza perché: «Da dove parti?» con il suo obiettivo già scritto");
+  await page.fill("form[data-form=obiettivo] input[name=cifra]", "500");
+  await page.fill("form[data-form=obiettivo] textarea[name=perche]", "Per i miei figli");
+  await page.click("form[data-form=obiettivo] button.primary");
+  await page.getByText("Ciao Pia").waitFor();
+  await sync(page);
+  check(DB.obiettivi.find(o => o.partner_id === "pe6").perche === "Per i miei figli", "il perché è salvato e si entra in Io");
+  await ctx.close();
+  // l'avviata: «Per iniziare», il punto con l'upline, la tessera dei nomi nuovi e la fonte
+  ({ ctx, page } = await apri({}, "#chiave=" + "a6".repeat(16)));
+  await page.getByText("Ciao Ada").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  const pi = page.locator(".card.per-iniziare");
+  check(await pi.isVisible() && (await pi.locator(".eyebrow").textContent()).trim() === "Per iniziare · 1 di 2", "avviata: «Per iniziare · 1 di 2» (perché fatto, punto con l'upline)");
+  check(await pi.locator("li.fatto", { hasText:"Il mio perché" }).count() === 1 && !(await pi.locator("li", { hasText:"Importa la tua mappa" }).count()), "senza gruppo niente import della mappa");
+  check(await page.locator(".cruscotto .tessera.nomi-nuovi").isVisible(), "avviata: nel cruscotto la tessera dei nomi nuovi");
+  await page.screenshot({ path: S + "/e2e/60-avviata.png", fullPage:true });
+  await pi.locator("button[data-act=punto-fissa]").click();
+  await page.locator(".sheet h2", { hasText:"Il punto con la tua upline" }).waitFor();
+  await page.click(".sheet button.primary");
+  await page.locator(".sheet .errore", { hasText:"Scegli il giorno" }).waitFor(); check(true, "punto: senza giorno chiede il giorno");
+  const oggiG = new Date().toISOString().slice(0, 10);
+  await page.check(`.sheet input[name=quando][value="${oggiG}"]`, { force:true });
+  await page.click(".sheet button.primary");
+  await page.getByText("Punto con l'upline: oggi").waitFor();
+  check((await page.locator(".oggi-lista .prossima-titolo").innerText()).trim() === "Il punto con la tua upline", "il giorno fissato il punto è la prossima cosa");
+  await page.click(".oggi-lista button[data-act=punto-fatto]");
+  await page.getByText("Punto con l'upline fatto").waitFor();
+  check(!(await page.locator(".card.per-iniziare").count()), "tutto fatto: «Per iniziare» sparisce");
+  await sync(page);
+  check((p => p.punto_upline === oggiG && p.punto_upline_fatto === oggiG)(DB.partners.find(p => p.id === "av6")), "nel database: giorno del punto e fatto");
+  // un nome nuovo con la fonte
+  await page.click("button[data-act=vista-persone]");
+  await page.click("button[data-act=persona-nuova]");
+  check(await page.locator(".sheet input[name=fonte]").count() === 3, "avviata: la fonte del nome (Conoscenza, Dal vivo, Social)");
+  await page.fill(".sheet input[name=nome]", "Nome Dal Vivo");
+  await page.check(".sheet input[name=fonte][value=dal_vivo]", { force:true });
+  await page.click(".sheet button.primary");
+  await page.getByText("Nome Dal Vivo nella tua lista").waitFor();
+  await page.click("button[data-act=vista-io]");
+  check((await page.locator(".cruscotto .tessera.nomi-nuovi b").innerText()).trim() === "1" && (await page.locator(".cruscotto .fonti-riga").innerText()).includes("1 dal vivo"),
+    "il cruscotto conta il nome nuovo e la sua fonte");
+  await sync(page);
+  check(DB.persone.some(x => x.nome === "Nome Dal Vivo" && x.fonte === "dal_vivo"), "nel database la fonte del nome");
+  check(!errori.length, "consegna 6: nessun errore nella pagina");
+  await ctx.close();
+  // il nuovo (iscritto da 5 giorni): niente «Per iniziare», niente nomi nuovi né fonte (avrà il suo percorso)
+  ({ ctx, page } = await apri({}, "#chiave=" + "b6".repeat(16)));
+  await page.getByText("Ciao Nino").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  check(!(await page.locator(".card.per-iniziare").count()) && !(await page.locator(".tessera.nomi-nuovi").count()), "nuovo: niente «Per iniziare» né nomi nuovi");
+  await page.click("button[data-act=vista-persone]");
+  await page.click("button[data-act=persona-nuova]");
+  check(!(await page.locator(".sheet input[name=fonte]").count()), "nuovo: nessuna fonte nel nome");
+  await ctx.close();
+  DB.partners = DB.partners.filter(p => !["av6", "nu6", "pe6"].includes(p.id));
 }
 
 await browser.close();
