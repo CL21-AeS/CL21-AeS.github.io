@@ -48,7 +48,7 @@
     { k:"sara", titolo:"Sono entrata da 12 giorni", chi:"Sara Conti",
       testo:"A metà del percorso di partenza: cosa le manca, i primi nomi della Lista, i primi contatti." },
     { k:"stefano", titolo:"Siamo la sua upline (e admin)", chi:"Stefano e Alessia",
-      testo:"Vedono il gruppo con i numeri, mai i nomi delle Liste né il perché di nessuno. Importano la mappa Amway: scarica qui sotto quella di prova." }];
+      testo:"Vedono il gruppo con i numeri, mai i nomi delle Liste né il perché di nessuno. Importano la mappa Amway (qui sotto quella di prova)." }];
   function vaiCome(k){
     const d = window.__DB, ch = d._prova.chiavi;
     /* si entra come da un telefono nuovo: via la sessione e le scelte della prova, i dati restano */
@@ -76,26 +76,39 @@
     location.hash = ""; location.reload();
   }
 
-  /* ---- la mappa Amway di prova (CSV), per far vedere l'import: il gruppo di Stefano e Alessia con due iscritti nuovi ---- */
-  function mappaProva(){
-    const d = window.__DB, m = new Date(), mm = `${m.getFullYear()}${String(m.getMonth() + 1).padStart(2, "0")}`, mese = mm.slice(0, 4) + "-" + mm.slice(4);
-    const MESI = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
-    const lunga = iso => { const [a, b, c] = String(iso || "2020-01-01").split("-"); return `${Number(c)} ${MESI[Number(b) - 1]} ${a}`; };
-    const it = n => (Math.round(Number(n || 0) * 100) / 100).toLocaleString("it-IT", { minimumFractionDigits:2, maximumFractionDigits:2 });
-    const amway = n => { const t = n.split(" "); return t.length > 1 && !/ e /.test(n) ? `${t.slice(1).join(" ")}, ${t[0]}`.toUpperCase() : n.toUpperCase(); };
+  /* ---- i file «del sito Amway» di prova, per far vedere gli import (tutto inventato) ---- */
+  const MESI_L = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
+  const oggiL = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12); };
+  const ggL = n => { const x = oggiL(); x.setDate(x.getDate() - n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
+  const lunga = iso => { const [a, b, c] = String(iso || "2020-01-01").split("-"); return `${Number(c)} ${MESI_L[Number(b) - 1]} ${a}`; };
+  const it = n => (Math.round(Number(n || 0) * 100) / 100).toLocaleString("it-IT", { minimumFractionDigits:2, maximumFractionDigits:2 });
+  const q = v => `"${String(v).replace(/"/g, '""')}"`;
+  const meseFile = () => { const m = oggiL(); return `${m.getFullYear()}${String(m.getMonth() + 1).padStart(2, "0")}`; };
+  const amway = n => { const t = n.split(" "); return t.length > 1 && !/ e /.test(n) ? `${t.slice(1).join(" ")}, ${t[0]}`.toUpperCase() : n.toUpperCase(); };
+  function scarica(nome, righe){
+    const blob = new Blob(["﻿" + righe.join("\n") + "\n"], { type:"text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = nome;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  const testaFile = titolo => [[q("Amway"), q("CONFIDENZIALE - " + titolo + " DI PROVA, DATI INVENTATI")].join(","), [q("Mese di competenza"), q(meseFile())].join(",")];
+
+  /* la mappa (Linea di Sponsorizzazione) di Giulia o di Stefano e Alessia: il loro gruppo, i VP di oggi e due iscritti nuovi */
+  function mappaProva(chi){
+    const d = window.__DB, mm = meseFile(), mese = mm.slice(0, 4) + "-" + mm.slice(4);
     const ultimo = id => (d.numeri || []).filter(x => x.partner_id === id && x.mese === mese).sort((a, b) => String(a.dati_al) < String(b.dati_al) ? -1 : 1).pop();
     const sotto = id => d.partners.filter(p => p.sponsor_id === id && !p.fuori_report_dal);
     const righe = [];
     const giro = (p, liv, sp) => { const n = ultimo(p.id) || {};
-      righe.push({ liv, sp, cod:p.codice_amway, nome:amway(p.nome), ingresso:p.data_iscrizione, vpp:(Number(n.vpp) || 0) * 1.08, vpg:0, id:p.id });
+      righe.push({ liv, sp, cod:p.codice_amway, nome:amway(p.nome), ingresso:p.data_iscrizione, vpp:(Number(n.vpp) || 0) * 1.08, vpg:0 });
       for(const f of sotto(p.id)) if(f.codice_amway) giro(f, liv + 1, p.codice_amway); };
-    const r = d.partners.find(p => p.id === "R");
-    giro(r, 1, "7000000");
+    const radice = d.partners.find(p => p.id === chi), sopra = d.partners.find(p => p.id === radice.sponsor_id);
+    giro(radice, 1, sopra ? sopra.codice_amway : "7000000");
     /* due iscritti nuovi in questi giorni: nella mappa ci sono, nell'app non ancora */
-    const oggi = new Date(), gg = n => { const x = new Date(oggi); x.setDate(x.getDate() - n); return x.toISOString().slice(0, 10); };
+    const liv = c => (righe.find(x => x.cod === c) || {}).liv || 1;
     const marco = d.partners.find(p => p.nome === "Marco Ferri"), teresa = d.partners.find(p => p.nome === "Teresa Villa");
-    if(marco && !d.partners.some(p => p.codice_amway === "7199001")) righe.push({ liv:4, sp:marco.codice_amway, cod:"7199001", nome:"CONTE, LIA", ingresso:gg(3), vpp:64.5, vpg:0 });
-    if(teresa && !d.partners.some(p => p.codice_amway === "7199002")) righe.push({ liv:5, sp:teresa.codice_amway, cod:"7199002", nome:"FANTI, ELIO", ingresso:gg(2), vpp:58, vpg:0 });
+    if(marco && !d.partners.some(p => p.codice_amway === "7199001")) righe.push({ liv:liv(marco.codice_amway) + 1, sp:marco.codice_amway, cod:"7199001", nome:"CONTE, LIA", ingresso:ggL(3), vpp:64.5, vpg:0 });
+    if(teresa && !d.partners.some(p => p.codice_amway === "7199002")) righe.push({ liv:liv(teresa.codice_amway) + 1, sp:teresa.codice_amway, cod:"7199002", nome:"FANTI, ELIO", ingresso:ggL(2), vpp:58, vpg:0 });
     /* VPG: personali + tutto il gruppo sotto */
     const figli = c => righe.filter(x => x.sp === c);
     const vpg = x => x.vpp + figli(x.cod).reduce((t, f) => t + vpg(f), 0);
@@ -103,14 +116,37 @@
     const pct = v => [[10000, 21], [7000, 18], [4000, 15], [2400, 12], [1200, 9], [600, 6], [200, 3]].find(([s]) => v >= s)?.[1] || 0;
     const testa = ["Qualifica Amway Partner", "Codice Amway Partner Sponsor", "Codice Amway Partner", "Paese", "Nome", "Data di ingresso", "Telefono",
       "Email", "Indirizzo", "Data di rinnovo", "VPG", "VPP", "Percentuale di bonus", "VVG", "VP Cliente", " Clienti", "Punti al livello successivo"];
-    const q = v => `"${String(v).replace(/"/g, '""')}"`;
-    const linee = [[q("Amway"), q("CONFIDENZIALE - MAPPA DI PROVA, DATI INVENTATI")].join(","), [q("Mese di competenza"), q(mm)].join(","), testa.map(q).join(",")]
+    scarica(`mappa-di-prova-${chi === "G" ? "giulia" : "stefano-e-alessia"}-${mm}.csv`, testaFile("MAPPA").concat([testa.map(q).join(",")])
       .concat(righe.map(x => [String(x.liv), "'" + x.sp, "'" + x.cod, "'Italia", "'" + x.nome, "'" + lunga(x.ingresso), "", "", "", "",
-        "'" + it(x.vpg), "'" + it(x.vpp), "'" + pct(x.vpg) + "%", "0", "'0,00", "'0", "0"].map(q).join(",")));
-    const blob = new Blob(["﻿" + linee.join("\n")], { type:"text/csv" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = `mappa-di-prova-${mm}.csv`;
-    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        "'" + it(x.vpg), "'" + it(x.vpp), "'" + pct(x.vpg) + "%", "0", "'0,00", "'0", "0"].map(q).join(","))));
+  }
+
+  /* i clienti di Giulia dal sito Amway (export «Clienti»): alcuni ci sono già, tre sono nuovi, due non hanno mai comprato */
+  const CLIENTI_FILE = [
+    ["MORETTI, ANNA", "7300000101", 300, "+39 333 000 0031", 2],
+    ["FERRARO, CARLA", "7300000103", 150, "+39 333 000 0033", 1],
+    ["LONGO, BEATRICE", "7300000102", 200, "+39 333 000 0032", 16],
+    ["RUSSO, ELENA", "7300000201", 40, "+39 333 000 0041", 6],
+    ["GALLI, TEO", "7300000202", 25, "+39 333 000 0042", 3],
+    ["BERTONI, SONIA", "7300000203", 90, "+39 333 000 0043", 12],
+    ["FUMAGALLI, ADA", "7300000204", 60, "+39 333 000 0044", null],
+    ["PIRANI, UGO", "7300000205", 15, "", null]];
+  function clientiProva(){
+    const testa = ["Nome", "Codice Cliente", "Tipo", "Nuovo cliente", "Data di ingresso", "Telefono", "Email", "Indirizzo", "N. di ordini", "VP Cliente", "Data ultimo ordine"];
+    scarica(`${meseFile()}_Cliente_prova.csv`, testaFile("CLIENTI").concat([testa.map(q).join(",")])
+      .concat(CLIENTI_FILE.map(([nome, cod, ingresso, tel, ultimo]) => [nome, cod, "Preferito", ingresso < 31 ? "Sì" : "No", lunga(ggL(ingresso)),
+        tel ? "Principale: " + tel : "", "", "", ultimo == null ? "0" : "1", "0,00", ultimo == null ? "--" : lunga(ggL(ultimo))]
+        .map((v, i) => i === 5 && !v ? "" : q("'" + v)).join(","))));
+  }
+  /* gli ordini dei clienti di Giulia dal sito Amway (export «Ordini») */
+  function ordiniProva(){
+    const testa = ["Nome", "Codice Cliente", "Data ordine", "Numero ordine", "VP", "VV", "Tipo ordine", "Dettagli VeCV"];
+    const ordini = [["MORETTI, ANNA", "7300000101", 2, "180000011", "28,60", "64,30"], ["FERRARO, CARLA", "7300000103", 1, "180000012", "31,70", "71,20"],
+      ["LONGO, BEATRICE", "7300000102", 16, "180000013", "25,40", "57,10"], ["RUSSO, ELENA", "7300000201", 6, "180000014", "17,20", "38,60"],
+      ["GALLI, TEO", "7300000202", 3, "180000015", "15,50", "34,90"], ["BERTONI, SONIA", "7300000203", 12, "180000016", "22,50", "50,70"],
+      ["BERTONI, SONIA", "7300000203", 45, "180000017", "13,20", "29,70"]];
+    scarica(`${meseFile()}_Ordine_prova.csv`, testaFile("ORDINI").concat([testa.map(q).join(",")])
+      .concat(ordini.map(([nome, cod, giorni, numero, vp, vv]) => [nome, cod, lunga(ggL(giorni)), numero, vp, vv, "Ordine"].map(v => q("'" + v)).join(",") + ",")));
   }
 
   /* ---- la pagina: quella vera (index.html), senza i suoi script; poi la scelta o l'app ---- */
@@ -149,10 +185,17 @@
       <p class="avviso"><b>Dati inventati.</b> Persone, numeri e nomi sono di fantasia. Niente va al database: tutto resta su questo telefono, e l'app vera non si tocca.</p>
       <p class="small" style="margin:4px 0 0">Chi vuoi essere?</p>
       ${PERSONE.map(p => `<button type="button" class="chi" data-prova="come" data-k="${p.k}"><i>${esc(p.chi)}</i><b>${esc(p.titolo)}</b><span>${esc(p.testo)}</span></button>`).join("")}
-      <div class="row wrap" style="gap:8px;margin-top:6px">
-        <button type="button" class="btn small" data-prova="mappa">Scarica la mappa Amway di prova</button>
-        <button type="button" class="btn small ghost" data-prova="ricomincia">Ricomincia da capo</button></div>
-      <p class="small" style="margin:0">La mappa di prova serve a Stefano e Alessia: in Gruppo, «Importa da Amway», e si sceglie il file scaricato. Ci sono due iscritti nuovi.</p>
+      <span class="eyebrow" style="margin-top:10px">I file del sito Amway, per gli import (inventati)</span>
+      <p class="small" style="margin:0">Scaricali qui, poi entra come la persona indicata e importali dall'app: si sceglie il file scaricato.</p>
+      <button type="button" class="chi" data-prova="mappa" data-chi="G"><i>Giulia · Gruppo → Importa da Amway</i><b>La mappa della rete di Giulia</b>
+        <span>Il suo gruppo con i VP di oggi e due iscritti nuovi: la struttura si aggiorna da sola.</span></button>
+      <button type="button" class="chi" data-prova="mappa" data-chi="R"><i>Stefano e Alessia · Gruppo → Importa da Amway</i><b>La mappa della rete di Stefano e Alessia</b>
+        <span>Tutto il gruppo, con le stesse due persone nuove.</span></button>
+      <button type="button" class="chi" data-prova="clienti"><i>Giulia · Persone → Clienti → Importa</i><b>I clienti di Giulia</b>
+        <span>L'elenco «Clienti» del sito: tre clienti nuovi e due che non hanno mai comprato; chi c'è già si riconosce dal nome.</span></button>
+      <button type="button" class="chi" data-prova="ordini"><i>Giulia · Persone → Clienti → Importa</i><b>Gli ordini dei clienti di Giulia</b>
+        <span>L'elenco «Ordini» del sito: gli ultimi ordini finiscono nello storico di ogni cliente. Si può importare insieme ai clienti.</span></button>
+      <button type="button" class="btn small ghost" data-prova="ricomincia" style="align-self:flex-start;margin-top:6px">Ricomincia da capo</button>
     </main>`;
   }
   document.addEventListener("click", e => {
@@ -163,7 +206,9 @@
     if(a === "scegli"){ for(const x of chiaviProva()) if(x !== K_DATI) scrivi(x, null); salvaDati(); location.hash = ""; location.reload(); }
     else if(a === "come") vaiCome(t.dataset.k);
     else if(a === "ricomincia") ricomincia();
-    else if(a === "mappa") mappaProva();
+    else if(a === "mappa") mappaProva(t.dataset.chi === "G" ? "G" : "R");
+    else if(a === "clienti") clientiProva();
+    else if(a === "ordini") ordiniProva();
   }, true);
 
   const carica = src => new Promise((ok, ko) => { const s = document.createElement("script"); s.src = src; s.async = false; s.onload = ok; s.onerror = ko; document.body.appendChild(s); });

@@ -1,2 +1,3 @@
 *.png
 e2e/test.mjs
+e2e/prova-*.csv

@@ -13,6 +13,9 @@ script veri e carica quelli della prova. All'inizio si sceglie chi essere: Luca 
 il percorso di partenza), Giulia Martini (in attività da due anni: Lista, clienti, Target, Verifica, gruppo di 26; è la
 sponsor di Sara e Luca), Sara Conti (12 giorni, a metà partenza), Stefano e Alessia (upline e admin). «Scarica la mappa
 Amway di prova» fa un CSV del gruppo con due iscritti nuovi, da importare come Stefano e Alessia. «Ricomincia da capo».
+Il 5 novembre (app v104) nella pagina di scelta si aggiungono i file del sito Amway, tutti inventati, per far vedere gli
+import: la mappa della rete di Giulia (da importare come Giulia), quella di Stefano e Alessia, i clienti di Giulia
+(export «Clienti»: tre nuovi, due mai comprato) e i loro ordini (export «Ordini»), da importare insieme in Clienti.
 Sicurezza: la pagina ha `connect-src 'self'` (nessun collegamento al database); tutte le chiavi sul telefono hanno
 «prova.» davanti (`salvaLocale`/`leggiLocale` in app.js, la sessione dell'API finta), così il link personale dell'app
 vera sullo stesso telefono non si tocca; notifiche e captcha finti. Controlli nella sezione 68 dei test.

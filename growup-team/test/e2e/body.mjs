@@ -4057,7 +4057,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const prima = await tutte();
   await pg.goto(BASE + "prova/");
   await pg.locator(".prova-scelta").waitFor();
-  check(await pg.locator(".prova-scelta button.chi").count() === 4 && (await pg.locator(".prova-scelta").innerText()).includes("Dati inventati"),
+  check(await pg.locator(".prova-scelta button.chi[data-prova=come]").count() === 4 && await pg.locator(".prova-scelta button.chi[data-prova=mappa], .prova-scelta button.chi[data-prova=clienti], .prova-scelta button.chi[data-prova=ordini]").count() === 4 && (await pg.locator(".prova-scelta").innerText()).includes("Dati inventati"),
     "prova: si sceglie chi essere, con l'avviso dei dati inventati");
   await pg.screenshot({ path: S + "/e2e/68-prova-scelta.png", fullPage:true });
   /* Giulia, in attività da due anni */
@@ -4088,6 +4088,25 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await pg.click("[data-prova=scegli]"); await pg.locator(".prova-scelta").waitFor();
   await pg.click("[data-prova=come][data-k=luca]");
   await pg.getByText("Ciao Luca").waitFor(); check(true, "prova: rientrando come Luca si torna nel suo profilo");
+  /* i file del sito Amway di prova: la mappa di Giulia, i suoi clienti e i loro ordini, importati come Giulia */
+  await pg.click("[data-prova=scegli]"); await pg.locator(".prova-scelta").waitFor();
+  const scaricaP = async (sel, nome) => { const [dl] = await Promise.all([pg.waitForEvent("download"), pg.click(sel)]);
+    const f = S + "/e2e/" + nome; await dl.saveAs(f); return f; };
+  const mappaG = await scaricaP("[data-prova=mappa][data-chi=G]", "prova-mappa-giulia.csv");
+  const cliG = await scaricaP("[data-prova=clienti]", "prova-clienti.csv"), ordG = await scaricaP("[data-prova=ordini]", "prova-ordini.csv");
+  await pg.click("[data-prova=come][data-k=giulia]"); await pg.getByText("Ciao Giulia").waitFor();
+  await pg.locator("button[data-act=vista-gruppo]").first().click();
+  await pg.locator("input.file-amway").first().setInputFiles(mappaG);
+  await pg.locator(".sheet h2", { hasText:"importata" }).waitFor();
+  check((await pg.locator(".sheet").innerText()).includes("Nuove nella tua struttura · 2"), "prova: la mappa di Giulia si importa, con due iscritti nuovi");
+  await pg.locator(".sheet [data-act=chiudi]").first().click();
+  await pg.click("button[data-act=vista-persone]"); await pg.click("button[data-sez=clienti]");
+  await pg.locator("input.file-amway").first().setInputFiles([cliG, ordG]);
+  await pg.locator(".sheet form[data-form=importa-ordini]").waitFor();
+  check((await pg.locator(".sheet").innerText()).includes("7 ordini e 8 clienti nei file"), "prova: i clienti e gli ordini di Giulia si leggono insieme");
+  await pg.click(".sheet button:has-text('Importa')");
+  await pg.getByText("7 ordini nello storico, 3 nuovi clienti, 2 in Lista (mai comprato)").waitFor();
+  check(true, "prova: import dei clienti: 3 nuovi clienti, 2 mai comprato, gli ordini nello storico");
   /* l'app vera non si tocca: le sue chiavi restano uguali, le altre sono tutte «prova.» */
   const dopo = await tutte();
   check(Object.entries(prima).every(([k, v]) => dopo[k] === v) && Object.keys(dopo).every(k => k in prima || k.startsWith("prova.")),
