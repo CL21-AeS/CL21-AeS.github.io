@@ -3,6 +3,20 @@
 Ultimo aggiornamento: 4 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## La versione di prova (4 novembre 2026, notte, app v103, database non toccato)
+
+Per far vedere l'app senza dati veri (incontro del 7 novembre con un leader CL21): **`growup-team/prova/`**, link
+`https://cl21-aes.github.io/growup-team/prova/`. È l'app vera (index.html, app.js, listino.js) con al posto del database
+l'API finta dei test, spostata in `prova/api-prova.js` (i test la leggono da lì), e dati inventati generati da
+`prova/dati-prova.js` con le date relative a oggi. `prova/avvio-prova.js` prende la pagina da `index.html`, toglie gli
+script veri e carica quelli della prova. All'inizio si sceglie chi essere: Luca Bassi (entra con l'invito di Giulia e fa
+il percorso di partenza), Giulia Martini (in attività da due anni: Lista, clienti, Target, Verifica, gruppo di 26; è la
+sponsor di Sara e Luca), Sara Conti (12 giorni, a metà partenza), Stefano e Alessia (upline e admin). «Scarica la mappa
+Amway di prova» fa un CSV del gruppo con due iscritti nuovi, da importare come Stefano e Alessia. «Ricomincia da capo».
+Sicurezza: la pagina ha `connect-src 'self'` (nessun collegamento al database); tutte le chiavi sul telefono hanno
+«prova.» davanti (`salvaLocale`/`leggiLocale` in app.js, la sessione dell'API finta), così il link personale dell'app
+vera sullo stesso telefono non si tocca; notifiche e captcha finti. Controlli nella sezione 68 dei test.
+
 ## VPP negativi nella mappa (4 novembre 2026, notte, app v102, database non toccato)
 
 Spiegato da Stefano: dopo la prima qualifica Argento (10.000 VPG), per sei mesi Amway chiude il mese come qualificato

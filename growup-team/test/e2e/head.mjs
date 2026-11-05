@@ -1,7 +1,7 @@
 import { chromium } from "/opt/node22/lib/node_modules/playwright/index.mjs";
 import fs from "fs";
 const S = process.env.S, BASE = "http://127.0.0.1:8765/growup-team/";
-const mock = fs.readFileSync(S + "/e2e/mock.js", "utf8");
+const mock = fs.readFileSync(S + "/../prova/api-prova.js", "utf8");   // la stessa API finta della versione di prova
 const stages = [
  {ordine:1,chiave:"primo_ordine",nome:"Primo ordine",vp_personali:50,giorni_scadenza:30},
  {ordine:2,chiave:"primi_clienti",nome:"Primi clienti",vp_personali:0,clienti:3},

@@ -1,6 +1,6 @@
 # Test di Growup Team (solo per lo sviluppo, l'app non li usa)
 
-**Interfaccia** (Playwright, con un finto Supabase in `e2e/mock.js`), dalla radice del repository:
+**Interfaccia** (Playwright, con un finto Supabase in `../prova/api-prova.js`, lo stesso della versione di prova), dalla radice del repository:
 
 ```sh
 npx http-server -a 127.0.0.1 -p 8765 -s . &
