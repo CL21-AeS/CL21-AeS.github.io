@@ -4253,8 +4253,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
       await page.waitForFunction(() => document.querySelector(".sheet input[name=contatto]").value);
       check(await page.inputValue(".sheet input[name=nome]") === "Mario Rubrica" && await page.inputValue(".sheet input[name=contatto]") === "+393330000001",
         "rubrica: nome e telefono nei campi, il numero pulito con +39");
-      check(await page.evaluate(() => JSON.stringify(window.__chiesto)) === JSON.stringify({ props:["name", "tel"], opz:{ multiple:false } }),
-        "rubrica: si chiedono solo nome e telefono, un contatto alla volta");
+      check(await page.evaluate(() => JSON.stringify(window.__chiesto)) === JSON.stringify({ props:["name", "tel"], opz:{ multiple:true } }),
+        "rubrica: si chiedono solo nome e telefono (si possono scegliere più contatti)");
       // i campi restano modificabili a mano
       await page.fill(".sheet input[name=contatto]", "333 000 0009");
       // se si annulla non cambia niente
@@ -4494,6 +4494,95 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(DB.persone.length === prima + 1 && DB.persone.some(x => x.nome === "Nome Rapido Nuovo" && x.fase === "contattato"), "contatto rapido: un nome nuovo entra già Contattato");
   check(!errori.length, "nome: nessun errore nella pagina");
   await ctx.close();
+}
+
+// 75. «Rubrica» con più contatti: l'elenco da controllare e «Aggiungi N nomi»; con uno solo il modulo si compila anche se
+//     l'app lo ha ridisegnato mentre la rubrica era aperta
+{
+  const finta = () => { window.ContactsManager = function(){};
+    Object.defineProperty(navigator, "contacts", { configurable:true, value:{ select:async () => {
+      /* come Android: mentre la rubrica è aperta l'app va in secondo piano e, tornando, può ridisegnare il modulo */
+      if(window.__ridisegna){ const f = document.querySelector("#sheet form"); f.replaceWith(f.cloneNode(true)); }
+      return window.__contatti || []; } } }); };
+  for(const tema of ["light", "dark"]){
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema }, "#chiave=" + "a".repeat(32)));
+    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+    await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+    await page.evaluate(finta);
+    await page.click("button[data-act=persona-nuova]");
+    if(tema === "light"){
+      // un contatto solo, con il modulo ridisegnato mentre la rubrica è aperta
+      await page.evaluate(() => { window.__ridisegna = true; window.__contatti = [{ name:["Uno Solo"], tel:["333 000 0020"] }]; });
+      await page.click(".sheet button[data-act=rubrica]");
+      await page.waitForFunction(() => document.querySelector(".sheet input[name=nome]").value);
+      check(await page.inputValue(".sheet input[name=nome]") === "Uno Solo" && await page.inputValue(".sheet input[name=contatto]") === "+393330000020",
+        "rubrica: un contatto solo entra nei campi anche se il modulo è stato ridisegnato");
+      await page.evaluate(() => { window.__ridisegna = false; });
+    }
+    // tre contatti: uno già in lista (numero di Primo Numero), uno con due numeri, uno senza nome
+    await page.evaluate(() => { window.__contatti = [
+      { name:["Anna Rubrica"], tel:["333 000 0030"] },
+      { name:["Bruno Due"], tel:["333 000 0031", "02 000 0032"] },
+      { name:["Primo Doppio"], tel:["+39 333 000 0010"] },
+      { name:[], tel:["333 000 0033"] }]; });
+    await page.click(".sheet button[data-act=rubrica]");
+    await page.locator(".sheet .rubrica-molti").waitFor();
+    if(tema === "light"){
+      const righe = page.locator(".sheet .rubrica-molti li");
+      check(await righe.count() === 4 && await page.locator(".sheet .rubrica-molti input[name=r-sel]:checked").count() === 4
+        && (await page.locator(".sheet h2").innerText()) === "Nomi dalla rubrica", "rubrica: più contatti → l'elenco, tutti spuntati");
+      check(await page.locator(".sheet input[name=r-nome-0]").inputValue() === "Anna Rubrica" && await page.locator(".sheet input[name=r-tel-0]").inputValue() === "+393330000030",
+        "rubrica: nome e numero pulito in ogni riga");
+      check(await righe.nth(2).evaluate(e => e.classList.contains("doppione")) && (await righe.nth(2).innerText()).includes("È già nella tua lista: Primo Numero"),
+        "rubrica: chi ha un numero già in lista è segnato in ambra");
+      check((await page.locator(".sheet .aggiungi-molti").innerText()).trim() === "Aggiungi 4 nomi", "rubrica: «Aggiungi 4 nomi»");
+      await page.uncheck(".sheet input[name=r-sel][value='2']");
+      check((await page.locator(".sheet .aggiungi-molti").innerText()).trim() === "Aggiungi 3 nomi", "rubrica: togliendo una spunta il numero scende");
+      await page.click(".sheet .rubrica-molti button[data-act=rubrica-altro-numero][data-numero='+39020000032']");
+      check(await page.locator(".sheet input[name=r-tel-1]").inputValue() === "+39020000032", "rubrica: con due numeri si sceglie quale");
+      // senza nome: si chiede di scriverlo
+      await page.click(".sheet .aggiungi-molti");
+      await page.locator(".sheet .errore", { hasText:"Scrivi il nome di tutti quelli spuntati" }).waitFor();
+      check(true, "rubrica: senza nome non si aggiunge, lo chiede");
+      await page.fill(".sheet input[name=r-nome-3]", "Carla Senza Nome");
+      await page.locator(".sheet fieldset.come-conosci label.chip", { hasText:"Lo conoscevo" }).click();
+      await page.fill(".sheet input[name=origine]", "colleghi");
+      await page.click(".sheet .aggiungi-molti");
+      await page.getByText("3 nomi nella tua lista").waitFor();
+      await sync(page);
+      const nuovi = ["Anna Rubrica", "Bruno Due", "Carla Senza Nome"].map(n => DB.persone.find(x => x.nome === n));
+      check(nuovi.every(x => x && x.fonte === "conoscenza" && x.origine === "colleghi" && x.esito == null)
+        && nuovi[1].contatto === "+39020000032" && !DB.persone.some(x => x.nome === "Primo Doppio"),
+        "rubrica: entrano i tre spuntati, con la stessa risposta e lo stesso dettaglio; il doppione tolto no");
+      // nuovi clienti dalla rubrica
+      await page.click("button[data-sez=clienti]");
+      await page.click("button[data-act=cliente-nuovo]");
+      await page.evaluate(() => { window.__contatti = [{ name:["Cliente Uno R"], tel:["333 000 0041"] }, { name:["Cliente Due R"], tel:["333 000 0042"] }]; });
+      await page.click(".sheet button[data-act=rubrica]");
+      await page.locator(".sheet .rubrica-molti").waitFor();
+      check((await page.locator(".sheet h2").innerText()) === "Nuovi clienti dalla rubrica" && (await page.locator(".sheet .aggiungi-molti").innerText()).trim() === "Aggiungi 2 clienti",
+        "rubrica: anche per i nuovi clienti");
+      await page.click(".sheet .aggiungi-molti");
+      await page.getByText("2 nuovi clienti").waitFor();
+      await sync(page);
+      check(["Cliente Uno R", "Cliente Due R"].every(n => (DB.persone.find(x => x.nome === n) || {}).esito === "cliente"), "rubrica: i clienti entrano come Cliente");
+      // annullando, si riparte dal modulo di un nome
+      await page.click("button[data-sez=lista]");
+      await page.click("button[data-act=persona-nuova]");
+      check(await page.locator(".sheet input[name=nome]").count() === 1 && !(await page.locator(".sheet .rubrica-molti").count()), "rubrica: riaprendo, il modulo di un nome");
+      check(!errori.length, "rubrica, più contatti: nessun errore nella pagina");
+    } else {
+      await page.uncheck(".sheet input[name=r-sel][value='2']");
+      await page.screenshot({ path: S + "/e2e/75-rubrica-molti-dark.png" });
+    }
+    if(tema === "light"){ await page.evaluate(() => { window.__contatti = [{ name:["Anna Rubrica"], tel:["333 000 0030"] },
+        { name:["Bruno Due"], tel:["333 000 0031", "02 000 0032"] }, { name:["Primo Doppio"], tel:["+39 333 000 0010"] }]; });
+      await page.click(".sheet button[data-act=rubrica]");
+      await page.locator(".sheet .rubrica-molti").waitFor(); await page.uncheck(".sheet input[name=r-sel][value='2']");
+      await page.screenshot({ path: S + "/e2e/75-rubrica-molti-light.png" }); }
+    await ctx.close();
+  }
 }
 
 await browser.close();

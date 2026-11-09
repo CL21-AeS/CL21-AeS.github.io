@@ -4834,6 +4834,42 @@ function doppioneDi(f){
   const stesso = f.dataset.form === "persona-nuova" && st.rapido === "contatto" ? senzaAccenti(f.nome.value) : null;
   return st.persone.find(p => p.id !== io && !(stesso && senzaAccenti(p.nome) === stesso) && cifreTelefono(p.contatto) === c) || null;
 }
+/* chi nella mia lista ha già uno di questi numeri (per l'elenco «Dalla rubrica») */
+function giaInLista(numeri){
+  const cc = new Set((numeri || []).map(cifreTelefono).filter(Boolean));
+  return cc.size ? st.persone.find(p => cc.has(cifreTelefono(p.contatto))) || null : null;
+}
+/* «Rubrica» con più contatti scelti: l'elenco da controllare (spunte, nome e numero modificabili, doppioni in ambra);
+   «Come lo conosci?», il dettaglio e le cerchie valgono per tutti. Poi «Aggiungi N nomi». */
+const RUBRICA_MAX = 50;
+function vRubricaMolti(annulla){
+  const l = st.rubricaMolti, cl = st.nuovoCliente, n = l.length;
+  return `<h2>${cl ? "Nuovi clienti dalla rubrica" : "Nomi dalla rubrica"}</h2>
+    <p class="small">Togli la spunta a chi non vuoi aggiungere. Nomi e numeri si possono correggere.</p>
+    <form data-form="persona-nuova" novalidate>
+      <ul class="rubrica-molti">${l.map((c, i) => { const d = giaInLista(c.numeri);
+        return `<li class="${d ? "doppione" : ""}"><input type="checkbox" name="r-sel" value="${i}" checked aria-label="Aggiungi ${esc(c.nome || "questo contatto")}">
+          <div class="grow">
+            <input name="r-nome-${i}" maxlength="80" value="${esc(c.nome)}" placeholder="Nome" aria-label="Nome" autocomplete="off">
+            <input name="r-tel-${i}" type="tel" maxlength="80" value="${esc(c.numeri[0] || "")}" placeholder="Telefono" aria-label="Telefono">
+            ${c.numeri.length > 1 ? `<div class="opzioni">${c.numeri.map(x => `<button type="button" class="btn small" data-act="rubrica-altro-numero" data-i="${i}" data-numero="${esc(x)}">${esc(x)}</button>`).join("")}</div>` : ""}
+            ${d ? `<p class="small fermo-testo">È già nella tua lista: ${esc(d.nome)}</p>` : ""}
+          </div></li>`; }).join("")}</ul>
+      <fieldset class="field come-conosci"><legend>Come li conosci? <i>(facoltativo, vale per tutti)</i></legend><div class="opzioni">${FONTI.map(([k, t]) =>
+        `<label class="chip"><input type="radio" name="fonte" value="${k}"><span>${t}</span></label>`).join("")}</div></fieldset>
+      <label class="field"><span>Dettaglio <i>(facoltativo, vale per tutti)</i></span><input name="origine" maxlength="80" placeholder="es. colleghi, palestra, cugini"></label>
+      ${campoCerchie(cl ? "clienti" : "lista", (cl ? st.cerchiaClienti : st.cerchiaLista) ? [cl ? st.cerchiaClienti : st.cerchiaLista] : [])}
+      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow aggiungi-molti">${testoAggiungi(n, cl)}</button></div>
+    </form>`;
+}
+const testoAggiungi = (n, cl) => n === 1 ? (cl ? "Aggiungi 1 cliente" : "Aggiungi 1 nome") : `Aggiungi ${n} ${cl ? "clienti" : "nomi"}`;
+/* il numero sul pulsante segue le spunte (senza ridisegnare) */
+document.addEventListener("change", e => {
+  const t = e.target, f = t && t.form;
+  if(t && t.name === "r-sel" && f){ const b = f.querySelector(".aggiungi-molti");
+    if(b) b.textContent = testoAggiungi(f.querySelectorAll("input[name=r-sel]:checked").length, st.nuovoCliente); }
+});
+
 /* l'avviso ambra sotto il telefono, con il pulsante per aprire la scheda (si può comunque salvare).
    Il numero già avvisato resta solo in memoria (non nella pagina): cifre e momento dell'avviso, per ogni modulo */
 const doppioniVisti = new WeakMap();
@@ -4895,6 +4931,7 @@ function vSheetPersone(s){
   if(s === "persona-nuova" || (s === "persona-modifica" && p)){
     const m = s === "persona-modifica" ? p : {};
     const rapido = !m.id && st.rapido === "contatto";
+    if(!m.id && !rapido && st.rubricaMolti && st.rubricaMolti.length) return vRubricaMolti(annulla);
     return `<h2>${m.id ? "Modifica i dati" : st.nuovoCliente ? "Un nuovo cliente" : rapido ? "Un contatto" : "Un nome nella tua lista"}</h2>
     ${rapido ? `<p class="small">Entra nella tua lista già come Contattato e conta nei contatti della settimana.
       Se è già nella lista, scrivi il nome uguale: il contatto si segna su di lei.</p>` : ""}
@@ -5014,7 +5051,7 @@ function vSheetPersone(s){
 }
 
 /* chiudendo un foglio aperto dai pulsanti rapidi di Io non resta niente di mezzo */
-function chiudiSheet(){ st.sheet = null; st.ordiniInAttesa = null; st.erroriAmway = []; if(st.rapido === "piano"){ st.personaId = null; st.passoTipo = null; } st.rapido = null; }
+function chiudiSheet(){ st.sheet = null; st.rubricaMolti = null; st.ordiniInAttesa = null; st.erroriAmway = []; if(st.rapido === "piano"){ st.personaId = null; st.passoTipo = null; } st.rapido = null; }
 async function dopoPersone(msg){
   /* + Piano da Io: finito il passo si resta su Io, senza una scheda aperta in Persone */
   if(st.rapido === "piano"){ st.rapido = null; st.personaId = null; }
@@ -5036,21 +5073,30 @@ Object.assign(AZIONI, {
   "percorso-intero"(el){ const p = el.closest(".percorso"); if(p) p.classList.add("aperto"); },
   "percorso-corto"(el){ const p = el.closest(".percorso"); if(p) p.classList.remove("aperto"); },
   "filtro-gruppo"(el){ st.filtroGruppo = el.dataset.filtro; render(); applicaRicerca(); },
-  "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = null; st.sheet = "persona-nuova"; render(); },
+  "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = null; st.rubricaMolti = null; st.sheet = "persona-nuova"; render(); },
   /* i pulsanti rapidi di Io: + Contatto apre "un nome", + Piano apre il passo Piano di una persona */
   /* «Rubrica»: si sceglie un contatto del telefono; nome e numero vanno nei campi (modificabili). Se si annulla, niente */
-  async rubrica(el){
-    const f = el.closest("form");
+  async rubrica(){
     let scelti;
-    try{ scelti = await navigator.contacts.select(["name", "tel"], { multiple:false }); }
+    try{ scelti = await navigator.contacts.select(["name", "tel"], { multiple:true }); }
     catch(e){ toast("La rubrica non si è aperta"); return; }
-    const c = scelti && scelti[0];
-    if(!c || !document.body.contains(f)) return;
-    const nome = String((c.name || []).find(x => String(x || "").trim()) || "").trim().slice(0, 80);
-    const numeri = [...new Set((c.tel || []).map(numeroPulito).filter(Boolean))];
-    if(nome) f.nome.value = nome;
-    if(numeri.length === 1) mettiNumero(f, numeri[0]);
-    sceltaNumeri(f, numeri);
+    /* di ogni contatto solo il nome e i numeri (puliti, senza ripetizioni) */
+    const lista = (scelti || []).map(c => ({ nome:String((c.name || []).find(x => String(x || "").trim()) || "").trim().slice(0, 80),
+      numeri:[...new Set((c.tel || []).map(numeroPulito).filter(Boolean))] })).filter(c => c.nome || c.numeri.length);
+    scelti = null;
+    if(!lista.length || st.sheet !== "persona-nuova") return;
+    if(lista.length > RUBRICA_MAX){ lista.length = RUBRICA_MAX; toast(`Al massimo ${RUBRICA_MAX} alla volta: ho preso i primi ${RUBRICA_MAX}`); }
+    if(lista.length > 1){ st.rubricaMolti = lista; render(); return; }
+    /* un contatto solo: nome e numero nel modulo di adesso (mentre la rubrica era aperta l'app può averlo ridisegnato) */
+    const f = document.querySelector('#sheet form[data-form="persona-nuova"]'), c = lista[0];
+    if(!f) return;
+    if(c.nome) f.nome.value = c.nome;
+    if(c.numeri.length === 1) mettiNumero(f, c.numeri[0]);
+    sceltaNumeri(f, c.numeri);
+  },
+  "rubrica-altro-numero"(el){
+    const i = el.closest("form") && el.closest("form").elements["r-tel-" + el.dataset.i];
+    if(i) i.value = el.dataset.numero;
   },
   /* «Incolla»: legge gli appunti solo adesso; se c'è un numero va nel campo, altrimenti non scrive nulla */
   async "incolla-numero"(el){
@@ -5154,9 +5200,31 @@ Object.assign(AZIONI, {
   }
 });
 
+/* «Aggiungi N nomi» dalla rubrica: tutti insieme, con la stessa risposta a «Come li conosci?», dettaglio e cerchie.
+   I nuovi clienti entrano chiusi come Cliente (come uno alla volta). */
+async function salvaRubricaMolti(f, fonte){
+  const sel = [...f.querySelectorAll("input[name=r-sel]:checked")].map(i => i.value);
+  if(!sel.length){ mostraErroreForm(f, "Spunta almeno un nome."); return; }
+  const righe = sel.map(i => ({ id:uuid(), nome:f.elements["r-nome-" + i].value.trim().slice(0, 80),
+    contatto:f.elements["r-tel-" + i].value.trim().slice(0, 80) || null, origine:f.origine.value.trim() || null, fonte }));
+  if(righe.some(r => !r.nome)){ mostraErroreForm(f, "Scrivi il nome di tutti quelli spuntati."); return; }
+  const cl = st.nuovoCliente;
+  try{
+    await api.nuovePersone(righe);
+    const scelte = [...f.querySelectorAll("input[name=cerchia]:checked")].map(i => i.value);
+    if(scelte.length) await api.inCerchia(righe.flatMap(r => scelte.map(c => ({ persona_id:r.id, cerchia_id:c }))));
+    if(cl) await api.nuoviPassi(righe.map(r => ({ id:uuid(), persona_id:r.id, tipo:"chiusura", esito:"cliente", data:oggi() })));
+    st.rubricaMolti = null; st.nuovoCliente = false; st.vista = "persone"; st.personaId = null;
+    if(cl) st.sezPersone = "clienti";
+    const n = righe.length;
+    await dopoPersone(cl ? (n === 1 ? "1 nuovo cliente" : `${n} nuovi clienti`) : (n === 1 ? "1 nome nella tua lista" : `${n} nomi nella tua lista`));
+  }catch(e){ mostraErroreForm(f, messaggio(e)); }
+}
+
 Object.assign(MODULI, {
   async "persona-nuova"(f){
     const fonteScelta = x => (x.querySelector("input[name=fonte]:checked") || {}).value || null;
+    if(st.rubricaMolti){ await salvaRubricaMolti(f, fonteScelta(f)); return; }
     const nome = f.nome.value.trim();
     if(!nome){ mostraErroreForm(f, "Scrivi il nome."); return; }
     if(fermaPerDoppione(f)) return;
@@ -6151,7 +6219,7 @@ Object.assign(AZIONI, {
   "apri-cliente"(el){ st.vista = "persone"; st.sezPersone = "clienti"; st.invitoId = null; st.personaId = el.dataset.id; render(); window.scrollTo(0, 0); },
   "torna-clienti"(){ st.personaId = null; render(); window.scrollTo(0, 0); },
   "filtro-clienti"(el){ st.filtroClienti = el.dataset.filtro; render(); },
-  "cliente-nuovo"(){ st.errore = ""; st.nuovoCliente = true; st.sheet = "persona-nuova"; render(); },
+  "cliente-nuovo"(){ st.errore = ""; st.nuovoCliente = true; st.rubricaMolti = null; st.sheet = "persona-nuova"; render(); },
   "ordine-nuovo"(){ st.bozza = nuovaBozza([]); st.cercaProdotto = ""; st.sheet = "ordine-cliente"; render(); },
   "ordine-modifica"(el){
     const o = st.ordini.find(x => x.id === el.dataset.id);

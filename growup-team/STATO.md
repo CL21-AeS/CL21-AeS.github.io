@@ -3,6 +3,20 @@
 Ultimo aggiornamento: 9 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Rubrica: più contatti insieme (9 novembre 2026, sera, app v106, database non toccato)
+
+Migrazione 062 applicata su Supabase da Claude il 9 novembre (colonna, permessi e policy controllati).
+Dal telefono di Stefano (Android, app sulla Home) la Rubrica «non inseriva» il contatto: scelto il contatto si vedeva una
+schermata bianca con il nome (la scheda del contatto nella rubrica di Android, non Growup). Decisione di Stefano: si
+possono scegliere **più contatti**. Ora `navigator.contacts.select(["name", "tel"], { multiple:true })`:
+- **un contatto**: come prima, nome e numero nel modulo (cercato di nuovo nella pagina al ritorno dalla rubrica, così
+  funziona anche se intanto l'app ha ridisegnato il modulo);
+- **più contatti** (al massimo 50): il foglio diventa «Nomi dalla rubrica» / «Nuovi clienti dalla rubrica», un elenco con
+  la spunta, nome e numero modificabili, i numeri alternativi da toccare e i doppioni con la barra ambra («È già nella
+  tua lista: …», spuntati: si tolgono a mano). «Come li conosci?», «Dettaglio» e cerchie valgono per tutti.
+  «Aggiungi N nomi» li salva insieme (`salvaRubricaMolti`); i nuovi clienti entrano chiusi come Cliente.
+Test: sezione 75 (e 71 aggiornata). Da riprovare sul telefono di Stefano.
+
 ## Il modulo di un nome: Social, «Come lo conosci?», Rubrica, Incolla, doppioni (9 novembre 2026: migrazione 062, app v105)
 
 Otto PR in fila (178-185), da unire in ordine; **prima la migrazione 062 su Supabase**. Riguardano il modulo «Un nome
