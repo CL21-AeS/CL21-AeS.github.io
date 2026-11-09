@@ -4834,7 +4834,9 @@ function doppioneDi(f){
   const stesso = f.dataset.form === "persona-nuova" && st.rapido === "contatto" ? senzaAccenti(f.nome.value) : null;
   return st.persone.find(p => p.id !== io && !(stesso && senzaAccenti(p.nome) === stesso) && cifreTelefono(p.contatto) === c) || null;
 }
-/* l'avviso ambra sotto il telefono, con il pulsante per aprire la scheda (si può comunque salvare) */
+/* l'avviso ambra sotto il telefono, con il pulsante per aprire la scheda (si può comunque salvare).
+   Il numero già avvisato resta solo in memoria (non nella pagina): cifre e momento dell'avviso, per ogni modulo */
+const doppioniVisti = new WeakMap();
 function mostraDoppione(f){
   const box = f && f.querySelector(".avviso-doppione");
   if(!box) return null;
@@ -4842,15 +4844,15 @@ function mostraDoppione(f){
   box.innerHTML = p ? `<p class="small">È già nella tua lista: <b>${esc(p.nome)}</b></p>
     <button type="button" class="btn small" data-act="apri-doppione" data-id="${esc(p.id)}">Apri la sua scheda</button>` : "";
   box.hidden = !p;
-  f.dataset.doppione = p ? cifreTelefono(f.contatto.value) + "|" + Date.now() : "";
+  if(p) doppioniVisti.set(f, { c:cifreTelefono(f.contatto.value), t:Date.now() }); else doppioniVisti.delete(f);
   return p;
 }
 /* al salvataggio: se c'è un doppione che non si è ancora visto, prima l'avviso; toccando di nuovo «Salva» si salva.
    (l'avviso appena comparso, uscendo dal campo con il tocco su «Salva», non conta come visto) */
 function fermaPerDoppione(f){
   if(!doppioneDi(f)) return false;
-  const [c, t] = String(f.dataset.doppione || "").split("|");
-  if(c === cifreTelefono(f.contatto.value) && Date.now() - Number(t) > 700) return false;
+  const v = doppioniVisti.get(f);
+  if(v && v.c === cifreTelefono(f.contatto.value) && Date.now() - v.t > 700) return false;
   mostraDoppione(f);
   return true;
 }
@@ -4861,8 +4863,8 @@ document.addEventListener("change", e => {
 document.addEventListener("input", e => {
   const t = e.target, f = t && t.form;
   /* cambiando il numero l'avviso di prima sparisce (torna uscendo dal campo, se serve) */
-  if(t && t.name === "contatto" && f && f.dataset.doppione && f.dataset.doppione.split("|")[0] !== cifreTelefono(t.value)){
-    const box = f.querySelector(".avviso-doppione"); if(box){ box.innerHTML = ""; box.hidden = true; } f.dataset.doppione = ""; }
+  if(t && t.name === "contatto" && f && doppioniVisti.has(f) && doppioniVisti.get(f).c !== cifreTelefono(t.value)){
+    const box = f.querySelector(".avviso-doppione"); if(box){ box.innerHTML = ""; box.hidden = true; } doppioniVisti.delete(f); }
 });
 /* scrive nel campo un numero scelto (dalla rubrica o dagli appunti): il campo resta modificabile a mano */
 function mettiNumero(f, n){

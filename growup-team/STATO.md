@@ -1,7 +1,38 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 4 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 9 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
+
+## Il modulo di un nome: Social, «Come lo conosci?», Rubrica, Incolla, doppioni (9 novembre 2026: migrazione 062, app v105)
+
+Otto PR in fila (178-185), da unire in ordine; **prima la migrazione 062 su Supabase**. Riguardano il modulo «Un nome
+nella tua lista» / «Un nuovo cliente» (`vSheetPersone`, foglio `persona-nuova`) e «Modifica i dati».
+Regola generale: tutti i campi restano scrivibili a mano; Rubrica e Incolla compilano soltanto i campi, e quello che si
+scrive a mano non viene mai trasformato.
+1. **Social (062)**: colonna `persone.social` (facoltativa, max 80), `grant insert/update (social)`. Nessuna policy nuova
+   (`persone_mie`: solo chi ha scritto la persona). Il social non è in `copia_dati`, `numeri_persone` né in altre funzioni;
+   controlli 062 in `tests_rls.sql` (l'upline, anche admin, non legge né contatto né social). I valori già in «contatto»
+   restano dove sono: il 9 novembre su 17 contatti salvati nessuno conteneva lettere o @.
+2. **Telefono e Social**: «Telefono (facoltativo)» (`type=tel`, `autocomplete=tel`) e sotto «Social (facoltativo)»
+   («es. @nome su Instagram»). Il social si vede nella scheda della persona e del cliente.
+3. **«Come lo conosci?»** al posto di «Come lo conosci» + «Fonte»: chip a scelta singola facoltativa **Lo conoscevo ·
+   Di recente · Dai social** (testi accorciati da Stefano perché stiano su una riga a 360 px; valori `conoscenza`,
+   `dal_vivo`, `social` come prima) e sotto «Dettaglio (facoltativo)» (colonna `origine`). Per tutti (non più solo gli
+   avviati) e per i nuovi clienti. «Dai social» porta il cursore al campo Social. Nel cruscotto (solo avviati) i nomi
+   nuovi della settimana: «lo conoscevi già», «incontrati di recente» (uno: «incontrato di recente»), «dai social».
+4. **Rubrica** (Contact Picker API, oggi Chrome su Android; dove non c'è non compare): pulsante a contorno in cima al
+   modulo, solo per un nome nuovo (non in modifica né nel «+ Contatto» rapido). Chiede solo nome e telefono di un
+   contatto; con più numeri «Quale numero?». Pulizia del numero (`numeroPulito`): via spazi, trattini, parentesi, punti
+   e barre; 00 → +; +39 se manca il prefisso.
+5. **Incolla** accanto al Telefono (pensato per iPhone), solo per un nome nuovo e solo se il browser legge gli appunti:
+   li legge solo al tocco, prende il primo numero dal testo (le date no), altrimenti «Negli appunti non c'è un numero».
+6. **Doppioni**: stesso numero già in `st.persone` (solo cifre, senza +39/0039; un prefisso estero resta diverso) →
+   avviso ambra «È già nella tua lista: [nome]» con «Apri la sua scheda». Dopo Rubrica e Incolla, uscendo dal campo e
+   al salvataggio (il primo «Salva» mostra l'avviso, il secondo salva). In modifica solo se il numero è cambiato.
+7. **Nome**: `autocomplete="name"` al posto di `off`; il «+ Contatto» rapido trova ancora il nome uguale.
+8. **Privacy e sicurezza**: dalla rubrica solo nome e telefono, il testo degli appunti non si tiene, nessun numero o
+   social in console o log (lo stato dei doppioni resta in memoria). Controllo /security-review fatto.
+Test: sezioni 69-74 (interfaccia) e 062 (database). Da provare dal telefono: Rubrica su Android, Incolla su iPhone.
 
 ## La versione di prova (4 novembre 2026, notte, app v103, database non toccato)
 
