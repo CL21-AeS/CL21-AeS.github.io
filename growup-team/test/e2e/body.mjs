@@ -4121,6 +4121,48 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await c.close();
 }
 
+// 69. Il campo «Social» (062): nel modulo «Telefono» e «Social» separati, salvati e mostrati nella scheda
+{
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+  await page.click("button[data-act=persona-nuova]");
+  const tel = page.locator(".sheet input[name=contatto]"), soc = page.locator(".sheet input[name=social]");
+  check((await page.locator(".sheet label.field:has(input[name=contatto]) > span").innerText()).replace(/\s+/g, " ").trim() === "Telefono (facoltativo)"
+    && await tel.getAttribute("type") === "tel" && await tel.getAttribute("autocomplete") === "tel", "social: il campo «Telefono (facoltativo)», di tipo tel");
+  check((await page.locator(".sheet label.field:has(input[name=social]) > span").innerText()).replace(/\s+/g, " ").trim() === "Social (facoltativo)"
+    && await soc.getAttribute("placeholder") === "es. @nome su Instagram" && await soc.getAttribute("autocomplete") === "off"
+    && await soc.getAttribute("autocapitalize") === "off", "social: sotto il telefono il campo «Social (facoltativo)»");
+  await page.screenshot({ path: S + "/e2e/69-modulo-chiaro.png" });
+  await page.fill(".sheet input[name=nome]", "Nome Con Social");
+  await tel.fill("+39 333 0000001");
+  await soc.fill("@nome_prova");
+  await page.click(".sheet button.primary");
+  await page.getByText("Nome Con Social nella tua lista").waitFor();
+  await sync(page);
+  const ps = DB.persone.find(x => x.nome === "Nome Con Social");
+  check(ps && ps.contatto === "+39 333 0000001" && ps.social === "@nome_prova", "social: telefono e social salvati così come sono scritti");
+  await page.locator("button[data-act=apri-persona]", { hasText:"Nome Con Social" }).click();
+  check((await page.locator("#app").innerText()).includes("+39 333 0000001 · @nome_prova"), "social: nella scheda della persona telefono e social");
+  await page.click("button[data-act=persona-modifica]");
+  check(await soc.inputValue() === "@nome_prova", "social: in «Modifica i dati» il social già scritto");
+  await soc.fill("@nome_nuovo");
+  await page.click(".sheet button.primary");
+  await page.locator(".sheet").waitFor({ state:"detached" });
+  await sync(page);
+  check(DB.persone.find(x => x.id === ps.id).social === "@nome_nuovo", "social: si modifica");
+  check(!errori.length, "social: nessun errore nella pagina");
+  await ctx.close();
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:"dark" }, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+  await page.click("button[data-act=persona-nuova]");
+  await page.screenshot({ path: S + "/e2e/69-modulo-scuro.png" });
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
