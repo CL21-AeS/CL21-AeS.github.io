@@ -4801,6 +4801,18 @@ function numeroPulito(t){
 /* La rubrica del telefono (Contact Picker API: per ora Chrome su Android): si chiedono solo nome e telefono */
 const rubricaOk = () => "contacts" in navigator && "ContactsManager" in window;
 const ICONA_RUBRICA = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="15" height="18" rx="2"/><path d="M3 7h3M3 12h3M3 17h3"/><circle cx="12.5" cy="10" r="2.5"/><path d="M8.5 16.5c.6-2 2.1-3 4-3s3.4 1 4 3"/></svg>`;
+/* «Incolla»: c'è solo se il browser lascia leggere gli appunti (e li legge solo al tocco) */
+const incollaOk = () => !!(navigator.clipboard && typeof navigator.clipboard.readText === "function");
+/* il primo numero di telefono in un testo (es. un messaggio copiato), pulito come quello della rubrica; le date no */
+function numeroNelTesto(t){
+  const pezzi = String(t || "").slice(0, 2000).match(/(?:\+|00)?\(?\d[\d\s\u200e\u200f\u202a-\u202e\-().\/]{4,}\d/g) || [];
+  for(const x of pezzi){
+    if(/^\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}$/.test(x.trim())) continue;
+    const n = numeroPulito(x);
+    if(n) return n;
+  }
+  return null;
+}
 /* scrive nel campo un numero scelto (dalla rubrica o dagli appunti): il campo resta modificabile a mano */
 function mettiNumero(f, n){
   if(!f || !f.contatto) return;
@@ -4836,7 +4848,9 @@ function vSheetPersone(s){
       ${!m.id && !rapido && rubricaOk() ? `<button type="button" class="btn wide rubrica" data-act="rubrica">${ICONA_RUBRICA}Rubrica</button>
         <div class="scegli-numero" aria-live="polite"></div>` : ""}
       <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc(m.nome || "")}" autocomplete="off"></label>
-      <label class="field"><span>Telefono <i>(facoltativo)</i></span><input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc(m.contatto || "")}"></label>
+      <label class="field"><span>Telefono <i>(facoltativo)</i></span>${!m.id && !rapido && incollaOk() ? `<span class="con-incolla"><input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc(m.contatto || "")}">
+        <button type="button" class="btn small" data-act="incolla-numero">Incolla</button></span>`
+        : `<input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc(m.contatto || "")}">`}</label>
       <label class="field"><span>Social <i>(facoltativo)</i></span><input name="social" maxlength="80" placeholder="es. @nome su Instagram" autocomplete="off" autocapitalize="off" value="${esc(m.social || "")}"></label>
       <fieldset class="field come-conosci"><legend>Come lo conosci? <i>(facoltativo)</i></legend><div class="opzioni">${FONTI.map(([k, t]) =>
         `<label class="chip"><input type="radio" name="fonte" value="${k}"${m.fonte === k ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>
@@ -4982,6 +4996,17 @@ Object.assign(AZIONI, {
     if(nome) f.nome.value = nome;
     if(numeri.length === 1) mettiNumero(f, numeri[0]);
     sceltaNumeri(f, numeri);
+  },
+  /* «Incolla»: legge gli appunti solo adesso; se c'è un numero va nel campo, altrimenti non scrive nulla */
+  async "incolla-numero"(el){
+    const f = el.closest("form");
+    let testo;
+    try{ testo = await navigator.clipboard.readText(); }
+    catch(e){ toast("Non riesco a leggere gli appunti"); return; }
+    const n = numeroNelTesto(testo);
+    testo = null;
+    if(!n){ toast("Negli appunti non c'è un numero"); return; }
+    if(document.body.contains(f)) mettiNumero(f, n);
   },
   "rubrica-numero"(el){
     const f = el.closest("form");

@@ -4129,7 +4129,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
   await page.click("button[data-act=persona-nuova]");
   const tel = page.locator(".sheet input[name=contatto]"), soc = page.locator(".sheet input[name=social]");
-  check((await page.locator(".sheet label.field:has(input[name=contatto]) > span").innerText()).replace(/\s+/g, " ").trim() === "Telefono (facoltativo)"
+  check((await page.locator(".sheet label.field:has(input[name=contatto]) > span:first-child").innerText()).replace(/\s+/g, " ").trim() === "Telefono (facoltativo)"
     && await tel.getAttribute("type") === "tel" && await tel.getAttribute("autocomplete") === "tel", "social: il campo «Telefono (facoltativo)», di tipo tel");
   check((await page.locator(".sheet label.field:has(input[name=social]) > span").innerText()).replace(/\s+/g, " ").trim() === "Social (facoltativo)"
     && await soc.getAttribute("placeholder") === "es. @nome su Instagram" && await soc.getAttribute("autocomplete") === "off"
@@ -4312,6 +4312,72 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(pul.join() === "+393331234567,+442079460000,+41790000000,+39061234567",
     "numeri: spazi, trattini e parentesi via; 00 → +; +39 se manca il prefisso; scartato chi non è un numero (" + pul.join() + ")");
   await ctx.close();
+}
+
+// 72. «Incolla» accanto al telefono: legge gli appunti solo al tocco, mette il numero se c'è
+{
+  /* appunti finti: readText risponde con window.__appunti (o rifiuta se window.__appuntiNo) */
+  const appunti = () => Object.defineProperty(navigator, "clipboard", { configurable:true, value:{ readText:async () => {
+    window.__letti = (window.__letti || 0) + 1; if(window.__appuntiNo) throw new Error("NotAllowedError"); return window.__appunti || ""; } } });
+  for(const tema of ["light", "dark"]){
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema }, "#chiave=" + "a".repeat(32)));
+    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+    await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+    if(tema === "light"){
+      await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { configurable:true, value:undefined }));
+      await page.click("button[data-act=persona-nuova]");
+      check(!(await page.locator(".sheet button[data-act=incolla-numero]").count()), "incolla: se il browser non legge gli appunti il pulsante non c'è");
+      await page.click(".sheet [data-act=chiudi]");
+    }
+    await page.evaluate(appunti);
+    await page.click("button[data-act=persona-nuova]");
+    const inc = page.locator(".sheet button[data-act=incolla-numero]");
+    const pos = await inc.evaluate(b => { const i = b.form.contatto.getBoundingClientRect(), r = b.getBoundingClientRect();
+      return { accanto:Math.abs(i.top - r.top) < 2 && r.left > i.right, h:r.height, testo:b.textContent.trim() }; });
+    check(pos.accanto && pos.testo === "Incolla" && pos.h < 50, "incolla: il pulsante «Incolla» accanto al campo Telefono, su una riga");
+    check(await page.evaluate(() => window.__letti || 0) === 0, "incolla: aprendo il modulo gli appunti non si leggono");
+    if(tema === "light"){
+      await page.evaluate(() => { window.__appunti = "Ciao, sono Gino! Il mio numero è 333 000 0004, ci sentiamo il 12/05/2026"; });
+      await inc.click();
+      await page.waitForFunction(() => document.querySelector(".sheet input[name=contatto]").value);
+      check(await page.inputValue(".sheet input[name=contatto]") === "+393330000004" && await page.evaluate(() => window.__letti) === 1,
+        "incolla: dal testo copiato solo il numero, pulito con +39");
+      await page.evaluate(() => { window.__appunti = "ci vediamo il 12/05/2026 alle 18"; });
+      await inc.click();
+      await page.locator(".toast", { hasText:"Negli appunti non c'è un numero" }).waitFor();
+      check(await page.inputValue(".sheet input[name=contatto]") === "+393330000004", "incolla: senza numero l'avviso e il campo resta com'è");
+      await page.evaluate(() => { window.__appuntiNo = true; });
+      await inc.click();
+      await page.locator(".toast", { hasText:"Non riesco a leggere gli appunti" }).waitFor();
+      check(await page.inputValue(".sheet input[name=contatto]") === "+393330000004", "incolla: se il telefono nega gli appunti, niente cambia");
+      await page.evaluate(() => { window.__appuntiNo = false; window.__appunti = "0039 333 000 0005"; });
+      await inc.click();
+      await page.waitForFunction(() => document.querySelector(".sheet input[name=contatto]").value === "+393330000005");
+      check(true, "incolla: 00 → +");
+      await page.fill(".sheet input[name=contatto]", "333-000-0006 ufficio");
+      await page.fill(".sheet input[name=nome]", "Gino Incolla");
+      await page.click(".sheet button.primary");
+      await page.getByText("Gino Incolla nella tua lista").waitFor();
+      await sync(page);
+      check(DB.persone.some(x => x.nome === "Gino Incolla" && x.contatto === "333-000-0006 ufficio"), "incolla: il campo resta scrivibile, a mano non si trasforma");
+      await page.locator("button[data-act=apri-persona]", { hasText:"Gino Incolla" }).click();
+      await page.click("button[data-act=persona-modifica]");
+      check(!(await page.locator(".sheet button[data-act=incolla-numero]").count()) && await page.inputValue(".sheet input[name=contatto]") === "333-000-0006 ufficio",
+        "incolla: non in «Modifica i dati»");
+      await page.click(".sheet [data-act=chiudi]");
+      await page.click("button[data-act=torna-lista]");
+      await page.click("button[data-sez=clienti]");
+      await page.click("button[data-act=cliente-nuovo]");
+      check(await page.locator(".sheet button[data-act=incolla-numero]").count() === 1, "incolla: c'è anche per un nuovo cliente");
+      check(!errori.length, "incolla: nessun errore nella pagina");
+    } else {
+      await page.screenshot({ path: S + "/e2e/72-incolla-dark.png" });
+    }
+    if(tema === "light"){ await page.click(".sheet [data-act=chiudi]"); await page.click("button[data-sez=lista]"); await page.click("button[data-act=persona-nuova]");
+      await page.screenshot({ path: S + "/e2e/72-incolla-light.png" }); }
+    await ctx.close();
+  }
 }
 
 await browser.close();
