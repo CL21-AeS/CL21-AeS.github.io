@@ -4613,6 +4613,9 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.waitForTimeout(1200);
   check(await page.inputValue(".sheet input[name=nome]") === "Ugo Testo" && await page.inputValue(".sheet input[name=contatto]") === "+393330000050",
     "rubrica: il contatto resta nel modulo anche quando l'app ridisegna");
+  { const d = await page.locator(".sheet .rubrica-passi").innerText();
+    check(/^v108 · clic 0,0s · rubrica chiesta [\d,]+s · risposta: 1 contatto [\d,]+s · nome sì, numeri 1 [\d,]+s · visibile [\d,]+s$/.test(d) && !/Ugo|333/.test(d),
+      "rubrica: sotto il pulsante i passaggi e la versione, senza nomi né numeri (" + d + ")"); }
   // un nome scritto prima viene sostituito da quello della rubrica; dopo, si corregge a mano
   await page.fill(".sheet input[name=nome]", "Scritto a mano");
   await page.evaluate(() => { window.__contatti = [{ name:["Vera Rubrica"], tel:["333 000 0051", "333 000 0052"] }]; });
@@ -4629,6 +4632,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(DB.persone.some(x => x.nome === "Vera Corretta" && x.contatto === "+393330000052"), "rubrica: si salva quello che c'è nei campi");
   await page.click("button[data-act=persona-nuova]");
   check(await page.inputValue(".sheet input[name=nome]") === "" && await page.inputValue(".sheet input[name=contatto]") === "", "rubrica: riaprendo, il modulo è vuoto");
+  check(!(await page.locator(".sheet .rubrica-passi").innerText()), "rubrica: riaprendo, i passaggi ripartono da zero");
   check(!errori.length, "rubrica, avvisi: nessun errore nella pagina");
   await ctx.close();
 }
