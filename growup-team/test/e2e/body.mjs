@@ -4380,6 +4380,87 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   }
 }
 
+// 73. Doppioni: lo stesso numero già nella lista → avviso ambra con la scheda da aprire; si può comunque salvare
+{
+  for(const tema of ["light", "dark"]){
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema }, "#chiave=" + "a".repeat(32)));
+    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+    await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+    const avviso = page.locator(".sheet .avviso-doppione");
+    const nuovo = async (nome, tel) => { await page.click("button[data-act=persona-nuova]"); await page.fill(".sheet input[name=nome]", nome);
+      if(tel) await page.fill(".sheet input[name=contatto]", tel); };
+    if(tema === "light"){
+      await nuovo("Primo Numero", "333 000 0010");
+      await page.click(".sheet button.primary");
+      await page.getByText("Primo Numero nella tua lista").waitFor();
+      // scritto a mano, con +39 e trattini: all'uscita dal campo l'avviso
+      await nuovo("Secondo Numero", "+39 333-000-0010");
+      check(await avviso.isHidden(), "doppioni: mentre si scrive nessun avviso");
+      await page.locator(".sheet input[name=contatto]").press("Tab");
+      await avviso.locator("button[data-act=apri-doppione]").waitFor();
+      check((await avviso.innerText()).includes("È già nella tua lista: Primo Numero"), "doppioni: uscendo dal campo «È già nella tua lista: Primo Numero»");
+      const amb = await avviso.evaluate(e => getComputedStyle(e.querySelector("b")).color === getComputedStyle(document.documentElement).getPropertyValue("--giallo").trim()
+        || getComputedStyle(e.querySelector("b")).color);
+      check(amb === true || /rgb/.test(String(amb)), "doppioni: avviso ambra");
+      // cambiando il numero l'avviso sparisce; un numero estero con le stesse cifre non è un doppione
+      await page.fill(".sheet input[name=contatto]", "+41 333 000 0010");
+      await page.locator(".sheet input[name=contatto]").press("Tab");
+      check(await avviso.isHidden(), "doppioni: un numero diverso (anche +41 con le stesse cifre) non dà l'avviso");
+      // al salvataggio: il primo tocco mostra l'avviso, il secondo salva
+      await page.fill(".sheet input[name=contatto]", "0039 3330000010");
+      await page.click(".sheet button.primary");
+      await avviso.locator("button[data-act=apri-doppione]").waitFor();
+      check(await page.locator(".sheet").count() === 1, "doppioni: al primo «Salva» l'avviso, il modulo resta aperto");
+      await page.waitForTimeout(800);
+      await page.click(".sheet button.primary");
+      await page.getByText("Secondo Numero nella tua lista").waitFor();
+      await sync(page);
+      check(DB.persone.some(x => x.nome === "Secondo Numero" && x.contatto === "0039 3330000010"), "doppioni: si può comunque salvare, il numero com'era scritto");
+      // dagli appunti e dalla rubrica
+      await page.evaluate(() => { Object.defineProperty(navigator, "clipboard", { configurable:true, value:{ readText:async () => "chiama 333 000 0010" } });
+        window.ContactsManager = function(){}; Object.defineProperty(navigator, "contacts", { configurable:true, value:{ select:async () => [{ name:["Terzo Rubrica"], tel:["3330000010"] }] } }); });
+      await nuovo("Terzo Incolla");
+      await page.click(".sheet button[data-act=incolla-numero]");
+      await avviso.locator("button[data-act=apri-doppione]").waitFor();
+      check((await avviso.innerText()).includes("Primo Numero"), "doppioni: anche con «Incolla»");
+      await page.click(".sheet [data-act=chiudi]");
+      await page.click("button[data-act=persona-nuova]");
+      await page.click(".sheet button[data-act=rubrica]");
+      await avviso.locator("button[data-act=apri-doppione]").waitFor();
+      check(await page.inputValue(".sheet input[name=nome]") === "Terzo Rubrica", "doppioni: anche con «Rubrica»");
+      // «Apri la sua scheda»
+      await avviso.locator("button[data-act=apri-doppione]").click();
+      await page.locator(".sheet").waitFor({ state:"detached" });
+      check(await page.locator("#app h2", { hasText:"Primo Numero" }).count() === 1, "doppioni: «Apri la sua scheda» chiude il modulo e apre quella scheda");
+      // «Modifica i dati»: salvare senza cambiare il numero non dà avvisi; cambiandolo in uno già presente sì
+      const primo = DB.persone.find(x => x.nome === "Primo Numero");
+      await page.click("button[data-act=persona-modifica]");
+      await page.fill(".sheet [name=note]", "nota");
+      await page.click(".sheet button.primary");
+      await page.locator(".sheet").waitFor({ state:"detached" });
+      check(true, "doppioni: in modifica, numero non toccato → si salva subito");
+      await page.click("button[data-act=persona-modifica]");
+      await page.fill(".sheet input[name=contatto]", "+39 333 000 0006");
+      await page.locator(".sheet input[name=contatto]").press("Tab");
+      await avviso.locator("button[data-act=apri-doppione]").waitFor();
+      check((await avviso.innerText()).includes("Gino Incolla"), "doppioni: in modifica, un numero di un altro → l'avviso");
+      await page.click(".sheet [data-act=chiudi]");
+      await sync(page);
+      check(DB.persone.find(x => x.id === primo.id).contatto === "333 000 0010", "doppioni: chiudendo senza salvare non cambia niente");
+      check(!errori.length, "doppioni: nessun errore nella pagina");
+    } else {
+      await nuovo("Altro Numero", "333 000 0010");
+      await page.locator(".sheet input[name=contatto]").press("Tab");
+      await avviso.locator("button[data-act=apri-doppione]").waitFor();
+    }
+    if(tema === "light"){ await page.click("button[data-act=torna-lista]"); await nuovo("Altro Numero", "333 000 0010"); await page.locator(".sheet input[name=contatto]").press("Tab");
+      await avviso.locator("button[data-act=apri-doppione]").waitFor(); }
+    await page.screenshot({ path: S + `/e2e/73-doppione-${tema}.png` });
+    await ctx.close();
+  }
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

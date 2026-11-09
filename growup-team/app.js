@@ -4813,11 +4813,63 @@ function numeroNelTesto(t){
   }
   return null;
 }
+/* Doppioni: lo stesso numero è già nella mia lista (o tra i clienti)? Si confrontano solo le cifre, senza +39 (o 0039);
+   un prefisso estero resta, così +41 79… non si confonde con un numero italiano. Meno di 6 cifre non si confronta. */
+function cifreTelefono(t){
+  const s = String(t || "").replace(/[^\d+]/g, "");
+  let d = s.replace(/\+/g, "");
+  const estero = s.startsWith("+") || s.startsWith("00");
+  if(s.startsWith("00")) d = d.slice(2);
+  if(estero) d = d.startsWith("39") ? d.slice(2) : "00" + d;
+  return d.length >= 6 ? d : "";
+}
+function doppioneDi(f){
+  if(!f || !f.contatto) return null;
+  const io = f.dataset.form === "persona-modifica" ? st.personaId : null;
+  /* in «Modifica i dati» si controlla solo un numero cambiato */
+  if(io && f.contatto.value === f.contatto.defaultValue) return null;
+  const c = cifreTelefono(f.contatto.value);
+  if(!c) return null;
+  /* nel contatto rapido, se il nome è già nella lista il contatto si segna su di lei: lei non è un doppione */
+  const stesso = f.dataset.form === "persona-nuova" && st.rapido === "contatto" ? senzaAccenti(f.nome.value) : null;
+  return st.persone.find(p => p.id !== io && !(stesso && senzaAccenti(p.nome) === stesso) && cifreTelefono(p.contatto) === c) || null;
+}
+/* l'avviso ambra sotto il telefono, con il pulsante per aprire la scheda (si può comunque salvare) */
+function mostraDoppione(f){
+  const box = f && f.querySelector(".avviso-doppione");
+  if(!box) return null;
+  const p = doppioneDi(f);
+  box.innerHTML = p ? `<p class="small">È già nella tua lista: <b>${esc(p.nome)}</b></p>
+    <button type="button" class="btn small" data-act="apri-doppione" data-id="${esc(p.id)}">Apri la sua scheda</button>` : "";
+  box.hidden = !p;
+  f.dataset.doppione = p ? cifreTelefono(f.contatto.value) + "|" + Date.now() : "";
+  return p;
+}
+/* al salvataggio: se c'è un doppione che non si è ancora visto, prima l'avviso; toccando di nuovo «Salva» si salva.
+   (l'avviso appena comparso, uscendo dal campo con il tocco su «Salva», non conta come visto) */
+function fermaPerDoppione(f){
+  if(!doppioneDi(f)) return false;
+  const [c, t] = String(f.dataset.doppione || "").split("|");
+  if(c === cifreTelefono(f.contatto.value) && Date.now() - Number(t) > 700) return false;
+  mostraDoppione(f);
+  return true;
+}
+document.addEventListener("change", e => {
+  const t = e.target;
+  if(t && t.name === "contatto" && t.form && /^persona-(nuova|modifica)$/.test(t.form.dataset.form || "")) mostraDoppione(t.form);
+});
+document.addEventListener("input", e => {
+  const t = e.target, f = t && t.form;
+  /* cambiando il numero l'avviso di prima sparisce (torna uscendo dal campo, se serve) */
+  if(t && t.name === "contatto" && f && f.dataset.doppione && f.dataset.doppione.split("|")[0] !== cifreTelefono(t.value)){
+    const box = f.querySelector(".avviso-doppione"); if(box){ box.innerHTML = ""; box.hidden = true; } f.dataset.doppione = ""; }
+});
 /* scrive nel campo un numero scelto (dalla rubrica o dagli appunti): il campo resta modificabile a mano */
 function mettiNumero(f, n){
   if(!f || !f.contatto) return;
   f.contatto.value = n;
   f.contatto.dispatchEvent(new Event("input", { bubbles:true }));
+  mostraDoppione(f);
 }
 /* «Rubrica» → «Quale numero?»: l'elenco dei numeri del contatto, sotto il pulsante (non passa da render) */
 function sceltaNumeri(f, numeri){
@@ -4851,6 +4903,7 @@ function vSheetPersone(s){
       <label class="field"><span>Telefono <i>(facoltativo)</i></span>${!m.id && !rapido && incollaOk() ? `<span class="con-incolla"><input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc(m.contatto || "")}">
         <button type="button" class="btn small" data-act="incolla-numero">Incolla</button></span>`
         : `<input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc(m.contatto || "")}">`}</label>
+      <div class="fermo-box avviso-doppione" aria-live="polite" hidden></div>
       <label class="field"><span>Social <i>(facoltativo)</i></span><input name="social" maxlength="80" placeholder="es. @nome su Instagram" autocomplete="off" autocapitalize="off" value="${esc(m.social || "")}"></label>
       <fieldset class="field come-conosci"><legend>Come lo conosci? <i>(facoltativo)</i></legend><div class="opzioni">${FONTI.map(([k, t]) =>
         `<label class="chip"><input type="radio" name="fonte" value="${k}"${m.fonte === k ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>
@@ -5008,6 +5061,13 @@ Object.assign(AZIONI, {
     if(!n){ toast("Negli appunti non c'è un numero"); return; }
     if(document.body.contains(f)) mettiNumero(f, n);
   },
+  /* dall'avviso dei doppioni: si chiude il modulo e si apre la scheda di chi ha già quel numero */
+  "apri-doppione"(el){
+    const p = st.persone.find(x => x.id === el.dataset.id);
+    if(!p) return;
+    chiudiSheet(); st.nuovoCliente = false;
+    AZIONI[p.esito === "cliente" ? "apri-cliente" : "apri-persona"]({ dataset:{ id:p.id } });
+  },
   "rubrica-numero"(el){
     const f = el.closest("form");
     mettiNumero(f, el.dataset.numero);
@@ -5097,6 +5157,7 @@ Object.assign(MODULI, {
     const fonteScelta = x => (x.querySelector("input[name=fonte]:checked") || {}).value || null;
     const nome = f.nome.value.trim();
     if(!nome){ mostraErroreForm(f, "Scrivi il nome."); return; }
+    if(fermaPerDoppione(f)) return;
     try{
       /* + Contatto da Io: la persona entra già contattata (il passo conta il contatto della settimana) e si resta su Io;
          se il nome è già nella lista il contatto si segna su di lei */
@@ -5182,6 +5243,7 @@ Object.assign(MODULI, {
   async "persona-modifica"(f){
     const nome = f.nome.value.trim();
     if(!nome){ mostraErroreForm(f, "Scrivi il nome."); return; }
+    if(fermaPerDoppione(f)) return;
     const campi = { nome, contatto:f.contatto.value.trim() || null, social:f.social.value.trim() || null, origine:f.origine.value.trim() || null, note:f.note.value.trim() || null };
     campi.fonte = (f.querySelector("input[name=fonte]:checked") || {}).value || null;
     if(f.codice_cliente){
