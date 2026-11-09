@@ -742,6 +742,15 @@ label.field>span.con-incolla{display:flex;gap:8px;align-items:stretch;margin:0;f
 .avviso-doppione{margin-top:8px}
 .avviso-doppione p{margin:0 0 8px}
 .avviso-doppione[hidden]{display:none}
+/* «Nomi dalla rubrica»: l'elenco dei contatti scelti, con la spunta; i doppioni con la barra ambra */
+.rubrica-molti{list-style:none;margin:8px 0 0;padding:0}
+.rubrica-molti li{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.rubrica-molti li>input[type=checkbox]{width:22px;height:22px;min-height:0;margin-top:12px;flex:none;accent-color:var(--scelta)}
+.rubrica-molti .grow>input+input{margin-top:6px}
+.rubrica-molti .opzioni{margin-top:6px}
+.rubrica-molti .opzioni .btn{white-space:nowrap}
+.rubrica-molti p{margin:6px 0 0}
+.rubrica-molti li.doppione{box-shadow:inset 4px 0 0 var(--giallo);padding-left:10px}
 .chip input:checked+span{background:var(--scelta);border-color:var(--scelta);color:var(--scelta-ink)}
 .chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
 .cerchie-lista .btn.cerchia.on{background:var(--scelta);border-color:var(--scelta);color:var(--scelta-ink)}
