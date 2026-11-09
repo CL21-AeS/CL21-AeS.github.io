@@ -3,6 +3,20 @@
 Ultimo aggiornamento: 9 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Rubrica: il contatto nello stato e gli avvisi (9 novembre 2026, sera, app v107, database non toccato)
+
+Dalla registrazione di Stefano (Android, app sulla Home, v106): rubrica di sistema → «Fine» → «Condividi contatti» di
+Chrome con nome e numero → «Fine» → si torna al modulo, che resta vuoto, senza avvisi e senza ricaricare la pagina.
+Causa non riprodotta (nessun problema noto di Chrome). Due cambi:
+- il contatto scelto sta nello **stato** (`st.rubricaUno`: nome, numeri, numero scelto) e il modulo lo mostra nei suoi
+  valori, quindi resta anche se l'app ridisegna; i campi si scrivono anche direttamente (il nome della rubrica prende il
+  posto di quello scritto prima). «Quale numero?» viene dallo stato. Nome e numeri si leggono anche se arrivano come
+  testo e non come elenco;
+- se non entra niente l'app lo **dice** (solo quanti, mai nomi o numeri): «Dalla rubrica non è arrivato nessun contatto»,
+  «Il contatto è arrivato senza nome e senza numero», «La rubrica non ha risposto (tipo di errore)», «La rubrica non ha
+  ancora risposto: riprova» (4 secondi dopo il ritorno all'app), «Il modulo si è chiuso: riapri «+ Nome» e riprova».
+Al prossimo tentativo l'avviso dice dove si ferma. Test: sezione 76.
+
 ## Rubrica: più contatti insieme (9 novembre 2026, sera, app v106, database non toccato)
 
 Migrazione 062 applicata su Supabase da Claude il 9 novembre (colonna, permessi e policy controllati).
