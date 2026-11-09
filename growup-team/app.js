@@ -4930,6 +4930,24 @@ document.addEventListener("visibilitychange", () => {
   if(document.visibilityState !== "visible" || !rubricaInAttesa) return;
   setTimeout(() => { if(rubricaInAttesa) toast("La rubrica non ha ancora risposto: riprova"); }, 4000);
 });
+/* Diagnosi della Rubrica (temporanea, 9 novembre 2026): sotto il pulsante, i passaggi dell'ultimo tentativo con i secondi
+   (clic, app nascosta e di nuovo visibile, risposta della rubrica) e la versione dell'app. Mai nomi o numeri. */
+const VERSIONE_APP = "v108";
+let rubricaPassi = [], rubricaInizio = 0;
+const testoPassi = () => rubricaPassi.length ? `${VERSIONE_APP} · ${rubricaPassi.join(" · ")}` : "";
+function passoRubrica(t, nuovo){
+  if(nuovo){ rubricaPassi = []; rubricaInizio = Date.now(); }
+  else if(!rubricaPassi.length) return;
+  rubricaPassi.push(`${t} ${((Date.now() - rubricaInizio) / 1000).toFixed(1).replace(".", ",")}s`);
+  if(rubricaPassi.length > 14) rubricaPassi.splice(1, 1);
+  const el = document.querySelector("#sheet .rubrica-passi");
+  if(el) el.textContent = testoPassi();
+}
+document.addEventListener("visibilitychange", () => passoRubrica(document.visibilityState === "visible" ? "visibile" : "nascosta"));
+window.addEventListener("pagehide", () => passoRubrica("pagehide"));
+window.addEventListener("pageshow", e => passoRubrica(e.persisted ? "pageshow (dalla cache)" : "pageshow"));
+document.addEventListener("freeze", () => passoRubrica("congelata"));
+document.addEventListener("resume", () => passoRubrica("ripresa"));
 
 /* «Come lo conosci?» → «Dai social»: il cursore va al campo Social, per scriverlo subito */
 document.addEventListener("change", e => {
@@ -4953,6 +4971,7 @@ function vSheetPersone(s){
       Se è già nella lista, scrivi il nome uguale: il contatto si segna su di lei.</p>` : ""}
     <form data-form="${s}" novalidate>
       ${!m.id && !rapido && rubricaOk() ? `<button type="button" class="btn wide rubrica" data-act="rubrica">${ICONA_RUBRICA}Rubrica</button>
+        <p class="small rubrica-passi" aria-live="polite">${esc(testoPassi())}</p>
         <div class="scegli-numero" aria-live="polite">${ru && !ru.numero && ru.numeri.length > 1 ? htmlNumeri(ru.numeri) : ""}</div>` : ""}
       <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc((ru && ru.nome) || m.nome || "")}" autocomplete="name"></label>
       <label class="field"><span>Telefono <i>(facoltativo)</i></span>${!m.id && !rapido && incollaOk() ? `<span class="con-incolla"><input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc((ru && ru.numero) || m.contatto || "")}">
@@ -5067,7 +5086,7 @@ function vSheetPersone(s){
 }
 
 /* chiudendo un foglio aperto dai pulsanti rapidi di Io non resta niente di mezzo */
-function chiudiSheet(){ st.sheet = null; st.rubricaMolti = null; st.rubricaUno = null; st.ordiniInAttesa = null; st.erroriAmway = []; if(st.rapido === "piano"){ st.personaId = null; st.passoTipo = null; } st.rapido = null; }
+function chiudiSheet(){ st.sheet = null; st.rubricaMolti = null; st.rubricaUno = null; rubricaPassi = []; st.ordiniInAttesa = null; st.erroriAmway = []; if(st.rapido === "piano"){ st.personaId = null; st.passoTipo = null; } st.rapido = null; }
 async function dopoPersone(msg){
   /* + Piano da Io: finito il passo si resta su Io, senza una scheda aperta in Persone */
   if(st.rapido === "piano"){ st.rapido = null; st.personaId = null; }
@@ -5089,15 +5108,22 @@ Object.assign(AZIONI, {
   "percorso-intero"(el){ const p = el.closest(".percorso"); if(p) p.classList.add("aperto"); },
   "percorso-corto"(el){ const p = el.closest(".percorso"); if(p) p.classList.remove("aperto"); },
   "filtro-gruppo"(el){ st.filtroGruppo = el.dataset.filtro; render(); applicaRicerca(); },
-  "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = null; st.rubricaMolti = null; st.rubricaUno = null; st.sheet = "persona-nuova"; render(); },
+  "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = null; st.rubricaMolti = null; st.rubricaUno = null; rubricaPassi = []; st.sheet = "persona-nuova"; render(); },
   /* i pulsanti rapidi di Io: + Contatto apre "un nome", + Piano apre il passo Piano di una persona */
   /* «Rubrica»: si sceglie un contatto del telefono; nome e numero vanno nei campi (modificabili). Se si annulla, niente */
   async rubrica(){
     let scelti;
     rubricaInAttesa = true;
-    try{ scelti = await navigator.contacts.select(["name", "tel"], { multiple:true }); }
-    catch(e){ rubricaInAttesa = false; toast(`La rubrica non ha risposto (${String(e && e.name || "errore").slice(0, 40)})`); return; }
+    passoRubrica("clic", true);
+    try{
+      const attesa = navigator.contacts.select(["name", "tel"], { multiple:true });
+      passoRubrica("rubrica chiesta");
+      scelti = await attesa;
+    }
+    catch(e){ rubricaInAttesa = false; const n = String(e && e.name || "errore").slice(0, 40);
+      passoRubrica("errore " + n); toast(`La rubrica non ha risposto (${n})`); return; }
     rubricaInAttesa = false;
+    { const n = scelti && scelti.length || 0; passoRubrica(`risposta: ${n} ${n === 1 ? "contatto" : "contatti"}`); }
     if(!scelti || !scelti.length){ toast("Dalla rubrica non è arrivato nessun contatto"); return; }
     /* di ogni contatto solo il nome e i numeri (puliti, senza ripetizioni); nome e numeri possono arrivare come elenco o no */
     const elenco = x => Array.isArray(x) ? x : x == null ? [] : typeof x === "string" ? [x] : [...x];
@@ -5111,6 +5137,7 @@ Object.assign(AZIONI, {
     if(lista.length > 1){ st.rubricaUno = null; st.rubricaMolti = lista; render(); return; }
     const c = lista[0];
     st.rubricaUno = { nome:c.nome, numeri:c.numeri, numero:c.numeri.length === 1 ? c.numeri[0] : "" };
+    passoRubrica(`nome ${c.nome ? "sì" : "no"}, numeri ${c.numeri.length}`);
     mettiDallaRubrica();
   },
   "rubrica-altro-numero"(el){
@@ -6239,7 +6266,7 @@ Object.assign(AZIONI, {
   "apri-cliente"(el){ st.vista = "persone"; st.sezPersone = "clienti"; st.invitoId = null; st.personaId = el.dataset.id; render(); window.scrollTo(0, 0); },
   "torna-clienti"(){ st.personaId = null; render(); window.scrollTo(0, 0); },
   "filtro-clienti"(el){ st.filtroClienti = el.dataset.filtro; render(); },
-  "cliente-nuovo"(){ st.errore = ""; st.nuovoCliente = true; st.rubricaMolti = null; st.rubricaUno = null; st.sheet = "persona-nuova"; render(); },
+  "cliente-nuovo"(){ st.errore = ""; st.nuovoCliente = true; st.rubricaMolti = null; st.rubricaUno = null; rubricaPassi = []; st.sheet = "persona-nuova"; render(); },
   "ordine-nuovo"(){ st.bozza = nuovaBozza([]); st.cercaProdotto = ""; st.sheet = "ordine-cliente"; render(); },
   "ordine-modifica"(el){
     const o = st.ordini.find(x => x.id === el.dataset.id);

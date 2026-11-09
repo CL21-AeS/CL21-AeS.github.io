@@ -3,6 +3,14 @@
 Ultimo aggiornamento: 9 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Rubrica: la riga di diagnosi (9 novembre 2026, sera, app v108, database non toccato, TEMPORANEA)
+
+Con la v107 sul telefono di Stefano stessa cosa: modulo vuoto e nessun avviso. Per capire dove si ferma, sotto il pulsante
+«Rubrica» una riga grigia con la versione e i passaggi dell'ultimo tentativo con i secondi: clic, rubrica chiesta,
+nascosta/visibile, pagehide/pageshow, congelata/ripresa, risposta (quanti contatti), nome sì/no e quanti numeri. Mai nomi
+o numeri. Si azzera aprendo o chiudendo il modulo. Da togliere quando la Rubrica funziona (`passoRubrica`, `.rubrica-passi`).
+Prova chiesta a Stefano: dall'app sulla Home e da una scheda di Chrome, con lo screenshot della riga. Test: sezione 76.
+
 ## Rubrica: il contatto nello stato e gli avvisi (9 novembre 2026, sera, app v107, database non toccato)
 
 Dalla registrazione di Stefano (Android, app sulla Home, v106): rubrica di sistema → «Fine» → «Condividi contatti» di
