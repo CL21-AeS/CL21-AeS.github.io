@@ -4224,6 +4224,96 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
 }
 
+// 71. «Rubrica» (Contact Picker API): solo per un nome nuovo e solo dove il telefono la offre; prende nome e telefono
+{
+  /* una rubrica finta: risponde con window.__contatti (vuoto = l'utente annulla) e si segna cosa le chiede l'app */
+  const finta = () => { window.ContactsManager = function(){};
+    Object.defineProperty(navigator, "contacts", { configurable:true, value:{ select:async (props, opz) => { window.__chiesto = { props, opz }; return window.__contatti || []; } } }); };
+  for(const tema of ["light", "dark"]){
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema }, "#chiave=" + "a".repeat(32)));
+    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+    await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+    if(tema === "light"){
+      await page.click("button[data-act=persona-nuova]");
+      check(!(await page.locator(".sheet button[data-act=rubrica]").count()), "rubrica: dove il browser non la offre il pulsante non c'è");
+      await page.click(".sheet [data-act=chiudi]");
+    }
+    await page.evaluate(finta);
+    await page.click("button[data-act=persona-nuova]");
+    const rb = page.locator(".sheet button[data-act=rubrica]");
+    check(await rb.count() === 1 && (await rb.innerText()).trim() === "Rubrica" && await rb.locator("svg").count() === 1, "rubrica: il pulsante «Rubrica» con l'icona, in cima al modulo");
+    const st1 = await rb.evaluate(b => { const c = getComputedStyle(b), r = b.getBoundingClientRect(); return { bg:c.backgroundColor, h:r.height,
+      azione:getComputedStyle(document.querySelector(".sheet button.primary")).backgroundColor, prima:b.compareDocumentPosition(b.form.nome) & Node.DOCUMENT_POSITION_FOLLOWING }; });
+    check(st1.bg !== st1.azione && st1.h < 50 && st1.prima, "rubrica: stile secondario (contorno), su una riga, prima del nome");
+    if(tema === "light"){
+      // un contatto con un solo numero
+      await page.evaluate(() => { window.__contatti = [{ name:["Mario Rubrica"], tel:["333 000-0001"], email:["non@serve.it"] }]; });
+      await rb.click();
+      await page.waitForFunction(() => document.querySelector(".sheet input[name=contatto]").value);
+      check(await page.inputValue(".sheet input[name=nome]") === "Mario Rubrica" && await page.inputValue(".sheet input[name=contatto]") === "+393330000001",
+        "rubrica: nome e telefono nei campi, il numero pulito con +39");
+      check(await page.evaluate(() => JSON.stringify(window.__chiesto)) === JSON.stringify({ props:["name", "tel"], opz:{ multiple:false } }),
+        "rubrica: si chiedono solo nome e telefono, un contatto alla volta");
+      // i campi restano modificabili a mano
+      await page.fill(".sheet input[name=contatto]", "333 000 0009");
+      // se si annulla non cambia niente
+      await page.evaluate(() => { window.__contatti = []; });
+      await rb.click(); await page.waitForTimeout(200);
+      check(await page.inputValue(".sheet input[name=nome]") === "Mario Rubrica" && await page.inputValue(".sheet input[name=contatto]") === "333 000 0009",
+        "rubrica: annullando i campi restano come sono");
+      await page.click(".sheet button.primary");
+      await page.getByText("Mario Rubrica nella tua lista").waitFor();
+      await sync(page);
+      check(DB.persone.some(x => x.nome === "Mario Rubrica" && x.contatto === "333 000 0009" && !("email" in x)),
+        "rubrica: si salva quello che c'è nel campo (scritto a mano: non trasformato), niente email");
+      await page.click("button[data-act=persona-nuova]");
+    }
+    // un contatto con più numeri: si sceglie quale
+    await page.evaluate(() => { window.__contatti = [{ name:["Lucia Due Numeri"], tel:["(0039) 333 0000002", "02 0000003", "02 0000003"] }]; });
+    await page.click(".sheet button[data-act=rubrica]");
+    await page.locator(".sheet .scegli-numero button").first().waitFor();
+    check((await page.locator(".sheet .scegli-numero button").allInnerTexts()).join("|") === "+393330000002|+39020000003"
+      && await page.inputValue(".sheet input[name=contatto]") === "", "rubrica: più numeri → «Quale numero?», senza doppioni, campo ancora vuoto");
+    await page.screenshot({ path: S + `/e2e/71-rubrica-${tema}.png` });
+    if(tema === "light"){
+      await page.click(".sheet .scegli-numero button:has-text('+39020000003')");
+      check(await page.inputValue(".sheet input[name=contatto]") === "+39020000003" && !(await page.locator(".sheet .scegli-numero button").count()),
+        "rubrica: scelto il numero, va nel campo e l'elenco sparisce");
+      await page.click(".sheet [data-act=chiudi]");
+      // non in «Modifica i dati», non nel contatto rapido; sì nel nuovo cliente
+      await page.locator("button[data-act=apri-persona]", { hasText:"Mario Rubrica" }).click();
+      await page.click("button[data-act=persona-modifica]");
+      check(!(await page.locator(".sheet button[data-act=rubrica]").count()), "rubrica: non in «Modifica i dati»");
+      await page.click(".sheet [data-act=chiudi]");
+      await page.click("button[data-act=vista-io]");
+      await page.click("button[data-act=contatto-rapido]");
+      check(!(await page.locator(".sheet button[data-act=rubrica]").count()), "rubrica: non nel contatto rapido di Io");
+      await page.click(".sheet [data-act=chiudi]");
+      await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
+      await page.click("button[data-act=cliente-nuovo]");
+      check(await page.locator(".sheet button[data-act=rubrica]").count() === 1, "rubrica: c'è anche per un nuovo cliente");
+      check(!errori.length, "rubrica: nessun errore nella pagina");
+    }
+    await ctx.close();
+  }
+  /* la pulizia dei numeri, vista dall'elenco «Quale numero?» (i numeri uguali dopo la pulizia compaiono una volta) */
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+  await page.evaluate(finta);
+  await page.click("button[data-act=persona-nuova]");
+  await page.evaluate(() => { window.__contatti = [{ name:["Prova Numeri"], tel:["333 123 4567", "+39 333-123-4567", "0039 (333) 1234567", "0044 20 7946 0000",
+    "+41 79 000 00 00", "06 1234567", "333.123.4567", "ciao", "12", "*31#"] }]; });
+  await page.click(".sheet button[data-act=rubrica]");
+  await page.locator(".sheet .scegli-numero button").first().waitFor();
+  const pul = await page.locator(".sheet .scegli-numero button").allInnerTexts();
+  check(pul.join() === "+393331234567,+442079460000,+41790000000,+39061234567",
+    "numeri: spazi, trattini e parentesi via; 00 → +; +39 se manca il prefisso; scartato chi non è un numero (" + pul.join() + ")");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
