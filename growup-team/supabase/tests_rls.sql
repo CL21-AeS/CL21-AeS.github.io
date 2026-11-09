@@ -1843,6 +1843,38 @@ begin
     delete from public.persone where id = sr;
   end;
 
+  -- ---- 062: il «Social» delle persone, come il telefono, lo legge solo chi ha scritto la persona ----
+  declare
+    so uuid; ok boolean := false; numeri text;
+  begin
+    perform growup_test.come(u5);  -- A
+    insert into public.persone (nome, contatto, social) values ('Nome Social', '+390000000001', '@prova_social')
+      returning id into so;
+    perform growup_test.ok((select social from public.persone where id = so) = '@prova_social', '062: A salva il social di un suo nome');
+    update public.persone set social = '@prova_social2' where id = so;
+    perform growup_test.ok((select social from public.persone where id = so) = '@prova_social2', '062: A modifica il social');
+    begin
+      update public.persone set social = repeat('x', 81) where id = so;
+    exception when check_violation then ok := true; end;
+    perform growup_test.ok(ok, '062: il social ha al massimo 80 caratteri');
+    perform growup_test.come(u1);  -- R, upline di A (e admin)
+    perform growup_test.ok(not exists (select 1 from public.persone where id = so), '062: l''upline non legge né contatto né social di A');
+    perform growup_test.ok((select count(*) from public.persone where social is not null or contatto is not null) = 0,
+                           '062: l''upline non trova nessun contatto o social della lista di A');
+    perform growup_test.ok(growup_test.righe(format('update public.persone set social = ''@altro'' where id = %L', so)) = 0,
+                           '062: l''upline non modifica il social di A');
+    numeri := public.numeri_persone(a)::text;  -- funziona solo per chi sta sopra A: R è davvero la sua upline
+    perform growup_test.ok(numeri !~ 'prova_social|0000000001' and not (public.numeri_persone(a) ? 'social')
+                           and not (public.numeri_persone(a) ? 'contatto'), '062: nei numeri per l''upline non ci sono né contatto né social');
+    perform growup_test.ok(public.copia_dati()::text !~ 'prova_social|0000000001', '062: la copia dei dati non contiene contatto e social');
+    execute 'reset role';
+    perform growup_test.ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                             where n.nspname = 'public' and (p.prosrc ~ '\msocial\M[^'']' or p.prosrc ~ '[^'']\mcontatto\M[^'']')),
+                           '062: nessuna funzione del database legge le colonne contatto o social');
+    perform growup_test.come(u5);
+    delete from public.persone where id = so;
+  end;
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),
