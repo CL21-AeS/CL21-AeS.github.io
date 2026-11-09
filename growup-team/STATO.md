@@ -3,6 +3,24 @@
 Ultimo aggiornamento: 9 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Rubrica su Android 17: «Condividi → Growup» (9 novembre 2026, sera, app v109, database non toccato)
+
+La riga di diagnosi (v108) ha mostrato la causa: sul telefono di Stefano (Samsung, One UI 9.0, **Android 17**), sia
+dall'app sulla Home sia da una scheda di Chrome, `navigator.contacts.select` risponde **0 contatti dopo 0,6 secondi**,
+appena si apre la nuova rubrica di sistema di Android 17 e prima della scelta. È Chrome, non Growup: da una pagina web
+non si aggira. Decisione di Stefano: il pulsante «Rubrica» resta e, quando non funziona, spiega l'altra strada.
+- **Riquadro**: se la rubrica risponde vuota in meno di 2 secondi (`RUBRICA_SUBITO_MS`), sotto il pulsante il riquadro
+  ambra «Su questo telefono la rubrica non passa i contatti a Growup» con «apri l'app Contatti, spunta uno o più nomi,
+  tocca Condividi e scegli Growup». Se la risposta vuota arriva dopo (chi annulla), solo l'avviso di prima.
+- **Condividi → Growup** (`share_target` nel manifest, POST `./condividi`): il service worker legge il file vCard
+  (2.1 con quoted-printable, 3.0, 4.0) e tiene **solo nome e numeri** (`contattiDaVcard`; niente email, indirizzi, foto,
+  note), li mette nella cache `growup-condivisi` e apre `./?condivisi=1`. L'app (`prendiCondivisi`, da `vaiHome`) li legge,
+  li cancella subito e apre «Nomi dalla rubrica» (o il modulo già compilato, se è uno solo). Massimo 50.
+  «Growup» compare nel menu Condividi quando il telefono ha aggiornato l'app installata (Chrome lo fa da solo, entro un
+  giorno circa; altrimenti si rimette l'icona sulla Home, **dopo aver salvato il link personale**).
+- Tolta la riga di diagnosi. Test: sezioni 76 (riquadro) e 77 (manifest, lettore vCard, apertura dell'elenco).
+- Da fare: segnalare il difetto a Chrome (issues.chromium.org) con i dati della diagnosi, senza nomi né numeri.
+
 ## Rubrica: la riga di diagnosi (9 novembre 2026, sera, app v108, database non toccato, TEMPORANEA)
 
 Con la v107 sul telefono di Stefano stessa cosa: modulo vuoto e nessun avviso. Per capire dove si ferma, sotto il pulsante

@@ -939,6 +939,11 @@ async function vaiHome(profilo){
     if(p){ st.vista = "persone"; st.sezPersone = p.esito === "cliente" ? "clienti" : "lista"; st.invitoId = null; st.personaId = p.id; }
     try{ history.replaceState(null, "", location.pathname + location.hash); }catch(e){}
   }
+  /* «Condividi → Growup» dall'app Contatti: il service worker ha messo da parte nomi e numeri; si apre l'elenco */
+  if(/[?&]condivisi=1/.test(location.search)){
+    if(st.fase === "home") await prendiCondivisi();
+    try{ history.replaceState(null, "", location.pathname + location.hash); }catch(e){}
+  }
   if(st.fase === "home" && /[?&]importa=1/.test(location.search)){
     st.sheet = "importa-amway";
     try{ history.replaceState(null, "", location.pathname + location.hash); }catch(e){}
@@ -4930,24 +4935,33 @@ document.addEventListener("visibilitychange", () => {
   if(document.visibilityState !== "visible" || !rubricaInAttesa) return;
   setTimeout(() => { if(rubricaInAttesa) toast("La rubrica non ha ancora risposto: riprova"); }, 4000);
 });
-/* Diagnosi della Rubrica (temporanea, 9 novembre 2026): sotto il pulsante, i passaggi dell'ultimo tentativo con i secondi
-   (clic, app nascosta e di nuovo visibile, risposta della rubrica) e la versione dell'app. Mai nomi o numeri. */
-const VERSIONE_APP = "v108";
-let rubricaPassi = [], rubricaInizio = 0;
-const testoPassi = () => rubricaPassi.length ? `${VERSIONE_APP} · ${rubricaPassi.join(" · ")}` : "";
-function passoRubrica(t, nuovo){
-  if(nuovo){ rubricaPassi = []; rubricaInizio = Date.now(); }
-  else if(!rubricaPassi.length) return;
-  rubricaPassi.push(`${t} ${((Date.now() - rubricaInizio) / 1000).toFixed(1).replace(".", ",")}s`);
-  if(rubricaPassi.length > 14) rubricaPassi.splice(1, 1);
-  const el = document.querySelector("#sheet .rubrica-passi");
-  if(el) el.textContent = testoPassi();
+/* I contatti condivisi con Growup dall'app Contatti (share_target): il service worker li ha letti dal file vCard e ha
+   tenuto solo nomi e numeri, in una cache del telefono. Si leggono una volta e si cancellano subito; poi l'elenco
+   «Nomi dalla rubrica» (o il modulo di un nome, se è uno solo), come con il pulsante Rubrica. */
+const CACHE_CONDIVISI = "growup-condivisi";
+async function prendiCondivisi(){
+  let dati = [];
+  try{
+    const c = await caches.open(CACHE_CONDIVISI), dove = new URL("condivisi", location.href.replace(/[?#].*$/, "")).href;
+    const r = await c.match(dove);
+    await c.delete(dove);
+    dati = r ? await r.json() : [];
+  }catch(e){ dati = []; }
+  const lista = (Array.isArray(dati) ? dati : []).map(c => ({ nome:String(c && c.nome || "").trim().slice(0, 80),
+    numeri:[...new Set((Array.isArray(c && c.tel) ? c.tel : []).map(numeroPulito).filter(Boolean))] })).filter(c => c.nome || c.numeri.length);
+  dati = null;
+  if(!lista.length){ setTimeout(() => toast("In quello che hai condiviso non ho trovato contatti"), 300); return; }
+  if(lista.length > RUBRICA_MAX){ lista.length = RUBRICA_MAX; setTimeout(() => toast(`Al massimo ${RUBRICA_MAX} alla volta: ho preso i primi ${RUBRICA_MAX}`), 300); }
+  Object.assign(st, { vista:"persone", sezPersone:"lista", personaId:null, invitoId:null, nuovoCliente:false, rapido:null, rubricaGuida:false });
+  if(lista.length > 1){ st.rubricaUno = null; st.rubricaMolti = lista; }
+  else { const c = lista[0]; st.rubricaMolti = null; st.rubricaUno = { nome:c.nome, numeri:c.numeri, numero:c.numeri.length === 1 ? c.numeri[0] : "" }; }
+  st.sheet = "persona-nuova";
 }
-document.addEventListener("visibilitychange", () => passoRubrica(document.visibilityState === "visible" ? "visibile" : "nascosta"));
-window.addEventListener("pagehide", () => passoRubrica("pagehide"));
-window.addEventListener("pageshow", e => passoRubrica(e.persisted ? "pageshow (dalla cache)" : "pageshow"));
-document.addEventListener("freeze", () => passoRubrica("congelata"));
-document.addEventListener("resume", () => passoRubrica("ripresa"));
+
+/* Android 17 (novembre 2026): Chrome apre la nuova rubrica di sistema e risponde subito «0 contatti», prima della scelta.
+   Se la risposta vuota arriva così in fretta, nel modulo compare il riquadro che spiega l'altra strada: dall'app Contatti,
+   «Condividi» → Growup (share_target nel manifest, letto dal service worker: vedi prendiCondivisi). */
+const RUBRICA_SUBITO_MS = 2000;
 
 /* «Come lo conosci?» → «Dai social»: il cursore va al campo Social, per scriverlo subito */
 document.addEventListener("change", e => {
@@ -4971,7 +4985,9 @@ function vSheetPersone(s){
       Se è già nella lista, scrivi il nome uguale: il contatto si segna su di lei.</p>` : ""}
     <form data-form="${s}" novalidate>
       ${!m.id && !rapido && rubricaOk() ? `<button type="button" class="btn wide rubrica" data-act="rubrica">${ICONA_RUBRICA}Rubrica</button>
-        <p class="small rubrica-passi" aria-live="polite">${esc(testoPassi())}</p>
+        ${st.rubricaGuida ? `<div class="fermo-box rubrica-guida" role="status"><p><b>Su questo telefono la rubrica non passa i contatti a Growup.</b></p>
+          <p class="small">Fai così: apri l'app <b>Contatti</b>, spunta uno o più nomi, tocca <b>Condividi</b> e scegli <b>Growup</b>.
+          Qui si apre l'elenco pronto, da controllare e aggiungere.</p></div>` : ""}
         <div class="scegli-numero" aria-live="polite">${ru && !ru.numero && ru.numeri.length > 1 ? htmlNumeri(ru.numeri) : ""}</div>` : ""}
       <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc((ru && ru.nome) || m.nome || "")}" autocomplete="name"></label>
       <label class="field"><span>Telefono <i>(facoltativo)</i></span>${!m.id && !rapido && incollaOk() ? `<span class="con-incolla"><input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc((ru && ru.numero) || m.contatto || "")}">
@@ -5086,7 +5102,7 @@ function vSheetPersone(s){
 }
 
 /* chiudendo un foglio aperto dai pulsanti rapidi di Io non resta niente di mezzo */
-function chiudiSheet(){ st.sheet = null; st.rubricaMolti = null; st.rubricaUno = null; rubricaPassi = []; st.ordiniInAttesa = null; st.erroriAmway = []; if(st.rapido === "piano"){ st.personaId = null; st.passoTipo = null; } st.rapido = null; }
+function chiudiSheet(){ st.sheet = null; st.rubricaMolti = null; st.rubricaUno = null; st.rubricaGuida = false; st.ordiniInAttesa = null; st.erroriAmway = []; if(st.rapido === "piano"){ st.personaId = null; st.passoTipo = null; } st.rapido = null; }
 async function dopoPersone(msg){
   /* + Piano da Io: finito il passo si resta su Io, senza una scheda aperta in Persone */
   if(st.rapido === "piano"){ st.rapido = null; st.personaId = null; }
@@ -5108,23 +5124,22 @@ Object.assign(AZIONI, {
   "percorso-intero"(el){ const p = el.closest(".percorso"); if(p) p.classList.add("aperto"); },
   "percorso-corto"(el){ const p = el.closest(".percorso"); if(p) p.classList.remove("aperto"); },
   "filtro-gruppo"(el){ st.filtroGruppo = el.dataset.filtro; render(); applicaRicerca(); },
-  "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = null; st.rubricaMolti = null; st.rubricaUno = null; rubricaPassi = []; st.sheet = "persona-nuova"; render(); },
+  "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = null; st.rubricaMolti = null; st.rubricaUno = null; st.rubricaGuida = false; st.sheet = "persona-nuova"; render(); },
   /* i pulsanti rapidi di Io: + Contatto apre "un nome", + Piano apre il passo Piano di una persona */
   /* «Rubrica»: si sceglie un contatto del telefono; nome e numero vanno nei campi (modificabili). Se si annulla, niente */
   async rubrica(){
     let scelti;
     rubricaInAttesa = true;
-    passoRubrica("clic", true);
-    try{
-      const attesa = navigator.contacts.select(["name", "tel"], { multiple:true });
-      passoRubrica("rubrica chiesta");
-      scelti = await attesa;
-    }
-    catch(e){ rubricaInAttesa = false; const n = String(e && e.name || "errore").slice(0, 40);
-      passoRubrica("errore " + n); toast(`La rubrica non ha risposto (${n})`); return; }
+    const inizio = Date.now();
+    try{ scelti = await navigator.contacts.select(["name", "tel"], { multiple:true }); }
+    catch(e){ rubricaInAttesa = false; toast(`La rubrica non ha risposto (${String(e && e.name || "errore").slice(0, 40)})`); return; }
     rubricaInAttesa = false;
-    { const n = scelti && scelti.length || 0; passoRubrica(`risposta: ${n} ${n === 1 ? "contatto" : "contatti"}`); }
-    if(!scelti || !scelti.length){ toast("Dalla rubrica non è arrivato nessun contatto"); return; }
+    if(!scelti || !scelti.length){
+      /* risposta vuota subito, prima che si potesse scegliere: è Chrome su Android 17 → il riquadro con l'altra strada */
+      if(Date.now() - inizio < RUBRICA_SUBITO_MS && st.sheet === "persona-nuova"){ st.rubricaGuida = true; render(); return; }
+      toast("Dalla rubrica non è arrivato nessun contatto"); return;
+    }
+    st.rubricaGuida = false;
     /* di ogni contatto solo il nome e i numeri (puliti, senza ripetizioni); nome e numeri possono arrivare come elenco o no */
     const elenco = x => Array.isArray(x) ? x : x == null ? [] : typeof x === "string" ? [x] : [...x];
     const lista = [...scelti].map(c => ({ nome:String(elenco(c && c.name).find(x => String(x || "").trim()) || "").trim().slice(0, 80),
@@ -5137,7 +5152,6 @@ Object.assign(AZIONI, {
     if(lista.length > 1){ st.rubricaUno = null; st.rubricaMolti = lista; render(); return; }
     const c = lista[0];
     st.rubricaUno = { nome:c.nome, numeri:c.numeri, numero:c.numeri.length === 1 ? c.numeri[0] : "" };
-    passoRubrica(`nome ${c.nome ? "sì" : "no"}, numeri ${c.numeri.length}`);
     mettiDallaRubrica();
   },
   "rubrica-altro-numero"(el){
@@ -6266,7 +6280,7 @@ Object.assign(AZIONI, {
   "apri-cliente"(el){ st.vista = "persone"; st.sezPersone = "clienti"; st.invitoId = null; st.personaId = el.dataset.id; render(); window.scrollTo(0, 0); },
   "torna-clienti"(){ st.personaId = null; render(); window.scrollTo(0, 0); },
   "filtro-clienti"(el){ st.filtroClienti = el.dataset.filtro; render(); },
-  "cliente-nuovo"(){ st.errore = ""; st.nuovoCliente = true; st.rubricaMolti = null; st.rubricaUno = null; rubricaPassi = []; st.sheet = "persona-nuova"; render(); },
+  "cliente-nuovo"(){ st.errore = ""; st.nuovoCliente = true; st.rubricaMolti = null; st.rubricaUno = null; st.rubricaGuida = false; st.sheet = "persona-nuova"; render(); },
   "ordine-nuovo"(){ st.bozza = nuovaBozza([]); st.cercaProdotto = ""; st.sheet = "ordine-cliente"; render(); },
   "ordine-modifica"(el){
     const o = st.ordini.find(x => x.id === el.dataset.id);

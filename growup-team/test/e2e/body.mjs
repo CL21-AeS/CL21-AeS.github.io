@@ -4594,6 +4594,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.evaluate(() => { window.ContactsManager = function(){};
     Object.defineProperty(navigator, "contacts", { configurable:true, value:{ select:async () => {
       if(window.__rubricaErrore){ const e = new Error("x"); e.name = window.__rubricaErrore; throw e; }
+      if(window.__lenta) await new Promise(r => setTimeout(r, 2300));
       return window.__contatti; } } }); });
   await page.click("button[data-act=persona-nuova]");
   const prova = async (contatti, errore, testo, msg) => {
@@ -4602,7 +4603,17 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     await page.locator(".toast", { hasText:testo }).waitFor();
     check(await page.inputValue(".sheet input[name=nome]") === "" && await page.inputValue(".sheet input[name=contatto]") === "", msg);
   };
-  await prova([], null, "Dalla rubrica non è arrivato nessun contatto", "rubrica: nessun contatto → lo dice");
+  // Android 17: «0 contatti» subito, prima della scelta → il riquadro con l'altra strada (Contatti → Condividi → Growup)
+  await page.evaluate(() => { window.__contatti = []; window.__rubricaErrore = null; });
+  await page.click(".sheet button[data-act=rubrica]");
+  await page.locator(".sheet .rubrica-guida").waitFor();
+  check((await page.locator(".sheet .rubrica-guida").innerText()).replace(/\s+/g, " ").includes("apri l'app Contatti, spunta uno o più nomi, tocca Condividi e scegli Growup"),
+    "rubrica: «0 contatti» subito → il riquadro che spiega Contatti → Condividi → Growup");
+  await page.screenshot({ path: S + "/e2e/76-rubrica-guida.png" });
+  // se la risposta vuota arriva dopo (chi annulla dopo aver guardato) → solo l'avviso
+  await page.evaluate(() => { window.__lenta = true; });
+  await prova([], null, "Dalla rubrica non è arrivato nessun contatto", "rubrica: annullando dopo un po' → l'avviso");
+  await page.evaluate(() => { window.__lenta = false; });
   await prova([{ name:[], tel:[] }], null, "Il contatto è arrivato senza nome e senza numero", "rubrica: contatto vuoto → lo dice");
   await prova(null, "SecurityError", "La rubrica non ha risposto (SecurityError)", "rubrica: errore → lo dice, con il tipo di errore");
   // nome e numero arrivati anche come testo semplice; restano tornando sull'app (l'app ridisegna)
@@ -4613,9 +4624,6 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.waitForTimeout(1200);
   check(await page.inputValue(".sheet input[name=nome]") === "Ugo Testo" && await page.inputValue(".sheet input[name=contatto]") === "+393330000050",
     "rubrica: il contatto resta nel modulo anche quando l'app ridisegna");
-  { const d = await page.locator(".sheet .rubrica-passi").innerText();
-    check(/^v108 · clic 0,0s · rubrica chiesta [\d,]+s · risposta: 1 contatto [\d,]+s · nome sì, numeri 1 [\d,]+s · visibile [\d,]+s$/.test(d) && !/Ugo|333/.test(d),
-      "rubrica: sotto il pulsante i passaggi e la versione, senza nomi né numeri (" + d + ")"); }
   // un nome scritto prima viene sostituito da quello della rubrica; dopo, si corregge a mano
   await page.fill(".sheet input[name=nome]", "Scritto a mano");
   await page.evaluate(() => { window.__contatti = [{ name:["Vera Rubrica"], tel:["333 000 0051", "333 000 0052"] }]; });
@@ -4632,9 +4640,68 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(DB.persone.some(x => x.nome === "Vera Corretta" && x.contatto === "+393330000052"), "rubrica: si salva quello che c'è nei campi");
   await page.click("button[data-act=persona-nuova]");
   check(await page.inputValue(".sheet input[name=nome]") === "" && await page.inputValue(".sheet input[name=contatto]") === "", "rubrica: riaprendo, il modulo è vuoto");
-  check(!(await page.locator(".sheet .rubrica-passi").innerText()), "rubrica: riaprendo, i passaggi ripartono da zero");
   check(!errori.length, "rubrica, avvisi: nessun errore nella pagina");
   await ctx.close();
+}
+
+// 77. «Condividi → Growup» dall'app Contatti (Android 17): il manifest, il service worker che tiene solo nomi e numeri,
+//     l'app che apre l'elenco «Nomi dalla rubrica»
+{
+  const man = JSON.parse(fs.readFileSync(S + "/../manifest.webmanifest", "utf8")), sh = man.share_target || {};
+  check(sh.action === "./condividi" && sh.method === "POST" && sh.enctype === "multipart/form-data"
+    && (sh.params.files || []).some(f => f.name === "contatti" && f.accept.includes("text/x-vcard") && f.accept.includes(".vcf")),
+    "condividi: Growup tra le app di «Condividi» per i file dei contatti");
+  /* il lettore del service worker, provato da solo */
+  const vm = await import("node:vm");
+  const cx = { self:{ addEventListener(){}, registration:{ scope:"https://x/growup-team/" } }, location:{ origin:"https://x" }, caches:{}, URL, Response:class{}, TextDecoder, Uint8Array };
+  vm.createContext(cx); vm.runInContext(fs.readFileSync(S + "/../sw.js", "utf8"), cx);
+  const vc = ["BEGIN:VCARD", "VERSION:2.1", "N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:Ross=C3=AC;Nicol=C3=B2;;;",
+    "FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:Nicol=C3=B2 Ross=C3=AC", "TEL;CELL:+39 333 000 0060", "TEL;HOME:02 000 0061", "EMAIL;HOME:non@serve.it", "END:VCARD",
+    "BEGIN:VCARD", "VERSION:3.0", "N:Bianchi;Luca;;;", "TEL;TYPE=CELL:333-000-0062", "ADR;TYPE=HOME:;;Via Prova 1;Città;;;Italia", "PHOTO;ENCODING=b;TYPE=JPEG:AAAA", " BBBB==", "NOTE:segreto", "END:VCARD",
+    "BEGIN:VCARD", "VERSION:4.0", "FN:Anna\\, la cugina", "TEL;VALUE=uri;TYPE=cell:tel:+39-333-000-0063", "END:VCARD"].join("\r\n");
+  const letti = JSON.parse(JSON.stringify(cx.contattiDaVcard(vc)));
+  check(JSON.stringify(letti) === JSON.stringify([{ nome:"Nicolò Rossì", tel:["+39 333 000 0060", "02 000 0061"] }, { nome:"Luca Bianchi", tel:["333-000-0062"] },
+    { nome:"Anna, la cugina", tel:["+39-333-000-0063"] }]) && !/serve|Prova 1|segreto|AAAA/.test(JSON.stringify(letti)),
+    "condividi: dal file vCard solo nomi e numeri (2.1 con accenti, 3.0, 4.0); niente email, indirizzi, foto, note (" + JSON.stringify(letti) + ")");
+  /* l'app: si apre con ?condivisi=1 e trova nella cache quello che il service worker ha messo da parte */
+  const entraCondivisi = async (contatti, tema) => {
+    const c = await browser.newContext({ viewport:{ width:360, height:780 }, colorScheme:tema || "light", locale:"it-IT", timezoneId:"Europe/Rome", bypassCSP:true, reducedMotion:"reduce" });
+    await c.route(/cdn\.jsdelivr\.net/, r => r.abort());
+    await c.route(/challenges\.cloudflare\.com/, r => r.fulfill({ contentType:"text/javascript", body:
+      "window.turnstile={render:function(el,o){setTimeout(function(){o.callback('tok-prova')},50)}};" }));
+    await c.addInitScript(dati => { window.__cachePronta = caches.open("growup-condivisi").then(x => x.put(new URL("condivisi", location.href.replace(/[?#].*$/, "")).href,
+      new Response(JSON.stringify(dati), { headers:{ "Content-Type":"application/json" } }))); }, contatti);
+    await c.addInitScript(([db, m]) => { window.__DB = db; eval(m); }, [DB, mock]);
+    const pg = await c.newPage(); pg.on("dialog", d => d.accept()); pg.on("pageerror", e => errori.push(String(e)));
+    await pg.addLocatorHandler(pg.locator(".festa.traguardo"), async t => { await t.locator("button[data-act=traguardo-chiudi]").click(); });
+    await pg.goto(BASE + "?condivisi=1#chiave=" + "a".repeat(32));
+    return { c, pg };
+  };
+  let { c, pg } = await entraCondivisi([{ nome:"Ines Condivisa", tel:["347 555 0170"] }, { nome:"Oreste Condiviso", tel:["347 555 0171", "02 555 0172"] }, { nome:"", tel:[] }]);
+  await pg.locator(".sheet .rubrica-molti").waitFor();
+  check(await pg.locator(".sheet .rubrica-molti li").count() === 2 && await pg.locator(".sheet input[name=r-tel-0]").inputValue() === "+393475550170"
+    && (await pg.locator(".sheet .aggiungi-molti").innerText()).trim() === "Aggiungi 2 nomi" && !(await pg.evaluate(() => location.search)),
+    "condividi: Growup si apre con l'elenco «Nomi dalla rubrica» (numeri puliti) e l'indirizzo torna pulito");
+  check(await pg.evaluate(async () => !(await (await caches.open("growup-condivisi")).match(new URL("condivisi", location.href).href))),
+    "condividi: nomi e numeri messi da parte si cancellano appena letti");
+  await pg.click(".sheet .aggiungi-molti");
+  await pg.getByText("2 nomi nella tua lista").waitFor();
+  await sync(pg);
+  check(["Ines Condivisa", "Oreste Condiviso"].every(n => DB.persone.some(x => x.nome === n)), "condividi: «Aggiungi 2 nomi» li mette nella Lista");
+  await c.close();
+  // un contatto solo: il modulo di un nome già compilato
+  ({ c, pg } = await entraCondivisi([{ nome:"Pia Sola", tel:["347 555 0180"] }], "dark"));
+  await pg.locator(".sheet input[name=nome]").waitFor();
+  check(await pg.inputValue(".sheet input[name=nome]") === "Pia Sola" && await pg.inputValue(".sheet input[name=contatto]") === "+393475550180",
+    "condividi: un contatto solo → il modulo di un nome già compilato");
+  await pg.screenshot({ path: S + "/e2e/77-condividi-uno-dark.png" });
+  await c.close();
+  // niente contatti nel file
+  ({ c, pg } = await entraCondivisi([]));
+  await pg.locator(".toast", { hasText:"In quello che hai condiviso non ho trovato contatti" }).waitFor();
+  check(!(await pg.locator(".sheet").count()), "condividi: senza contatti l'avviso, nessun modulo");
+  await c.close();
+  check(!errori.length, "condividi: nessun errore nella pagina");
 }
 
 await browser.close();
