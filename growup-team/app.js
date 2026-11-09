@@ -4789,6 +4789,32 @@ function personePiano(q){
       <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${FASI[indiceFase(p.fase)].nome}</span></span><b>›</b></button></li>`).join("")
     : `<li class="muted small">${t ? "Nessun nome così nella lista." : "La lista è vuota."}</li>`;
 }
+/* Un numero preso dalla rubrica (o incollato): via spazi, trattini, parentesi, punti e barre; 00 iniziale → +; senza
+   prefisso internazionale si aggiunge +39. Se non resta un numero di telefono (da 6 a 15 cifre) → null.
+   Vale solo per quello che arriva da fuori: quello che si scrive a mano nel campo resta com'è. */
+function numeroPulito(t){
+  let n = String(t || "").replace(/[\s\u200e\u200f\u202a-\u202e\-().\/]/g, "");
+  if(n.startsWith("00")) n = "+" + n.slice(2);
+  if(!/^\+?\d{6,15}$/.test(n)) return null;
+  return n.startsWith("+") ? n : "+39" + n;
+}
+/* La rubrica del telefono (Contact Picker API: per ora Chrome su Android): si chiedono solo nome e telefono */
+const rubricaOk = () => "contacts" in navigator && "ContactsManager" in window;
+const ICONA_RUBRICA = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="15" height="18" rx="2"/><path d="M3 7h3M3 12h3M3 17h3"/><circle cx="12.5" cy="10" r="2.5"/><path d="M8.5 16.5c.6-2 2.1-3 4-3s3.4 1 4 3"/></svg>`;
+/* scrive nel campo un numero scelto (dalla rubrica o dagli appunti): il campo resta modificabile a mano */
+function mettiNumero(f, n){
+  if(!f || !f.contatto) return;
+  f.contatto.value = n;
+  f.contatto.dispatchEvent(new Event("input", { bubbles:true }));
+}
+/* «Rubrica» → «Quale numero?»: l'elenco dei numeri del contatto, sotto il pulsante (non passa da render) */
+function sceltaNumeri(f, numeri){
+  const box = f.querySelector(".scegli-numero");
+  if(!box) return;
+  box.innerHTML = numeri.length > 1 ? `<p class="small">Quale numero?</p><div class="opzioni">${numeri.map(n =>
+    `<button type="button" class="btn small" data-act="rubrica-numero" data-numero="${esc(n)}">${esc(n)}</button>`).join("")}</div>` : "";
+}
+
 /* «Come lo conosci?» → «Dai social»: il cursore va al campo Social, per scriverlo subito */
 document.addEventListener("change", e => {
   const t = e.target, f = t && t.form;
@@ -4807,6 +4833,8 @@ function vSheetPersone(s){
     ${rapido ? `<p class="small">Entra nella tua lista già come Contattato e conta nei contatti della settimana.
       Se è già nella lista, scrivi il nome uguale: il contatto si segna su di lei.</p>` : ""}
     <form data-form="${s}" novalidate>
+      ${!m.id && !rapido && rubricaOk() ? `<button type="button" class="btn wide rubrica" data-act="rubrica">${ICONA_RUBRICA}Rubrica</button>
+        <div class="scegli-numero" aria-live="polite"></div>` : ""}
       <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc(m.nome || "")}" autocomplete="off"></label>
       <label class="field"><span>Telefono <i>(facoltativo)</i></span><input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc(m.contatto || "")}"></label>
       <label class="field"><span>Social <i>(facoltativo)</i></span><input name="social" maxlength="80" placeholder="es. @nome su Instagram" autocomplete="off" autocapitalize="off" value="${esc(m.social || "")}"></label>
@@ -4941,6 +4969,25 @@ Object.assign(AZIONI, {
   "filtro-gruppo"(el){ st.filtroGruppo = el.dataset.filtro; render(); applicaRicerca(); },
   "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = null; st.sheet = "persona-nuova"; render(); },
   /* i pulsanti rapidi di Io: + Contatto apre "un nome", + Piano apre il passo Piano di una persona */
+  /* «Rubrica»: si sceglie un contatto del telefono; nome e numero vanno nei campi (modificabili). Se si annulla, niente */
+  async rubrica(el){
+    const f = el.closest("form");
+    let scelti;
+    try{ scelti = await navigator.contacts.select(["name", "tel"], { multiple:false }); }
+    catch(e){ toast("La rubrica non si è aperta"); return; }
+    const c = scelti && scelti[0];
+    if(!c || !document.body.contains(f)) return;
+    const nome = String((c.name || []).find(x => String(x || "").trim()) || "").trim().slice(0, 80);
+    const numeri = [...new Set((c.tel || []).map(numeroPulito).filter(Boolean))];
+    if(nome) f.nome.value = nome;
+    if(numeri.length === 1) mettiNumero(f, numeri[0]);
+    sceltaNumeri(f, numeri);
+  },
+  "rubrica-numero"(el){
+    const f = el.closest("form");
+    mettiNumero(f, el.dataset.numero);
+    sceltaNumeri(f, []);
+  },
   "contatto-rapido"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = "contatto"; st.sheet = "persona-nuova"; render(); },
   "piano-rapido"(){ st.errore = ""; st.rapido = "piano"; st.cercaPiano = ""; st.sheet = "piano-chi"; render(); },
   "piano-con"(el){ st.personaId = el.dataset.id; st.passoTipo = "piano"; st.sheet = "passo"; render(); },
