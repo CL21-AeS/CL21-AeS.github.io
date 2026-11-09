@@ -4523,7 +4523,7 @@ function vPersona(){
   return `<button class="btn link" data-act="torna-lista" style="padding:0">‹ La mia lista</button>
   <div class="card">
     <div class="spread"><h2><button class="nome-modifica" data-act="persona-modifica" aria-label="Modifica i dati di ${esc(p.nome)}">${esc(p.nome)} <span aria-hidden="true">✎</span></button></h2>${maiComprato(p) ? `<span class="pill g">Mai comprato</span>` : ""}${p.esito ? `<span class="pill ${p.esito === "partner" || p.esito === "cliente" ? "v" : p.esito === "no" ? "r" : "g"}">${ESITI[p.esito]}</span>` : ""}</div>
-    ${p.contatto || p.origine ? `<p class="small" style="margin:2px 0 0">${[p.contatto, p.origine].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
+    ${p.contatto || p.social || p.origine ? `<p class="small" style="margin:2px 0 0">${[p.contatto, p.social, p.origine].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
     ${cerchiePersona(p, "lista")}
     ${avvisoScadenza(p)}
     ${vFermo(p)}
@@ -4800,7 +4800,8 @@ function vSheetPersone(s){
       Se è già nella lista, scrivi il nome uguale: il contatto si segna su di lei.</p>` : ""}
     <form data-form="${s}" novalidate>
       <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc(m.nome || "")}" autocomplete="off"></label>
-      <label class="field"><span>Telefono o contatto <i>(facoltativo)</i></span><input name="contatto" maxlength="80" inputmode="tel" value="${esc(m.contatto || "")}"></label>
+      <label class="field"><span>Telefono <i>(facoltativo)</i></span><input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc(m.contatto || "")}"></label>
+      <label class="field"><span>Social <i>(facoltativo)</i></span><input name="social" maxlength="80" placeholder="es. @nome su Instagram" autocomplete="off" autocapitalize="off" value="${esc(m.social || "")}"></label>
       <label class="field"><span>Come lo conosci <i>(facoltativo)</i></span><input name="origine" maxlength="80" placeholder="es. collega, palestra, cugino" value="${esc(m.origine || "")}"></label>
       ${avviato() && !st.nuovoCliente && m.esito !== "cliente" ? `<fieldset class="field"><legend>Fonte <i>(facoltativa)</i></legend><div class="opzioni">${FONTI.map(([k, t]) =>
         `<label class="chip"><input type="radio" name="fonte" value="${k}"${m.fonte === k ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>` : ""}
@@ -5021,7 +5022,7 @@ Object.assign(MODULI, {
          se il nome è già nella lista il contatto si segna su di lei */
       if(st.rapido === "contatto"){
         const gia = st.persone.find(p => senzaAccenti(p.nome) === senzaAccenti(nome)), pid = gia ? gia.id : uuid();
-        if(!gia) await api.nuovePersone([{ id:pid, nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null, fonte:fonteScelta(f) }]);
+        if(!gia) await api.nuovePersone([{ id:pid, nome, contatto:f.contatto.value.trim() || null, social:f.social.value.trim() || null, origine:f.origine.value.trim() || null, fonte:fonteScelta(f) }]);
         await api.nuoviPassi([{ id:uuid(), persona_id:pid, tipo:"contatto", data:oggi() }]);
         if(gia && gia.nascosta_io) await api.modificaPersona(pid, { nascosta_io:false });
         st.rapido = null;
@@ -5029,7 +5030,7 @@ Object.assign(MODULI, {
         return;
       }
       const id = uuid();
-      await api.nuovePersone([{ id, nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null, fonte:st.nuovoCliente ? null : fonteScelta(f) }]);
+      await api.nuovePersone([{ id, nome, contatto:f.contatto.value.trim() || null, social:f.social.value.trim() || null, origine:f.origine.value.trim() || null, fonte:st.nuovoCliente ? null : fonteScelta(f) }]);
       const scelte = [...f.querySelectorAll("input[name=cerchia]:checked")].map(i => i.value);
       if(scelte.length) await api.inCerchia(scelte.map(c => ({ persona_id:id, cerchia_id:c })));
       st.vista = "persone";
@@ -5101,7 +5102,7 @@ Object.assign(MODULI, {
   async "persona-modifica"(f){
     const nome = f.nome.value.trim();
     if(!nome){ mostraErroreForm(f, "Scrivi il nome."); return; }
-    const campi = { nome, contatto:f.contatto.value.trim() || null, origine:f.origine.value.trim() || null, note:f.note.value.trim() || null };
+    const campi = { nome, contatto:f.contatto.value.trim() || null, social:f.social.value.trim() || null, origine:f.origine.value.trim() || null, note:f.note.value.trim() || null };
     if(f.querySelector("input[name=fonte]")) campi.fonte = (f.querySelector("input[name=fonte]:checked") || {}).value || null;
     if(f.codice_cliente){
       const cod = f.codice_cliente.value.replace(/\D/g, "");
@@ -5801,7 +5802,7 @@ function vCliente(){
   return `${indietro}
   <div class="card">
     <div class="spread"><h2><button class="nome-modifica" data-act="persona-modifica" aria-label="Modifica i dati di ${esc(p.nome)}">${esc(p.nome)} <span aria-hidden="true">✎</span></button></h2><span class="etichette">${etichetteOrdini(p)}<span class="pill ${s.cl}">${esc(s.txt)}</span></span></div>
-    <p class="small" style="margin:2px 0 0">${[p.contatto, abitudine(p), c ? `compleanno ${c.testo}` : "", p.codice_cliente ? `codice cliente ${p.codice_cliente}` : ""].filter(Boolean).map(esc).join(" · ")}</p>
+    <p class="small" style="margin:2px 0 0">${[p.contatto, p.social, abitudine(p), c ? `compleanno ${c.testo}` : "", p.codice_cliente ? `codice cliente ${p.codice_cliente}` : ""].filter(Boolean).map(esc).join(" · ")}</p>
     ${cerchiePersona(p, "clienti")}
     ${avvisoScadenza(p)}
     ${tel ? `<div class="row" style="gap:6px;margin-top:8px">
