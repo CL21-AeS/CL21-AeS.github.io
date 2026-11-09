@@ -2183,11 +2183,14 @@ function vFesta(){
     <button class="btn primary wide" data-act="festa-fine">Vai al cruscotto</button>
   </div>`;
 }
-/* i nomi nuovi della settimana (solo avviati): i nomi messi in Lista da lunedì, con la loro fonte */
-const FONTI = [["conoscenza", "Conoscenza"], ["dal_vivo", "Dal vivo"], ["social", "Social"]];
+/* «Come lo conosci?»: la fonte del nome (058), facoltativa, con le parole per il modulo e per il conteggio nel cruscotto
+   (i nomi nuovi della settimana, solo avviati: i nomi messi in Lista da lunedì). Il dettaglio scritto a mano sta in origine. */
+const FONTI = [["conoscenza", "Lo conoscevo", "lo conoscevi già", "lo conoscevi già"],
+  ["dal_vivo", "Di recente", "incontrato di recente", "incontrati di recente"],
+  ["social", "Dai social", "dai social", "dai social"]];
 function nomiNuoviSettimana(){
   const l = st.persone.filter(p => p.esito !== "cliente" && String(p.creato_il || "").slice(0, 10) >= settimana());
-  return { n:l.length, fonti:FONTI.map(([k, t]) => [t.toLowerCase(), l.filter(p => p.fonte === k).length]).filter(x => x[1]) };
+  return { n:l.length, fonti:FONTI.map(([k, , uno, tanti]) => { const n = l.filter(p => p.fonte === k).length; return [n === 1 ? uno : tanti, n]; }).filter(x => x[1]) };
 }
 function vCruscotto(){
   const o = st.obiettivo, t = datiTappa(), aperta = !!st.tappaAperta, g = st.goal;
@@ -4786,6 +4789,11 @@ function personePiano(q){
       <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${FASI[indiceFase(p.fase)].nome}</span></span><b>›</b></button></li>`).join("")
     : `<li class="muted small">${t ? "Nessun nome così nella lista." : "La lista è vuota."}</li>`;
 }
+/* «Come lo conosci?» → «Dai social»: il cursore va al campo Social, per scriverlo subito */
+document.addEventListener("change", e => {
+  const t = e.target, f = t && t.form;
+  if(t.name === "fonte" && t.value === "social" && t.checked && f && f.social) f.social.focus();
+});
 document.addEventListener("input", e => {
   if(e.target && e.target.id === "cerca-piano"){ st.cercaPiano = e.target.value; const u = document.getElementById("risultati-piano"); if(u) u.innerHTML = personePiano(e.target.value); }
 });
@@ -4802,9 +4810,9 @@ function vSheetPersone(s){
       <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc(m.nome || "")}" autocomplete="off"></label>
       <label class="field"><span>Telefono <i>(facoltativo)</i></span><input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc(m.contatto || "")}"></label>
       <label class="field"><span>Social <i>(facoltativo)</i></span><input name="social" maxlength="80" placeholder="es. @nome su Instagram" autocomplete="off" autocapitalize="off" value="${esc(m.social || "")}"></label>
-      <label class="field"><span>Come lo conosci <i>(facoltativo)</i></span><input name="origine" maxlength="80" placeholder="es. collega, palestra, cugino" value="${esc(m.origine || "")}"></label>
-      ${avviato() && !st.nuovoCliente && m.esito !== "cliente" ? `<fieldset class="field"><legend>Fonte <i>(facoltativa)</i></legend><div class="opzioni">${FONTI.map(([k, t]) =>
-        `<label class="chip"><input type="radio" name="fonte" value="${k}"${m.fonte === k ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>` : ""}
+      <fieldset class="field come-conosci"><legend>Come lo conosci? <i>(facoltativo)</i></legend><div class="opzioni">${FONTI.map(([k, t]) =>
+        `<label class="chip"><input type="radio" name="fonte" value="${k}"${m.fonte === k ? " checked" : ""}><span>${t}</span></label>`).join("")}</div></fieldset>
+      <label class="field"><span>Dettaglio <i>(facoltativo)</i></span><input name="origine" maxlength="80" placeholder="es. collega, palestra, cugino" value="${esc(m.origine || "")}"></label>
       ${m.id && (m.esito === "cliente" || m.codice_cliente) ? (() => { const [mm, gg] = (m.compleanno || "-").split("-");
         return `<label class="field"><span>Codice cliente Amway <i>(facoltativo)</i></span><input name="codice_cliente" inputmode="numeric" maxlength="15" value="${esc(m.codice_cliente || "")}"></label>
         <div class="row" style="gap:8px">
@@ -5030,7 +5038,7 @@ Object.assign(MODULI, {
         return;
       }
       const id = uuid();
-      await api.nuovePersone([{ id, nome, contatto:f.contatto.value.trim() || null, social:f.social.value.trim() || null, origine:f.origine.value.trim() || null, fonte:st.nuovoCliente ? null : fonteScelta(f) }]);
+      await api.nuovePersone([{ id, nome, contatto:f.contatto.value.trim() || null, social:f.social.value.trim() || null, origine:f.origine.value.trim() || null, fonte:fonteScelta(f) }]);
       const scelte = [...f.querySelectorAll("input[name=cerchia]:checked")].map(i => i.value);
       if(scelte.length) await api.inCerchia(scelte.map(c => ({ persona_id:id, cerchia_id:c })));
       st.vista = "persone";
@@ -5103,7 +5111,7 @@ Object.assign(MODULI, {
     const nome = f.nome.value.trim();
     if(!nome){ mostraErroreForm(f, "Scrivi il nome."); return; }
     const campi = { nome, contatto:f.contatto.value.trim() || null, social:f.social.value.trim() || null, origine:f.origine.value.trim() || null, note:f.note.value.trim() || null };
-    if(f.querySelector("input[name=fonte]")) campi.fonte = (f.querySelector("input[name=fonte]:checked") || {}).value || null;
+    campi.fonte = (f.querySelector("input[name=fonte]:checked") || {}).value || null;
     if(f.codice_cliente){
       const cod = f.codice_cliente.value.replace(/\D/g, "");
       if(cod && !/^\d{4,15}$/.test(cod)){ mostraErroreForm(f, "Il codice cliente sono solo cifre (da 4 a 15)."); return; }
