@@ -4585,6 +4585,54 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   }
 }
 
+// 76. «Rubrica»: se non entra niente l'app dice perché (solo quanti, mai nomi o numeri); il contatto resta anche ridisegnando
+{
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+  await page.evaluate(() => { window.ContactsManager = function(){};
+    Object.defineProperty(navigator, "contacts", { configurable:true, value:{ select:async () => {
+      if(window.__rubricaErrore){ const e = new Error("x"); e.name = window.__rubricaErrore; throw e; }
+      return window.__contatti; } } }); });
+  await page.click("button[data-act=persona-nuova]");
+  const prova = async (contatti, errore, testo, msg) => {
+    await page.evaluate(([c, e]) => { window.__contatti = c; window.__rubricaErrore = e; }, [contatti, errore]);
+    await page.click(".sheet button[data-act=rubrica]");
+    await page.locator(".toast", { hasText:testo }).waitFor();
+    check(await page.inputValue(".sheet input[name=nome]") === "" && await page.inputValue(".sheet input[name=contatto]") === "", msg);
+  };
+  await prova([], null, "Dalla rubrica non è arrivato nessun contatto", "rubrica: nessun contatto → lo dice");
+  await prova([{ name:[], tel:[] }], null, "Il contatto è arrivato senza nome e senza numero", "rubrica: contatto vuoto → lo dice");
+  await prova(null, "SecurityError", "La rubrica non ha risposto (SecurityError)", "rubrica: errore → lo dice, con il tipo di errore");
+  // nome e numero arrivati anche come testo semplice; restano tornando sull'app (l'app ridisegna)
+  await page.evaluate(() => { window.__rubricaErrore = null; window.__contatti = [{ name:"Ugo Testo", tel:"333 000 0050" }]; });
+  await page.click(".sheet button[data-act=rubrica]");
+  await page.waitForFunction(() => document.querySelector(".sheet input[name=nome]").value === "Ugo Testo");
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await page.waitForTimeout(1200);
+  check(await page.inputValue(".sheet input[name=nome]") === "Ugo Testo" && await page.inputValue(".sheet input[name=contatto]") === "+393330000050",
+    "rubrica: il contatto resta nel modulo anche quando l'app ridisegna");
+  // un nome scritto prima viene sostituito da quello della rubrica; dopo, si corregge a mano
+  await page.fill(".sheet input[name=nome]", "Scritto a mano");
+  await page.evaluate(() => { window.__contatti = [{ name:["Vera Rubrica"], tel:["333 000 0051", "333 000 0052"] }]; });
+  await page.click(".sheet button[data-act=rubrica]");
+  await page.locator(".sheet .scegli-numero button").first().waitFor();
+  check(await page.inputValue(".sheet input[name=nome]") === "Vera Rubrica", "rubrica: il nome della rubrica prende il posto di quello scritto");
+  await page.click(".sheet .scegli-numero button:has-text('+393330000052')");
+  check(await page.inputValue(".sheet input[name=contatto]") === "+393330000052" && !(await page.locator(".sheet .scegli-numero button").count()),
+    "rubrica: scelto il numero, l'elenco sparisce");
+  await page.fill(".sheet input[name=nome]", "Vera Corretta");
+  await page.click(".sheet button.primary");
+  await page.getByText("Vera Corretta nella tua lista").waitFor();
+  await sync(page);
+  check(DB.persone.some(x => x.nome === "Vera Corretta" && x.contatto === "+393330000052"), "rubrica: si salva quello che c'è nei campi");
+  await page.click("button[data-act=persona-nuova]");
+  check(await page.inputValue(".sheet input[name=nome]") === "" && await page.inputValue(".sheet input[name=contatto]") === "", "rubrica: riaprendo, il modulo è vuoto");
+  check(!errori.length, "rubrica, avvisi: nessun errore nella pagina");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

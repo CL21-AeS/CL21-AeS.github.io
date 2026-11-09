@@ -4910,12 +4910,26 @@ function mettiNumero(f, n){
   mostraDoppione(f);
 }
 /* «Rubrica» → «Quale numero?»: l'elenco dei numeri del contatto, sotto il pulsante (non passa da render) */
-function sceltaNumeri(f, numeri){
-  const box = f.querySelector(".scegli-numero");
-  if(!box) return;
-  box.innerHTML = numeri.length > 1 ? `<p class="small">Quale numero?</p><div class="opzioni">${numeri.map(n =>
-    `<button type="button" class="btn small" data-act="rubrica-numero" data-numero="${esc(n)}">${esc(n)}</button>`).join("")}</div>` : "";
+function htmlNumeri(numeri){
+  return `<p class="small">Quale numero?</p><div class="opzioni">${numeri.map(n =>
+    `<button type="button" class="btn small" data-act="rubrica-numero" data-numero="${esc(n)}">${esc(n)}</button>`).join("")}</div>`;
 }
+/* il contatto scelto nella rubrica va nel modulo di adesso: nello stato (così resta anche se l'app ridisegna) e nei campi
+   (così prende il posto di quello che c'era scritto). I campi restano modificabili. */
+function mettiDallaRubrica(){
+  render();
+  const f = document.querySelector('#sheet form[data-form="persona-nuova"]'), ru = st.rubricaUno;
+  if(!f || !ru) return;
+  if(ru.nome) f.nome.value = ru.nome;
+  if(ru.numero) mettiNumero(f, ru.numero);
+}
+/* Quello che arriva dalla rubrica, detto in parole semplici (solo quanti, mai nomi o numeri): se non entra niente si sa
+   perché. Se dopo il ritorno all'app la rubrica non ha ancora risposto, lo si dice. */
+let rubricaInAttesa = false;
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState !== "visible" || !rubricaInAttesa) return;
+  setTimeout(() => { if(rubricaInAttesa) toast("La rubrica non ha ancora risposto: riprova"); }, 4000);
+});
 
 /* «Come lo conosci?» → «Dai social»: il cursore va al campo Social, per scriverlo subito */
 document.addEventListener("change", e => {
@@ -4932,16 +4946,18 @@ function vSheetPersone(s){
     const m = s === "persona-modifica" ? p : {};
     const rapido = !m.id && st.rapido === "contatto";
     if(!m.id && !rapido && st.rubricaMolti && st.rubricaMolti.length) return vRubricaMolti(annulla);
+    /* il contatto preso dalla rubrica sta nello stato: il modulo lo mostra anche se l'app lo ridisegna */
+    const ru = !m.id && !rapido ? st.rubricaUno : null;
     return `<h2>${m.id ? "Modifica i dati" : st.nuovoCliente ? "Un nuovo cliente" : rapido ? "Un contatto" : "Un nome nella tua lista"}</h2>
     ${rapido ? `<p class="small">Entra nella tua lista già come Contattato e conta nei contatti della settimana.
       Se è già nella lista, scrivi il nome uguale: il contatto si segna su di lei.</p>` : ""}
     <form data-form="${s}" novalidate>
       ${!m.id && !rapido && rubricaOk() ? `<button type="button" class="btn wide rubrica" data-act="rubrica">${ICONA_RUBRICA}Rubrica</button>
-        <div class="scegli-numero" aria-live="polite"></div>` : ""}
-      <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc(m.nome || "")}" autocomplete="name"></label>
-      <label class="field"><span>Telefono <i>(facoltativo)</i></span>${!m.id && !rapido && incollaOk() ? `<span class="con-incolla"><input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc(m.contatto || "")}">
+        <div class="scegli-numero" aria-live="polite">${ru && !ru.numero && ru.numeri.length > 1 ? htmlNumeri(ru.numeri) : ""}</div>` : ""}
+      <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc((ru && ru.nome) || m.nome || "")}" autocomplete="name"></label>
+      <label class="field"><span>Telefono <i>(facoltativo)</i></span>${!m.id && !rapido && incollaOk() ? `<span class="con-incolla"><input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc((ru && ru.numero) || m.contatto || "")}">
         <button type="button" class="btn small" data-act="incolla-numero">Incolla</button></span>`
-        : `<input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc(m.contatto || "")}">`}</label>
+        : `<input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc((ru && ru.numero) || m.contatto || "")}">`}</label>
       <div class="fermo-box avviso-doppione" aria-live="polite" hidden></div>
       <label class="field"><span>Social <i>(facoltativo)</i></span><input name="social" maxlength="80" placeholder="es. @nome su Instagram" autocomplete="off" autocapitalize="off" value="${esc(m.social || "")}"></label>
       <fieldset class="field come-conosci"><legend>Come lo conosci? <i>(facoltativo)</i></legend><div class="opzioni">${FONTI.map(([k, t]) =>
@@ -5051,7 +5067,7 @@ function vSheetPersone(s){
 }
 
 /* chiudendo un foglio aperto dai pulsanti rapidi di Io non resta niente di mezzo */
-function chiudiSheet(){ st.sheet = null; st.rubricaMolti = null; st.ordiniInAttesa = null; st.erroriAmway = []; if(st.rapido === "piano"){ st.personaId = null; st.passoTipo = null; } st.rapido = null; }
+function chiudiSheet(){ st.sheet = null; st.rubricaMolti = null; st.rubricaUno = null; st.ordiniInAttesa = null; st.erroriAmway = []; if(st.rapido === "piano"){ st.personaId = null; st.passoTipo = null; } st.rapido = null; }
 async function dopoPersone(msg){
   /* + Piano da Io: finito il passo si resta su Io, senza una scheda aperta in Persone */
   if(st.rapido === "piano"){ st.rapido = null; st.personaId = null; }
@@ -5059,7 +5075,7 @@ async function dopoPersone(msg){
   aggiornaAttivita();     // i passi contano contatti e piani della settimana
   await caricaInviti();   // togliendo una persona, il suo invito Target si scollega
   await caricaClienti();  // e i suoi ordini
-  st.sheet = null; st.passoTipo = null; render();
+  st.sheet = null; st.passoTipo = null; st.rubricaUno = null; st.rubricaMolti = null; render();
   if(msg) toast(msg);
   aggiornaAttivita();  // i passi contano contatti, piani e clienti: si aggiornano anche i numeri di Io
 }
@@ -5073,26 +5089,29 @@ Object.assign(AZIONI, {
   "percorso-intero"(el){ const p = el.closest(".percorso"); if(p) p.classList.add("aperto"); },
   "percorso-corto"(el){ const p = el.closest(".percorso"); if(p) p.classList.remove("aperto"); },
   "filtro-gruppo"(el){ st.filtroGruppo = el.dataset.filtro; render(); applicaRicerca(); },
-  "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = null; st.rubricaMolti = null; st.sheet = "persona-nuova"; render(); },
+  "persona-nuova"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = null; st.rubricaMolti = null; st.rubricaUno = null; st.sheet = "persona-nuova"; render(); },
   /* i pulsanti rapidi di Io: + Contatto apre "un nome", + Piano apre il passo Piano di una persona */
   /* «Rubrica»: si sceglie un contatto del telefono; nome e numero vanno nei campi (modificabili). Se si annulla, niente */
   async rubrica(){
     let scelti;
+    rubricaInAttesa = true;
     try{ scelti = await navigator.contacts.select(["name", "tel"], { multiple:true }); }
-    catch(e){ toast("La rubrica non si è aperta"); return; }
-    /* di ogni contatto solo il nome e i numeri (puliti, senza ripetizioni) */
-    const lista = (scelti || []).map(c => ({ nome:String((c.name || []).find(x => String(x || "").trim()) || "").trim().slice(0, 80),
-      numeri:[...new Set((c.tel || []).map(numeroPulito).filter(Boolean))] })).filter(c => c.nome || c.numeri.length);
+    catch(e){ rubricaInAttesa = false; toast(`La rubrica non ha risposto (${String(e && e.name || "errore").slice(0, 40)})`); return; }
+    rubricaInAttesa = false;
+    if(!scelti || !scelti.length){ toast("Dalla rubrica non è arrivato nessun contatto"); return; }
+    /* di ogni contatto solo il nome e i numeri (puliti, senza ripetizioni); nome e numeri possono arrivare come elenco o no */
+    const elenco = x => Array.isArray(x) ? x : x == null ? [] : typeof x === "string" ? [x] : [...x];
+    const lista = [...scelti].map(c => ({ nome:String(elenco(c && c.name).find(x => String(x || "").trim()) || "").trim().slice(0, 80),
+      numeri:[...new Set(elenco(c && c.tel).map(numeroPulito).filter(Boolean))] })).filter(c => c.nome || c.numeri.length);
+    const arrivati = scelti.length;
     scelti = null;
-    if(!lista.length || st.sheet !== "persona-nuova") return;
+    if(!lista.length){ toast(arrivati === 1 ? "Il contatto è arrivato senza nome e senza numero" : `${arrivati} contatti arrivati senza nome e senza numero`); return; }
+    if(st.sheet !== "persona-nuova"){ toast("Il modulo si è chiuso: riapri «+ Nome» e riprova"); return; }
     if(lista.length > RUBRICA_MAX){ lista.length = RUBRICA_MAX; toast(`Al massimo ${RUBRICA_MAX} alla volta: ho preso i primi ${RUBRICA_MAX}`); }
-    if(lista.length > 1){ st.rubricaMolti = lista; render(); return; }
-    /* un contatto solo: nome e numero nel modulo di adesso (mentre la rubrica era aperta l'app può averlo ridisegnato) */
-    const f = document.querySelector('#sheet form[data-form="persona-nuova"]'), c = lista[0];
-    if(!f) return;
-    if(c.nome) f.nome.value = c.nome;
-    if(c.numeri.length === 1) mettiNumero(f, c.numeri[0]);
-    sceltaNumeri(f, c.numeri);
+    if(lista.length > 1){ st.rubricaUno = null; st.rubricaMolti = lista; render(); return; }
+    const c = lista[0];
+    st.rubricaUno = { nome:c.nome, numeri:c.numeri, numero:c.numeri.length === 1 ? c.numeri[0] : "" };
+    mettiDallaRubrica();
   },
   "rubrica-altro-numero"(el){
     const i = el.closest("form") && el.closest("form").elements["r-tel-" + el.dataset.i];
@@ -5117,9 +5136,10 @@ Object.assign(AZIONI, {
     AZIONI[p.esito === "cliente" ? "apri-cliente" : "apri-persona"]({ dataset:{ id:p.id } });
   },
   "rubrica-numero"(el){
-    const f = el.closest("form");
-    mettiNumero(f, el.dataset.numero);
-    sceltaNumeri(f, []);
+    if(st.rubricaUno) st.rubricaUno.numero = el.dataset.numero;
+    render();
+    const f = document.querySelector('#sheet form[data-form="persona-nuova"]');
+    if(f) mettiNumero(f, el.dataset.numero);
   },
   "contatto-rapido"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = "contatto"; st.sheet = "persona-nuova"; render(); },
   "piano-rapido"(){ st.errore = ""; st.rapido = "piano"; st.cercaPiano = ""; st.sheet = "piano-chi"; render(); },
@@ -6219,7 +6239,7 @@ Object.assign(AZIONI, {
   "apri-cliente"(el){ st.vista = "persone"; st.sezPersone = "clienti"; st.invitoId = null; st.personaId = el.dataset.id; render(); window.scrollTo(0, 0); },
   "torna-clienti"(){ st.personaId = null; render(); window.scrollTo(0, 0); },
   "filtro-clienti"(el){ st.filtroClienti = el.dataset.filtro; render(); },
-  "cliente-nuovo"(){ st.errore = ""; st.nuovoCliente = true; st.rubricaMolti = null; st.sheet = "persona-nuova"; render(); },
+  "cliente-nuovo"(){ st.errore = ""; st.nuovoCliente = true; st.rubricaMolti = null; st.rubricaUno = null; st.sheet = "persona-nuova"; render(); },
   "ordine-nuovo"(){ st.bozza = nuovaBozza([]); st.cercaProdotto = ""; st.sheet = "ordine-cliente"; render(); },
   "ordine-modifica"(el){
     const o = st.ordini.find(x => x.id === el.dataset.id);
