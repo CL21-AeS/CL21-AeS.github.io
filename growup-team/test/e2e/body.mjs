@@ -3633,26 +3633,26 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   // un nome nuovo con la fonte
   await page.click("button[data-act=vista-persone]");
   await page.click("button[data-act=persona-nuova]");
-  check(await page.locator(".sheet input[name=fonte]").count() === 3, "avviata: la fonte del nome (Conoscenza, Dal vivo, Social)");
+  check(await page.locator(".sheet input[name=fonte]").count() === 3, "avviata: «Come lo conosci?» (Lo conoscevo, Di recente, Dai social)");
   await page.fill(".sheet input[name=nome]", "Nome Dal Vivo");
   await page.check(".sheet input[name=fonte][value=dal_vivo]", { force:true });
   await page.click(".sheet button.primary");
   await page.getByText("Nome Dal Vivo nella tua lista").waitFor();
   await page.click("button[data-act=vista-io]");
-  check((await page.locator(".cruscotto .tessera.nomi-nuovi b").innerText()).trim() === "1" && (await page.locator(".cruscotto .fonti-riga").innerText()).includes("1 dal vivo"),
+  check((await page.locator(".cruscotto .tessera.nomi-nuovi b").innerText()).trim() === "1" && (await page.locator(".cruscotto .fonti-riga").innerText()).includes("1 incontrato di recente"),
     "il cruscotto conta il nome nuovo e la sua fonte");
   await sync(page);
   check(DB.persone.some(x => x.nome === "Nome Dal Vivo" && x.fonte === "dal_vivo"), "nel database la fonte del nome");
   check(!errori.length, "consegna 6: nessun errore nella pagina");
   await ctx.close();
-  // il nuovo (iscritto da 5 giorni): niente «Per iniziare», niente nomi nuovi né fonte (avrà il suo percorso)
+  // il nuovo (iscritto da 5 giorni): niente «Per iniziare» né nomi nuovi (avrà il suo percorso); «Come lo conosci?» sì, come per tutti
   ({ ctx, page } = await apri({}, "#chiave=" + "b6".repeat(16)));
   await page.getByText("Ciao Nino").waitFor();
   if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
   check(!(await page.locator(".card.per-iniziare").count()) && !(await page.locator(".tessera.nomi-nuovi").count()), "nuovo: niente «Per iniziare» né nomi nuovi");
   await page.click("button[data-act=vista-persone]");
   await page.click("button[data-act=persona-nuova]");
-  check(!(await page.locator(".sheet input[name=fonte]").count()), "nuovo: nessuna fonte nel nome");
+  check(await page.locator(".sheet input[name=fonte]").count() === 3, "nuovo: anche lui ha «Come lo conosci?»");
   await ctx.close();
   DB.partners = DB.partners.filter(p => !["av6", "nu6", "pe6"].includes(p.id));
 }
@@ -4160,6 +4160,67 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
   await page.click("button[data-act=persona-nuova]");
   await page.screenshot({ path: S + "/e2e/69-modulo-scuro.png" });
+  await ctx.close();
+}
+
+// 70. «Come lo conosci?»: una domanda sola (tre scelte e il dettaglio), per tutti e anche per i nuovi clienti
+{
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+  await page.click("button[data-act=persona-nuova]");
+  const cc = page.locator(".sheet fieldset.come-conosci");
+  check((await cc.locator("legend").innerText()).replace(/\s+/g, " ").trim() === "Come lo conosci? (facoltativo)"
+    && (await cc.locator(".chip span").allInnerTexts()).join("|") === "Lo conoscevo|Di recente|Dai social"
+    && (await cc.locator("input").evaluateAll(l => l.map(i => i.value))).join() === "conoscenza,dal_vivo,social",
+    "come lo conosci: tre scelte con gli stessi valori di prima");
+  check(!(await page.locator(".sheet legend", { hasText:"Fonte" }).count()), "come lo conosci: niente più «Fonte»");
+  check((await page.locator(".sheet label.field:has(input[name=origine]) > span").innerText()).replace(/\s+/g, " ").trim() === "Dettaglio (facoltativo)"
+    && await page.getAttribute(".sheet input[name=origine]", "placeholder") === "es. collega, palestra, cugino", "come lo conosci: sotto, il «Dettaglio»");
+  const righe = await cc.locator(".chip span").evaluateAll(l => l.map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.height)]; }));
+  check(new Set(righe.map(r => r[0])).size === 1 && righe.every(r => r[1] < 40), "come lo conosci: a 360 px i tre chip su una riga, senza a capo");
+  check(await page.evaluate(() => document.documentElement.scrollWidth) <= 360, "come lo conosci: la pagina non scorre di lato");
+  await page.screenshot({ path: S + "/e2e/70-come-chiaro.png" });
+  await cc.locator("label.chip", { hasText:"Dai social" }).click();
+  check(await page.evaluate(() => document.activeElement && document.activeElement.name) === "social", "«Dai social»: il cursore va al campo Social");
+  await cc.locator("label.chip", { hasText:"Di recente" }).click();
+  check(await page.evaluate(() => document.activeElement && document.activeElement.name) !== "social", "le altre scelte non spostano il cursore");
+  await page.fill(".sheet input[name=nome]", "Nome Di Recente");
+  await page.fill(".sheet input[name=origine]", "palestra");
+  await page.click(".sheet button.primary");
+  await page.getByText("Nome Di Recente nella tua lista").waitFor();
+  await sync(page);
+  check(DB.persone.some(x => x.nome === "Nome Di Recente" && x.fonte === "dal_vivo" && x.origine === "palestra"), "nel database la scelta e il dettaglio");
+  // i nuovi clienti: la stessa domanda
+  await page.click("button[data-sez=clienti]");
+  await page.click("button[data-act=cliente-nuovo]");
+  check(await page.locator(".sheet fieldset.come-conosci input[name=fonte]").count() === 3, "nuovo cliente: anche lui ha «Come lo conosci?»");
+  await page.fill(".sheet input[name=nome]", "Cliente Conosciuto");
+  await page.locator(".sheet fieldset.come-conosci label.chip", { hasText:"Lo conoscevo" }).click();
+  await page.click(".sheet button.primary");
+  await page.getByText("Cliente Conosciuto tra i tuoi clienti").waitFor();
+  await sync(page);
+  const cl = DB.persone.find(x => x.nome === "Cliente Conosciuto");
+  check(cl && cl.fonte === "conoscenza", "nuovo cliente: la scelta è salvata");
+  // in «Modifica i dati» la scelta di prima resta e si può cambiare
+  /* salvato il cliente nuovo si apre già la sua scheda */
+  if(!(await page.locator("button[data-act=persona-modifica]").count())) await page.locator("button[data-act=apri-cliente]", { hasText:"Cliente Conosciuto" }).click();
+  await page.click("button[data-act=persona-modifica]");
+  check(await page.isChecked(".sheet input[name=fonte][value=conoscenza]"), "modifica: la scelta di prima è già segnata");
+  await page.click(".sheet button.primary");
+  await page.locator(".sheet").waitFor({ state:"detached" });
+  await sync(page);
+  check(DB.persone.find(x => x.id === cl.id).fonte === "conoscenza", "modifica: salvando senza toccarla la scelta resta");
+  check(!errori.length, "come lo conosci: nessun errore nella pagina");
+  await ctx.close();
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:"dark" }, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+  await page.click("button[data-act=persona-nuova]");
+  await page.locator(".sheet fieldset.come-conosci label.chip", { hasText:"Di recente" }).click();
+  await page.screenshot({ path: S + "/e2e/70-come-scuro.png" });
   await ctx.close();
 }
 
