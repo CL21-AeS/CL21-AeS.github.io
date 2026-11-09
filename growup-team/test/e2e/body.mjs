@@ -4461,6 +4461,41 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   }
 }
 
+// 74. iPhone: il campo «Nome» con autocomplete="name"; il «+ Contatto» rapido trova ancora il nome uguale
+{
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  const ac = () => page.getAttribute(".sheet input[name=nome]", "autocomplete");
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+  await page.click("button[data-act=persona-nuova]");
+  const a1 = await ac(); await page.click(".sheet [data-act=chiudi]");
+  await page.locator("button[data-act=apri-persona]", { hasText:"Primo Numero" }).click();
+  await page.click("button[data-act=persona-modifica]");
+  const a2 = await ac(); await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-io]");
+  await page.click("button[data-act=contatto-rapido]");
+  const a3 = await ac();
+  check(a1 === "name" && a2 === "name" && a3 === "name", "nome: autocomplete «name» (nuovo, modifica, contatto rapido)");
+  await sync(page);
+  const prima = DB.persone.length, primo = DB.persone.find(x => x.nome === "Primo Numero");
+  const passiPrima = (DB.passi || []).filter(x => x.persona_id === primo.id && x.tipo === "contatto").length;
+  await page.fill(".sheet input[name=nome]", "primo numero");
+  await page.click(".sheet button.primary");
+  await page.getByText("Contatto con Primo registrato").or(page.getByText("Contatto con primo registrato")).waitFor();
+  await sync(page);
+  check(DB.persone.length === prima && (DB.passi || []).filter(x => x.persona_id === primo.id && x.tipo === "contatto").length === passiPrima + 1,
+    "contatto rapido: con il nome uguale (anche minuscolo) il contatto si segna su chi c'è già, nessun nome nuovo");
+  await page.click("button[data-act=contatto-rapido]");
+  await page.fill(".sheet input[name=nome]", "Nome Rapido Nuovo");
+  await page.click(".sheet button.primary");
+  await page.getByText("Contatto con Nome registrato").waitFor();
+  await sync(page);
+  check(DB.persone.length === prima + 1 && DB.persone.some(x => x.nome === "Nome Rapido Nuovo" && x.fase === "contattato"), "contatto rapido: un nome nuovo entra già Contattato");
+  check(!errori.length, "nome: nessun errore nella pagina");
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

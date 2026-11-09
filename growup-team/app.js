@@ -4899,7 +4899,7 @@ function vSheetPersone(s){
     <form data-form="${s}" novalidate>
       ${!m.id && !rapido && rubricaOk() ? `<button type="button" class="btn wide rubrica" data-act="rubrica">${ICONA_RUBRICA}Rubrica</button>
         <div class="scegli-numero" aria-live="polite"></div>` : ""}
-      <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc(m.nome || "")}" autocomplete="off"></label>
+      <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc(m.nome || "")}" autocomplete="name"></label>
       <label class="field"><span>Telefono <i>(facoltativo)</i></span>${!m.id && !rapido && incollaOk() ? `<span class="con-incolla"><input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc(m.contatto || "")}">
         <button type="button" class="btn small" data-act="incolla-numero">Incolla</button></span>`
         : `<input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc(m.contatto || "")}">`}</label>
