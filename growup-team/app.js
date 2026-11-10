@@ -4790,6 +4790,38 @@ Object.assign(MODULI, {
   }
 });
 
+/* il contatto di oggi segnato su una persona (nuova o già nella lista): torna anche su Io se era stata tolta */
+async function contattoSu(p, nome){
+  await api.nuoviPassi([{ id:uuid(), persona_id:p.id, tipo:"contatto", data:oggi() }]);
+  if(p.nascosta_io) await api.modificaPersona(p.id, { nascosta_io:false });
+  st.rapido = null;
+  await dopoPersone(`Contatto con ${nomeSaluto(nome)} registrato`);
+}
+/* il nome confrontato senza accenti, maiuscole e spazi doppi */
+function chiaveNome(n){ return senzaAccenti(n).replace(/\s+/g, " "); }
+function stessoNome(nome, tranne){ const k = chiaveNome(nome); return k ? st.persone.find(p => p.id !== tranne && chiaveNome(p.nome) === k) || null : null; }
+/* nella Lista e nei Clienti, chi ha un nome che contiene tutte le parole scritte (anche solo il nome o il cognome) */
+function nomiCome(q, l){
+  const parole = chiaveNome(q).split(" ").filter(Boolean);
+  return parole.length ? l.filter(p => { const n = chiaveNome(p.nome); return parole.every(w => n.includes(w)); }) : l;
+}
+/* la fase in breve, come nei filtri della Lista: «in lista», «in corso», «cliente», «non ora»… */
+function faseBreve(p){ return p.esito ? ESITI[p.esito].toLowerCase() : p.fase === "lista" ? "in lista" : "in corso"; }
+/* + Contatto: mentre si scrive il nome, fino a 5 nomi già nella Lista o tra i Clienti (prima chi inizia così, poi per nome) */
+const SUGGERITI_CONTATTO = 5;
+function personeContatto(q){
+  const k = chiaveNome(q);
+  if(!k) return "";
+  const inizia = p => chiaveNome(p.nome).split(" ").some(w => w.startsWith(k.split(" ")[0])) ? 0 : 1;
+  return nomiCome(q, st.persone).sort((a, b) => inizia(a) - inizia(b) || a.nome.localeCompare(b.nome, "it")).slice(0, SUGGERITI_CONTATTO)
+    .map(p => `<li><button type="button" class="persona" data-act="contatto-su" data-id="${esc(p.id)}">
+      <span class="grow"><b>${esc(p.nome)}</b> <span class="small">· ${esc(faseBreve(p))}</span></span><b aria-hidden="true">›</b></button></li>`).join("");
+}
+document.addEventListener("input", e => {
+  const t = e.target, f = t && t.form;
+  if(t && t.name === "nome" && f && f.dataset.form === "persona-nuova" && st.rapido === "contatto"){
+    st.cercaContatto = t.value; const u = document.getElementById("suggerimenti-contatto"); if(u) u.innerHTML = personeContatto(t.value); }
+});
 /* per + Piano: le persone ancora in percorso, prima quelle più avanti (invitate), poi per nome */
 function personePiano(q){
   const t = senzaAccenti(q || "");
@@ -4841,13 +4873,18 @@ function doppioneDi(f){
   const c = cifreTelefono(f.contatto.value);
   if(!c) return null;
   /* nel contatto rapido, se il nome è già nella lista il contatto si segna su di lei: lei non è un doppione */
-  const stesso = f.dataset.form === "persona-nuova" && st.rapido === "contatto" ? senzaAccenti(f.nome.value) : null;
-  return st.persone.find(p => p.id !== io && !(stesso && senzaAccenti(p.nome) === stesso) && cifreTelefono(p.contatto) === c) || null;
+  const stesso = f.dataset.form === "persona-nuova" && st.rapido === "contatto" ? chiaveNome(f.nome.value) : null;
+  return st.persone.find(p => p.id !== io && !(stesso && chiaveNome(p.nome) === stesso) && cifreTelefono(p.contatto) === c) || null;
 }
+/* «+ Nome» (Lista e Clienti, anche dalla Rubrica): lo stesso numero, oppure lo stesso nome (senza accenti e maiuscole).
+   Un solo avviso anche se coincidono tutti e due; gli omonimi si possono salvare lo stesso. */
+function nomeControllato(f){ return !!f && f.dataset.form === "persona-nuova" && st.rapido !== "contatto" && !!f.nome; }
+function doppioneNuovo(f){ return doppioneDi(f) || (nomeControllato(f) ? stessoNome(f.nome.value) : null); }
+function chiaveDoppione(f){ return cifreTelefono(f.contatto ? f.contatto.value : "") + "|" + (nomeControllato(f) ? chiaveNome(f.nome.value) : ""); }
 /* chi nella mia lista ha già uno di questi numeri (per l'elenco «Dalla rubrica») */
-function giaInLista(numeri){
+function giaInLista(numeri, nome){
   const cc = new Set((numeri || []).map(cifreTelefono).filter(Boolean));
-  return cc.size ? st.persone.find(p => cc.has(cifreTelefono(p.contatto))) || null : null;
+  return (cc.size ? st.persone.find(p => cc.has(cifreTelefono(p.contatto))) : null) || stessoNome(nome);
 }
 /* «Rubrica» con più contatti scelti: l'elenco da controllare (spunte, nome e numero modificabili, doppioni in ambra);
    «Come lo conosci?», il dettaglio e le cerchie valgono per tutti. Poi «Aggiungi N nomi». */
@@ -4857,7 +4894,7 @@ function vRubricaMolti(annulla){
   return `<h2>${cl ? "Nuovi clienti dalla rubrica" : "Nomi dalla rubrica"}</h2>
     <p class="small">Togli la spunta a chi non vuoi aggiungere. Nomi e numeri si possono correggere.</p>
     <form data-form="persona-nuova" novalidate>
-      <ul class="rubrica-molti">${l.map((c, i) => { const d = giaInLista(c.numeri);
+      <ul class="rubrica-molti">${l.map((c, i) => { const d = giaInLista(c.numeri, c.nome);
         return `<li class="${d ? "doppione" : ""}"><input type="checkbox" name="r-sel" value="${i}" checked aria-label="Aggiungi ${esc(c.nome || "questo contatto")}">
           <div class="grow">
             <input name="r-nome-${i}" maxlength="80" value="${esc(c.nome)}" placeholder="Nome" aria-label="Nome" autocomplete="off">
@@ -4886,30 +4923,31 @@ const doppioniVisti = new WeakMap();
 function mostraDoppione(f){
   const box = f && f.querySelector(".avviso-doppione");
   if(!box) return null;
-  const p = doppioneDi(f);
+  const p = doppioneNuovo(f);
   box.innerHTML = p ? `<p class="small">È già nella tua lista: <b>${esc(p.nome)}</b></p>
     <button type="button" class="btn small" data-act="apri-doppione" data-id="${esc(p.id)}">Apri la sua scheda</button>` : "";
   box.hidden = !p;
-  if(p) doppioniVisti.set(f, { c:cifreTelefono(f.contatto.value), t:Date.now() }); else doppioniVisti.delete(f);
+  if(p) doppioniVisti.set(f, { c:chiaveDoppione(f), t:Date.now() }); else doppioniVisti.delete(f);
   return p;
 }
 /* al salvataggio: se c'è un doppione che non si è ancora visto, prima l'avviso; toccando di nuovo «Salva» si salva.
    (l'avviso appena comparso, uscendo dal campo con il tocco su «Salva», non conta come visto) */
 function fermaPerDoppione(f){
-  if(!doppioneDi(f)) return false;
+  if(!doppioneNuovo(f)) return false;
   const v = doppioniVisti.get(f);
-  if(v && v.c === cifreTelefono(f.contatto.value) && Date.now() - v.t > 700) return false;
+  if(v && v.c === chiaveDoppione(f) && Date.now() - v.t > 700) return false;
   mostraDoppione(f);
   return true;
 }
 document.addEventListener("change", e => {
   const t = e.target;
   if(t && t.name === "contatto" && t.form && /^persona-(nuova|modifica)$/.test(t.form.dataset.form || "")) mostraDoppione(t.form);
+  if(t && t.name === "nome" && nomeControllato(t.form)) mostraDoppione(t.form);
 });
 document.addEventListener("input", e => {
   const t = e.target, f = t && t.form;
-  /* cambiando il numero l'avviso di prima sparisce (torna uscendo dal campo, se serve) */
-  if(t && t.name === "contatto" && f && doppioniVisti.has(f) && doppioniVisti.get(f).c !== cifreTelefono(t.value)){
+  /* cambiando il numero (o il nome) l'avviso di prima sparisce (torna uscendo dal campo, se serve) */
+  if(t && (t.name === "contatto" || t.name === "nome") && f && doppioniVisti.has(f) && doppioniVisti.get(f).c !== chiaveDoppione(f)){
     const box = f.querySelector(".avviso-doppione"); if(box){ box.innerHTML = ""; box.hidden = true; } doppioniVisti.delete(f); }
 });
 /* scrive nel campo un numero scelto (dalla rubrica o dagli appunti): il campo resta modificabile a mano */
@@ -4932,6 +4970,7 @@ function mettiDallaRubrica(){
   if(!f || !ru) return;
   if(ru.nome) f.nome.value = ru.nome;
   if(ru.numero) mettiNumero(f, ru.numero);
+  else mostraDoppione(f);
 }
 /* Quello che arriva dalla rubrica, detto in parole semplici (solo quanti, mai nomi o numeri): se non entra niente si sa
    perché. Se dopo il ritorno all'app la rubrica non ha ancora risposto, lo si dice. */
@@ -4986,8 +5025,7 @@ function vSheetPersone(s){
     /* il contatto preso dalla rubrica sta nello stato: il modulo lo mostra anche se l'app lo ridisegna */
     const ru = !m.id && !rapido ? st.rubricaUno : null;
     return `<h2>${m.id ? "Modifica i dati" : st.nuovoCliente ? "Un nuovo cliente" : rapido ? "Un contatto" : "Un nome nella tua lista"}</h2>
-    ${rapido ? `<p class="small">Entra nella tua lista già come Contattato e conta nei contatti della settimana.
-      Se è già nella lista, scrivi il nome uguale: il contatto si segna su di lei.</p>` : ""}
+    ${rapido ? `<p class="small">Entra nella tua lista già come Contattato e conta nei contatti della settimana.</p>` : ""}
     <form data-form="${s}" novalidate>
       ${!m.id && !rapido && rubricaOk() ? `<button type="button" class="btn wide rubrica" data-act="rubrica">${ICONA_RUBRICA}Rubrica</button>
         ${st.rubricaGuida ? `<div class="fermo-box rubrica-guida" role="status"><p><b>Su questo telefono la rubrica non passa i contatti a Growup.</b></p>
@@ -4995,6 +5033,7 @@ function vSheetPersone(s){
           Qui si apre l'elenco pronto, da controllare e aggiungere.</p></div>` : ""}
         <div class="scegli-numero" aria-live="polite">${ru && !ru.numero && ru.numeri.length > 1 ? htmlNumeri(ru.numeri) : ""}</div>` : ""}
       <label class="field"><span>Nome</span><input name="nome" maxlength="80" required value="${esc((ru && ru.nome) || m.nome || "")}" autocomplete="name"></label>
+      ${rapido ? `<ul class="persone suggerimenti" id="suggerimenti-contatto" aria-live="polite" aria-label="Già nella tua lista">${personeContatto(st.cercaContatto)}</ul>` : ""}
       <label class="field"><span>Telefono <i>(facoltativo)</i></span>${!m.id && !rapido && incollaOk() ? `<span class="con-incolla"><input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc((ru && ru.numero) || m.contatto || "")}">
         <button type="button" class="btn small" data-act="incolla-numero">Incolla</button></span>`
         : `<input name="contatto" type="tel" autocomplete="tel" maxlength="80" value="${esc((ru && ru.numero) || m.contatto || "")}">`}</label>
@@ -5187,7 +5226,16 @@ Object.assign(AZIONI, {
     const f = document.querySelector('#sheet form[data-form="persona-nuova"]');
     if(f) mettiNumero(f, el.dataset.numero);
   },
-  "contatto-rapido"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = "contatto"; st.sheet = "persona-nuova"; render(); },
+  "contatto-rapido"(){ st.errore = ""; st.nuovoCliente = false; st.rapido = "contatto"; st.cercaContatto = ""; st.sheet = "persona-nuova"; render(); },
+  /* + Contatto: toccando un nome suggerito il contatto si segna su quella persona */
+  async "contatto-su"(el){
+    const p = st.persone.find(x => x.id === el.dataset.id);
+    if(!p || st.occupato) return;
+    st.occupato = true;
+    try{ await contattoSu(p, p.nome); }
+    catch(e){ toast(messaggio(e)); }
+    finally{ st.occupato = false; }
+  },
   "piano-rapido"(){ st.errore = ""; st.rapido = "piano"; st.cercaPiano = ""; st.sheet = "piano-chi"; render(); },
   "piano-con"(el){ st.personaId = el.dataset.id; st.passoTipo = "piano"; st.sheet = "passo"; render(); },
   async "senza-nome"(el){ const tipo = el.dataset.tipo; st.rapido = null; st.sheet = null; render(); await registra(tipo); },
@@ -5298,12 +5346,11 @@ Object.assign(MODULI, {
       /* + Contatto da Io: la persona entra già contattata (il passo conta il contatto della settimana) e si resta su Io;
          se il nome è già nella lista il contatto si segna su di lei */
       if(st.rapido === "contatto"){
-        const gia = st.persone.find(p => senzaAccenti(p.nome) === senzaAccenti(nome)), pid = gia ? gia.id : uuid();
-        if(!gia) await api.nuovePersone([{ id:pid, nome, contatto:f.contatto.value.trim() || null, social:f.social.value.trim() || null, origine:f.origine.value.trim() || null, fonte:fonteScelta(f) }]);
-        await api.nuoviPassi([{ id:uuid(), persona_id:pid, tipo:"contatto", data:oggi() }]);
-        if(gia && gia.nascosta_io) await api.modificaPersona(pid, { nascosta_io:false });
-        st.rapido = null;
-        await dopoPersone(`Contatto con ${nomeSaluto(nome)} registrato`);
+        const gia = stessoNome(nome);
+        if(gia){ await contattoSu(gia, nome); return; }
+        const pid = uuid();
+        await api.nuovePersone([{ id:pid, nome, contatto:f.contatto.value.trim() || null, social:f.social.value.trim() || null, origine:f.origine.value.trim() || null, fonte:fonteScelta(f) }]);
+        await contattoSu({ id:pid }, nome);
         return;
       }
       const id = uuid();

@@ -4807,6 +4807,133 @@ for(const tema of ["light", "dark"]){
   await ctx.close();
 }
 
+// 79. Doppioni e «+ Contatto»: i nomi suggeriti mentre si scrive (Lista e Clienti, senza accenti, fino a 5) e l'avviso ambra
+//     anche per il nome uguale in «+ Nome» (Lista, Clienti, Rubrica); gli omonimi si possono salvare lo stesso
+for(const tema of ["light", "dark"]){
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema }, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  const sugg = page.locator(".sheet #suggerimenti-contatto li");
+  const avviso = page.locator(".sheet .avviso-doppione");
+  const conta = (nome, tipo) => DB.persone.filter(x => x.nome === nome).length;
+  if(tema === "light"){
+    // un nome con gli accenti nella Lista
+    await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+    await page.click("button[data-act=persona-nuova]");
+    await page.fill(".sheet input[name=nome]", "Agnès Càruso");
+    await page.click(".sheet button.primary");
+    await page.getByText("Agnès Càruso nella tua lista").waitFor();
+    await page.click("button[data-act=vista-io]");
+  }
+  // «+ Contatto»: la frase di prima non c'è più; i suggerimenti compaiono solo scrivendo
+  await page.click("button[data-act=contatto-rapido]");
+  check(!(await page.locator(".sheet").innerText()).includes("scrivi il nome uguale") && await sugg.count() === 0,
+    `contatto ${tema}: niente frase «scrivi il nome uguale», nessun suggerimento a campo vuoto`);
+  await page.fill(".sheet input[name=nome]", "caruso");
+  /* nel tema scuro c'è anche l'omonimo salvato nel tema chiaro: il primo è già contattato (in corso), l'altro in lista */
+  const n1 = tema === "light" ? 1 : 2, testi = (await sugg.allInnerTexts()).map(x => x.replace(/\s+/g, " "));
+  check(await sugg.count() === n1 && testi.some(x => x.includes(tema === "light" ? "Agnès Càruso · in lista" : "Agnès Càruso · in corso")),
+    `contatto ${tema}: scrivendo il cognome senza accenti compare «Agnès Càruso · ${tema === "light" ? "in lista" : "in corso"}»`);
+  await page.fill(".sheet input[name=nome]", "AGNES");
+  check(await sugg.count() === n1, `contatto ${tema}: anche solo il nome, in maiuscolo e senza accenti`);
+  await page.fill(".sheet input[name=nome]", "o");
+  const quanti = await sugg.count();
+  check(quanti === 5 && DB.persone.filter(x => /o/i.test(x.nome.normalize("NFD"))).length > 5, `contatto ${tema}: al massimo 5 suggerimenti (${quanti})`);
+  await page.fill(".sheet input[name=nome]", "Ines");
+  check((await sugg.allInnerTexts()).some(x => x.includes("Ines Condivisa")), `contatto ${tema}: suggerisce anche i nomi presi dalla rubrica`);
+  // anche i clienti
+  const cliente = DB.persone.find(x => x.esito === "cliente" && x.proprietario === "R");
+  if(cliente){ await page.fill(".sheet input[name=nome]", cliente.nome.split(" ")[0]);
+    check((await sugg.allInnerTexts()).some(x => x.replace(/\s+/g, " ").includes(cliente.nome + " · cliente")), `contatto ${tema}: suggerisce anche i Clienti, con «· cliente»`); }
+  if(tema === "light"){
+    // toccando un suggerimento il contatto si segna su quella persona
+    await page.fill(".sheet input[name=nome]", "agnes car");
+    await sync(page);
+    const prima = DB.persone.length, ag = DB.persone.find(x => x.nome === "Agnès Càruso");
+    const passi = () => (DB.passi || []).filter(x => x.persona_id === ag.id && x.tipo === "contatto").length, p0 = passi();
+    await page.screenshot({ path: S + `/e2e/79-suggerimenti-${tema}.png` });
+    await sugg.first().click();
+    await page.getByText("Contatto con Agnès registrato").waitFor();
+    await sync(page);
+    check(!(await page.locator(".sheet").count()) && DB.persone.length === prima && passi() === p0 + 1,
+      "contatto: dal suggerimento il contatto si segna su quella persona, nessun nome nuovo");
+  } else {
+    await page.fill(".sheet input[name=nome]", "car");
+    await page.screenshot({ path: S + `/e2e/79-suggerimenti-${tema}.png` });
+    await page.click(".sheet [data-act=chiudi]");
+  }
+  // «+ Nome»: il nome uguale (senza accenti e maiuscole) → avviso ambra con la scheda da aprire
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+  await page.click("button[data-act=persona-nuova]");
+  await page.fill(".sheet input[name=nome]", "agnes  CARUSO");
+  check(await avviso.isHidden(), `nome ${tema}: mentre si scrive nessun avviso`);
+  await page.locator(".sheet input[name=nome]").press("Tab");
+  await avviso.locator("button[data-act=apri-doppione]").waitFor();
+  check((await avviso.innerText()).includes("È già nella tua lista: Agnès Càruso"), `nome ${tema}: nome con accenti e maiuscole diversi → «È già nella tua lista: Agnès Càruso»`);
+  await page.screenshot({ path: S + `/e2e/79-nome-doppio-${tema}.png` });
+  if(tema === "light"){
+    // cambiando il nome l'avviso sparisce
+    await page.fill(".sheet input[name=nome]", "Agnese Caruso");
+    await page.locator(".sheet input[name=nome]").press("Tab");
+    check(await avviso.isHidden(), "nome: un nome diverso non dà l'avviso");
+    // l'omonimo si salva lo stesso: il primo «Salva» mostra l'avviso, il secondo salva
+    await page.fill(".sheet input[name=nome]", "Agnès Càruso");
+    await page.click(".sheet button.primary");
+    await avviso.locator("button[data-act=apri-doppione]").waitFor();
+    check(await page.locator(".sheet").count() === 1, "nome: nome identico, al primo «Salva» l'avviso e il modulo resta aperto");
+    await page.waitForTimeout(800);
+    await page.click(".sheet button.primary");
+    await page.getByText("Agnès Càruso nella tua lista").waitFor();
+    await sync(page);
+    check(conta("Agnès Càruso") === 2, "nome: l'omonimo si può salvare lo stesso");
+    // nome e telefono uguali: un solo avviso
+    await page.click("button[data-act=persona-nuova]");
+    await page.fill(".sheet input[name=nome]", "Primo Numero");
+    await page.fill(".sheet input[name=contatto]", "333 000 0010");
+    await page.locator(".sheet input[name=contatto]").press("Tab");
+    await avviso.locator("button[data-act=apri-doppione]").waitFor();
+    const t = await avviso.innerText();
+    check(await page.locator(".sheet .avviso-doppione:visible").count() === 1 && t.split("È già nella tua lista").length === 2 && t.includes("Primo Numero"),
+      "nome: se coincidono nome e telefono, un solo avviso");
+    // «Apri la sua scheda»
+    await avviso.locator("button[data-act=apri-doppione]").click();
+    await page.locator(".sheet").waitFor({ state:"detached" });
+    check(await page.locator("#app h2", { hasText:"Primo Numero" }).count() === 1, "nome: «Apri la sua scheda» apre la scheda");
+    await page.click("button[data-act=torna-lista]");
+    // nei Clienti
+    if(cliente){
+      await page.click("button[data-sez=clienti]");
+      await page.click("button[data-act=cliente-nuovo]");
+      await page.fill(".sheet input[name=nome]", cliente.nome.toUpperCase());
+      await page.locator(".sheet input[name=nome]").press("Tab");
+      await avviso.locator("button[data-act=apri-doppione]").waitFor();
+      check((await avviso.innerText()).includes(cliente.nome), "nome: anche in «+ Nome» dei Clienti");
+      await page.click(".sheet [data-act=chiudi]");
+      await page.click("button[data-sez=lista]");
+    }
+    // dalla Rubrica: un contatto con lo stesso nome (senza numero)
+    await page.evaluate(() => { window.ContactsManager = function(){}; Object.defineProperty(navigator, "contacts", { configurable:true,
+      value:{ select:async () => [{ name:["PRIMO NUMERO"], tel:[] }] } }); });
+    await page.click("button[data-act=persona-nuova]");
+    await page.click(".sheet button[data-act=rubrica]");
+    await avviso.locator("button[data-act=apri-doppione]").waitFor();
+    check((await avviso.innerText()).includes("Primo Numero"), "nome: anche con il nome preso dalla Rubrica");
+    await page.click(".sheet [data-act=chiudi]");
+    // dalla Rubrica, più contatti: il nome uguale è segnato nell'elenco
+    await page.evaluate(() => { Object.defineProperty(navigator, "contacts", { configurable:true,
+      value:{ select:async () => [{ name:["primo numero"], tel:[] }, { name:["Nome Mai Visto"], tel:["347 555 0199"] }] } }); });
+    await page.click("button[data-act=persona-nuova]");
+    await page.click(".sheet button[data-act=rubrica]");
+    await page.locator(".sheet .rubrica-molti").waitFor();
+    check(await page.locator(".sheet .rubrica-molti li.doppione").count() === 1
+      && (await page.locator(".sheet .rubrica-molti li.doppione").innerText()).includes("È già nella tua lista: Primo Numero"),
+      "nome: nell'elenco della Rubrica il nome uguale ha l'avviso");
+    await page.click(".sheet [data-act=chiudi]");
+  } else await page.click(".sheet [data-act=chiudi]");
+  check(!errori.length, `doppioni ${tema}: nessun errore nella pagina`);
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
