@@ -1,7 +1,49 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 10 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 10 novembre 2026 (notte). Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
+
+## I VP solo dalla mappa Amway e più bozze d'ordine (10 novembre 2026, notte: migrazione 063, app v112)
+
+Sei PR in fila (196-201), da unire in ordine. **Migrazione 063 applicata su Supabase da Claude il 10 novembre** (colonne,
+indice tolto, regole, permessi delle funzioni e dati controllati: bozze, ordini e rettifiche vecchi, mappe e totali intatti).
+Decisione di Stefano: i VP dell'app (personali, di gruppo, linee, percentuale; per me e per tutti, anche per chi non ha
+l'app) sono **solo quelli ufficiali delle mappe Amway importate**. Nessun ordine, bozza o correzione scritta a mano cambia
+più i VP. Restano le bozze d'ordine (anche più di una), che non toccano i VP; una bozza confermata va nello storico.
+1. **Solo mappa (063)**: `calcola_mese`, `riepilogo_mese`, `chiudi_mese` leggono solo `numeri_mese` (la mappa che vale
+   per ogni persona e mese, regole della 051: anche se l'ha importata un upline o l'admin). Senza la mappa del mese:
+   **null**, «nessuna mappa di [mese]», mai uno zero. Si congelano solo i numeri di chi ha la mappa; lo Storico (mio e del
+   gruppo) viene dalle mappe dei mesi passati, i totali congelati restano nel database ma non si mostrano. La regola sulle
+   attività **rifiuta** nuovi `ordine` e `rettifica` (quelli vecchi restano e si vedono nel diario, ma non contano).
+   `partenze.vp_dal_ingresso` = VPP della prima mappa (dal mese di iscrizione) che ne mostra (prima sommava gli ordini,
+   anche quelli che la RLS nasconde allo sponsor). La notifica «mancano X VP» la calcola il database dalla mappa e
+   l'obiettivo del mese, con la data: «(mappa dell'8 novembre)»; senza mappa non parte. App: VP, percorso, requisiti,
+   Come arrivarci, Seguimi, traguardi, Gruppo, scheda, confronto, preferiti ed etichette solo dalla mappa; accanto ai VP
+   «mappa del 3 novembre» (`testoMappa`, `delGiorno`: «dell'8», «dell'11», «del 1°»). In cima al Gruppo **una sola data**
+   (la mia mappa del mese, cioè la più recente importata da me o da sopra). Test 063 in `tests_rls.sql`.
+2. **Niente VP a mano**: tolti Ordine veloce, «Aggiorna il totale del mese» (anche nella scheda del partner senza app, con
+   il suo «+ Ordine»: restano + Contatto, + Piano, + Cliente). Foglio «+ Ordine»: Le mie bozze · I miei ordini · Ordini
+   dal sito Amway; il pulsante in basso resta «+ Ordine» con sotto i VP della mappa.
+3. **Più bozze** (063: tolto `ordini_personali_una_bozza`; `nome` max 60, `persona_id` solo persone mie con RLS,
+   `ordine_cliente_id`): elenco con nome, cliente, VP e prezzo; «+ Nuova bozza»; nella bozza «Con questa bozza
+   arriveresti a X VP» (mappa + bozza, «stima: non conta finché non arriva la mappa»), con l'obiettivo «ti mancherebbero
+   Y VP» o «obiettivo del mese raggiunto ✓». «Conferma ordine»: nello storico con la data, senza VP, **nessun limite di
+   mese chiuso** (scelta di Stefano: le mappe passate non cambiano); con un cliente l'ordine entra anche nella sua scheda
+   (riordino come gli altri ordini dei clienti); conta per la serie. «Rifai» = bozza nuova con gli stessi prodotti; «×»
+   nello storico toglie anche l'ordine dalla scheda del cliente (scelta di Stefano).
+4. **Il primo ordine** (percorso di partenza): fatto quando una mappa (dal mese di iscrizione) mostra il primo ordine;
+   scelta di Stefano: anche sotto i 50 VP è fatto, con «sotto i 50: iscrizione a pagamento», e da lì sparisce il conto dei
+   30 giorni (percorso, cruscotto, «Nuovo · ordine ✓» dello sponsor). Bozza confermata non ancora nella mappa: «Ordine
+   confermato · in attesa della mappa» con «!», non spuntato. La tappa «Primo ordine» del cruscotto resta a 50 VP in un mese.
+5. **Testi e «?»**: «?» dei VP (anello, Il mio mese, Ordini, Le mie bozze) con il testo di Stefano; aiuti senza numeri
+   scritti a mano.
+6. Service worker v112, questo STATO.md. Controllo /security-review fatto: nessun problema (calcola_mese e chiudi_mese
+   restano chiuse ai telefoni; bozze: nome e cliente solo con permessi di colonna e `persona_mia`, il cliente solo tra le
+   mie persone, `ordine_cliente_id` lo scrive solo `conferma_ordine`, che rifà il controllo e passa dal trigger
+   `ordini_prima`; testi nuovi sempre con `esc()`).
+Da sapere: dal giorno 1 al primo import del mese tutti vedono «nessuna mappa di [mese]»; più spesso i Platino importano,
+più i numeri restano freschi. Test: `test/db.sh` superati; test dell'interfaccia 1088 controlli (i VP arrivano da mappe di
+prova: `mappa()` e `mappaIn()` in `test/e2e/head.mjs`).
 
 ## Indietro su un foglio compilato: non esce più dall'app (10 novembre 2026, sera, app v111, database non toccato)
 
