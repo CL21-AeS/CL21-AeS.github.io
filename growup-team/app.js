@@ -2056,7 +2056,7 @@ function datiTappa(){
   let scadenza = "";
   if(attuale.chiave === "primo_ordine"){
     const f = finestraPrimoOrdine(attuale);
-    if(f && f.restano >= 0) scadenza = `<p class="pill g" style="margin:8px 0 0">${f.restano === 0 ? "Ultimo giorno" : `Mancano ${plur(f.restano, "giorno", "giorni")}`} per non pagare i 40 € di iscrizione</p>`;
+    if(f && f.restano >= 0 && !f.ordine) scadenza = `<p class="pill g" style="margin:8px 0 0">${f.restano === 0 ? "Ultimo giorno" : `Mancano ${plur(f.restano, "giorno", "giorni")}`} per non pagare i 40 € di iscrizione</p>`;
     else if(!st.profilo.data_iscrizione) scadenza = `<p class="small">Aggiungi la data di iscrizione per vedere il conto alla rovescia dei 30 giorni.</p>`;
   }
   const nelMese = Number(attuale.vp_personali) > 0 && attuale.chiave !== "primo_ordine";
@@ -2155,10 +2155,14 @@ function attivitaTutte(tipo){ const v = new Map(); (st.attSerie || []).concat(st
 function primoOrdinePercorso(){
   const p = st.profilo, t = st.stages.find(x => x.chiave === "primo_ordine"), min = t ? Number(t.vp_personali) || 50 : 50;
   const dal = String(p.data_iscrizione || "").slice(0, 10), fine = piuGiorni(dal, t && t.giorni_scadenza ? Number(t.giorni_scadenza) : GIORNI_NUOVO);
-  /* 063: dalla mappa (la prima, dal mese di iscrizione, che mostra dei VP) */
+  /* 063: dalla mappa (la prima, dal mese di iscrizione, che mostra dei VP). Il primo ordine c'è appena la mappa lo mostra,
+     anche sotto i VP richiesti (scelta di Stefano: «fatto», con la nota dell'iscrizione a pagamento); da lì niente più
+     conto dei 30 giorni. Una bozza confermata che la mappa non mostra ancora: «in attesa della mappa», non spuntato. */
   const o = primoOrdineMappa(), tot = o ? o.vp : 0;
   const dichiarato = t && p.qualifica_iniziale && tappaFatta(t);
-  return { min, vp:tot, fatto:tot >= min || !!dichiarato, quando:null, mappa:o ? o.mappa : null, fine, restano:giorniTra(oggi(), fine) };
+  const attesa = !o && !dichiarato && (st.mieiOrdini || []).some(x => x.stato === "confermato" && !x.persona_id && String(x.data || "") >= dal);
+  return { min, vp:tot, fatto:tot > 0 || !!dichiarato, sotto:tot > 0 && tot < min, attesa, quando:null, mappa:o ? o.mappa : null, fine,
+           restano:giorniTra(oggi(), fine) };
 }
 function fasiPercorso(){
   const p = st.profilo, nomi = nomiInLista(), ord = primoOrdinePercorso();
@@ -2185,10 +2189,12 @@ function vPercorso(){
       ${riga(x.nomi >= NOMI_PARTENZA, `${NOMI_PARTENZA} nomi nella Lista`, `${num(Math.min(x.nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}${x.nomi < NOMI_PARTENZA ? ` · entro ${esc(riassuntoAgenda(entro < oggi() ? oggi() : entro))}` : ""}`,
         x.nomi < NOMI_PARTENZA ? `<button class="btn small" data-act="guida-vai" data-dove="lista">Lista ›</button>` : "")}</ul>`;
   else if(f.k === "ordine"){ const o = x.ord, pct = pctOk(Math.round(o.vp / o.min * 100));
-    corpo = `<div class="percorso-ordine"><b class="num">${num(o.vp)}<small> / ${num(o.min)} VP</small></b>
+    corpo = `${o.attesa ? `<p class="ordine-attesa"><span class="segno-attesa" aria-hidden="true">!</span><span><b>Ordine confermato</b> · in attesa della mappa</span></p>` : ""}
+      <div class="percorso-ordine"><b class="num">${num(o.vp)}<small> / ${num(o.min)} VP</small></b>
       <span class="small">${o.restano >= 0 ? `restano ${o.restano === 1 ? "1 giorno" : `${o.restano} giorni`} (entro il ${dataIt(o.fine)})` : "oltre i 30 giorni: il percorso aspetta il tuo primo ordine"}</span></div>
       <div class="bar" role="progressbar" aria-label="VP del primo ordine" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
-      <p class="small" style="margin:0">Scegli con il tuo sponsor i prodotti che ti servono in casa: almeno ${num(o.min)} VP entro 30 giorni dall'iscrizione.</p>`; }
+      <p class="small" style="margin:0">Scegli con il tuo sponsor i prodotti che ti servono in casa: almeno ${num(o.min)} VP entro 30 giorni dall'iscrizione.
+        I VP sono quelli della mappa Amway.</p>`; }
   else if(f.k === "binari"){ const conta = t => attivitaTutte(t).reduce((n, a) => n + (Number(a.quantita) || 1), 0);
     const invitati = (st.passi || []).filter(s => !s.importato && s.tipo === "invito").length;
     corpo = `<div class="binari">
@@ -2196,7 +2202,7 @@ function vPercorso(){
         <span class="binario${x.piani.length ? " ok" : ""}">${x.piani.length ? "✓ " : ""}Primo piano</span></div>
       <div><span class="eyebrow">Prodotto</span><span class="small">Clienti <b>${num(conta("cliente"))}</b></span>
         <span class="binario${x.clienti.length ? " ok" : ""}">${x.clienti.length ? "✓ " : ""}Primo cliente</span></div></div>`; }
-  const fatto = x.fasi[2].fatto ? `<span class="small">✓ primo ordine · ${num(x.ord.vp)} VP</span>` : "";
+  const fatto = x.fasi[2].fatto ? `<span class="small">✓ primo ordine · ${num(x.ord.vp)} VP${x.ord.sotto ? `, sotto i ${num(x.ord.min)}: iscrizione a pagamento` : ""}</span>` : "";
   return `<div class="card cruscotto percorso-partenza">
     <div class="spread"><span class="eyebrow">Percorso di partenza</span><span class="small">Fase ${x.qui + 1} di ${x.fasi.length}</span></div>
     <ol class="fasi" aria-label="Le fasi del percorso">${x.fasi.map((y, i) => `<li class="${y.fatto ? "fatta" : i === x.qui ? "qui" : "poi"}"><i></i>
@@ -2218,7 +2224,7 @@ function festaDaFare(){ if(!percorsoAttivo()) return false; const x = fasiPercor
 function vFesta(){
   const x = fasiPercorso(), p = st.profilo, giorni = giorniTra(String(p.data_iscrizione).slice(0, 10), oggi());
   const primo = l => l[0] ? dataIt(String(l[0].data).slice(0, 10)) : "";
-  const voci = [["Il primo ordine", `${num(x.ord.vp)} VP${x.ord.mappa ? `, mappa ${delGiorno(x.ord.mappa.dati_al)}` : ""}`],
+  const voci = [["Il primo ordine", `${num(x.ord.vp)} VP${x.ord.sotto ? ` (sotto i ${num(x.ord.min)})` : ""}${x.ord.mappa ? `, mappa ${delGiorno(x.ord.mappa.dati_al)}` : ""}`],
     ["Il primo cliente", x.clienti[0] ? `il ${primo(x.clienti)}` : ""], ["Il primo piano mostrato", x.piani[0] ? `il ${primo(x.piani)}` : ""]];
   return `<div class="festa" role="dialog" aria-modal="true" aria-labelledby="festa-titolo">
     <span class="eyebrow">Percorso di partenza</span>
@@ -2743,8 +2749,9 @@ function nuovoDa(id){
   const g = giorniTra(String(d).slice(0, 10), oggi());
   if(g < 0 || g >= GIORNI_NUOVO) return null;
   const x = (st.partenze || []).find(y => y.id === id), r = rigaDi(st.riep, id) || {};
+  /* 063: il primo ordine dalla mappa: c'è appena una mappa lo mostra (anche sotto i 50 VP) */
   const vp = x ? Number(x.vp_dal_ingresso) || 0 : Number(r.vp_personali) || 0;
-  return { restano:GIORNI_NUOVO - g, ordine:vp >= PRIMO_ORDINE_VP, vp };
+  return { restano:GIORNI_NUOVO - g, ordine:vp > 0, vp };
 }
 const PRIMO_ORDINE_VP = 50;
 function etichettaNuovo(id){
@@ -2763,8 +2770,9 @@ function partenzaDi(x){
       { nome:"Partenza con te", fatto:!!x.incontro_sponsor && nomi >= NOMI_PARTENZA,
         sotto:`${!x.incontro_sponsor ? "Incontro: data da fissare" : giornoFatto(x.incontro_sponsor) ? `Incontro fatto ${dataIt(String(x.incontro_sponsor).slice(0, 10))}`
           : `Incontro fissato per ${riassuntoAgenda(String(x.incontro_sponsor).slice(0, 10))}`} · Lista ${num(Math.min(nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}` },
-      { nome:"Il primo ordine", fatto:vp >= PRIMO_ORDINE_VP,
-        sotto:vp >= PRIMO_ORDINE_VP ? `fatto · ${num(vp)} VP` : `${num(vp)} / ${PRIMO_ORDINE_VP} VP · ${restano >= 0 ? `restano ${restano} giorni` : "oltre i 30 giorni"}` },
+      { nome:"Il primo ordine", fatto:vp > 0,
+        sotto:vp >= PRIMO_ORDINE_VP ? `fatto · ${num(vp)} VP` : vp > 0 ? `fatto · ${num(vp)} VP, sotto i ${PRIMO_ORDINE_VP}: iscrizione a pagamento`
+          : `0 / ${PRIMO_ORDINE_VP} VP · ${restano >= 0 ? `restano ${restano} giorni` : "oltre i 30 giorni"}` },
       { nome:"I due binari", fatto:Number(x.piani) > 0 && Number(x.clienti) > 0,
         sotto:`${Number(x.piani) > 0 ? "primo piano fatto" : "primo piano"} · ${Number(x.clienti) > 0 ? "primo cliente fatto" : "primo cliente"}` },
       { nome:"Partenza completata", fatto:false, sotto:"poi il Seguimi" }];
@@ -2803,13 +2811,14 @@ function vPartenzaScheda(p){
   if(p.stato === "gestito"){
     const n = nuovoDa(p.id);
     if(!n) return "";
-    const pct = pctOk(Math.round(n.vp / PRIMO_ORDINE_VP * 100));
+    const pct = pctOk(Math.round(n.vp / PRIMO_ORDINE_VP * 100)), sm = (rigaDi(st.riep, p.id) || {}).vp_personali == null;
     return `<div class="card partenza-scheda">
       <span class="eyebrow">Il primo ordine</span>
-      <div class="spread" style="align-items:baseline"><b class="num grande">${num(n.vp)}<small> / ${PRIMO_ORDINE_VP} VP</small></b>
+      <div class="spread" style="align-items:baseline"><b class="num grande">${sm ? "—" : num(n.vp)}<small> / ${PRIMO_ORDINE_VP} VP</small></b>
         <b class="${n.ordine ? "ok" : "pesca-t"}">${n.ordine ? "fatto ✓" : `restano ${n.restano} giorni`}</b></div>
       <div class="bar" role="progressbar" aria-label="VP del primo ordine" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
-      <p class="small" style="margin:0">Dalla mappa importata. Non usa Growup: il suo percorso si vede quando entra con il suo invito.</p>
+      <p class="small" style="margin:0">${n.ordine && n.vp < PRIMO_ORDINE_VP ? `Sotto i ${PRIMO_ORDINE_VP} VP: iscrizione a pagamento. ` : ""}${sm
+        ? `${esc(testoMappa(meseDi(oggi()), null).replace(/^./, c => c.toUpperCase()))}. ` : "Dalla mappa importata. "}Non usa Growup: il suo percorso si vede quando entra con il suo invito.</p>
       ${possoInvitare() ? `<button class="btn primary wide" data-act="invita" data-nome="${esc(p.nome)}">Invitalo in Growup</button>` : ""}
     </div>`;
   }

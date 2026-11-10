@@ -3757,11 +3757,24 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.activities.push({ id:"np7o", partner_id:"np7", tipo:"ordine", quantita:1, vp:60, data:giorniFa(1), inserito_il:ora, inserito_da:"np7" });
   await entra();
   check((await page.locator(".percorso-partenza .fase-titolo").innerText()).trim() === "Il primo ordine", "063: un ordine scritto a mano non fa il primo ordine");
+  check(!(await page.locator(".ordine-attesa").count()), "063: senza bozza confermata niente «in attesa della mappa»");
   await ctx.close();
-  mappa("np7", 60);
+  // 063: una bozza confermata che la mappa non mostra ancora: «Ordine confermato · in attesa della mappa», con «!», non spuntato
+  DB.ordiniMiei = (DB.ordiniMiei || []).concat([{ id:"np7b", proprietario:"np7", stato:"confermato", data:giorniFa(0), vp:60, attivita_id:null, nome:null,
+    persona_id:null, ordine_cliente_id:null, creato_il:ora, confermato_il:ora }]);
   await entra();
-  check((await page.locator(".percorso-partenza .fase-titolo").innerText()).trim() === "I due binari" && (await page.locator(".percorso-partenza").innerText()).includes("✓ primo ordine · 60 VP"),
-    "fase 4: i due binari, con il primo ordine fatto");
+  check((await page.locator(".percorso-partenza .fase-titolo").innerText()).trim() === "Il primo ordine"
+    && (await page.locator(".percorso-partenza .ordine-attesa").innerText()).replace(/\s+/g, " ").trim() === "! Ordine confermato · in attesa della mappa"
+    && (await page.locator(".percorso-ordine").innerText()).includes("0 / 50 VP") && (await page.locator(".percorso-ordine").innerText()).includes("restano"),
+    "063: bozza confermata: «Ordine confermato · in attesa della mappa» con «!», la barra solo dalla mappa (0 / 50)");
+  await page.locator(".percorso-partenza").screenshot({ path: S + "/e2e/61-in-attesa-mappa.png" });
+  await ctx.close();
+  // la mappa mostra il primo ordine, sotto i 50 VP: il passo è fatto, con la nota (scelta di Stefano); niente più 30 giorni
+  mappa("np7", 30);
+  await entra();
+  check((await page.locator(".percorso-partenza .fase-titolo").innerText()).trim() === "I due binari"
+    && (await page.locator(".percorso-partenza").innerText()).includes("✓ primo ordine · 30 VP, sotto i 50: iscrizione a pagamento"),
+    "fase 4: i due binari, con il primo ordine fatto dalla mappa (30 VP, sotto i 50: con la nota)");
   check(await page.locator(".binari .binario:not(.ok)").count() === 2, "fase 4: primo piano e primo cliente ancora da fare");
   await ctx.close();
   // primo piano e primo cliente → la festa, una volta sola
@@ -3787,6 +3800,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
   DB.partners = DB.partners.filter(p => p.id !== "np7"); DB.persone = DB.persone.filter(x => x.proprietario !== "np7");
   DB.activities = DB.activities.filter(a => a.partner_id !== "np7"); DB.numeri = DB.numeri.filter(x => x.partner_id !== "np7");
+  DB.ordiniMiei = (DB.ordiniMiei || []).filter(x => x.proprietario !== "np7");
 }
 
 // 62. Consegna 8: lo sponsor e i suoi nuovi (in partenza, etichetta Nuovo, filtro, scheda con e senza app)
@@ -3798,6 +3812,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     data_iscrizione:giorniFa(200), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true });
   DB.partners.push({ id:"sp8g", nome:"Gino Mappa", sponsor_id:"R", stato:"gestito", gestore_id:"R", codice_invito:"SP8GGG", codice_amway:"7920003",
     data_iscrizione:giorniFa(6), creato_il:ora, conPercorso:true });
+  mappa("sp8g", 0);   // 063: nella mappa del mese, ancora senza ordine
   DB.obiettivi = (DB.obiettivi || []).filter(o => !["sp8n", "sp8a"].includes(o.partner_id))
     .concat(["sp8n", "sp8a"].map(id => ({ partner_id:id, cifra_mese:300, entro:"2027-06-01", perche:"Segreto suo" })));
   DB.persone = (DB.persone || []).concat(Array.from({ length:12 }, (_, i) => ({ id:"sp8p" + i, proprietario:"sp8n", nome:"Nome Sara " + i, fase:"lista", esito:null, creato_il:ora })));
@@ -3858,6 +3873,20 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(!(await page.locator(".nuovi-partenza li", { hasText:"Aldo Avviato" }).count()), "l'avviato che ha finito «Per iniziare» non c'è più");
   check((await page.locator(".nuovi-partenza li", { hasText:"Sara Nuova" }).innerText()).includes("Manca: Lista 12 / 30"), "incontro fissato: manca solo la Lista");
   await ctx.close();
+  // 063: la mappa mostra il primo ordine di Sara (30 VP, sotto i 50): «ordine ✓», niente più giorni; nella scheda la nota
+  mappa("sp8n", 30);
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-gruppo]");
+  check((await page.locator(".albero.struttura").first().locator("li", { hasText:"Sara Nuova" }).locator(".pill.nuovo").innerText()).trim() === "Nuovo · ordine ✓",
+    "063: struttura: il primo ordine dalla mappa (anche sotto i 50) → «Nuovo · ordine ✓»");
+  await page.locator(".card.nuovi-partenza button[data-act=apri-scheda][data-id=sp8n]").click();
+  await page.locator(".card.partenza-scheda").waitFor();
+  check((await page.locator(".percorso-scheda li", { hasText:"Il primo ordine" }).innerText()).includes("fatto · 30 VP, sotto i 50: iscrizione a pagamento")
+    && await page.locator(".percorso-scheda li.fatto", { hasText:"Il primo ordine" }).count() === 1, "063: scheda del nuovo: il primo ordine fatto, con la nota");
+  await ctx.close();
+  DB.numeri = DB.numeri.filter(x => !["sp8n", "sp8g"].includes(x.partner_id));
   DB.partners = DB.partners.filter(p => !["sp8n", "sp8a", "sp8g"].includes(p.id)); DB.persone = DB.persone.filter(x => x.proprietario !== "sp8n");
 }
 
