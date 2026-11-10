@@ -82,7 +82,7 @@ check(await page.getByText("«Per la famiglia»").isVisible(), "il perché si ve
 await page.screenshot({ path: S + "/e2e/25-obiettivo.png", fullPage:true });
 await page.click("button[data-act=vista-io]");
 await page.getByText("Ciao Anna").waitFor(); await apriTappa(page);
-check(await page.locator(".miei-numeri button[data-act=vista-obiettivo]").getByText("300 €").isVisible() && !(await page.locator(".obiettivo-breve").count()),
+check(await page.locator(".miei-numeri button[data-act=obiettivo-da-io]").getByText("300 €").isVisible() && !(await page.locator(".obiettivo-breve").count()),
   "su Io: il mio obiettivo è la prima riga di «I miei numeri»");
 await page.click("button[data-act=vista-profilo]");
 check(await page.locator("button[data-act=copia-dati]").count() === 0, "chi non è admin non vede la copia dei dati");
@@ -4702,6 +4702,109 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(!(await pg.locator(".sheet").count()), "condividi: senza contatti l'avviso, nessun modulo");
   await c.close();
   check(!errori.length, "condividi: nessun errore nella pagina");
+}
+
+// 78. Il tasto Indietro del telefono: chiude il foglio o torna alla schermata di prima, senza uscire dall'app; i pulsanti
+//     dell'app tolgono la stessa voce della cronologia (niente fogli che si riaprono, niente doppio Indietro)
+for(const tema of ["light", "dark"]){
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema }, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  const livello = () => page.evaluate(() => (history.state && history.state.growup) || 0);
+  const aspetta = n => page.waitForFunction(x => ((history.state && history.state.growup) || 0) === x, n);
+  const indietro = async n => { await page.goBack({ waitUntil:"commit" }); await aspetta(n); };
+  const titolo = () => page.locator("#app h1").first().innerText();
+  const foglio = () => page.locator(".sheet").count();
+  const base = await page.evaluate(() => history.length);
+  check(await livello() === 0, `indietro ${tema}: sulla schermata principale nessuna voce in più`);
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+  check(await livello() === 0 && await page.evaluate(() => history.length) === base, `indietro ${tema}: le schede principali non aggiungono voci`);
+  // una scheda: Indietro torna alla Lista
+  const persona = page.locator("button[data-act=apri-persona]", { hasText:"Primo Numero" });
+  await persona.click();
+  await aspetta(1);
+  check(await titolo() === "La mia lista" && await page.locator("#app h2", { hasText:"Primo Numero" }).count() === 1, `indietro ${tema}: la scheda aggiunge una voce`);
+  await indietro(0);
+  check(await titolo() === "Persone" && !(await page.locator("#app h2", { hasText:"Primo Numero" }).count()), `indietro ${tema}: Indietro dalla scheda torna alla Lista`);
+  // «‹ La mia lista» toglie la stessa voce: dopo, un foglio aperto e Indietro non riaprono la scheda
+  await persona.click(); await aspetta(1);
+  await page.click("button[data-act=torna-lista]"); await aspetta(0);
+  await page.click("button[data-act=persona-nuova]"); await aspetta(1);
+  check(await foglio() === 1, `indietro ${tema}: «+ Nome» apre il foglio con una voce`);
+  await indietro(0);
+  check(!(await foglio()) && await titolo() === "Persone", `indietro ${tema}: Indietro chiude il foglio e non riapre la scheda chiusa con «‹ La mia lista»`);
+  // «Annulla» toglie la voce del foglio
+  await page.click("button[data-act=persona-nuova]"); await aspetta(1);
+  await page.click(".sheet [data-act=chiudi]"); await aspetta(0);
+  check(!(await foglio()) && await page.evaluate(() => history.length) <= base + 1, `indietro ${tema}: «Annulla» chiude il foglio e toglie la voce`);
+  // foglio sopra una scheda: Indietro chiude il foglio, il secondo Indietro la scheda
+  await persona.click(); await aspetta(1);
+  await page.click("button[data-act=persona-modifica]"); await aspetta(2);
+  await indietro(1);
+  check(!(await foglio()) && await page.locator("#app h2", { hasText:"Primo Numero" }).count() === 1, `indietro ${tema}: Indietro chiude il foglio e lascia la scheda aperta`);
+  await indietro(0);
+  check(await titolo() === "Persone", `indietro ${tema}: il secondo Indietro torna alla Lista`);
+  // campi compilati: «Uscire senza salvare?»; con «Annulla» il foglio resta com'era
+  await page.click("button[data-act=persona-nuova]"); await aspetta(1);
+  await page.fill(".sheet input[name=nome]", "Nome Da Non Perdere");
+  await page.evaluate(() => { window.__domande = []; window.confirm = t => { window.__domande.push(t); return false; }; });
+  await page.goBack({ waitUntil:"commit" }); await aspetta(1);
+  check(await foglio() === 1 && await page.inputValue(".sheet input[name=nome]") === "Nome Da Non Perdere"
+    && JSON.stringify(await page.evaluate(() => window.__domande)) === JSON.stringify(["Uscire senza salvare?"]),
+    `indietro ${tema}: con campi compilati chiede «Uscire senza salvare?» e con «Annulla» il foglio resta`);
+  await page.evaluate(() => { window.confirm = t => { window.__domande.push(t); return true; }; });
+  await indietro(0);
+  check(!(await foglio()) && (await page.evaluate(() => window.__domande)).length === 2, `indietro ${tema}: confermando si esce senza salvare`);
+  // un foglio vuoto si chiude senza domande
+  await page.click("button[data-act=persona-nuova]"); await aspetta(1);
+  await indietro(0);
+  check((await page.evaluate(() => window.__domande)).length === 2, `indietro ${tema}: un foglio vuoto si chiude senza domande`);
+  // il salvataggio che chiude il foglio toglie la voce
+  if(tema === "light"){
+    await page.click("button[data-act=persona-nuova]"); await aspetta(1);
+    await page.fill(".sheet input[name=nome]", "Nome Indietro");
+    await page.click(".sheet button.primary");
+    await page.getByText("Nome Indietro nella tua lista").waitFor(); await aspetta(0);
+    await persona.click(); await aspetta(1);
+    await indietro(0);
+    check(!(await foglio()) && await titolo() === "Persone", `indietro ${tema}: dopo «Salva» Indietro non riapre il foglio`);
+  }
+  // il Profilo: da Io e da una scheda
+  await page.click("button[data-act=vista-io]");
+  await page.click("button[data-act=vista-profilo]"); await aspetta(1);
+  await indietro(0);
+  check(await titolo() === "Ciao Stefano e Alessia", `indietro ${tema}: Indietro dal Profilo torna a Io`);
+  await page.click("button[data-act=vista-profilo]"); await aspetta(1);
+  await page.click("button[data-act=profilo-indietro]"); await aspetta(0);
+  check(await titolo() === "Ciao Stefano e Alessia", `indietro ${tema}: «‹ Indietro» del Profilo toglie la voce`);
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+  await persona.click(); await aspetta(1);
+  await page.click("button[data-act=vista-profilo]"); await aspetta(2);
+  await indietro(1);
+  check(await page.locator("#app h2", { hasText:"Primo Numero" }).count() === 1, `indietro ${tema}: dal Profilo aperto da una scheda si torna alla scheda`);
+  await page.click("button[data-act=vista-profilo]"); await aspetta(2);
+  await page.click("button[data-act=vista-gruppo]"); await aspetta(0);
+  check(await titolo() === "Il mio gruppo", `indietro ${tema}: una scheda principale toglie tutte le voci`);
+  // la scheda di un partner
+  await page.locator("button[data-act=apri-scheda]").first().click(); await aspetta(1);
+  check(await titolo() === "Scheda partner", `indietro ${tema}: la scheda partner aggiunge una voce`);
+  await indietro(0);
+  check(await titolo() === "Il mio gruppo", `indietro ${tema}: Indietro dalla scheda partner torna al Gruppo`);
+  // l'Obiettivo aperto da Io è una sotto-pagina; dalla scheda «Obiettivo» no
+  await page.click("button[data-act=vista-io]");
+  const riga = page.locator("button[data-act=obiettivo-da-io]");
+  if(await riga.count()){
+    await riga.click(); await aspetta(1);
+    check(await titolo() === "Il mio obiettivo", `indietro ${tema}: l'Obiettivo da Io aggiunge una voce`);
+    await indietro(0);
+    check(await titolo() === "Ciao Stefano e Alessia", `indietro ${tema}: Indietro dall'Obiettivo torna a Io`);
+  }
+  await page.click("button[data-act=vista-obiettivo]");
+  check(await livello() === 0, `indietro ${tema}: la scheda «Obiettivo» non aggiunge voci`);
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+  await page.screenshot({ path: S + `/e2e/78-indietro-${tema}.png` });
+  check(!errori.length, `indietro ${tema}: nessun errore nella pagina`);
+  await ctx.close();
 }
 
 await browser.close();
