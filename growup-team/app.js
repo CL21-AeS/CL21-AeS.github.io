@@ -994,6 +994,8 @@ async function apriInvito(codice){
 }
 
 async function avvio(){
+  /* la pagina ricaricata con un foglio o una scheda aperta: la voce della cronologia torna la base */
+  if(history.state && history.state.growup) try{ history.replaceState(null, "", location.href); }catch(e){}
   /* il link del Target per il contatto: le otto domande, senza accesso */
   if(/^#t&/.test(location.hash)){ avviaContatto(location.hash); return; }
   /* le risposte del Target rimandate dal contatto: si leggono appena si è dentro */
@@ -1121,6 +1123,7 @@ function render(){
   filtroInVista();
   muoviDopo(prima);
   aggiornaPreviste();
+  allineaStoria();
 }
 /* le righe di filtri che scorrono di lato: il filtro acceso resta sempre in vista (anche dopo un ridisegno) */
 function filtroInVista(){
@@ -2212,7 +2215,7 @@ function vCruscotto(){
       <div class="bar${ob && f >= ob ? " fatto" : ""}" role="progressbar" aria-label="${nome}" aria-valuenow="${x}" aria-valuemin="0" aria-valuemax="100"><i style="width:${x}%"></i></div></div>`; };
   return `<div class="card miei-numeri cruscotto">
     <span class="eyebrow">${esc(nomeMese(m).split(" ")[0].toUpperCase())} · GIORNO ${Number(oggi().slice(8))} DI ${giorni}</span>
-    ${o ? `<button class="riga-apri prima obiettivo-riga" data-act="vista-obiettivo"><span class="grow"><b class="num">${euro(o.cifra_mese)}</b> al mese
+    ${o ? `<button class="riga-apri prima obiettivo-riga" data-act="obiettivo-da-io"><span class="grow"><b class="num">${euro(o.cifra_mese)}</b> al mese
       <span class="small">· ${esc(testoTraguardo(o.entro))}</span></span><span class="fr" aria-hidden="true">›</span></button>` : ""}
     <div class="cruscotto-cima">
       <div class="anello" role="img" aria-label="VP personali: ${num(fatto)} su ${num(obj)}">
@@ -3905,9 +3908,11 @@ const AZIONI = {
     st.versoNav = -1;
     AZIONI["apri-scheda"]({ dataset:{ id, indietro:"1" } });
   },
-  "vista-obiettivo"(){ st.vista = "obiettivo"; st.target = null; render(); window.scrollTo(0, 0); },
+  "vista-obiettivo"(){ st.vista = "obiettivo"; st.sotto = null; st.target = null; render(); window.scrollTo(0, 0); },
+  /* dal cruscotto di Io: la stessa pagina, ma come sotto-pagina (Indietro torna a Io) */
+  "obiettivo-da-io"(){ st.sotto = livelloDi(st); st.vista = "obiettivo"; st.target = null; render(); window.scrollTo(0, 0); },
   "scheda-tab"(el){ st.schedaTab = el.dataset.tab; render(); },
-  "vista-profilo"(){ if(st.vista === "profilo") return; st.vista = "profilo"; st.target = null; render(); window.scrollTo(0, 0); },
+  "vista-profilo"(){ if(st.vista === "profilo") return; st.sotto = livelloDi(st); st.vista = "profilo"; st.target = null; render(); window.scrollTo(0, 0); },
   "profilo-indietro"(){ if(!tornaIndietro()){ st.vista = "io"; render(); window.scrollTo(0, 0); } },
   "primi-passi-si"(){ salvaLocale(chiavePrimiPassiNo(), null); st.vista = "io"; st.sezIo = "giorno"; render(); window.scrollTo(0, 0); },
   "obiettivo-modifica"(){ st.errore = ""; st.sheet = "obiettivo"; render(); },
@@ -7113,7 +7118,8 @@ Object.assign(AZIONI, {
   "sez-io"(el){ st.sezIo = el.dataset.sez; render(); window.scrollTo(0, 0); },
   "guida-vai"(el){ const d = el.dataset.dove;
     if(d === "lista" || d === "clienti"){ st.vista = "persone"; st.sezPersone = d; st.personaId = null; st.invitoId = null; }
-    else st.vista = d === "gruppo" ? "gruppo" : "obiettivo";
+    else if(d === "gruppo") st.vista = "gruppo";
+    else { st.sotto = livelloDi(st); st.vista = "obiettivo"; }
     render(); window.scrollTo(0, 0); },
   "guida-cl21"(){ st.errore = null; st.sheet = "guida-cl21"; render(); },
   "guida-obiettivo"(el){ st.guidaK = el.dataset.k; st.errore = null; st.sheet = "guida-obiettivo"; render(); },
@@ -7293,6 +7299,7 @@ Object.assign(AZIONI, {
    (senza calcoli), peso sul gruppo, mesi al 21% e tendenza; poi la Stabilità Cum Laude 21 mese per mese. I numeri scritti
    a mano e le abitudini di un altro si vedono solo se li ha condivisi. */
 async function apriAnalisi(pid){
+  if(st.vista !== "analisi") st.sotto = livelloDi(st);
   st.analisiId = pid; st.vista = "analisi"; render(); window.scrollTo(0, 0);
   try{
     const [righe, cond] = await Promise.all([api.analisiPersona(pid), pid === st.profilo.id ? Promise.resolve(null) : api.datiCondivisi(pid)]);
@@ -7630,7 +7637,7 @@ document.addEventListener("click", e => {
    «Oggi per te», una scheda partner) trascinando verso destra torna da dove era partito, allo stesso punto della pagina.
    Le schede principali e i pulsanti di sezione (Il mio giorno · Verifica, Target · Lista · Clienti) azzerano la strada. */
 const AZIONI_MENU = new Set(["vista-obiettivo", "vista-io", "vista-persone", "vista-gruppo", "sez-io", "sez-persone"]);
-const CAMPI_PAGINA = ["vista", "sezIo", "sezPersone", "personaId", "invitoId", "schedaId", "target"];
+const CAMPI_PAGINA = ["vista", "sezIo", "sezPersone", "personaId", "invitoId", "schedaId", "target", "sotto"];
 function statoPagina(){ const f = { y:window.scrollY, schedaPila:(st.schedaPila || []).slice() }; for(const k of CAMPI_PAGINA) f[k] = st[k]; return f; }
 function ricordaRitorno(act, prima){
   st.ritorni = st.ritorni || [];
@@ -7647,6 +7654,69 @@ function tornaIndietro(){
   render(); window.scrollTo(0, f.y);
   return true;
 }
+
+/* Il tasto (o il gesto) Indietro del telefono. Ogni foglio aperto e ogni sotto-pagina (la scheda di una persona, di un
+   cliente, di un invito del Target o di un partner, il Profilo, l'Analisi, l'Obiettivo aperto da Io) ha una voce nella
+   cronologia del browser: Indietro chiude il foglio o torna alla schermata di prima, senza uscire dall'app. Le schede
+   principali (Obiettivo · Io · Persone · Gruppo) sono la base: da lì Indietro fa come prima.
+   Il numero di voci si ricava dallo stato (livelloApp) e dopo ogni ridisegno la cronologia si allinea (allineaStoria):
+   un foglio o una scheda che si apre aggiunge la voce, un pulsante dell'app che chiude o torna indietro la toglie. */
+function livelloDi(s){
+  if(s.vista === "persone") return s.personaId || s.invitoId ? 1 : 0;
+  if(s.vista === "scheda") return 1 + (s.schedaPila || []).length;
+  if(s.vista === "profilo" || s.vista === "analisi" || s.vista === "obiettivo") return s.sotto == null ? 0 : s.sotto + 1;
+  return 0;
+}
+function livelloApp(){ return (st.fase === "home" && st.profilo ? livelloDi(st) : 0) + (st.sheet ? 1 : 0); }
+function livelloStoria(){ const s = history.state; return s && typeof s.growup === "number" ? s.growup : 0; }
+let storiaInViaggio = false, storiaFerma = false;
+function allineaStoria(){
+  if(storiaInViaggio || storiaFerma) return;
+  const voglio = livelloApp(), ora = livelloStoria();
+  try{
+    if(voglio > ora){ for(let k = ora + 1; k <= voglio; k++) history.pushState({ growup:k }, ""); }
+    /* tolte dall'app (pulsante, salvataggio, scheda principale): si tolgono anche dalla cronologia; il popstate che
+       arriva dopo è il nostro e non chiude niente */
+    else if(voglio < ora){ storiaInViaggio = true; history.go(voglio - ora); }
+  }catch(e){ storiaInViaggio = false; }
+}
+/* un foglio con qualcosa di scritto o scelto (le ricerche no) */
+function foglioCompilato(){
+  if(st.rubricaUno || (st.rubricaMolti && st.rubricaMolti.length)) return true;
+  const f = document.getElementById("sheet");
+  const cambiato = el => el.type === "radio" || el.type === "checkbox" ? el.checked !== el.defaultChecked
+    : el.tagName === "SELECT" ? [...el.options].some(o => o.selected !== o.defaultSelected) : el.value !== el.defaultValue;
+  return !!f && [...f.querySelectorAll("input, textarea, select")].some(el => !/^(file|hidden|submit|button|search)$/.test(el.type) && cambiato(el));
+}
+/* la schermata di prima, come il «‹» della pagina (o lo scorrimento verso destra) */
+function indietroPagina(){
+  const r = st.ritorni || [], f = r[r.length - 1];
+  if(f && livelloDi(f) < livelloDi(st) && tornaIndietro()) return;
+  if(st.vista === "persone" && st.invitoId) AZIONI["torna-target"]();
+  else if(st.vista === "persone" && st.personaId) AZIONI[st.sezPersone === "clienti" ? "torna-clienti" : "torna-lista"]();
+  else if(st.vista === "scheda") AZIONI["scheda-indietro"]();
+  else if(st.vista === "analisi" && st.analisiId !== st.profilo.id){ st.vista = "scheda"; render(); window.scrollTo(0, 0); }
+  else { st.vista = "io"; st.sotto = null; render(); window.scrollTo(0, 0); }
+}
+window.addEventListener("popstate", () => {
+  if(storiaInViaggio){ storiaInViaggio = false; allineaStoria(); return; }
+  const verso = livelloStoria();
+  storiaFerma = true;
+  try{
+    for(let giri = 0; livelloApp() > verso && giri < 12; giri++){
+      const prima = livelloApp();
+      if(st.sheet){
+        /* campi già compilati: si chiede prima di perderli; «Annulla» lascia il foglio aperto */
+        if(foglioCompilato() && !confirm("Uscire senza salvare?")) break;
+        chiudiSheet(); render();
+      }else if(st.fase === "home") indietroPagina();
+      else break;
+      if(livelloApp() >= prima) break;
+    }
+  }finally{ storiaFerma = false; }
+  allineaStoria();
+});
+try{ history.scrollRestoration = "manual"; }catch(e){}
 
 document.addEventListener("submit", e => {
   const f = e.target.closest("form[data-form]");
@@ -7706,8 +7776,11 @@ document.addEventListener("touchstart", e => {
   /* anche le righe di filtri che scorrono di lato (Persone, Clienti, …): scorrerle non cambia pagina */
   if(e.target.closest("input, select, textarea, .sheet, [data-no-swipe], .filtri")) return;
   const t = e.touches[0];
+  /* dal bordo sinistro è il gesto Indietro del telefono (Safari, Android): lo gestisce la cronologia, non lo scorrimento */
+  if(t.clientX < 20 && livelloApp() > 0) return;
   tocco = { x:t.clientX, y:t.clientY, quando:Date.now() };
 }, { passive:true });
+document.addEventListener("touchcancel", () => { tocco = null; }, { passive:true });
 document.addEventListener("touchend", e => {
   if(!tocco || !e.changedTouches.length) return;
   const t = e.changedTouches[0], dx = t.clientX - tocco.x, dy = t.clientY - tocco.y, ms = Date.now() - tocco.quando;
