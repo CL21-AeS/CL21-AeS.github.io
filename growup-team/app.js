@@ -1750,8 +1750,12 @@ function campiObiettivo(o, primo){
    non si aprono; chi è già nell'app senza perché la vede una volta. Sotto, per chi è appena entrato, il link da salvare. */
 function senzaPerche(){ return !st.obiettivo || !String(st.obiettivo.perche || "").trim(); }
 function vObiettivoPrimo(){
+  /* subito dopo il passo 1 (l'ingresso con l'invito, o la privacy per chi è stato aggiunto a mano): «Passo 2 di 2» */
+  const pr = st.profilo && st.profilo.privacy_accettata_il, dopoPasso1 = !!pr && giorniTra(String(pr).slice(0, 10), oggi()) <= 7;
   return `<div>
     ${marchio()}
+    ${dopoPasso1 ? `<div class="spread passo-ingresso" style="margin-top:12px"><span class="eyebrow">Passo 2 di 2</span>
+      <span class="passi-mini" aria-hidden="true"><i class="on"></i><i class="on"></i></span></div>` : ""}
     <h1 style="margin-top:6px">Da dove parti?</h1>
     <p class="muted">Tutto parte da qui: cosa vuoi ottenere, per quando e perché. Lo rivedrai ogni giorno e puoi cambiarlo quando vuoi.</p>
     <form data-form="obiettivo" class="card" novalidate>
@@ -2080,15 +2084,23 @@ const GIORNI_NUOVO = 30;
 function avviato(){ const p = st.profilo, d = p && p.data_iscrizione;
   return !!p && !percorsoAttivo() && !p.partenza_completata_il && (!d || giorniTra(String(d).slice(0, 10), oggi()) > GIORNI_NUOVO); }
 function conUpline(){ return !!(st.profilo && st.profilo.sponsor_id); }
+/* il giorno di un incontro: nel futuro è «fissato per …», da oggi in poi è fatto («fatto 10 novembre») */
+function giornoFatto(d){ return !!d && String(d).slice(0, 10) <= oggi(); }
 function puntoDaFare(){ const p = st.profilo; return avviato() && conUpline() && p.punto_upline && !p.punto_upline_fatto && p.punto_upline <= oggi(); }
 function perIniziare(){
   const p = st.profilo, io = p.id, l = [{ k:"perche", nome:"Il mio perché", fatto:!senzaPerche() }];
   if(conUpline()) l.push({ k:"punto", nome:"Il punto con la tua upline", fatto:!!p.punto_upline_fatto,
-    sotto:p.punto_upline_fatto ? `fatto il ${dataIt(String(p.punto_upline_fatto).slice(0, 10))}` : p.punto_upline ? `fissato per ${riassuntoAgenda(String(p.punto_upline).slice(0, 10))}` : "",
+    sotto:testoPunto(p),
     azione:p.punto_upline_fatto ? "" : `<button class="btn small" data-act="punto-fissa">${p.punto_upline ? "Cambia" : "Fissa ›"}</button>` });
   if(figli(io).length) l.push({ k:"mappa", nome:"Importa la tua mappa", fatto:[...(st.mioReport || new Map()).values()].some(r => r.importato_da === io),
     azione:btnAmway("Importa ›", "small") });
   return l;
+}
+/* il punto con l'upline: la spunta viene da «L'ho già fatto»; arrivato il giorno senza conferma resta «era fissato per» */
+function testoPunto(p){
+  const d = p.punto_upline ? String(p.punto_upline).slice(0, 10) : "";
+  return p.punto_upline_fatto ? `fatto ${dataIt(String(p.punto_upline_fatto).slice(0, 10))}` : !d ? ""
+    : d < oggi() ? `era fissato per il ${dataIt(d)}` : `fissato per ${riassuntoAgenda(d)}`;
 }
 function vPerIniziare(){
   if(!avviato()) return "";
@@ -2141,8 +2153,9 @@ function vPercorso(){
   const entro = piuGiorni(String(p.privacy_accettata_il || p.creato_il || oggi()).slice(0, 10), ORE_NOMI / 24);
   let corpo = "";
   if(f.k === "sponsor") corpo = `<ul class="percorso-l">
-      ${riga(!!p.incontro_sponsor, "Primo incontro con il tuo sponsor", p.incontro_sponsor ? `fissato per ${esc(riassuntoAgenda(String(p.incontro_sponsor).slice(0, 10)))}` : "data da fissare",
-        `<button class="btn small" data-act="incontro-fissa">${p.incontro_sponsor ? "Cambia" : "Fissa ›"}</button>`)}
+      ${(() => { const d = p.incontro_sponsor ? String(p.incontro_sponsor).slice(0, 10) : "", fatto = giornoFatto(d);
+        return riga(fatto, "Primo incontro con il tuo sponsor", fatto ? `fatto ${esc(dataIt(d))}` : d ? `fissato per ${esc(riassuntoAgenda(d))}` : "data da fissare",
+          fatto ? "" : `<button class="btn small" data-act="incontro-fissa">${d ? "Cambia" : "Fissa ›"}</button>`); })()}
       ${riga(x.nomi >= NOMI_PARTENZA, `${NOMI_PARTENZA} nomi nella Lista`, `${num(Math.min(x.nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}${x.nomi < NOMI_PARTENZA ? ` · entro ${esc(riassuntoAgenda(entro < oggi() ? oggi() : entro))}` : ""}`,
         x.nomi < NOMI_PARTENZA ? `<button class="btn small" data-act="guida-vai" data-dove="lista">Lista ›</button>` : "")}</ul>`;
   else if(f.k === "ordine"){ const o = x.ord, pct = pctOk(Math.round(o.vp / o.min * 100));
@@ -2730,7 +2743,8 @@ function partenzaDi(x){
     const fasi = [
       { nome:"Il suo perché", fatto:!!x.ha_perche, sotto:x.ha_perche ? "obiettivo scritto" : "obiettivo da scrivere" },
       { nome:"Partenza con te", fatto:!!x.incontro_sponsor && nomi >= NOMI_PARTENZA,
-        sotto:`Incontro: ${x.incontro_sponsor ? riassuntoAgenda(String(x.incontro_sponsor).slice(0, 10)) : "data da fissare"} · Lista ${num(Math.min(nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}` },
+        sotto:`${!x.incontro_sponsor ? "Incontro: data da fissare" : giornoFatto(x.incontro_sponsor) ? `Incontro fatto ${dataIt(String(x.incontro_sponsor).slice(0, 10))}`
+          : `Incontro fissato per ${riassuntoAgenda(String(x.incontro_sponsor).slice(0, 10))}`} · Lista ${num(Math.min(nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}` },
       { nome:"Il primo ordine", fatto:vp >= PRIMO_ORDINE_VP,
         sotto:vp >= PRIMO_ORDINE_VP ? `fatto · ${num(vp)} VP` : `${num(vp)} / ${PRIMO_ORDINE_VP} VP · ${restano >= 0 ? `restano ${restano} giorni` : "oltre i 30 giorni"}` },
       { nome:"I due binari", fatto:Number(x.piani) > 0 && Number(x.clienti) > 0,
@@ -2744,7 +2758,7 @@ function partenzaDi(x){
   }
   /* avviato: «Per iniziare» (il perché, il punto con l'upline, la mappa se ha un gruppo) */
   const fasi = [{ nome:"Il suo perché", fatto:!!x.ha_perche, sotto:"" },
-    { nome:"Il punto con la sua upline", fatto:!!x.punto_upline_fatto, sotto:x.punto_upline && !x.punto_upline_fatto ? `fissato per ${riassuntoAgenda(String(x.punto_upline).slice(0, 10))}` : "" }];
+    { nome:"Il punto con la sua upline", fatto:!!x.punto_upline_fatto, sotto:testoPunto(x) }];
   if(x.ha_gruppo) fasi.push({ nome:"Importa la sua mappa", fatto:!!x.mappa_importata, sotto:"" });
   const fatti = fasi.filter(f => f.fatto).length;
   if(fatti === fasi.length) return null;

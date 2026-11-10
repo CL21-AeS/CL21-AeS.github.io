@@ -3680,7 +3680,9 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.check(`.sheet input[name=quando][value="${domaniG}"]`, { force:true });
   await page.click(".sheet button.primary");
   await page.getByText("Primo incontro con lo sponsor: domani").waitFor();
-  check(await pc.locator(".percorso-l li.fatto", { hasText:"Primo incontro con il tuo sponsor" }).isVisible(), "incontro fissato: la riga è spuntata");
+  const incontro = pc.locator(".percorso-l li", { hasText:"Primo incontro con il tuo sponsor" });
+  check(!(await incontro.evaluate(e => e.classList.contains("fatto"))) && (await incontro.innerText()).includes("fissato per domani")
+    && await incontro.locator("button[data-act=incontro-fissa]", { hasText:"Cambia" }).count() === 1, "incontro fissato per domani: niente spunta, «fissato per domani» e «Cambia»");
   check((await pc.locator(".percorso-l li", { hasText:"30 nomi" }).innerText()).includes("0 / 30"), "i 30 nomi: il contatore");
   await sync(page); await ctx.close();
   check(DB.partners.find(p => p.id === "np7").incontro_sponsor === domaniG, "nel database il giorno del primo incontro");
@@ -4949,6 +4951,93 @@ for(const tema of ["light", "dark"]){
   check(await page.getAttribute(".sezioni-persone button[data-sez=target]", "aria-pressed") === "true", `persone ${tema}: Target si apre dall'ultima linguetta`);
   check(!errori.length, `persone ${tema}: nessun errore nella pagina`);
   await ctx.close();
+}
+
+// 81. Il primo incontro con lo sponsor (e il punto con l'upline, e «Partenza con te» vista dallo sponsor): data nel futuro →
+//     «fissato per» senza spunta; data di oggi o passata → ✓ «fatto [giorno mese]». Lo sblocco della fase non cambia.
+//     «Da dove parti?» subito dopo il passo 1: «Passo 2 di 2» sopra il titolo.
+{
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), ora = new Date().toISOString();
+  const MESI_T = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
+  const it = d => `${Number(d.slice(8))} ${MESI_T[Number(d.slice(5, 7)) - 1]}`;
+  DB.partners.push({ id:"ni81", nome:"Nina Incontro", sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:"b1".repeat(16), codice_invito:"NI81NI", codice_amway:"7981001",
+    data_iscrizione:giorno(-2), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true });
+  DB.partners.push({ id:"pu81", nome:"Pio Upline", sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:"c1".repeat(16), codice_invito:"PU81PU", codice_amway:"7981002",
+    data_iscrizione:giorno(-300), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true, punto_upline:giorno(-2) });
+  const ni = DB.partners.find(p => p.id === "ni81");
+  for(const [n, tema] of [[2, "light"], [0, "dark"], [-3, "light"]]){
+    ni.incontro_sponsor = giorno(n);
+    const fatto = n <= 0, quando = fatto ? `fatto ${it(giorno(n))}` : "fissato per ";
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema }, "#chiave=" + "b1".repeat(16)));
+    await page.getByText("Ciao Nina").waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+    const pc = page.locator(".card.percorso-partenza"), r = pc.locator(".percorso-l li", { hasText:"Primo incontro con il tuo sponsor" });
+    const testo = await r.innerText(), spuntata = await r.evaluate(e => e.classList.contains("fatto"));
+    check(spuntata === fatto && testo.includes(quando) && (await r.locator("button[data-act=incontro-fissa]").count() === (fatto ? 0 : 1)),
+      `incontro ${n > 0 ? "nel futuro" : n === 0 ? "di oggi" : "passato"}: ${fatto ? "✓ «" + quando + "»" : "niente spunta, «fissato per», «Cambia»"} (${testo.replace(/\s+/g, " ")})`);
+    check((await pc.locator(".fase-titolo").innerText()).trim() === "Partenza con lo sponsor", `incontro ${n}: la fase resta «Partenza con lo sponsor» (mancano i 30 nomi)`);
+    await pc.screenshot({ path: S + `/e2e/81-incontro-${n > 0 ? "futuro" : n === 0 ? "oggi" : "passato"}-${tema}.png` });
+    await ctx.close();
+    // lo sponsor, nella scheda di Nina: «Partenza con te»
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema }, "#chiave=" + "a".repeat(32)));
+    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+    await page.click("button[data-act=vista-gruppo]");
+    await page.locator(".albero.struttura button[data-act=apri-scheda]", { hasText:"Nina Incontro" }).first().click();
+    const ps = page.locator(".partenza-scheda li", { hasText:"Partenza con te" });
+    await ps.waitFor();
+    const t2 = (await ps.innerText()).replace(/\s+/g, " ");
+    check(t2.includes(fatto ? `Incontro fatto ${it(giorno(n))}` : "Incontro fissato per ") && !(await ps.evaluate(e => e.classList.contains("fatto"))),
+      `sponsor, incontro ${n}: «${fatto ? "Incontro fatto" : "Incontro fissato per"}», la spunta resta della fase (${t2})`);
+    await ctx.close();
+  }
+  // con i 30 nomi la fase si sblocca come prima (anche con l'incontro nel futuro)
+  DB.persone = (DB.persone || []).concat(Array.from({ length:30 }, (_, i) => ({ id:"ni81n" + i, proprietario:"ni81", nome:"Nome Nina " + (i + 1), fase:"lista", esito:null, creato_il:ora })));
+  ni.incontro_sponsor = giorno(3);
+  ({ ctx, page } = await apri({}, "#chiave=" + "b1".repeat(16)));
+  await page.getByText("Ciao Nina").waitFor();
+  check((await page.locator(".percorso-partenza .fase-titolo").innerText()).trim() === "Il primo ordine", "incontro fissato + 30 nomi: la fase si sblocca come prima");
+  await ctx.close();
+  // il punto con l'upline di un avviato: passato e non confermato → «era fissato per il …», niente spunta, «Cambia»
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "c1".repeat(16)));
+  await page.getByText("Ciao Pio").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  const pu = page.locator(".card.per-iniziare li", { hasText:"Il punto con la tua upline" });
+  check(!(await pu.evaluate(e => e.classList.contains("fatto"))) && (await pu.innerText()).includes(`era fissato per il ${it(giorno(-2))}`)
+    && await pu.locator("button[data-act=punto-fissa]", { hasText:"Cambia" }).count() === 1, "punto con l'upline passato e non confermato: «era fissato per il …», «Cambia»");
+  check(await page.locator(".oggi-lista button[data-act=punto-fatto]").count() === 1, "punto con l'upline: resta la domanda in «Il mio giorno»");
+  await ctx.close();
+  DB.partners.find(p => p.id === "pu81").punto_upline = giorno(4);
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "c1".repeat(16)));
+  await page.getByText("Ciao Pio").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  check((await page.locator(".card.per-iniziare li", { hasText:"Il punto con la tua upline" }).innerText()).includes("fissato per "), "punto con l'upline nel futuro: «fissato per …»");
+  await ctx.close();
+  // lo sponsor, nella scheda di Pio: lo stesso testo del punto con la sua upline
+  Object.assign(DB.partners.find(p => p.id === "pu81"), { punto_upline:giorno(-1), punto_upline_fatto:null });
+  ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-gruppo]");
+  await page.locator(".albero.struttura button[data-act=apri-scheda]", { hasText:"Pio Upline" }).first().click();
+  const pp = page.locator(".partenza-scheda li", { hasText:"Il punto con la sua upline" });
+  await pp.waitFor();
+  check((await pp.innerText()).includes(`era fissato per il ${it(giorno(-1))}`) && !(await pp.evaluate(e => e.classList.contains("fatto"))),
+    "sponsor: il punto con l'upline passato e non confermato, «era fissato per il …»");
+  await ctx.close();
+  // «Passo 2 di 2»: chi ha appena fatto il passo 1; chi è nell'app da tempo senza perché no
+  for(const [id, nome, privacy, si, tema, k] of [["ob81", "Olga Passo", ora, true, "light", "9a"], ["ob82", "Otto Vecchio", "2026-01-01T00:00:00Z", false, "dark", "8b"]]){
+    DB.partners.push({ id, nome, sponsor_id:"R", stato:"attivo", chiave:k.repeat(16), codice_invito:id.toUpperCase() + "XX", codice_amway:"79810" + id.slice(-2),
+      privacy_accettata_il:privacy, confermato_il:ora, creato_il:ora, senzaObiettivo:true });
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema }, "#chiave=" + k.repeat(16)));
+    await page.locator("h1", { hasText:"Da dove parti?" }).waitFor();
+    const passo = page.locator(".passo-ingresso .eyebrow", { hasText:"Passo 2 di 2" });
+    check(await passo.count() === (si ? 1 : 0) && (!si || await passo.evaluate(e => e.compareDocumentPosition(document.querySelector("h1")) & Node.DOCUMENT_POSITION_FOLLOWING)),
+      `«Da dove parti?»: ${si ? "«Passo 2 di 2» sopra il titolo dopo il passo 1" : "niente «Passo 2 di 2» per chi è nell'app da tempo"}`);
+    if(si) for(const t of ["light", "dark"]){ await page.emulateMedia({ colorScheme:t }); await page.screenshot({ path: S + `/e2e/81-passo2-${t}.png`, clip:{ x:0, y:0, width:360, height:300 } }); }
+    await ctx.close();
+  }
+  check(!errori.length, "incontro: nessun errore nella pagina");
 }
 
 await browser.close();
