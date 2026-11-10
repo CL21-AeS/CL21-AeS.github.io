@@ -3,6 +3,22 @@
 Ultimo aggiornamento: 10 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Indietro su un foglio compilato: non esce più dall'app (10 novembre 2026, sera, app v111, database non toccato)
+
+Dalla prova di Stefano su Android (v110): «+ Nome», scritto un nome, Indietro → «Uscire senza salvare?» → Annulla →
+di nuovo Indietro: **l'app si chiudeva** senza chiedere. Causa: Chrome su Android salta con Indietro le voci della
+cronologia aggiunte senza un tocco della persona (e la schermata da cui sono state aggiunte); la finestra di sistema
+(`confirm`) non conta come tocco sulla pagina, quindi la voce rimessa dopo «Annulla» veniva saltata insieme alla Lista.
+I test automatici non lo vedono (succede solo con il vero tasto Indietro del telefono). Ora:
+- una voce si aggiunge **solo subito dopo un tocco o un tasto** (`conTocco`, `navigator.userActivation`); se non c'è,
+  aspetta il prossimo tocco (`storiaInAttesa`);
+- un foglio compilato ha una **voce di guardia** in più (`livelloVoluto`), aggiunta mentre si scrive: il primo Indietro
+  toglie la guardia e chiede, il foglio ha ancora la sua voce;
+- «Uscire senza salvare?» è una **finestra dell'app** (`chiediUscita`, Annulla / Esci): «Annulla» è un tocco vero e
+  rimette la guardia, così l'Indietro dopo chiede di nuovo; un altro Indietro con la domanda aperta chiude il foglio
+  senza salvare ma **resta nell'app**.
+Test: sezione 78 aggiornata (anche: nessuna voce aggiunta senza tocco).
+
 ## Ritocchi di usabilità: Indietro, doppioni, linguette, testi (10 novembre 2026, app v110, database non toccato)
 
 Cinque PR in fila (190-194), da unire in ordine; la versione del service worker sale una volta sola, nell'ultima.

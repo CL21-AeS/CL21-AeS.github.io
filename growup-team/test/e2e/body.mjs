@@ -4718,6 +4718,10 @@ for(const tema of ["light", "dark"]){
   const titolo = () => page.locator("#app h1").first().innerText();
   const foglio = () => page.locator(".sheet").count();
   const base = await page.evaluate(() => history.length);
+  /* Chrome su Android salta con Indietro le voci aggiunte senza un tocco (e la schermata da cui sono state aggiunte):
+     l'app ne deve aggiungere solo subito dopo un tocco o un tasto. Qui si segna ogni pushState e se c'era il tocco. */
+  await page.evaluate(() => { window.__senzaTocco = 0; window.__voci = 0; const ps = history.pushState.bind(history);
+    history.pushState = (a, b, c) => { window.__voci++; if(!navigator.userActivation.isActive) window.__senzaTocco++; return ps(a, b, c); }; });
   check(await livello() === 0, `indietro ${tema}: sulla schermata principale nessuna voce in più`);
   await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
   check(await livello() === 0 && await page.evaluate(() => history.length) === base, `indietro ${tema}: le schede principali non aggiungono voci`);
@@ -4746,21 +4750,45 @@ for(const tema of ["light", "dark"]){
   check(!(await foglio()) && await page.locator("#app h2", { hasText:"Primo Numero" }).count() === 1, `indietro ${tema}: Indietro chiude il foglio e lascia la scheda aperta`);
   await indietro(0);
   check(await titolo() === "Persone", `indietro ${tema}: il secondo Indietro torna alla Lista`);
-  // campi compilati: «Uscire senza salvare?»; con «Annulla» il foglio resta com'era
+  // campi compilati: «Uscire senza salvare?» (finestra dell'app); con «Annulla» il foglio resta com'era e un altro Indietro
+  // chiede di nuovo, senza uscire dall'app (sul telefono la finestra di sistema non contava come tocco e Chrome saltava la voce)
+  const domanda = page.locator(".domanda-uscita");
+  let nativa = 0; page.on("dialog", () => { nativa++; });
   await page.click("button[data-act=persona-nuova]"); await aspetta(1);
-  await page.fill(".sheet input[name=nome]", "Nome Da Non Perdere");
-  await page.evaluate(() => { window.__domande = []; window.confirm = t => { window.__domande.push(t); return false; }; });
+  await page.click(".sheet input[name=nome]");
+  await page.locator(".sheet input[name=nome]").pressSequentially("Nome Da Non Perdere");
+  await aspetta(2);
+  check(true, `indietro ${tema}: scrivendo nel foglio si aggiunge la voce di guardia`);
   await page.goBack({ waitUntil:"commit" }); await aspetta(1);
+  await domanda.waitFor();
   check(await foglio() === 1 && await page.inputValue(".sheet input[name=nome]") === "Nome Da Non Perdere"
-    && JSON.stringify(await page.evaluate(() => window.__domande)) === JSON.stringify(["Uscire senza salvare?"]),
-    `indietro ${tema}: con campi compilati chiede «Uscire senza salvare?» e con «Annulla» il foglio resta`);
-  await page.evaluate(() => { window.confirm = t => { window.__domande.push(t); return true; }; });
-  await indietro(0);
-  check(!(await foglio()) && (await page.evaluate(() => window.__domande)).length === 2, `indietro ${tema}: confermando si esce senza salvare`);
-  // un foglio vuoto si chiude senza domande
+    && (await domanda.innerText()).includes("Uscire senza salvare?") && nativa === 0,
+    `indietro ${tema}: con campi compilati chiede «Uscire senza salvare?» nella finestra dell'app`);
+  if(tema === "light") await page.screenshot({ path: S + `/e2e/78-uscire-light.png` });
+  await domanda.locator("button[data-act=uscita-annulla]").click();
+  await aspetta(2);
+  check(!(await domanda.count()) && await page.inputValue(".sheet input[name=nome]") === "Nome Da Non Perdere", `indietro ${tema}: «Annulla» lascia il foglio com'era e rimette la voce`);
+  await page.goBack({ waitUntil:"commit" }); await aspetta(1);
+  await domanda.waitFor();
+  check(await foglio() === 1 && await titolo() === "Persone", `indietro ${tema}: dopo «Annulla» un altro Indietro chiede di nuovo (non esce dall'app)`);
+  if(tema === "dark") await page.screenshot({ path: S + `/e2e/78-uscire-dark.png` });
+  // Indietro ancora, con la domanda aperta: si esce dal foglio senza salvare ma si resta nell'app
+  await page.goBack({ waitUntil:"commit" }); await aspetta(0);
+  check(!(await foglio()) && !(await domanda.count()) && await titolo() === "Persone" && page.url().startsWith(BASE), `indietro ${tema}: Indietro sulla domanda chiude il foglio, l'app resta aperta`);
+  // «Esci» chiude il foglio senza salvare
   await page.click("button[data-act=persona-nuova]"); await aspetta(1);
+  await page.click(".sheet input[name=nome]"); await page.locator(".sheet input[name=nome]").pressSequentially("Altro Da Perdere"); await aspetta(2);
+  await page.goBack({ waitUntil:"commit" }); await domanda.waitFor();
+  await domanda.locator("button[data-act=uscita-esci]").click(); await aspetta(0);
+  await sync(page);
+  check(!(await foglio()) && !DB.persone.some(x => x.nome === "Altro Da Perdere"), `indietro ${tema}: «Esci» chiude il foglio senza salvare`);
+  // cancellando quello che si è scritto la voce di guardia si toglie
+  await page.click("button[data-act=persona-nuova]"); await aspetta(1);
+  await page.click(".sheet input[name=nome]"); await page.locator(".sheet input[name=nome]").pressSequentially("X"); await aspetta(2);
+  await page.locator(".sheet input[name=nome]").press("Backspace"); await aspetta(1);
+  // un foglio vuoto si chiude senza domande
   await indietro(0);
-  check((await page.evaluate(() => window.__domande)).length === 2, `indietro ${tema}: un foglio vuoto si chiude senza domande`);
+  check(!(await foglio()) && !(await domanda.count()) && nativa === 0, `indietro ${tema}: un foglio vuoto si chiude senza domande`);
   // il salvataggio che chiude il foglio toglie la voce
   if(tema === "light"){
     await page.click("button[data-act=persona-nuova]"); await aspetta(1);
@@ -4804,6 +4832,8 @@ for(const tema of ["light", "dark"]){
   await page.click("button[data-act=vista-obiettivo]");
   check(await livello() === 0, `indietro ${tema}: la scheda «Obiettivo» non aggiunge voci`);
   await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=lista]");
+  check(await page.evaluate(() => window.__voci) > 10 && await page.evaluate(() => window.__senzaTocco) === 0,
+    `indietro ${tema}: ogni voce della cronologia è aggiunta subito dopo un tocco (${await page.evaluate(() => window.__voci)} voci)`);
   await page.screenshot({ path: S + `/e2e/78-indietro-${tema}.png` });
   check(!errori.length, `indietro ${tema}: nessun errore nella pagina`);
   await ctx.close();
