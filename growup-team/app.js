@@ -7730,12 +7730,23 @@ function livelloDi(s){
 }
 function livelloApp(){ return (st.fase === "home" && st.profilo ? livelloDi(st) : 0) + (st.sheet ? 1 : 0); }
 function livelloStoria(){ const s = history.state; return s && typeof s.growup === "number" ? s.growup : 0; }
-let storiaInViaggio = false, storiaFerma = false;
+let storiaInViaggio = false, storiaFerma = false, storiaInAttesa = false, domandaUscita = null;
+/* Chrome su Android salta con Indietro le voci aggiunte senza un tocco della persona (e con loro la schermata da cui sono
+   state aggiunte: così si usciva dall'app). Una voce si aggiunge solo subito dopo un tocco o un tasto; se non c'è, si
+   aspetta il prossimo. */
+function conTocco(){ try{ return !navigator.userActivation || navigator.userActivation.isActive; }catch(e){ return true; } }
+/* un foglio compilato ha una voce in più (la «guardia»): il primo Indietro chiede «Uscire senza salvare?» e lascia ancora
+   una voce, così anche un secondo Indietro resta nell'app */
+function livelloVoluto(){ return livelloApp() + (st.sheet && foglioCompilato() ? 1 : 0); }
 function allineaStoria(){
-  if(storiaInViaggio || storiaFerma) return;
-  const voglio = livelloApp(), ora = livelloStoria();
+  if(storiaInViaggio || storiaFerma || domandaUscita) return;
+  const voglio = livelloVoluto(), ora = livelloStoria();
   try{
-    if(voglio > ora){ for(let k = ora + 1; k <= voglio; k++) history.pushState({ growup:k }, ""); }
+    if(voglio > ora){
+      if(!conTocco()){ storiaInAttesa = true; return; }
+      storiaInAttesa = false;
+      for(let k = ora + 1; k <= voglio; k++) history.pushState({ growup:k }, "");
+    }
     /* tolte dall'app (pulsante, salvataggio, scheda principale): si tolgono anche dalla cronologia; il popstate che
        arriva dopo è il nostro e non chiude niente */
     else if(voglio < ora){ storiaInViaggio = true; history.go(voglio - ora); }
@@ -7759,16 +7770,40 @@ function indietroPagina(){
   else if(st.vista === "analisi" && st.analisiId !== st.profilo.id){ st.vista = "scheda"; render(); window.scrollTo(0, 0); }
   else { st.vista = "io"; st.sotto = null; render(); window.scrollTo(0, 0); }
 }
+/* il prossimo tocco o tasto rimette le voci che aspettavano */
+["pointerup", "touchend", "click", "keydown", "input", "change"].forEach(t => document.addEventListener(t, () => {
+  if(storiaInAttesa || (st.sheet && document.getElementById("sheet").contains(document.activeElement))) allineaStoria();
+}, { capture:true, passive:true }));
+/* «Uscire senza salvare?»: una finestra dell'app (quella del telefono non conta come tocco sulla pagina) */
+function chiediUscita(){
+  if(domandaUscita) return;
+  domandaUscita = document.createElement("div");
+  domandaUscita.className = "domanda-uscita";
+  domandaUscita.innerHTML = `<div class="domanda-uscita-box" role="alertdialog" aria-modal="true" aria-labelledby="domanda-uscita-t">
+    <p id="domanda-uscita-t"><b>Uscire senza salvare?</b></p><p class="small">Quello che hai scritto in questo foglio si perde.</p>
+    <div class="row"><button type="button" class="btn ghost grow" data-act="uscita-annulla">Annulla</button>
+      <button type="button" class="btn primary grow" data-act="uscita-esci">Esci</button></div></div>`;
+  document.body.appendChild(domandaUscita);
+  domandaUscita.querySelector("[data-act=uscita-annulla]").focus({ preventScroll:true });
+}
+function chiudiDomanda(){ if(domandaUscita){ domandaUscita.remove(); domandaUscita = null; } }
+Object.assign(AZIONI, {
+  /* resta nel foglio: con questo tocco la voce torna nella cronologia */
+  "uscita-annulla"(){ chiudiDomanda(); allineaStoria(); },
+  "uscita-esci"(){ chiudiDomanda(); chiudiSheet(); render(); }
+});
 window.addEventListener("popstate", () => {
   if(storiaInViaggio){ storiaInViaggio = false; allineaStoria(); return; }
+  /* un altro Indietro mentre c'è la domanda: si esce dal foglio (senza salvare), ma si resta nell'app */
+  if(domandaUscita){ chiudiDomanda(); chiudiSheet(); render(); return; }
   const verso = livelloStoria();
+  /* campi già compilati: si chiede prima di perderli (Indietro ha tolto la voce di guardia, il foglio ha ancora la sua) */
+  if(st.sheet && foglioCompilato() && verso < livelloVoluto()){ chiediUscita(); return; }
   storiaFerma = true;
   try{
     for(let giri = 0; livelloApp() > verso && giri < 12; giri++){
       const prima = livelloApp();
       if(st.sheet){
-        /* campi già compilati: si chiede prima di perderli; «Annulla» lascia il foglio aperto */
-        if(foglioCompilato() && !confirm("Uscire senza salvare?")) break;
         chiudiSheet(); render();
       }else if(st.fase === "home") indietroPagina();
       else break;
@@ -7825,6 +7860,7 @@ document.addEventListener("input", e => {
 });
 
 document.addEventListener("keydown", e => {
+  if(e.key === "Escape" && domandaUscita){ AZIONI["uscita-annulla"](); return; }
   if(e.key === "Escape" && st.sheet){ st.sheet = null; render(); }
 });
 
