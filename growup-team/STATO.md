@@ -1,7 +1,37 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 9 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 10 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
+
+## Ritocchi di usabilità: Indietro, doppioni, linguette, testi (10 novembre 2026, app v110, database non toccato)
+
+Cinque PR in fila (190-194), da unire in ordine; la versione del service worker sale una volta sola, nell'ultima.
+1. **Tasto e gesto Indietro** (Android, Safari su iPhone): ogni foglio e ogni sotto-pagina (scheda di persona, cliente,
+   invito Target, partner; Profilo; Analisi; Obiettivo aperto da Io) ha una voce nella cronologia (`history.pushState`).
+   Il numero di voci si ricava dallo stato (`livelloDi`, `livelloApp`) e dopo ogni `render()` la cronologia si allinea
+   (`allineaStoria`): un foglio o una scheda che si apre aggiunge la voce, un pulsante dell'app che chiude o torna indietro
+   la toglie (`history.go`). Il `popstate` chiude il foglio o torna alla schermata di prima (`indietroPagina`, come lo
+   scorrimento verso destra). Foglio con campi compilati (le ricerche no): «Uscire senza salvare?». Dalle schede
+   principali Indietro fa come prima. La riga dell'obiettivo nel cruscotto di Io è `obiettivo-da-io` (sotto-pagina);
+   `st.sotto` dice da che livello si è aperto Profilo, Analisi o Obiettivo. Lo scorrimento con il dito non parte dal bordo
+   sinistro quando c'è una voce (è il gesto del telefono). Pagina ricaricata con un foglio aperto: la voce torna la base.
+   `#chiave=`, `#invito=`, `?condivisi=1` non toccati. Test: sezione 78.
+2. **«+ Contatto»**: mentre si scrive il nome, fino a 5 nomi della Lista e dei Clienti (`personeContatto`: ogni parola
+   scritta, senza accenti, deve stare nel nome) con la fase in breve («· in lista», «· in corso», «· cliente»…); toccandone
+   uno il contatto si segna su quella persona (`contatto-su`, `contattoSu`). Senza scelta come prima (nome identico →
+   persona esistente). Tolta la frase «Se è già nella lista, scrivi il nome uguale…». **«+ Nome»** (Lista, Clienti,
+   Rubrica): avviso ambra anche per il nome identico (`stessoNome`, `chiaveNome`: senza accenti, maiuscole e spazi doppi),
+   un solo avviso se coincidono nome e telefono; gli omonimi si salvano lo stesso (secondo «Salva»). Test: sezione 79.
+3. **Persone**: linguette Lista | Clienti | Target; si apre sempre la Lista. Test: sezione 80.
+4. **Testi**: «Passo 2 di 2» sopra «Da dove parti?» per chi ha accettato la privacy negli ultimi 7 giorni. Percorso di
+   partenza: «Primo incontro con il tuo sponsor» si spunta solo da quel giorno («fatto 10 novembre»); nel futuro
+   «fissato per …» e «Cambia». Lo sblocco della fase non cambia (data fissata + 30 nomi). Scelte di Stefano: il punto con
+   l'upline cambia solo nei testi (la ✓ resta «L'ho già fatto»; data passata senza conferma: «era fissato per il …»,
+   `testoPunto`), «Partenza con te» vista dallo sponsor solo nel testo («Incontro fissato per …» / «Incontro fatto …»).
+   Test: sezione 81 (e 61 aggiornata).
+5. Service worker v110. Controllo /security-review fatto: nessun problema (testi nuovi sempre con `esc()`, nella
+   cronologia solo un numero, niente dati nuovi sul telefono).
+Da provare dal telefono (Android: app installata e Chrome; iPhone: Safari e app sulla Home): vedi la PR 194.
 
 ## Rubrica su Android 17: «Condividi → Growup» (9 novembre 2026, sera, app v109, database non toccato)
 
