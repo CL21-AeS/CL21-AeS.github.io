@@ -5,7 +5,8 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
 ## I VP solo dalla mappa Amway e più bozze d'ordine (10 novembre 2026, notte: migrazione 063, app v112)
 
-Sei PR in fila (196-201), da unire in ordine; **prima la migrazione 063 su Supabase** (la usano tutte, dalla 196).
+Sei PR in fila (196-201), da unire in ordine. **Migrazione 063 applicata su Supabase da Claude il 10 novembre** (colonne,
+indice tolto, regole, permessi delle funzioni e dati controllati: bozze, ordini e rettifiche vecchi, mappe e totali intatti).
 Decisione di Stefano: i VP dell'app (personali, di gruppo, linee, percentuale; per me e per tutti, anche per chi non ha
 l'app) sono **solo quelli ufficiali delle mappe Amway importate**. Nessun ordine, bozza o correzione scritta a mano cambia
 più i VP. Restano le bozze d'ordine (anche più di una), che non toccano i VP; una bozza confermata va nello storico.
