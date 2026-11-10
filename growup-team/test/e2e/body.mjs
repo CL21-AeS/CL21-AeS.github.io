@@ -139,13 +139,17 @@ await page.click(".sheet button[data-act=chiudi]");
 // 063: i VP vengono solo dalla mappa Amway: senza la mappa del mese nessuna cifra, mai uno zero
 check(await page.locator("button[data-act=ordini] b").first().innerText() === "nessuna mappa", "063: senza la mappa del mese, sotto + Ordine «nessuna mappa»");
 check(await page.locator(".cruscotto .anello b.num").innerText() === "—"
-  && await page.locator(".cruscotto .mappa-riga").innerText() === "VP: nessuna mappa di " + new Intl.DateTimeFormat("it-IT", { timeZone:"Europe/Rome", month:"long" }).format(new Date()),
+  && await page.locator(".cruscotto .mappa-riga > span").innerText() === "VP: nessuna mappa di " + new Intl.DateTimeFormat("it-IT", { timeZone:"Europe/Rome", month:"long" }).format(new Date()),
   "063: anello senza mappa: «—» e «nessuna mappa di [mese]»");
 const mappaAnna = await mappaIn(page, anna.id, 62.5);
 await page.locator("button[data-act=ordini] b", { hasText:"62,5 VP · mese" }).waitFor();
-check(await page.locator(".cruscotto .anello b.num").innerText() === "62,5" && await page.locator(".cruscotto .mappa-riga").innerText() === "VP: mappa " + delGiornoIt(mappaAnna.dati_al),
+check(await page.locator(".cruscotto .anello b.num").innerText() === "62,5" && await page.locator(".cruscotto .mappa-riga > span").innerText() === "VP: mappa " + delGiornoIt(mappaAnna.dati_al),
   "063: i VP della mappa nell'anello, con la data della mappa");
 check(await page.getByText("Primi clienti").first().isVisible(), "063: primo ordine dalla mappa -> tappa 2");
+await page.click(".cruscotto .mappa-riga .aiuto-btn");
+check((await page.locator(".cruscotto .aiuto-testo").innerText()).trim() === "I VP sono quelli ufficiali di Amway, dall'ultima mappa importata (anche da chi ti segue). "
+  + "Le bozze ti aiutano a preparare gli ordini e la chiusura del mese, ma non cambiano i VP.", "063: il «?» dei VP con il testo di Stefano");
+await page.click(".cruscotto .mappa-riga .aiuto-btn");
 
 // 2b. Il mio mese: + VP e niente struttura nella pagina Io
 check(!(await page.locator(".miei-numeri button[data-act=ordine], .miei-numeri button[data-act=totale-mese], .miei-numeri button[data-act=importa]").count()),
@@ -483,7 +487,7 @@ await page.click("button.link[data-act=vista-gruppo]");
 // admin: nuovo link personale per chi usa l'app
 await page.locator(".albero.struttura li", { hasText:"Anna Bianchi" }).locator("button[data-act=apri-scheda]").click();
 await azioniScheda(page);
-await page.getByText("Usa l'app: i suoi numeri li aggiorna lui.").waitFor();
+await page.getByText("Usa l'app: contatti e piani li aggiorna lui; i VP arrivano dalla mappa.").waitFor();
 check(!(await page.locator(".griglia-azioni").count()), "nessun inserimento per chi usa l'app");
 await page.click("button[data-act=nuovo-link]");
 await page.getByText("Il link di Anna Bianchi").waitFor();
@@ -606,7 +610,7 @@ check(await prefIvo.getByText("Piani sotto soglia").isVisible() && await prefIvo
 await prefIvo.getByText("La sua lista").waitFor();
 check(/La sua lista: 1 in lista · 1 in corso · questo mese 0 piani, 0 partner e 0 clienti nuovi · 0 clienti in tutto/.test((await prefIvo.innerText()).replace(/\s+/g, " ")) && !/Nome Uno|Nome Due/.test(await prefIvo.innerText()), "Ivo nei preferiti: i numeri della sua lista, senza nomi");
 const prefGino = pref.locator("li.preferito", { hasText:"Gino Senza App" });
-check(await prefGino.getByText("senza app · numeri inseriti dallo sponsor").isVisible() && await prefGino.locator(".obiettivo.debole").count() === 0
+check(await prefGino.getByText("senza app · VP dalla mappa").isVisible() && await prefGino.locator(".obiettivo.debole").count() === 0
   && !(await prefGino.getByText("La sua lista").count()), "Gino nei preferiti: senza etichetta e senza lista");
 await page.screenshot({ path: S + "/e2e/14-preferiti.png", fullPage:true });
 // tolgo Gino
@@ -1863,7 +1867,7 @@ await ctx.close();
   check(await lui.getAttribute("data-chiave") === "linee_zero" && await lui.getByText("Non ha ancora linee attive: gli servono i primi 3 frontali.").isVisible()
     && await lui.getByText("Ricorda: per Path to Bronze servono anche 100 VP personali nel mese · ne ha 150 ✓").isVisible(), "scheda partner: i consigli in terza persona");
   check(!(await page.getByText("VP medio: di chi ha fatturato").count()) && await lui.locator(".nota").count() === 1
-    && await lui.getByText("Calcolato sui numeri del mese fino a oggi. Sono spunti: la strada la decidete voi.").isVisible(), "sotto la tabellina solo la nota finale");
+    && await lui.getByText("Calcolato sui numeri della mappa del mese. Sono spunti: la strada la decidete voi.").isVisible(), "sotto la tabellina solo la nota finale");
   await page.click("button[data-act=vista-gruppo]");
   check(!(await page.locator(".consigli").count()), "nessun consiglio nell'elenco del gruppo");
   await page.locator(".albero.struttura li", { hasText:"Linea Beta" }).first().locator("button[data-act=apri-scheda]").first().click();

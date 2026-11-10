@@ -12,8 +12,8 @@ Growup Team sostituisce `growup/` con un database condiviso. **Non si usa l'emai
 - "Primi passi" (finché non sono fatti, si può nascondere con ×): salva il link, installa, obiettivo, 30 nomi in Lista,
   primo import. Le spiegazioni lunghe si aprono con il «?» accanto al titolo.
 - "I miei numeri": obiettivo, tappa (si apre toccandola), settimana (contatti e piani) e mese (VP e nuovi clienti);
-  **+ Contatto**, **+ Piano**, **+ Ordine** sempre in basso (+ Ordine apre il foglio «Ordini»: ordine veloce, bozza,
-  i miei ordini, totale del mese).
+  **+ Contatto**, **+ Piano**, **+ Ordine** sempre in basso (+ Ordine apre il foglio «Ordini»: le mie bozze, i miei
+  ordini, ordini dal sito Amway). I VP sono solo quelli della mappa Amway importata, con la sua data accanto.
 - Il percorso base: visione Argento, tappa attuale, conto alla rovescia dei 30 giorni per il primo ordine.
 
 `growup/` resta com'è e continua a funzionare.
@@ -137,6 +137,9 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 41k. `supabase/053_cerchie.sql` — le cerchie della Lista: gruppi di nomi solo miei, una persona in più cerchie
 41l. `supabase/054_cerchie_clienti.sql` — le cerchie anche nei Clienti, separate da quelle della Lista (tipo della cerchia)
 41m. `supabase/055_contatti_24_mesi.sql` — i contatti di Lista, Target e Clienti si cancellano 24 mesi dopo l'ultimo passo o ordine; avviso 30 giorni prima
+41n. `supabase/063_vp_solo_mappa.sql` — i VP solo dalle mappe Amway (`calcola_mese`, `riepilogo_mese`, `chiudi_mese`, `partenze`;
+     senza mappa nessun numero), niente più ordini e rettifiche scritti a mano, più bozze d'ordine con nome e cliente, la
+     notifica «mancano X VP» dalla mappa con la sua data
 41n. `supabase/055b_contatti_cron.sql` — l'attività pianificata della cancellazione, ogni notte (solo su Supabase, come la 050b)
 42. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente
