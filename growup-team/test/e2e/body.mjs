@@ -133,34 +133,36 @@ check(await oggiCard.getByText("Contatto: Paolo Rapido").isVisible() && await og
 await apriOrdini(page);
 check(await page.locator(".sheet .scelta-ordini").allInnerTexts().then(l => l.map(t => t.split("\n")[0])).then(l => l.join("|"))
   === "Ordine veloce|Bozza ordine|I miei ordini|Aggiorna il totale del mese|Importa da Amway", "+ Ordine apre il foglio Ordini con le 5 scelte");
-await page.click(".sheet button[data-act=ordine]");
-check(await page.inputValue(".sheet input[name=vp]") === "" && await page.getAttribute(".sheet input[name=vp]", "placeholder") === "0", "ordine: campo vuoto con lo 0 grigio");
-await page.click(".sheet button:has-text('Salva')");
-await page.locator(".sheet .errore").waitFor();
-check(await page.inputValue(".sheet input[name=vp]") === "", "ordine senza VP: errore e il campo resta vuoto");
-await page.fill("input[name=vp]", "62,5");
-await page.click(".sheet button:has-text('Salva')"); await page.getByText("Ordine da 62,5 VP registrato").waitFor();
-check(await page.getByText("Primi clienti").first().isVisible(), "primo ordine fatto -> tappa 2");
+await page.click(".sheet button[data-act=chiudi]");
+// 063: i VP vengono solo dalla mappa Amway: senza la mappa del mese nessuna cifra, mai uno zero
+check(await page.locator("button[data-act=ordini] b").first().innerText() === "nessuna mappa", "063: senza la mappa del mese, sotto + Ordine «nessuna mappa»");
+check(await page.locator(".cruscotto .anello b.num").innerText() === "—"
+  && await page.locator(".cruscotto .mappa-riga").innerText() === "VP: nessuna mappa di " + new Intl.DateTimeFormat("it-IT", { timeZone:"Europe/Rome", month:"long" }).format(new Date()),
+  "063: anello senza mappa: «—» e «nessuna mappa di [mese]»");
+const mappaAnna = await mappaIn(page, anna.id, 62.5);
+await page.locator("button[data-act=ordini] b", { hasText:"62,5 VP · mese" }).waitFor();
+check(await page.locator(".cruscotto .anello b.num").innerText() === "62,5" && await page.locator(".cruscotto .mappa-riga").innerText() === "VP: mappa " + delGiornoIt(mappaAnna.dati_al),
+  "063: i VP della mappa nell'anello, con la data della mappa");
+check(await page.getByText("Primi clienti").first().isVisible(), "063: primo ordine dalla mappa -> tappa 2");
 
 // 2b. Il mio mese: + VP e niente struttura nella pagina Io
 check(!(await page.locator(".miei-numeri button[data-act=ordine], .miei-numeri button[data-act=totale-mese], .miei-numeri button[data-act=importa]").count()),
   "nel mio mese niente più + Ordine, Aggiorna il totale, Importa");
-// Aggiorna il totale del mese: su a 100, poi giù a 80
-await apriOrdini(page, "totale-mese");
-check(await page.inputValue(".sheet input[name=vp]") === "" && await page.getAttribute(".sheet input[name=vp]", "placeholder") === "62,5", "totale proposto in grigio = VP già registrati");
-await page.fill(".sheet input[name=vp]", "100");
-await page.click(".sheet button:has-text('Salva')");
-await page.getByText("aggiornato: 100 VP").waitFor();
-check(await page.locator("button[data-act=ordini] b").first().innerText() === "100 VP · mese", "totale del mese a 100");
-await apriOrdini(page, "totale-mese");
-await page.fill(".sheet input[name=vp]", "80");
-await page.click(".sheet button:has-text('Salva')");
-await page.getByText("aggiornato: 80 VP").waitFor();
-check(await page.locator(".oggi li", { hasText:"-20 VP" }).isVisible(), "correzione negativa nella lista di oggi");
+// 063: una mappa più recente (anche importata da chi sta sopra) cambia i VP del mese: su a 100, poi giù a 80
+await mappaIn(page, anna.id, 100);
+await page.locator("button[data-act=ordini] b", { hasText:"100 VP · mese" }).waitFor(); check(true, "063: la mappa nuova porta i VP a 100");
+const mappaAnna2 = await mappaIn(page, anna.id, 80);
+await page.locator("button[data-act=ordini] b", { hasText:"80 VP · mese" }).waitFor(); check(true, "063: e poi a 80, sempre e solo dalla mappa");
 await apriMese(page); check(await page.locator(".card", { hasText:"Il mio mese" }).getByText("/ 100").isVisible(), "obiettivo invariato");
-await apriOrdini(page, "totale-mese");
-await page.click(".sheet button:has-text('Salva')");
-await page.getByText("Il totale era già questo").waitFor(); check(true, "nessuna correzione se il totale non cambia");
+check(await page.locator(".card.mio-mese .vp-report").innerText() === "Mappa " + delGiornoIt(mappaAnna2.dati_al), "063: in «Il mio mese» la data della mappa");
+{ /* «mappa dell'8 …», «del 1° …», «dell'11 …» */
+  const nomeM = new Intl.DateTimeFormat("it-IT", { timeZone:"Europe/Rome", month:"long" }).format(new Date()), dett = [];
+  for(const [g, t] of [["08", "dell'8"], ["01", "del 1°"], ["11", "dell'11"]]){
+    await mappaIn(page, anna.id, 80, null, { dati_al:meseOra() + "-" + g + "T10:00:00Z" });
+    await page.locator(".cruscotto .mappa-riga", { hasText:`VP: mappa ${t} ${nomeM}` }).waitFor({ timeout:5000 }).then(() => dett.push(t)).catch(() => {});
+  }
+  check(dett.length === 3, "063: «mappa dell'8 …», «del 1° …», «dell'11 …» (" + dett.join(", ") + ")");
+}
 await apriMese(page); await page.locator(".card", { hasText:"Il mio mese" }).screenshot({ path: S + "/e2e/7-mese.png" });
 check(!(await page.getByText("La mia struttura").count()), "struttura non nella pagina Io");
 await page.click("button[data-act=vista-profilo]");
@@ -211,6 +213,7 @@ check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).loca
   && !await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).locator(".pill", { hasText:"senza app" }).count(), "Marco senza app nella struttura: il pallino grigio, niente scritta");
 check(await page.locator(".albero.struttura li", { hasText:"Marco Rossi" }).getByText("0 VP · gruppo 1.234,56").isVisible(), "numeri accanto al nome: VP di gruppo dal report");
 check(await page.getByText("2 persone", { exact:true }).isVisible(), "conteggio persone del gruppo");
+check((await page.locator(".testata .mappa-gruppo").innerText()).startsWith("VP: mappa del"), "063: in cima al Gruppo una sola data, quella della mappa");
 await sync(page);
 const marco = DB.partners.find(p => p.nome === "Marco Rossi"), luca = DB.partners.find(p => p.nome === "Luca Verdi");
 check(marco.sponsor_id === anna.id && luca.sponsor_id === marco.id && marco.gestore_id === anna.id && luca.codice_amway === "1000002",
@@ -227,14 +230,14 @@ check(!(await page.locator(".azioni").count()), "niente barra delle mie azioni n
 await azioniScheda(page);
 await page.locator(".griglia-azioni button[data-act=contatto]").click();
 await page.getByText("Contatto registrato per Marco").waitFor();
-await page.locator(".griglia-azioni button[data-act=totale-mese]").click();
-check(await page.locator(".sheet h2", { hasText:"di Marco" }).isVisible(), "totale del mese di Marco");
-await page.fill(".sheet input[name=vp]", "150");
-await page.click(".sheet button:has-text('Salva')");
-await page.getByText(/aggiornato per Marco: 150 VP/).waitFor();
 check(await page.locator(".oggi li", { hasText:"Contatto" }).getByText("inserito da te").isVisible(), "ogni dato mostra chi l'ha inserito");
 await sync(page);
-check(DB.activities.filter(a => a.partner_id === marco.id).length === 2, "i dati sono di Marco, non miei");
+check(DB.activities.filter(a => a.partner_id === marco.id).length === 1, "i dati sono di Marco, non miei");
+// 063: i VP di chi non ha l'app vengono dalla mappa, con la sua data
+await page.click("button[data-act=scheda-tab][data-tab=numeri]");
+check(await page.locator(".dati-scheda div", { hasText:"VP personali" }).locator("b").innerText() === "0"
+  && (await page.locator(".mappa-scheda").innerText()).startsWith("VP: mappa del"), "063: nella scheda di Marco i VP della mappa con la data della mappa");
+await azioniScheda(page);
 await page.screenshot({ path: S + "/e2e/11-scheda-gestito.png", fullPage:true });
 // 041: Anna (nella mappa) invita Marco dalla voce «Invita» della pagina Gruppo
 await page.locator("button[data-act=vista-gruppo]").first().click();
@@ -491,10 +494,13 @@ const mesePrec = (() => { const d = new Date(oggiStr.slice(0, 7) + "-01T00:00:00
 DB.partners = [DB.partners.find(p => p.id === "R")];
 DB.partners[0].privacy_accettata_il = "2026-10-01T00:00:00Z";
 DB.accessi = []; DB.activities = []; DB.goals = []; DB.mgoals = []; DB.storico = []; DB.anonDisattivo = false; DB.numeri = [];
-const P = (id, nome, sponsor) => DB.partners.push({ id, nome, sponsor_id:sponsor, stato:"gestito", gestore_id:"R", codice_invito:id.toUpperCase() + "XXXX" });
-P("l1", "Linea Uno", "R"); P("l1b", "Sotto Uno", "l1"); P("l2", "Linea Due", "R"); P("l3", "Linea Tre", "R");
+const P = (id, nome, sponsor, codice) => DB.partners.push({ id, nome, sponsor_id:sponsor, stato:"gestito", gestore_id:"R", codice_invito:id.toUpperCase() + "XXXX", codice_amway:codice });
+P("l1", "Linea Uno", "R", "7000011"); P("l1b", "Sotto Uno", "l1", "7000012"); P("l2", "Linea Due", "R", "7000021"); P("l3", "Linea Tre", "R", "7000031");
+/* 063: i VP solo dalle mappe (un ordine scritto a mano non conta più: c'è, ma non cambia niente) */
 const O = (pid, vp, tipo) => DB.activities.push({ id:"a" + DB.activities.length, partner_id:pid, tipo:tipo || "ordine", quantita:1, vp, data:oggiStr, inserito_il:new Date().toISOString() });
-O("R", 120); O("l1", 150); O("l1b", 100); O("l2", 120); O("l3", 80);
+O("R", 999);
+const lineeR = (a, b, c) => [{ codice:"7000011", vpg:a }, { codice:"7000021", vpg:b }, { codice:"7000031", vpg:c }];
+mappa("R", 120, 570, { percentuale:3, linee:lineeR(250, 120, 80) }); mappa("l1", 150, 250, { linee:[{ codice:"7000012", vpg:100 }] }); mappa("l1b", 100); mappa("l2", 120); mappa("l3", 80);
 for(let i = 0; i < 3; i++) DB.activities.push({ id:"c" + i, partner_id:"R", tipo:"cliente", quantita:1, data:oggiStr });
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
@@ -528,7 +534,7 @@ check(true, "con il dito si torna alla scheda di prima");
 await page.click("button[data-act=vista-gruppo]");
 await sync(page); await ctx.close();
 // la terza linea arriva a 120: Path to Bronze fatto; poi tanti VP su una sola linea: 9% ma non Foundation
-O("l3", 40, "rettifica"); O("l1b", 700);
+mappa("R", 120, 1310, { percentuale:9, linee:lineeR(950, 120, 120) }); mappa("l1", 150, 950, { linee:[{ codice:"7000012", vpg:800 }] }); mappa("l1b", 800); mappa("l3", 120);
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 check(await page.getByText("✓ Path to Bronze").isVisible(), "Path to Bronze riconosciuto dai numeri");
@@ -537,7 +543,8 @@ check(await page.getByText(/9% raggiunto · Bronze Foundation 9% non qualificato
 await page.screenshot({ path: S + "/e2e/9-distinti.png", fullPage:true });
 await sync(page); await ctx.close();
 // storico: un mese chiuso da Bronze Foundation 9% -> tappa successiva e pagamenti
-DB.storico = [{ partner_id:"R", mese:mesePrec + "-01", vp_personali:150, vp_gruppo:1300, linee_attive:3, percentuale:9, qualifica:"foundation_9" }];
+/* 063: lo storico viene dalle mappe dei mesi passati */
+mappa("R", 150, 1300, { mese:mesePrec, percentuale:9, linee:lineeR(600, 300, 400) });
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 check(await page.locator(".miei-numeri .riga-apri", { hasText:"Bronze Foundation 12%" }).isVisible(), "dopo un mese da Foundation 9% si punta al 12%");
@@ -566,10 +573,11 @@ DB.partners.push({ id:"gino", nome:"Gino Senza App", sponsor_id:"R", stato:"gest
   ultimo_aggiornamento:giorniFa(30) + "T10:00:00Z", creato_il:giorniFa(60) + "T10:00:00Z", partenza_confermata_il:"2026-10-01" });
 A("lino", "contatto", 3);
 A("ivo", "contatto", 25); A("ivo", "piano", 2);
-A("fede", "contatto", 22); A("fede", "piano", 6); A("fede", "ordine", 1, 20);
+A("fede", "contatto", 22); A("fede", "piano", 6); A("fede", "ordine", 1, 70);   // 063: l'ordine scritto non conta, solo la mappa (20)
 A("cri", "contatto", 25); A("cri", "piano", 6); A("cri", "ordine", 2, 60);
-/* 034: di chi usa l'app la upline vede solo i VP del report (gli ordini a mano no) */
+/* 063: per tutti i VP sono quelli della mappa (gli ordini a mano no) */
 DB.numeri = [{ visto_da:"R", partner_id:"cri", mese:oggiStr.slice(0, 7), vpp:120, vpg:120, percentuale:null, linee:[], dati_al:new Date().toISOString() }];
+mappa("fede", 20);
 DB.persone = (DB.persone || []).concat([{ id:"pv1", proprietario:"ivo", nome:"Nome Uno", fase:"lista", esito:null },
   { id:"pv2", proprietario:"ivo", nome:"Nome Due", fase:"invitato", esito:null }]);
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
@@ -718,9 +726,9 @@ await ctx.close();
 
 // 12. Storico del gruppo: i mesi chiusi e il dettaglio per persona
 const mese2 = (() => { const d = new Date(mesePrec + "-01T00:00:00Z"); d.setUTCDate(0); return d.toISOString().slice(0, 7); })();
-DB.storico = [
-  { partner_id:"R", mese:mese2 + "-01", vp_personali:100, vp_gruppo:300, linee_attive:1, percentuale:3, qualifica:null },
-  { partner_id:"R", mese:mesePrec + "-01", vp_personali:0, vp_gruppo:80, linee_attive:0, percentuale:null, qualifica:null }];
+/* 063: lo storico del gruppo viene dalle mie mappe dei mesi passati */
+mappa("R", 100, 300, { mese:mese2, percentuale:3, linee:[{ codice:"9990001", vpg:300 }] });
+mappa("R", 0, 80, { mese:mesePrec, linee:[{ codice:"9990002", vpg:80 }] });
 DB.activities.push({ id:"st1", partner_id:"lino", tipo:"ordine", quantita:1, vp:50, data:mese2 + "-10", inserito_il:new Date().toISOString() });
 DB.numeri.push({ visto_da:"R", partner_id:"lino", mese:mese2, vpp:50, vpg:50, percentuale:null, linee:[], dati_al:new Date().toISOString() });
 ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
@@ -735,7 +743,7 @@ await page.locator(".sheet .storico li").first().waitFor();
 const det = await page.locator(".sheet .storico li").allInnerTexts();
 check(det[0].startsWith("Cri Crescita") && det[0].includes("80"), "dettaglio: Cri per prima con 80 VP");
 const lino = det.find(t => t.startsWith("Lino Lista")) || "";
-check(lino.includes("▼ 0") && lino.includes("50 VP"), "dettaglio: Lino sotto il mese prima (50 VP)");
+check(lino.includes("—") && !lino.includes("▼ 0") && lino.includes("50 VP"), "063: dettaglio: Lino senza mappa quel mese (—, mai 0), il mese prima 50 VP");
 check(!det.some(t => t.startsWith("Stefano e Alessia")), "nel dettaglio solo il gruppo, non noi");
 await page.screenshot({ path: S + "/e2e/17-storico-gruppo.png" });
 await ctx.close();
@@ -1004,7 +1012,7 @@ await page.getByText(/3 persone aggiunte/).waitFor();
 await page.click(".sheet button[data-act=chiudi]");
 check(await page.locator(".albero.struttura li", { hasText:"Bianca Platini" }).getByText("gruppo 5.300").isVisible(), "Platino: VP di gruppo dal report");
 await page.locator(".albero.struttura li", { hasText:"Bianca Platini" }).locator("button[data-act=apri-scheda]").click();
-check(await page.getByText("Linee non visibili nel report").isVisible() && await page.locator(".dati-scheda").getByText("15%").isVisible(), "scheda del Platino: 15%, linee non visibili");
+check(await page.getByText("Linee non visibili nella mappa").isVisible() && await page.locator(".dati-scheda").getByText("15%").isVisible(), "scheda del Platino: 15%, linee non visibili");
 await azioniScheda(page);
 check(!(await page.locator(".card", { hasText:"Inviti · solo admin" }).count()) && !(await page.locator("button[data-act=invito-sopra]").count()),
   "041: niente più inviti degli admin nella scheda (né sotto una persona né «chi manca sopra»)");
@@ -1012,7 +1020,7 @@ await sync(page);
 const bianca = DB.partners.find(p => p.codice_amway === "4100001");
 await page.screenshot({ path: S + "/e2e/28-platino.png", fullPage:true });
 await page.click("button[data-act=vista-io]");
-check(await page.getByText("dal report Amway").first().isVisible() && await page.getByText("18% questo mese").isVisible(), "pagina Io: percentuale ufficiale dal report");
+check(await page.locator(".tappa-aperta .pill", { hasText:/^mappa del/ }).first().isVisible() && await page.getByText("18% questo mese").isVisible(), "pagina Io: percentuale ufficiale dalla mappa, con la data");
 await ctx.close();
 // Nora entra con l'invito della radice: resta in attesa finché la mappa non la mette sotto Bianca
 ({ ctx, page } = await apri({}, invitoPer("R", "Nora Sotto", "4000002")));
@@ -1401,7 +1409,7 @@ await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
 const cardCli = page.locator(".card.oggi-lista");
 await page.screenshot({ path: S + "/e2e/46-io-chiaro.png", fullPage:true });
 /* consegna 2: il cruscotto e «La prossima cosa» */
-check(await page.locator(".cruscotto .anello[role=img]").getAttribute("aria-label").then(t => /^VP personali: \S+ su \S+$/.test(t)), "cruscotto: l'anello dei VP ha la sua descrizione");
+check(await page.locator(".cruscotto .anello[role=img]").getAttribute("aria-label").then(t => /^VP personali: (\S+ su \S+, mappa del.+|nessuna mappa di \S+)$/.test(t)), "cruscotto: l'anello dei VP ha la sua descrizione");
 check(await page.locator(".cruscotto .tessera .bar[role=progressbar]").count() === 2, "cruscotto: contatti e piani della settimana");
 check((await page.locator(".tappa-riga").innerText()).includes("su 1 requisito") && !(await page.locator(".tappa-riga").innerText()).includes("1 requisiti"), "tappa: «requisito» al singolare");
 const primaCosa = async () => (await page.locator(".oggi-lista .prossima-titolo").innerText()).trim();
@@ -1823,8 +1831,10 @@ await ctx.close();
   const V = (pid, vp) => DB.activities.push({ id:"ca" + DB.activities.length, partner_id:pid, tipo:"ordine", quantita:1, vp, data:oggiStr, inserito_il:new Date().toISOString() });
   G("ca", "Linea Alfa", "R", "7000001"); G("cb", "Linea Beta", "R", "7000002"); G("cb1", "Beta Uno", "cb"); G("cb2", "Beta Due", "cb"); G("cb3", "Beta Tre", "cb");
   G("cc", "Linea Gamma", "R", "7000003");
-  V("R", 120); V("cb2", 5); V("cb3", 55); V("cc", 150);
-  const report = linee => { DB.numeri = [{ visto_da:"R", partner_id:"R", mese:oggiStr.slice(0, 7), vpp:120, vpg:120 + linee.reduce((t, l) => t + l.vpg, 0), percentuale:null, linee }]; };
+  /* 063: i VP di tutti dalla mappa (gli ordini scritti non contano) */
+  V("R", 999); V("cb1", 70);
+  mappa("ca", 0); mappa("cb", 0, 60); mappa("cb1", 0); mappa("cb2", 5); mappa("cb3", 55); mappa("cc", 150);
+  const report = linee => { mappa("R", 120, 120 + linee.reduce((t, l) => t + l.vpg, 0), { linee }); };
   /* il report: Alfa 0, Beta 60, Gamma 150, più una linea che non è nell'app */
   report([{ codice:"7000001", vpg:0 }, { codice:"7000002", vpg:60 }, { codice:"7000003", vpg:150 }, { codice:"7000099", vpg:40 }]);
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
@@ -2194,8 +2204,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   await apriMese(page); const mese = page.locator(".card", { hasText:"Il mio mese" });
   const vpFatti = async () => (await mese.locator(".obiettivo", { hasText:"VP personali" }).locator(".num").innerText()).split("/")[0].trim();
-  check(await vpFatti() === "300", "034: l'ordine scritto prima del report non si somma (300 VP)");
-  check((await mese.locator(".vp-report").innerText()).startsWith("300 VP dal report del "), "034: la riga dice da dove viene il numero");
+  check(await vpFatti() === "300", "063: l'ordine scritto non si somma: 300 VP dalla mappa");
+  check((await mese.locator(".vp-report").innerText()) === "Mappa " + delGiornoIt(unOraFa), "063: la riga dice da quale mappa viene il numero");
   // la bozza: dal foglio «Ordini»; cerco, aggiungo, cambio le quantità
   check(!(await page.locator("#bozza-ordine").count()) && !(await page.locator("#miei-ordini").count()), "bozza e storico non sono più nella pagina Io");
   await apriOrdini(page, "apri-bozza");
@@ -2221,21 +2231,20 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   await apriOrdini(page, "apri-bozza");
   check(await page.locator("#bozza-ordine").getByText("2 prodotti").isVisible(), "riaprendo l'app la bozza c'è ancora");
-  // confermo: i VP vanno nel mese, solo per me
+  // confermo: l'ordine va nello storico, i VP del mese restano quelli della mappa (063)
   await page.click("#bozza-ordine button[data-act=mio-conferma]");
   await page.locator(".sheet").getByText("Confermi l'ordine?").waitFor();
-  check((await page.locator("#testo-conferma-mio").innerText()).includes("Li vedi solo tu finché non arriva il report Amway"), "conferma: i VP li vedo solo io");
+  check((await page.locator("#testo-conferma-mio").innerText()).includes("Non cambia i VP del mese: arrivano con la mappa Amway"), "063: conferma: non cambia i VP");
   await page.click(".sheet button[data-act=apri-bozza]");
   check(await page.locator(".sheet #bozza-ordine").getByText("2 prodotti").isVisible(), "conferma, Indietro: si torna alla bozza");
   await page.click("#bozza-ordine button[data-act=mio-conferma]");
   await page.click(".sheet button.primary");
-  await page.getByText("Ordine confermato: 42,50 VP nel mese").waitFor();
+  await page.getByText("Ordine confermato: è nello storico").waitFor();
   const storico = page.locator(".sheet #miei-ordini");
   check(await storico.isVisible(), "dopo la conferma si vede «I miei ordini»");
   await apriMese(page); const mese2 = page.locator(".card", { hasText:"Il mio mese" });
-  check((await mese2.locator(".obiettivo", { hasText:"VP personali" }).locator(".num").innerText()).startsWith("342,5"), "034: report + il mio ordine dopo il report (342,5 VP)");
-  check((await mese2.locator(".vp-report").innerText()).includes("+ 42,5 VP dei tuoi ordini scritti dopo: li vedi solo tu"), "034: la parte scritta da me si vede a parte");
-  check(await mese2.locator(".bar.doppia > i.rep").count() === 1, "la barra divide report e ordini scritti dopo");
+  check((await mese2.locator(".obiettivo", { hasText:"VP personali" }).locator(".num").innerText()).startsWith("300"), "063: dopo la conferma i VP restano quelli della mappa (300)");
+  check(!(await mese2.locator(".bar.doppia").count()), "063: una sola barra, solo la mappa");
   check((await storico.innerText()).includes("2 prodotti") && (await storico.innerText()).includes("42,50 VP"), "l'ordine è nello storico");
   await storico.locator("button[data-act=mio-apri]").click();
   check((await storico.innerText()).includes("2 × Crema Prova"), "toccando l'ordine si vedono i prodotti");
@@ -2259,7 +2268,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.click(".sheet button[data-act=apri-miei]");
   await storico.locator("button[data-act=mio-togli]").click();
   await page.locator(".sheet h2", { hasText:"Togli l'ordine del" }).waitFor();
-  check((await page.locator(".sheet").innerText()).includes("I 42,50 VP escono dal tuo mese di"), "togli: la conferma dice quanti VP escono dal mese");
+  check((await page.locator(".sheet").innerText()).includes("I VP del mese non cambiano"), "063: togli: i VP del mese non cambiano");
   await page.click(".sheet [data-act=apri-miei]");
   check(await page.locator("#miei-ordini button[data-act=mio-togli]").count() === 1, "Indietro: l'ordine resta");
   await page.locator("#miei-ordini button[data-act=mio-togli]").click();
@@ -2267,9 +2276,9 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.getByText("Ordine tolto").waitFor();
   await apriMese(page); check(await page.locator("#miei-ordini").getByText("Ancora nessun ordine confermato").isVisible()
     && (await page.locator(".card", { hasText:"Il mio mese" }).locator(".obiettivo", { hasText:"VP personali" }).locator(".num").innerText()).startsWith("300"),
-    "ordine tolto: via dallo storico e i VP tornano al report");
+    "ordine tolto: via dallo storico, i VP restano quelli della mappa");
   await sync(page);
-  check(!DB.ordiniMiei.length && !DB.righeMie.length && !DB.activities.some(a => a.partner_id === "R" && a.vp === 42.5), "nel database: via l'ordine, i prodotti e i VP del mese");
+  check(!DB.ordiniMiei.length && !DB.righeMie.length && !DB.activities.some(a => a.partner_id === "R" && a.vp === 42.5), "nel database: via l'ordine e i prodotti (nessun VP nel mese)");
   await ctx.close();
 }
 
@@ -2292,9 +2301,9 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   let t = await storicoR();
   check(!/Diamante|Fondatore/.test(t), "storico: niente più Diamante Fondatore inventato (" + t + ")");
   await page.click(".sheet [data-act=chiudi]");
-  await apriMese(page); const parti = await page.locator(".card", { hasText:"Il mio mese" }).locator(".bar.doppia > i").evaluateAll(l => l.map(i => parseFloat(i.style.width)));
-  check(parti.length === 2 && parti[0] > 0 && parti[1] > 0 && parti[0] + parti[1] <= 100,
-    "oltre l'obiettivo la barra si divide in proporzione: report e ordini scritti dopo (" + parti.join(" + ") + ")");
+  await apriMese(page); const parti = await page.locator(".card", { hasText:"Il mio mese" }).locator(".obiettivo", { hasText:"VP personali" }).locator(".bar > i").evaluateAll(l => l.map(i => parseFloat(i.style.width)));
+  check(parti.length === 1 && parti[0] === 100 && (await page.locator(".card", { hasText:"Il mio mese" }).locator(".obiettivo", { hasText:"VP personali" }).locator(".num").innerText()).startsWith("400"),
+    "063: oltre l'obiettivo la barra è piena con i soli VP della mappa (400), l'ordine scritto non conta (" + parti.join(" + ") + ")");
   await ctx.close();
   numeroR(21000);
   t = await storicoR();
@@ -3693,8 +3702,12 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     "fase 3: il primo ordine, 0 su 50 VP");
   check((await page.locator(".percorso-ordine").innerText()).includes("restano 27 giorni"), "fase 3: i giorni che restano dei 30");
   await ctx.close();
-  // l'ordine da 60 VP → fase 4, i due binari
+  // 063: un ordine scritto non basta, serve la mappa: la mappa con 60 VP → fase 4, i due binari
   DB.activities.push({ id:"np7o", partner_id:"np7", tipo:"ordine", quantita:1, vp:60, data:giorniFa(1), inserito_il:ora, inserito_da:"np7" });
+  await entra();
+  check((await page.locator(".percorso-partenza .fase-titolo").innerText()).trim() === "Il primo ordine", "063: un ordine scritto a mano non fa il primo ordine");
+  await ctx.close();
+  mappa("np7", 60);
   await entra();
   check((await page.locator(".percorso-partenza .fase-titolo").innerText()).trim() === "I due binari" && (await page.locator(".percorso-partenza").innerText()).includes("✓ primo ordine · 60 VP"),
     "fase 4: i due binari, con il primo ordine fatto");
@@ -3722,7 +3735,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(!(await page.locator(".festa").count()), "la festa si vede una volta sola");
   await ctx.close();
   DB.partners = DB.partners.filter(p => p.id !== "np7"); DB.persone = DB.persone.filter(x => x.proprietario !== "np7");
-  DB.activities = DB.activities.filter(a => a.partner_id !== "np7");
+  DB.activities = DB.activities.filter(a => a.partner_id !== "np7"); DB.numeri = DB.numeri.filter(x => x.partner_id !== "np7");
 }
 
 // 62. Consegna 8: lo sponsor e i suoi nuovi (in partenza, etichetta Nuovo, filtro, scheda con e senza app)
@@ -3823,12 +3836,10 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.getByText("Ciao Tea").waitFor();
   await page.waitForTimeout(400);
   check(!(await page.locator(".festa.traguardo").count()), "il traguardo si vede una volta sola");
-  // la tappa raggiunta: il primo ordine da 60 VP chiude «Primo ordine», a tutto schermo con la prossima (Primi clienti)
+  // la tappa raggiunta: la mappa con il primo ordine da 60 VP chiude «Primo ordine», a tutto schermo con la prossima (Primi clienti)
   const tr2 = page.locator(".festa.traguardo");
   if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
-  await apriOrdini(page, "ordine");
-  await page.fill(".sheet input[name=vp]", "60");
-  await page.click(".sheet button:has-text('Salva')");
+  await mappaIn(page, "tr9", 60);
   await tr2.waitFor();
   check((await tr2.locator("h1").innerText()).trim() === "Primo ordine" && (await tr2.innerText()).includes("Il tuo percorso va avanti, Tea")
     && (await tr2.locator(".eyebrow").first().textContent()).trim().startsWith("Tappa raggiunta") && (await tr2.innerText()).includes("Primi clienti"),
@@ -3839,6 +3850,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(!errori.length, "traguardi: nessun errore nella pagina");
   await ctx.close();
   DB.partners = DB.partners.filter(p => p.id !== "tr9"); DB.persone = (DB.persone || []).filter(x => x.proprietario !== "tr9");
+  DB.numeri = (DB.numeri || []).filter(x => x.partner_id !== "tr9");
   DB.traguardiAperti = false;
 }
 
