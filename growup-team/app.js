@@ -94,8 +94,10 @@ function creaApi(){
     inAttesa:     () => q(sb.rpc("in_attesa")),
     /* 042: chi è in attesa ed è nel report che sto importando (il codice torna solo se era già nel file) */
     attesaNelReport: codici => q(sb.rpc("attesa_nel_report", { p_codici:codici })),
-    /* 034: i miei numeri ufficiali (per sommare i miei ordini scritti dopo il report) */
-    mioReport:    (pid, dal) => q(sb.from("numeri_mese").select("mese,vpp,vpg,percentuale,dati_al,importato_da").eq("partner_id", pid).gte("mese", dal)),
+    /* 063: i miei numeri ufficiali dalle mappe: gli unici VP dell'app */
+    mioReport:    (pid, dal) => q(sb.from("numeri_mese").select("mese,vpp,vpg,percentuale,linee,dati_al,importato_da").eq("partner_id", pid).gte("mese", dal)),
+    /* 063: la data della mappa di ogni persona che vedo (solo date, per la scheda partner) */
+    dateMappe:    dal => q(sb.from("numeri_mese").select("partner_id,mese,dati_al").gte("mese", dal)),
     /* 034: la bozza d'ordine e lo storico dei miei ordini (solo miei, RLS) */
     ordiniMiei:   () => q(sb.from("ordini_personali").select("*").order("creato_il")),
     righeMie:     () => q(sb.from("righe_ordine_personale").select("*")),
@@ -193,7 +195,6 @@ function creaApi(){
                     .lte("mese", finoA).order("mese", { ascending:false }).limit(1)),
     /* Fase 2: i numeri del mese di me e della mia downline (calcolati nel database) */
     riepilogo:    mese => q(sb.rpc("riepilogo_mese", { p_mese:mese })),
-    storico:      pid => q(sb.from("monthly_totals").select("*").eq("partner_id", pid).order("mese")),
     livelli:      () => q(sb.from("percent_levels").select("*").order("percentuale")),
     saveMonthGoal: row => q(sb.from("monthly_goals").upsert(row, { onConflict:"partner_id,mese" }).select().single())
   };
@@ -256,7 +257,7 @@ const st = {
   espansi: new Set(),      // durante la ricerca: persone di cui mostrare anche il gruppo       // nella struttura: persone con il gruppo richiuso
   gruppo4: { att:[], goals:[], mgoals:[] },  // ultime 4 settimane del gruppo: imbuto ed etichette
   riepPrec: [],           // lo stesso per il mese precedente, finché non è chiuso
-  storico: [],            // i miei mesi chiusi (monthly_totals)
+  storico: [],            // i miei mesi passati dalle mappe (063: storicoMappe)
   livelli: [],            // soglie delle percentuali
   aiuti: new Set(),       // le spiegazioni aperte con il «?» (ottimizzazione 2)
   passoAperto: null,      // la voce aperta di «Primi passi»
@@ -402,32 +403,33 @@ function perMese(lista, campo){
   for(const a of lista) out[meseDi(a.data)] = (out[meseDi(a.data)] || 0) + Number(a[campo] || 0);
   return out;
 }
-/* I VP: ordini più le correzioni fatte con "Aggiorna il totale del mese" (anche negative). */
-function movimentiVp(){ return st.att.filter(a => a.tipo === "ordine" || a.tipo === "rettifica"); }
-/* I miei VP del mese (034): il VPP del report Amway quando il mese ne ha uno (anche importato dalla upline) più i miei
-   ordini scritti dopo la data e ora del file; senza report, gli ordini registrati nell'app. Gli ordini a mano li vedo
-   solo io: sponsor e upline vedono solo il report. Con una lista esplicita (un partner senza app) contano gli ordini. */
+/* I VP (063): solo quelli ufficiali delle mappe Amway importate, anche da chi mi segue (l'import di un upline o
+   dell'admin aggiorna tutti quelli sotto). Per ogni mese vale la mappa più recente (numeri_mese, regole della 051).
+   Ordini, bozze e correzioni scritte a mano non cambiano i VP. Senza la mappa del mese i VP non ci sono: null. */
 function reportMio(m){ return (st.mioReport && st.mioReport.get(m)) || null; }
 function vpReport(m){ const r = reportMio(m); return r ? Number(r.vpp) || 0 : null; }
-function dopoReport(a, r){ return !r || (new Date(a.inserito_il || 0) > new Date(r.dati_al) && a.inserito_da === st.profilo.id); }
-function vpDopoReport(m){
-  const r = reportMio(m);
-  return somma(movimentiVp().filter(a => meseDi(a.data) === m && dopoReport(a, r)), "vp");
+function vpMese(m){ return vpReport(m); }
+/* (solo fino alla PR che toglie «Aggiorna il totale») */
+function vpAttuale(m){ return vpMese(m) || 0; }
+/* il giorno della mappa: «3 novembre» (ora italiana); con la preposizione: «del 3 novembre», «dell'8 novembre», «del 1° novembre» */
+function giornoMappa(datiAl){ return datiAl ? dataIt(fmtGiorno.format(new Date(datiAl))) : ""; }
+function delGiorno(datiAl){
+  const g = giornoMappa(datiAl), n = parseInt(g, 10);
+  return n === 1 ? "del 1°" + g.slice(1) : n === 8 || n === 11 ? "dell'" + g : "del " + g;
 }
-function vpMese(m, lista){
-  if(!lista){ const v = vpReport(m); if(v != null) return v + vpDopoReport(m); }
-  return somma((lista || st.att).filter(a => (a.tipo === "ordine" || a.tipo === "rettifica") && meseDi(a.data) === m), "vp");
+/* «mappa del 3 novembre» oppure «nessuna mappa di novembre» */
+function testoMappa(m, r){
+  if(r === undefined) r = reportMio(m);
+  return r && r.dati_al ? `mappa ${delGiorno(r.dati_al)}` : `nessuna mappa di ${MESI[Number(m.slice(5, 7)) - 1]}`;
 }
-/* il totale che vedo e correggo: il mio (report + dopo) o quello del partner senza app aperto nella scheda */
-function vpAttuale(m){ return st.target ? vpMese(m, lista()) : vpMese(m); }
 /* Le attività su cui sto lavorando: le mie, o quelle del partner senza app aperto nella scheda */
 function lista(){ return st.target ? st.attScheda : st.att; }
 function clientiMese(m){ return somma(attivita("cliente").filter(a => meseDi(a.data) === m), "quantita"); }
 function clientiTotali(){ return somma(attivita("cliente"), "quantita"); }
 
 /* ---- Fase 2: i numeri del gruppo ----
-   Il database calcola VP di gruppo e linee al caricamento (riepilogo_mese). I miei VP personali
-   li ricalcolo dal vivo, così un ordine appena registrato si vede subito anche nel gruppo. */
+   Il database dà i numeri della mappa di ogni persona (riepilogo_mese): VP personali e di gruppo, linee, percentuale.
+   Senza la mappa del mese: null (nessun numero, mai uno zero). */
 function soglia(){ return Number(cfg("soglia_linea_attiva")) || 100; }
 function giornoChiusura(){ return Number(cfg("chiusura_mese_giorno")) || 5; }
 function mesePrecedente(){ return meseDi(piuGiorni(primoDelMese(), -1)); }
@@ -443,23 +445,13 @@ function lineeReport(r){
     .sort((a, b) => b.vp - a.vp);
 }
 function numeriMese(m){
+  const rep = reportMio(m);
+  if(!rep) return { personali:null, gruppo:null, linee:[], attive:0, percentuale:null, mese:m, mappa:null };
   const righe = m === meseDi(oggi()) ? st.riep : m === mesePrecedente() ? st.riepPrec : [];
-  const me = st.profilo.id, r = rigaDi(righe, me);
-  const personali = vpMese(m);
-  /* con un import del report: VP di gruppo, linee e percentuale ufficiali di Amway */
-  if(r && r.da_report){
-    const linee = lineeReport(r), rep = reportMio(m);
-    /* il gruppo del report più i miei ordini scritti dopo il report (solo nella mia app) */
-    const extra = rep ? personali - (Number(rep.vpp) || 0) : 0;
-    const gruppo = rep ? (Number(rep.vpg) || 0) + extra : Number(r.vp_gruppo);
-    return { personali, gruppo, linee, attive:linee.filter(l => l.vp >= soglia()).length,
-             percentuale:extra || r.percentuale == null ? percentualeDa(gruppo) : Number(r.percentuale), daReport:true };
-  }
-  const gruppo = (r ? Number(r.vp_gruppo) - Number(r.vp_personali) : 0) + personali;
-  const linee = righe.filter(x => x.sponsor_id === me)
-    .map(x => ({ id:x.partner_id, nome:nomeDi(x.partner_id), vp:Number(x.vp_gruppo) }))
-    .sort((a, b) => b.vp - a.vp);
-  return { personali, gruppo, linee, attive: linee.filter(l => l.vp >= soglia()).length, percentuale: percentualeDa(gruppo) };
+  const r = rigaDi(righe, st.profilo.id);
+  const linee = lineeReport({ linee_report:(r && r.linee_report) || rep.linee || [] }), gruppo = Number(rep.vpg) || 0;
+  return { personali:Number(rep.vpp) || 0, gruppo, linee, attive:linee.filter(l => l.vp >= soglia()).length,
+           percentuale:rep.percentuale == null ? percentualeDa(gruppo) : Number(rep.percentuale), daReport:true, mese:m, mappa:rep };
 }
 function percentualeDa(vpGruppo){
   let pct = null;
@@ -469,6 +461,7 @@ function percentualeDa(vpGruppo){
 /* Requisiti di una tappa (dal Path to Bronze in su) nel mese m: cosa manca */
 function mancanze(t, n){
   const out = [];
+  if(!n.mappa) return [testoMappa(n.mese || meseDi(oggi()), null)];
   if(Number(t.vp_personali) > n.personali) out.push(`mancano ${num(t.vp_personali - n.personali)} VP personali`);
   if(t.vp_gruppo && n.gruppo < t.vp_gruppo) out.push(`mancano ${num(t.vp_gruppo - n.gruppo)} VP di gruppo`);
   if(t.linee){
@@ -515,12 +508,17 @@ function daPlatino(chiave){ return ordineDi("platino") > 0 && ordineDi(chiave) >
 const RUBINO_VP = 20000;   // Volume Rubino del mese: il VPG del report mappe (senza le linee al 21%)
 function nomeQualifica(chiave){ const t = st.stages.find(s => s.chiave === chiave); return t ? t.nome : ""; }
 
+/* Il primo ordine (063): dalle mappe. La prima mappa, dal mese di iscrizione, che mostra dei VP personali. */
+function primoOrdineMappa(){
+  const m0 = meseDi(String(st.profilo.data_iscrizione || "2000-01-01"));
+  const m = [...(st.mioReport || new Map()).keys()].filter(x => x >= m0 && Number(reportMio(x).vpp) > 0).sort()[0];
+  return m ? { mese:m, vp:Number(reportMio(m).vpp) || 0, mappa:reportMio(m) } : null;
+}
 function finestraPrimoOrdine(tappa){
   const p = st.profilo;
   if(!p.data_iscrizione || !tappa.giorni_scadenza) return null;
-  const fine = piuGiorni(p.data_iscrizione, tappa.giorni_scadenza);
-  const vp = somma(movimentiVp().filter(a => a.data >= p.data_iscrizione && a.data <= fine), "vp");
-  return { fine, vp, restano: giorniTra(oggi(), fine) };
+  const fine = piuGiorni(p.data_iscrizione, tappa.giorni_scadenza), o = primoOrdineMappa();
+  return { fine, vp:o ? o.vp : 0, ordine:o, restano: giorniTra(oggi(), fine) };
 }
 
 /* Una tappa è fatta se la qualifica dichiarata la comprende, oppure se i numeri lo dicono. */
@@ -532,15 +530,33 @@ function tappaFatta(t){
   if(t.chiave === "primo_ordine"){
     const f = finestraPrimoOrdine(t);
     if(f && f.vp >= t.vp_personali) return true;
-    return Object.values(perMese(movimentiVp(), "vp")).some(v => v >= t.vp_personali);
+    return [...(st.mioReport || new Map()).values()].some(r => Number(r.vpp) >= t.vp_personali);
   }
   /* i PRIMI 3 clienti, in totale: chi si iscrive il 29 non ha il tempo di farli nel mese */
   if(t.chiave === "primi_clienti") return clientiTotali() >= (t.clienti || 0);
-  /* dal Path to Bronze in su: un mese chiuso con quella qualifica (o una più alta), oppure il mese
-     in corso o il precedente ancora aperto con tutti i requisiti soddisfatti */
+  /* dal Path to Bronze in su: un mese passato con quella qualifica (o una più alta) nella sua mappa, oppure il mese
+     in corso con tutti i requisiti nella mappa */
   if(st.storico.some(r => ordineDi(r.qualifica) >= t.ordine)) return true;
-  if(!mancanze(t, numeriMese(meseDi(oggi()))).length) return true;
-  return precedenteAperto() && st.riepPrec.length > 0 && !mancanze(t, numeriMese(mesePrecedente())).length;
+  return !mancanze(t, numeriMese(meseDi(oggi()))).length;
+}
+/* la qualifica di un mese dai numeri della sua mappa (fino ad Argento; le annuali si contano sull'anno fiscale) */
+function qualificaDa(n){
+  if(!n.mappa) return null;
+  const t = st.stages.filter(s => s.ordine >= 3 && s.ordine <= ordineDi("argento")).sort((a, b) => b.ordine - a.ordine)
+    .find(s => !mancanze(s, n).length);
+  return t ? t.chiave : null;
+}
+/* I mesi passati (063): dal primo mese con una mappa al mese scorso, con i numeri della mappa (senza: mappa null).
+   Le mappe dei mesi passati non cambiano più (Amway le chiude): i totali congelati nel database non si mostrano. */
+function storicoMappe(){
+  const ora = meseDi(oggi()), mesi = [...(st.mioReport || new Map()).keys()].filter(m => m < ora).sort();
+  const out = [];
+  for(let m = mesi[0]; m && m < ora; m = spostaMese(m, 1)){
+    const n = numeriMese(m);
+    out.push({ mese:m + "-01", mappa:n.mappa, vp_personali:n.personali, vp_gruppo:n.gruppo, linee_attive:n.mappa ? n.attive : null,
+               percentuale:n.percentuale, qualifica:qualificaDa(n) });
+  }
+  return out;
 }
 
 function percorso(){
@@ -565,24 +581,25 @@ function requisiti(t){
   if(t.chiave === "primo_ordine"){
     const f = finestraPrimoOrdine(t);
     const vp = f ? f.vp : vpMese(m);
-    out.push({ ok: vp >= t.vp_personali,
+    out.push({ ok: vp != null && vp >= t.vp_personali,
       txt: `Almeno ${num(t.vp_personali)} VP personali${f ? " entro il " + dataIt(f.fine) : " nel mese"}`,
-      val: `${num(vp)} / ${num(t.vp_personali)}` });
+      val: vp == null ? "—" : `${num(vp)} / ${num(t.vp_personali)}` });
     return out;
   }
   if(t.clienti){
     const c = clientiTotali();
     out.push({ ok: c >= t.clienti, txt: `I tuoi primi ${t.clienti} clienti`, val: `${num(Math.min(c, t.clienti))} / ${t.clienti}`, cliente:true });
   }
-  const n = numeriMese(m);
+  const n = numeriMese(m), c = !n.mappa;   // senza la mappa del mese: requisiti da fare, nessuna cifra
   if(Number(t.vp_personali) > 0){
-    out.push({ ok: n.personali >= t.vp_personali, txt: `${num(t.vp_personali)} VP personali nel mese`, val: `${num(n.personali)} / ${num(t.vp_personali)}` });
+    out.push({ ok: !c && n.personali >= t.vp_personali, txt: `${num(t.vp_personali)} VP personali nel mese`, val: c ? "—" : `${num(n.personali)} / ${num(t.vp_personali)}` });
   }
   if(t.linee){
     const min = Number(t.vp_linea) || soglia(), ok = n.linee.filter(l => l.vp >= min).length;
-    out.push({ ok: ok >= t.linee, txt: `${t.linee} linee frontali da almeno ${num(min)} VP di gruppo`, val: `${Math.min(ok, t.linee)} / ${t.linee}` });
+    out.push({ ok: !c && ok >= t.linee, txt: `${t.linee} linee frontali da almeno ${num(min)} VP di gruppo`, val: c ? "—" : `${Math.min(ok, t.linee)} / ${t.linee}` });
   }
-  if(t.vp_gruppo) out.push({ ok: n.gruppo >= t.vp_gruppo, txt: `${num(t.vp_gruppo)} VP di gruppo nel mese`, val: `${num(n.gruppo)} / ${num(t.vp_gruppo)}` });
+  if(t.vp_gruppo) out.push({ ok: !c && n.gruppo >= t.vp_gruppo, txt: `${num(t.vp_gruppo)} VP di gruppo nel mese`, val: c ? "—" : `${num(n.gruppo)} / ${num(t.vp_gruppo)}` });
+  if(c && out.length) out.push({ ok:false, attesa:true, txt:`VP: ${testoMappa(m, null)}`, val:"" });
   return out;
 }
 
@@ -682,12 +699,14 @@ function lineeDi(pid, r){
     : st.riep.filter(x => x.sponsor_id === pid).map(x => ({ id:x.partner_id, nome:nomeDi(x.partner_id), vp:Number(x.vp_gruppo) || 0 }))
       .sort((a, b) => b.vp - a.vp);
 }
-/* { personali, gruppo, linee } del mese in corso: per me dal vivo, per gli altri dal riepilogo */
+/* { personali, gruppo, linee } del mese in corso dalla mappa (063): per me le mie mappe, per gli altri il riepilogo */
 function numeriDi(pid){
   if(pid === st.profilo.id) return numeriMese(meseDi(oggi()));
-  const r = rigaDi(st.riep, pid);
+  const r = rigaDi(st.riep, pid), m = meseDi(oggi());
   if(!r) return null;
-  return { personali:Number(r.vp_personali) || 0, gruppo:Number(r.vp_gruppo) || 0, linee:lineeDi(pid, r) };
+  /* 063: senza la mappa del mese i suoi VP non ci sono */
+  if(r.vp_personali == null) return { personali:null, gruppo:null, linee:[], mappa:null, mese:m };
+  return { personali:Number(r.vp_personali) || 0, gruppo:Number(r.vp_gruppo) || 0, linee:lineeDi(pid, r), mappa:true, mese:m };
 }
 /* una linea vista persona per persona: chi la apre e tutto il suo gruppo nella mia struttura (VP personali del mese) */
 function analisiLinea(l, vpLinea){
@@ -725,8 +744,8 @@ function situazione(pid){
     if(oltreArgento(a)) return situazioneArgento(pid, a, st.mesiReport);
     if(a.chiave === "primo_ordine"){
       const f = finestraPrimoOrdine(a), vp = f ? f.vp : vpMese(meseDi(oggi()));
-      return { chiave:"primo_ordine", tappa:a, linee:[], dati:{ manca:num(Math.max(0, a.vp_personali - vp)), entro:f ? dataIt(f.fine) : "fine mese" },
-        sintesi:`${num(vp)} VP personali su ${num(a.vp_personali)}` };
+      return { chiave:"primo_ordine", tappa:a, linee:[], dati:{ manca:num(Math.max(0, a.vp_personali - (vp || 0))), entro:f ? dataIt(f.fine) : "fine mese" },
+        sintesi:vp == null ? testoMappa(meseDi(oggi()), null) : `${num(vp)} VP personali su ${num(a.vp_personali)}` };
     }
     if(a.chiave === "primi_clienti"){
       const c = clientiTotali(), m = Math.max(0, (a.clienti || 0) - c);
@@ -745,6 +764,8 @@ function situazione(pid){
   }
   const t = tappaDaGuardare(pid), n = numeriDi(pid);
   if(!t || !n) return null;
+  /* 063: senza la mappa del mese niente calcoli: solo «nessuna mappa di …» */
+  if(!n.mappa) return { chiave:"senza_mappa", tappa:t, linee:[], personali:null, dati:{}, sintesi:testoMappa(meseDi(oggi()), null) };
   const vpLinea = Number(t.vp_linea) || soglia();
   const linee = n.linee.map(l => analisiLinea(l, vpLinea));
   const manc = mancanze(t, n);
@@ -849,16 +870,19 @@ function obiettiviSett(){ return { obiettivo_contatti:st.goal.obiettivo_contatti
 /* Numeri del gruppo, storico e soglie: se qualcosa non risponde l'app va avanti con i numeri personali. */
 async function caricaNumeri(){
   const pid = st.profilo.id;
-  const [riep, prec, storico, livelli] = await Promise.all([
+  const [riep, prec, livelli] = await Promise.all([
     api.riepilogo(primoDelMese()).catch(() => []),
     api.riepilogo(mesePrecedente() + "-01").catch(() => []),  // serve anche al confronto nella scheda partner
-    api.storico(pid).catch(() => []),
     api.livelli().catch(() => [])
   ]);
-  st.riep = riep || []; st.riepPrec = prec || []; st.storico = storico || []; st.livelli = livelli || [];
+  st.riep = riep || []; st.riepPrec = prec || []; st.livelli = livelli || [];
   try{ st.mesiReport = await api.mesiReport(pid) || []; }catch(e){ st.mesiReport = []; }
-  try{ st.mioReport = new Map((await api.mioReport(pid, mesePrecedente() + "-01") || []).map(r => [meseDi(r.mese), r])); }
+  /* le mie mappe degli ultimi 24 mesi (VP di Io, storico, primo ordine) e le date delle mappe di chi vedo */
+  try{ st.mioReport = new Map((await api.mioReport(pid, spostaMese(meseDi(oggi()), -24) + "-01") || []).map(r => [meseDi(r.mese), r])); }
   catch(e){ st.mioReport = new Map(); }
+  try{ st.dateMappe = new Map((await api.dateMappe(mesePrecedente() + "-01") || []).map(r => [r.partner_id + "|" + meseDi(r.mese), r.dati_al])); }
+  catch(e){ st.dateMappe = new Map(); }
+  st.storico = storicoMappe();
   st.mesiLinee = new Map();
   if(daPlatino(st.profilo.qualifica_iniziale)){
     const frontali = lineeDi(pid, rigaDi(st.riep, pid)).filter(l => l.id && l.id !== pid && st.struttura.some(p => p.id === l.id));
@@ -1488,7 +1512,8 @@ function vHome(){
   return `
   <div class="testata">
     <div>${marchio()}<h1>${st.vista === "scheda" ? "Scheda partner" : gruppo ? "Il mio gruppo" : `Ciao ${esc(nomeSaluto(p.nome))}`}</h1>
-      ${st.vista === "gruppo" ? `<p class="small" style="margin:0">${persone === 1 ? "1 persona" : `${num(persone)} persone`}</p>` : ""}</div>
+      ${st.vista === "gruppo" ? `<p class="small" style="margin:0"><span>${persone === 1 ? "1 persona" : `${num(persone)} persone`}</span>
+        · <span class="mappa-gruppo">VP: ${esc(testoMappa(meseDi(oggi())))}</span></p>` : ""}</div>
     ${omino()}
   </div>
   ${vBarraFissa()}
@@ -1660,7 +1685,8 @@ function calcolaPreviste(){
   /* chi è ancora «In lista» entra solo se l'ho messo in agenda (057) */
   const l = st.persone.filter(p => !p.nascosta_io && (p.fase !== "lista" || p.prossima_data) && (!p.esito || (p.esito === "non_ora" && p.prossima_data)));
   const clientiOggi = clientiDaSentire().length, m = meseDi(oggi());
-  const manca = Math.max(0, Math.round(((Number(st.goalMese.obiettivo_vp) || 0) - vpMese(m)) * 100) / 100);
+  /* 063: «mancano X VP» lo calcola il database dalla mappa del mese; qui solo lo stesso numero, senza mappa 0 */
+  const v = vpMese(m), manca = v == null ? 0 : Math.max(0, Math.round(((Number(st.goalMese.obiettivo_vp) || 0) - v) * 100) / 100);
   return Array.from({ length:14 }, (_, i) => { const g = piuGiorni(oggi(), i);
     return { giorno:g, persone:l.filter(p => p.prossima_data && p.prossima_data <= g).length, clienti:clientiOggi,
       seguimi:!!st.seguimi.attivo, vp_mancanti:meseDi(g) === m ? manca : 0 }; });
@@ -1949,8 +1975,9 @@ function situazioneArgento(pid, t, righe){
   const linee = n.linee.map(l => Object.assign(analisiLinea(l, 0), { pct:l.id ? Number((rigaDi(st.riep, l.id) || {}).percentuale) || null : null }));
   const dati = { tappa:t.nome, mesi:x.mesi, servono, vpg:num(n.gruppo) };
   const s = { tappa:t, linee, annuale:true, personali:n.personali, dati, mesi:x,
-    sintesi:`questo mese ${num(n.gruppo)} VP di gruppo${pct ? ` (${pct}%)` : ""}` };
+    sintesi:n.mappa ? `questo mese ${num(n.gruppo)} VP di gruppo${pct ? ` (${pct}%)` : ""}` : `questo mese: ${testoMappa(meseDi(oggi()), null)}` };
   const mancanti = io ? mesiDaImportare().filter(m => !m.fatto) : [];
+  if(!n.mappa && !mancanti.length){ s.chiave = "senza_mappa"; return s; }
   const l21 = linee.find(l => l.pct >= 21), verso = linee.find(l => l.vp >= ARGENTO_VICINO && !(l.pct >= 21));
   const vicine = k => k.vicine ? plur(k.vicine, "persona è", "persone sono") : "";
   if(mancanti.length){
@@ -1991,7 +2018,7 @@ function vComeArrivarci(pid, chi){
   const promemoria = s.annuale
     ? `<p class="promemoria">Mesi da Argento negli ultimi 12 mesi: ${s.mesi.mesi} su ${s.dati.servono} per ${esc(t.nome)}${s.mesi.mesi >= s.dati.servono ? " ✓" : ""}${
         t.chiave === "platino" ? ` · 3 di fila ${s.mesi.fila >= 3 ? "✓" : `○ (${Math.min(s.mesi.fila, 3)} su 3)`}` : ""}</p>`
-    : !TAPPE_DI_PERCORSO.includes(t.chiave) && vpp > 0
+    : !TAPPE_DI_PERCORSO.includes(t.chiave) && vpp > 0 && s.personali != null
     ? `<p class="promemoria">Ricorda: per ${esc(t.nome)} servono anche ${num(vpp)} VP personali nel mese ·
         ${chi === "io" ? "ne hai" : "ne ha"} ${num(s.personali)}${s.personali >= vpp ? " ✓" : `, mancano ${num(vpp - s.personali)}`}</p>` : "";
   const cella = v => `<td class="num">${v == null ? "–" : num(v)}</td>`;
@@ -2035,7 +2062,7 @@ function datiTappa(){
   }
   const nelMese = Number(attuale.vp_personali) > 0 && attuale.chiave !== "primo_ordine";
   const n = numeriMese(meseDi(oggi()));
-  const conLinee = attuale.ordine >= 3 && !oltreArgento(attuale);
+  const conLinee = attuale.ordine >= 3 && !oltreArgento(attuale) && !!n.mappa;
   /* percentuale e qualifica sono due cose distinte */
   const manca = conLinee ? mancanze(attuale, n) : [];
   const pinMax = Math.max(Number(st.profilo.percentuale_iniziale) || 0, ...st.storico.map(r => Number(r.percentuale) || 0));
@@ -2054,7 +2081,7 @@ function datiTappa(){
       <span class="small">· ${fatti} su ${req.length} requisiti</span>`, sempre:scadenza, corpo:`
     <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px">
       ${n.percentuale ? `<span class="pill s">${n.percentuale}% questo mese</span>` : ""}
-      ${n.daReport ? `<span class="pill">dal report Amway</span>` : ""}
+      <span class="pill">${esc(testoMappa(meseDi(oggi()), n.mappa))}</span>
       ${pinMax && pinMax > (n.percentuale || 0) ? `<span class="pill">${pinMax}% raggiunto</span>` : ""}
       ${raggiunta ? `<span class="pill v">✓ ${esc(raggiunta.nome)}</span>` : ""}</div>
     ${attuale.guadagno_mese ? `<p class="small" style="margin:6px 0 0">Circa ${euro(attuale.guadagno_mese)} al mese* con ${esc(attuale.struttura_calcolo || "")}</p>` : ""}
@@ -2129,10 +2156,10 @@ function attivitaTutte(tipo){ const v = new Map(); (st.attSerie || []).concat(st
 function primoOrdinePercorso(){
   const p = st.profilo, t = st.stages.find(x => x.chiave === "primo_ordine"), min = t ? Number(t.vp_personali) || 50 : 50;
   const dal = String(p.data_iscrizione || "").slice(0, 10), fine = piuGiorni(dal, t && t.giorni_scadenza ? Number(t.giorni_scadenza) : GIORNI_NUOVO);
-  let tot = 0, quando = null;
-  for(const a of movimentiVp().filter(a => a.data >= dal).sort((x, y) => x.data < y.data ? -1 : 1)){ tot += Number(a.vp) || 0; if(!quando && tot >= min) quando = a.data; }
+  /* 063: dalla mappa (la prima, dal mese di iscrizione, che mostra dei VP) */
+  const o = primoOrdineMappa(), tot = o ? o.vp : 0;
   const dichiarato = t && p.qualifica_iniziale && tappaFatta(t);
-  return { min, vp:tot, fatto:!!quando || !!dichiarato, quando, fine, restano:giorniTra(oggi(), fine) };
+  return { min, vp:tot, fatto:tot >= min || !!dichiarato, quando:null, mappa:o ? o.mappa : null, fine, restano:giorniTra(oggi(), fine) };
 }
 function fasiPercorso(){
   const p = st.profilo, nomi = nomiInLista(), ord = primoOrdinePercorso();
@@ -2192,7 +2219,7 @@ function festaDaFare(){ if(!percorsoAttivo()) return false; const x = fasiPercor
 function vFesta(){
   const x = fasiPercorso(), p = st.profilo, giorni = giorniTra(String(p.data_iscrizione).slice(0, 10), oggi());
   const primo = l => l[0] ? dataIt(String(l[0].data).slice(0, 10)) : "";
-  const voci = [["Il primo ordine", `${num(x.ord.vp)} VP${x.ord.quando ? `, il ${dataIt(x.ord.quando)}` : ""}`],
+  const voci = [["Il primo ordine", `${num(x.ord.vp)} VP${x.ord.mappa ? `, mappa ${delGiorno(x.ord.mappa.dati_al)}` : ""}`],
     ["Il primo cliente", x.clienti[0] ? `il ${primo(x.clienti)}` : ""], ["Il primo piano mostrato", x.piani[0] ? `il ${primo(x.piani)}` : ""]];
   return `<div class="festa" role="dialog" aria-modal="true" aria-labelledby="festa-titolo">
     <span class="eyebrow">Percorso di partenza</span>
@@ -2216,7 +2243,7 @@ function nomiNuoviSettimana(){
 function vCruscotto(){
   const o = st.obiettivo, t = datiTappa(), aperta = !!st.tappaAperta, g = st.goal;
   const m = meseDi(oggi()), fatto = vpMese(m), obj = Number(st.goalMese.obiettivo_vp) || 0;
-  const pct = obj ? pctOk(Math.round(fatto / obj * 100)) : 0;
+  const pct = obj && fatto != null ? pctOk(Math.round(fatto / obj * 100)) : 0;
   const [aa, mm] = m.split("-").map(Number), giorni = new Date(aa, mm, 0).getDate();
   const { attuale, indice } = percorso();
   const tot = (st.stages.findIndex(s => s.chiave === "platino") + 1) || st.stages.length;
@@ -2231,14 +2258,15 @@ function vCruscotto(){
     ${o ? `<button class="riga-apri prima obiettivo-riga" data-act="obiettivo-da-io"><span class="grow"><b class="num">${euro(o.cifra_mese)}</b> al mese
       <span class="small">· ${esc(testoTraguardo(o.entro))}</span></span><span class="fr" aria-hidden="true">›</span></button>` : ""}
     <div class="cruscotto-cima">
-      <div class="anello" role="img" aria-label="VP personali: ${num(fatto)} su ${num(obj)}">
+      <div class="anello" role="img" aria-label="VP personali: ${fatto == null ? esc(testoMappa(m)) : `${num(fatto)} su ${num(obj)}, ${esc(testoMappa(m))}`}">
         <svg viewBox="0 0 112 112" aria-hidden="true"><circle cx="56" cy="56" r="46" class="traccia"></circle>
           ${pct ? `<circle cx="56" cy="56" r="46" class="pieno" stroke-dasharray="${(GIRO_ANELLO * pct / 100).toFixed(1)} ${GIRO_ANELLO.toFixed(1)}"></circle>` : ""}</svg>
-        <span><b class="num">${num(fatto)}</b><small>di ${num(obj)} VP</small></span>
+        <span><b class="num">${fatto == null ? "—" : num(fatto)}</b><small>di ${num(obj)} VP</small></span>
       </div>
       <button class="riga-apri tappa-riga" data-act="apri-tappa" aria-expanded="${aperta}"><span class="grow">${riga}</span>
         <span class="fr" aria-hidden="true">${aperta ? "▴" : "▾"}</span></button>
     </div>
+    <p class="small mappa-riga">VP: ${esc(testoMappa(m))}</p>
     ${t.sempre}
     ${aperta ? `<div class="tappa-aperta">${t.corpo}</div>` : ""}
     ${(() => { const nn = avviato() ? nomiNuoviSettimana() : null;
@@ -2252,10 +2280,11 @@ function vCruscotto(){
   </div>`;
 }
 
-/* «Il mio mese»: una riga che si apre, con i VP (report e ordini scritti dopo), il gruppo, i nuovi clienti, storico e obiettivo */
+/* «Il mio mese»: una riga che si apre, con i VP della mappa, il gruppo, i nuovi clienti, storico e obiettivo */
 function vMioMese(){
   const m = meseDi(oggi()), c = clientiMese(m), nm = numeriMese(m), aperto = !!st.meseAperto;
-  const riassunto = [nm.gruppo > nm.personali || nm.linee.length ? `VP di gruppo ${num(nm.gruppo)}` : "", `nuovi clienti ${num(c)}`].filter(Boolean).join(" · ");
+  const riassunto = [!nm.mappa ? testoMappa(m, null) : nm.gruppo > nm.personali || nm.linee.length ? `VP di gruppo ${num(nm.gruppo)}` : "",
+    `nuovi clienti ${num(c)}`].filter(Boolean).join(" · ");
   return `<div class="card mio-mese">
     <button class="riga-apri prima" data-act="apri-mese" aria-expanded="${aperto}"><span class="grow"><span class="eyebrow">Il mio mese</span>
       <span class="small">${esc(nomeMese(m).replace(/^./, x => x.toUpperCase()))} · ${riassunto}</span></span><span class="fr" aria-hidden="true">${aperto ? "▴" : "▾"}</span></button>
@@ -2264,7 +2293,7 @@ function vMioMese(){
         <button class="btn small ghost" data-act="obiettivo-mese">Obiettivo</button></div>
       ${barraVp(m)}
       ${rigaVp(m)}
-      ${nm.gruppo > nm.personali || nm.linee.length
+      ${nm.mappa && (nm.gruppo > nm.personali || nm.linee.length)
         ? `<div class="spread" style="margin-top:10px"><span>VP di gruppo</span><b class="num">${num(nm.gruppo)}</b></div>` : ""}
       <div class="spread" style="margin-top:10px">
         <span>Nuovi clienti nel mese <b class="num">${num(c)}</b></span>
@@ -2443,54 +2472,41 @@ function barra(nome, fatto, obj){
     <div class="bar ${obj && fatto >= obj ? "fatto" : ""}" role="progressbar" aria-label="${nome}" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div></div>`;
 }
 
-/* VP del mese (034): in verde la parte del report Amway, in rame i miei ordini scritti dopo (li vedo solo io) */
+/* VP del mese (063): solo dalla mappa Amway; sotto, la data della mappa (o «nessuna mappa di …») */
 function barraVp(m){
-  const rep = vpReport(m);
-  if(rep == null) return barra("VP personali", vpMese(m), st.goalMese.obiettivo_vp);
-  const fatto = vpMese(m), obj = Number(st.goalMese.obiettivo_vp) || 0;
-  /* oltre l'obiettivo la barra si divide in proporzione al totale, così la parte scritta dopo il report si vede sempre */
-  const scala = Math.max(obj, fatto);
-  const w = v => scala ? pctOk(Math.round(v / scala * 100)) : 0, wRep = w(Math.max(0, Math.min(rep, fatto)));
-  const pct = obj ? pctOk(Math.round(fatto / obj * 100)) : 0, piena = w(fatto);
-  return `<div class="obiettivo"><div class="spread"><span>VP personali</span>
-    <span class="num">${num(fatto)} <span class="faint">/ ${num(obj)}</span></span></div>
-    <div class="bar doppia ${obj && fatto >= obj ? "fatto" : ""}" role="progressbar" aria-label="VP personali" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i class="rep" style="width:${wRep}%"></i><i style="width:${Math.max(0, piena - wRep)}%"></i></div></div>`;
+  const v = vpMese(m), obj = Number(st.goalMese.obiettivo_vp) || 0;
+  if(v == null) return `<div class="obiettivo"><div class="spread"><span>VP personali</span>
+    <span class="num">— <span class="faint">/ ${num(obj)}</span></span></div>
+    <div class="bar" role="progressbar" aria-label="VP personali" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><i style="width:0%"></i></div></div>`;
+  return barra("VP personali", v, obj);
 }
 function rigaVp(m){
-  const rep = vpReport(m), r = reportMio(m), dopo = vpMese(m) - (rep || 0);
-  if(rep == null) return vpMese(m) ? `<p class="small vp-report" style="margin:4px 0 0">I VP scritti da te: li vedi solo tu.
-    Sponsor e upline vedono i tuoi numeri quando arriva il report Amway.</p>` : "";
-  return `<p class="small vp-report" style="margin:4px 0 0">${num(rep)} VP dal report del ${esc(fmtDataOra.format(new Date(r.dati_al)))}${dopo
-    ? ` · ${dopo > 0 ? "+" : "−"} ${num(Math.abs(dopo))} VP dei tuoi ordini scritti dopo: li vedi solo tu.` : "."}</p>`;
+  return `<p class="small vp-report" style="margin:4px 0 0">${esc(testoMappa(m).replace(/^./, c => c.toUpperCase()))}</p>`;
 }
 
-/* Storico: i mesi chiusi (congelati il giorno 5) e quelli ancora aperti, dal più recente */
+/* Storico (063): i mesi dalle mappe Amway, dal più recente; un mese senza mappa: «nessuna mappa di …» */
 function vStorico(){
   const nome = chiave => { const t = st.stages.find(x => x.chiave === chiave); return t ? t.nome : ""; };
-  const righe = st.storico.map(r => ({ mese:meseDi(r.mese), personali:Number(r.vp_personali), gruppo:Number(r.vp_gruppo),
-    attive:r.linee_attive, pct:r.percentuale, qual:nome(r.qualifica), aperto:false }));
-  const aperti = [meseDi(oggi())].concat(precedenteAperto() && !righe.some(r => r.mese === mesePrecedente()) ? [mesePrecedente()] : []);
-  for(const m of aperti){
-    const n = numeriMese(m);
-    /* la qualifica del mese si calcola fino ad Argento (le annuali si contano sull'anno fiscale, qui sotto) */
-    const q = st.stages.filter(t => t.ordine >= 3 && t.ordine <= ordineDi("argento") && !mancanze(t, n).length).pop();
-    righe.push({ mese:m, personali:n.personali, gruppo:n.gruppo, attive:n.attive, pct:n.percentuale, qual:q ? q.nome : "", aperto:true });
-  }
+  const ora = meseDi(oggi()), n = numeriMese(ora);
+  const righe = st.storico.map(r => ({ mese:meseDi(r.mese), mappa:r.mappa, personali:r.vp_personali, gruppo:r.vp_gruppo,
+    attive:r.linee_attive, pct:r.percentuale, qual:nome(r.qualifica), aperto:false }))
+    .concat([{ mese:ora, mappa:n.mappa, personali:n.personali, gruppo:n.gruppo, attive:n.attive, pct:n.percentuale, qual:nome(qualificaDa(n)), aperto:true }]);
   /* se nell'anno fiscale, fino a quel mese, è già raggiunta una qualifica annuale (Oro, Platino, …), vale quella */
-  for(const r of righe){ const a = qualificaPY(r.mese); if(a) r.qual = nome(a); }
+  for(const r of righe){ const a = r.mappa && qualificaPY(r.mese); if(a) r.qual = nome(a); }
   righe.sort((a, b) => a.mese < b.mese ? 1 : -1);
   return `<h2>Il mio storico</h2>
-    <p class="small">Ogni mese si chiude il giorno ${giornoChiusura()} del mese dopo: da lì i numeri restano quelli.</p>
+    <p class="small">I numeri di ogni mese sono quelli della mappa Amway importata (anche da chi ti segue).</p>
     <ul class="storico">${righe.map(r => `<li>
       <div class="spread"><b>${nomeMese(r.mese).replace(/^./, c => c.toUpperCase())}</b>
         <span class="pill ${r.aperto ? "g" : ""}">${r.aperto ? "in corso" : "chiuso"}</span></div>
-      <div class="dati">
+      ${r.mappa ? `<div class="dati">
         <span>VP personali <b class="num">${num(r.personali)}</b></span>
         <span>VP di gruppo <b class="num">${num(r.gruppo)}</b></span>
         <span>Linee attive <b class="num">${r.attive}</b></span>
         <span>Percentuale <b class="num">${r.pct ? r.pct + "%" : "–"}</b></span>
       </div>
-      ${r.qual ? `<p class="small" style="margin:4px 0 0">Qualifica: <b>${esc(r.qual)}</b></p>` : ""}</li>`).join("")}</ul>
+      <p class="small" style="margin:4px 0 0">${esc(testoMappa(r.mese, r.mappa).replace(/^./, c => c.toUpperCase()))}${r.qual ? ` · Qualifica: <b>${esc(r.qual)}</b>` : ""}</p>`
+      : `<p class="small muted" style="margin:4px 0 0">${esc(testoMappa(r.mese, null).replace(/^./, c => c.toUpperCase()))}</p>`}</li>`).join("")}</ul>
     <button class="btn wide ghost" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
 }
 
@@ -2498,19 +2514,19 @@ function vStorico(){
 function meseAvanti(m, n){ const [y, mm] = m.split("-").map(Number), d = new Date(Date.UTC(y, mm - 1 + n, 1)); return d.toISOString().slice(0, 7); }
 function vStoricoGruppo(){
   if(!figli(st.profilo.id).length) return "";
-  const righe = st.storico.map(r => ({ mese:meseDi(r.mese), gruppo:Number(r.vp_gruppo) || 0, attive:r.linee_attive || 0, pct:r.percentuale }))
+  const righe = st.storico.map(r => ({ mese:meseDi(r.mese), mappa:r.mappa, gruppo:r.vp_gruppo, attive:r.linee_attive, pct:r.percentuale }))
     .sort((a, b) => a.mese < b.mese ? 1 : -1).slice(0, 12);
-  const prossima = meseAvanti(meseDi(oggi()), precedenteAperto() ? 0 : 1) + "-" + String(giornoChiusura()).padStart(2, "0");
   return `<div class="card">
     <span class="con-aiuto"><span class="eyebrow">Storico del gruppo</span>${righe.length ? aiutoBtn("storico-gruppo") : ""}</span>
-    ${aiutoTesto("storico-gruppo", `Ogni riga è un mese chiuso (si chiude il ${giornoChiusura()} del mese dopo) con i totali del tuo gruppo.
+    ${aiutoTesto("storico-gruppo", `Ogni riga è un mese passato con i totali del tuo gruppo dalla mappa Amway di quel mese.
       Tocca un mese per vedere i numeri di ogni persona.`)}
     ${righe.length ? `<table class="confronto mesi">
       <thead><tr><th></th><th>VP di gruppo</th><th>Linee</th><th>%</th></tr></thead>
       <tbody>${righe.map(r => `<tr data-act="mese-gruppo" data-mese="${r.mese}"><td><button class="btn link" data-act="mese-gruppo" data-mese="${r.mese}">${nomeMese(r.mese).replace(/^./, c => c.toUpperCase())}</button></td>
-        <td class="num">${num(r.gruppo)}</td><td class="num">${r.attive}</td><td class="num">${r.pct ? r.pct + "%" : "–"}</td></tr>`).join("")}</tbody>
+        ${r.mappa ? `<td class="num">${num(r.gruppo)}</td><td class="num">${r.attive}</td><td class="num">${r.pct ? r.pct + "%" : "–"}</td>`
+          : `<td colspan="3" class="small muted">${esc(testoMappa(r.mese, null))}</td>`}</tr>`).join("")}</tbody>
     </table>`
-    : `<p class="muted" style="margin:8px 0 0">Ancora nessun mese chiuso: il primo si chiude il ${dataIt(prossima)}.</p>`}
+    : `<p class="muted" style="margin:8px 0 0">Ancora nessuna mappa di un mese passato.</p>`}
   </div>`;
 }
 function vMeseGruppo(){
@@ -2524,7 +2540,8 @@ function vMeseGruppo(){
   const nomeQ = chiave => { const t = st.stages.find(x => x.chiave === chiave); return t ? t.nome : ""; };
   const persone = g.righe.filter(r => r.partner_id !== st.profilo.id && nomeDi(r.partner_id))
     .sort((a, b) => Number(b.vp_gruppo) - Number(a.vp_gruppo) || nomeDi(a.partner_id).localeCompare(nomeDi(b.partner_id)));
-  const freccia = (v, rif) => rif != null && Number(v) < Number(rif) ? `<b class="num sotto">▼ ${num(v)}</b>` : `<b class="num">${num(v)}</b>`;
+  /* 063: senza la mappa di quel mese, nessun numero (—) */
+  const freccia = (v, rif) => v == null ? `<b class="num">—</b>` : rif != null && Number(v) < Number(rif) ? `<b class="num sotto">▼ ${num(v)}</b>` : `<b class="num">${num(v)}</b>`;
   return `${titolo}
     <p class="small">Ogni persona del gruppo in ${nomeMese(g.mese)}. ▼ in rosso: sotto il mese prima.</p>
     ${persone.length ? `<ul class="storico">${persone.map(r => { const p = prima.get(r.partner_id) || {}; return `<li>
@@ -2532,7 +2549,7 @@ function vMeseGruppo(){
       <div class="dati">
         <span>VP personali ${freccia(r.vp_personali, p.vp_personali)}</span>
         <span>VP di gruppo ${freccia(r.vp_gruppo, p.vp_gruppo)}</span>
-        <span>Linee attive ${freccia(r.linee_attive || 0, p.linee_attive)}</span>
+        <span>Linee attive ${freccia(r.linee_attive, p.linee_attive)}</span>
         <span>${MESI[Number(meseAvanti(g.mese, -1).slice(5)) - 1].replace(/^./, c => c.toUpperCase())} <b class="num faint">${p.vp_gruppo != null ? num(p.vp_gruppo) + " VP" : "–"}</b></span>
       </div>
       ${r.qualifica ? `<p class="small" style="margin:4px 0 0">Qualifica: <b>${esc(nomeQ(r.qualifica))}</b></p>` : ""}</li>`; }).join("")}</ul>`
@@ -2653,7 +2670,7 @@ function vStruttura(){
   const rigaIo = `<li class="liv io" style="--rientro:0px" data-id="${esc(io)}" data-path="" data-nome="${esc(senzaAccenti(st.profilo.nome))}">
       <span class="livello l0" title="Livello 1">1</span>
       <div class="nome"><span>${esc(st.profilo.nome)}</span>
-        <span class="small">${testoVp(rIo.vp_personali)} · gruppo ${num(rIo.vp_gruppo)}${rIo.linee_attive ? ` · ${rIo.linee_attive} ${rIo.linee_attive === 1 ? "linea" : "linee"}` : ""}</span></div>
+        <span class="small">${numeriRiga(rIo)}</span></div>
       <button class="piega" data-act="piega" data-id="${esc(io)}" data-quanti="${righe.length}" aria-expanded="${!chiusoIo}"
         aria-label="${chiusoIo ? "Mostra" : "Nascondi"} il tuo gruppo">${chiusoIo ? "▸" : "▾"} ${righe.length}</button></li>`;
   return `<div class="card">
@@ -2683,7 +2700,7 @@ function vStruttura(){
       <span class="livello l${livello % 5 + 1}" title="Livello ${livello + 2}">${livello + 2}</span>
       <div class="nome"><button class="nome-apri" data-act="apri-scheda" data-id="${esc(p.id)}">
         <span>${esc(p.nome)}${pallinoApp(p)}</span>
-        <span class="small">${testoVp(r.vp_personali)} · gruppo ${num(r.vp_gruppo)}${r.linee_attive ? ` · ${r.linee_attive} ${r.linee_attive === 1 ? "linea" : "linee"}` : ""}</span>
+        <span class="small">${numeriRiga(r)}</span>
       </button></div>
       ${quanti ? `<button class="piega" data-act="piega" data-id="${esc(p.id)}" data-quanti="${quanti}" aria-expanded="${!chiuso}"
         aria-label="${chiuso ? "Mostra" : "Nascondi"} il gruppo di ${esc(p.nome)}">${chiuso ? "▸" : "▾"} ${quanti}</button>` : ""}
@@ -2819,9 +2836,9 @@ function vElencoFiltrato(righe, filtro){
       <span class="livello l${livello % 5 + 1}" title="Livello ${livello + 2}">${livello + 2}</span>
       <div class="nome"><button class="nome-apri" data-act="apri-scheda" data-id="${esc(p.id)}">
         <span>${esc(p.nome)}${pallinoApp(p)}</span>
-        <span class="small">${testoVp(r.vp_personali)} · gruppo ${num(r.vp_gruppo)}${x ? ` · sotto ${esc(x.sponsor)}` : ""}${ingresso}</span>
+        <span class="small">${r.vp_personali == null ? "nessuna mappa" : `${testoVp(r.vp_personali)} · gruppo ${num(r.vp_gruppo)}`}${x ? ` · sotto ${esc(x.sponsor)}` : ""}${ingresso}</span>
       </button></div>
-      ${etichettaNuovo(p.id)}${filtro.id === "percentuale" ? `<span class="pill v">${Number(r.percentuale) || 0}%</span>` : pillStato(p)}</li>`; }).join("")}</ul>
+      ${etichettaNuovo(p.id)}${filtro.id === "percentuale" ? `<span class="pill v">${r.percentuale == null ? "—" : `${Number(r.percentuale) || 0}%`}</span>` : pillStato(p)}</li>`; }).join("")}</ul>
     ${filtro.id === "nuovi" ? `<p class="small" style="margin:6px 0 0">Nuovi = iscritti da meno di 30 giorni, il tempo per il primo ordine. Sull'etichetta i giorni che restano, o ✓ se il primo ordine è fatto.</p>` : ""}`;
 }
 
@@ -2837,17 +2854,17 @@ const ETICHETTE_GRUPPO = {
   followup: { nome:"VP sotto soglia", cl:"g", ordine:4 },
   crescita: { nome:"In crescita", cl:"v", ordine:5 }
 };
-/* 034: di chi usa l'app (non io) sponsor e upline vedono solo i VP del report Amway, mai gli ordini scritti a mano */
+/* chi usa l'app (non io) */
 function soloReport(pid){ const p = st.struttura.find(x => x.id === pid); return pid !== st.profilo.id && !!p && p.stato !== "gestito"; }
-/* I numeri di una persona nelle ultime 4 settimane (i VP di chi usa l'app: quelli del report del mese) */
+/* I numeri di una persona nelle ultime 4 settimane (i VP: quelli della mappa del mese, per tutti) */
 function numeri4(pid){
   const dal = inizio4();
   const l = st.gruppo4.att.filter(a => a.partner_id === pid && a.data >= dal);
   const q = tipo => somma(l.filter(a => a.tipo === tipo), "quantita");
   const ultima = l.reduce((m, a) => a.data > m ? a.data : m, "");
-  return { contatti:q("contatto"), piani:q("piano"), ordini:q("ordine"),
-           vp:soloReport(pid) ? Number((rigaDi(st.riep, pid) || {}).vp_personali) || 0
-             : somma(l.filter(a => a.tipo === "ordine" || a.tipo === "rettifica"), "vp"), ultima };
+  /* 063: i VP del mese sono quelli della mappa, per tutti (null senza mappa) */
+  const v = (rigaDi(st.riep, pid) || {}).vp_personali;
+  return { contatti:q("contatto"), piani:q("piano"), ordini:q("ordine"), vp:v == null ? null : Number(v) || 0, ultima };
 }
 function obiettiviDi(pid){
   const pr = proposta();
@@ -2869,10 +2886,10 @@ function etichettaDi(p){
     k = "lista"; perche = `${plur(n.contatti, "contatto", "contatti")} in 4 settimane (obiettivo ${o.contatti} a settimana)`;
   } else if(n.piani < n.contatti * s.piani_per_contatti){
     k = "invito"; perche = `${plur(n.contatti, "contatto", "contatti")}, ${plur(n.piani, "piano", "piani")}: 1 piano ogni ${Math.round(n.contatti / Math.max(n.piani, 1))} contatti`;
-  } else if(n.piani >= s.piani_min_followup && n.vp < o.vp * s.quota_vp_followup){
+  } else if(n.vp != null && n.piani >= s.piani_min_followup && n.vp < o.vp * s.quota_vp_followup){
     k = "followup"; perche = `${plur(n.piani, "piano", "piani")} mostrati, ${num(n.vp)} VP su ${num(o.vp)} di obiettivo`;
   } else {
-    k = "crescita"; perche = `${plur(n.contatti, "contatto", "contatti")}, ${plur(n.piani, "piano", "piani")}, ${num(n.vp)} VP`;
+    k = "crescita"; perche = `${plur(n.contatti, "contatto", "contatti")}, ${plur(n.piani, "piano", "piani")}, ${n.vp == null ? "nessuna mappa" : `${num(n.vp)} VP`}`;
   }
   return Object.assign({ k, perche, giorni, n }, ETICHETTE_GRUPPO[k]);
 }
@@ -2888,13 +2905,13 @@ function vPreferiti(){
   const schede = l.map(p => {
     const n = numeri4(p.id), o = obiettiviDi(p.id), sp = statoDi(p), r = rigaDi(st.riep, p.id) || {};
     const e = p.stato === "gestito" ? null : etichettaDi(p);
-    const vp = Number(r.vp_personali) || 0;
+    const vp = r.vp_personali == null ? null : Number(r.vp_personali) || 0;
     /* la riga dove sta sotto la soglia è evidenziata, come le etichette (solo per chi usa l'app) */
     const debole = e ? { lista:"contatti", invito:"piani", followup:"vp" }[e.k] : null;
     const righe = [
       { k:"contatti", nome:"Contatti", v:n.contatti, ob:o.contatti * 4, nota:"4 settimane" },
       { k:"piani", nome:"Piani", v:n.piani, ob:o.piani * 4, nota:"4 settimane" },
-      { k:"vp", nome:"VP del mese", v:vp, ob:o.vp, nota:nomeMese(meseDi(oggi())).split(" ")[0] }
+      { k:"vp", nome:"VP del mese", v:vp, ob:o.vp, nota:vp == null ? "nessuna mappa" : nomeMese(meseDi(oggi())).split(" ")[0] }
     ];
     return { p, e, ordine: e ? e.ordine : 9, html:`<li class="preferito">
       <div class="spread"><button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}"><span>${esc(p.nome)}</span>
@@ -2902,8 +2919,8 @@ function vPreferiti(){
         ${e ? `<span class="pill ${e.cl}">${e.nome}</span>` : `<span class="pill ${sp.cl}">${sp.txt}</span>`}</div>
       ${p.stato === "gestito" ? "" : `<p class="small" style="margin:2px 0 0">${rigaObiettivoDi(p.id)}</p>`}
       ${righe.map(x => `<div class="obiettivo${debole === x.k ? " debole" : ""}"><div class="spread"><span>${x.nome} <span class="small">${x.nota}</span></span>
-        <span class="num">${num(x.v)} / ${num(x.ob)}</span></div>
-        <div class="bar${x.v >= x.ob ? " fatto" : ""}"><i style="width:${Math.min(100, x.ob ? Math.round(x.v / x.ob * 100) : 0)}%"></i></div></div>`).join("")}
+        <span class="num">${x.v == null ? "—" : num(x.v)} / ${num(x.ob)}</span></div>
+        <div class="bar${x.v != null && x.v >= x.ob ? " fatto" : ""}"><i style="width:${Math.min(100, x.ob && x.v ? Math.round(x.v / x.ob * 100) : 0)}%"></i></div></div>`).join("")}
       ${p.stato === "gestito" ? "" : vNumeriLista(chiediNumeriLista(p.id))}
     </li>` };
   }).sort((a, b) => a.ordine - b.ordine || a.p.nome.localeCompare(b.p.nome));
@@ -2982,34 +2999,37 @@ function confrontoMese(pid){
   const conta = (dal, al) => {
     const l = att.filter(a => a.data >= dal && a.data <= al);
     const q = tipo => somma(l.filter(a => a.tipo === tipo), "quantita");
-    return { contatti:q("contatto"), piani:q("piano"), ordini:q("ordine"), clienti:q("cliente"),
-             vp:somma(l.filter(a => a.tipo === "ordine" || a.tipo === "rettifica"), "vp") };
+    return { contatti:q("contatto"), piani:q("piano"), clienti:q("cliente") };
   };
   const ora = conta(m + "-01", oggi()), prima = conta(mp + "-01", mp + "-31");
   const r = rigaDi(st.riep, pid) || {}, rp = rigaDi(st.riepPrec, pid) || {};
   return { m, mp, righe: [
     { nome:"Contatti", ora:ora.contatti, prima:prima.contatti },
     { nome:"Piani", ora:ora.piani, prima:prima.piani },
-    soloReport(pid) ? null : { nome:"Ordini", ora:ora.ordini, prima:prima.ordini },
     { nome:"Nuovi clienti", ora:ora.clienti, prima:prima.clienti },
-    /* con la mappa del mese (anche per chi non usa l'app) i VP personali sono quelli della mappa */
-    soloReport(pid) || r.da_report
-      ? { nome:"VP personali", ora:Number(r.vp_personali) || 0, prima:Number(rp.vp_personali) || 0 }
-      : { nome:"VP personali", ora:ora.vp, prima: rp.vp_personali != null ? Number(rp.vp_personali) : prima.vp },
-    { nome:"VP di gruppo", ora:Number(r.vp_gruppo) || 0, prima:Number(rp.vp_gruppo) || 0 },
-    { nome:"Linee attive", ora:Number(r.linee_attive) || 0, prima:Number(rp.linee_attive) || 0 }
-  ].filter(Boolean)};
+    /* 063: i VP sono quelli della mappa del mese, per tutti (senza mappa: —) */
+    { nome:"VP personali", ora:nOnull(r.vp_personali), prima:nOnull(rp.vp_personali) },
+    { nome:"VP di gruppo", ora:nOnull(r.vp_gruppo), prima:nOnull(rp.vp_gruppo) },
+    { nome:"Linee attive", ora:nOnull(r.linee_attive), prima:nOnull(rp.linee_attive) }
+  ]};
+}
+function nOnull(v){ return v == null ? null : Number(v) || 0; }
+/* la data della mappa del mese di una persona che vedo (la mappa che vale in quel momento, anche importata da sopra) */
+function testoMappaDi(pid, m){
+  m = m || meseDi(oggi());
+  if(pid === st.profilo.id) return testoMappa(m);
+  const d = st.dateMappe && st.dateMappe.get(pid + "|" + m);
+  return testoMappa(m, d ? { dati_al:d } : null);
 }
 function vConfronto(p){
   const c = confrontoMese(p.id);
   const breve = m => MESI[Number(m.slice(5, 7)) - 1].slice(0, 3);
   return `<div class="card">
     <span class="con-aiuto"><span class="eyebrow">Questo mese e il mese prima</span>${aiutoBtn("confronto")}</span>
-    ${aiutoTesto("confronto", `Questo mese fino a oggi e, accanto, il totale di tutto il mese prima.${soloReport(p.id) || (rigaDi(st.riep, p.id) || {}).da_report
-      ? " I VP sono quelli della mappa Amway." : ""}`)}
+    ${aiutoTesto("confronto", `Questo mese fino a oggi e, accanto, il totale di tutto il mese prima. I VP sono quelli della mappa Amway di ogni mese.`)}
     <table class="confronto">
       <thead><tr><th></th><th>${breve(c.m)}<br><span>fino a oggi</span></th><th>${breve(c.mp)}<br><span>totale</span></th></tr></thead>
-      <tbody>${c.righe.map(x => `<tr><td>${x.nome}</td><td class="num">${num(x.ora)}</td><td class="num faint">${num(x.prima)}</td></tr>`).join("")}</tbody>
+      <tbody>${c.righe.map(x => `<tr><td>${x.nome}</td><td class="num">${x.ora == null ? "—" : num(x.ora)}</td><td class="num faint">${x.prima == null ? "—" : num(x.prima)}</td></tr>`).join("")}</tbody>
     </table>
   </div>`;
 }
@@ -3044,16 +3064,16 @@ function vScheda(){
     <p class="small" style="margin:6px 0 0">${p.codice_amway ? `Codice Amway <b>${esc(p.codice_amway)}</b>` : "Codice Amway non scritto"}
       ${st.profilo.is_admin && !gestito ? soloAdmin(`<button class="btn link small" data-act="codice" data-id="${esc(p.id)}" style="min-height:0;padding:0 4px">Correggi</button>`) : ""}</p>
     <div class="dati-scheda">
-      <div><span class="small">VP personali</span><b class="num">${num(r.vp_personali)}</b></div>
-      <div><span class="small">VP di gruppo</span><b class="num">${num(r.vp_gruppo)}</b></div>
-      <div><span class="small">Linee attive</span><b class="num">${r.linee_attive || 0}</b></div>
+      <div><span class="small">VP personali</span><b class="num">${r.vp_personali == null ? "—" : num(r.vp_personali)}</b></div>
+      <div><span class="small">VP di gruppo</span><b class="num">${r.vp_gruppo == null ? "—" : num(r.vp_gruppo)}</b></div>
+      <div><span class="small">Linee attive</span><b class="num">${r.linee_attive == null ? "—" : r.linee_attive}</b></div>
       <div><span class="small">Percentuale</span><b class="num">${r.percentuale ? r.percentuale + "%" : "–"}</b></div>
     </div>
-    ${r.da_report ? `<p class="nota" style="margin:6px 0 0">VP di gruppo, linee e percentuale dal report Amway${r.linee_nascoste
-      ? ". Linee non visibili nel report (il suo gruppo Amway non lo mostra): la qualifica non può contarle" : ""}.</p>` : ""}
+    <p class="nota mappa-scheda" style="margin:6px 0 0">VP: ${esc(testoMappaDi(p.id))}${r.linee_nascoste
+      ? ". Linee non visibili nella mappa (il suo gruppo Amway non lo mostra): la qualifica non può contarle" : ""}.</p>
     ${(() => { const l = lineeDi(p.id, r);
       /* le linee frontali: chi è nella mia struttura si apre toccando il nome */
-      return l.length ? `<p class="small" style="margin:12px 0 0"><b>Le sue linee frontali</b> · VP di gruppo di ogni linea${r.da_report ? ", dal report Amway" : ""}</p>
+      return l.length ? `<p class="small" style="margin:12px 0 0"><b>Le sue linee frontali</b> · VP di gruppo di ogni linea${r.da_report ? ", dalla mappa Amway" : ""}</p>
       <ul class="linee">${l.map(x => { const apri = x.id && x.id !== p.id && st.struttura.some(y => y.id === x.id);
         return `<li>${apri ? `<button class="grow nome-linea" data-act="apri-scheda" data-id="${esc(x.id)}">${esc(x.nome)} ›</button>` : `<span class="grow">${esc(x.nome)}</span>`}
       <span class="num ${x.vp >= soglia() ? "" : "faint"}">${num(x.vp)} VP</span></li>`; }).join("")}</ul>` : ""; })()}
@@ -3215,7 +3235,7 @@ function vAzioni(){
   return `<div class="azioni"><div class="in">
     <button class="btn primary c1" data-act="contatto-rapido"><span class="ico">${ICONE_AZIONI.contatto}+ Contatto</span><b>${num(fattoSettimana("contatto"))} questa sett.</b></button>
     <button class="btn primary c2" data-act="piano-rapido"><span class="ico">${ICONE_AZIONI.piano}+ Piano</span><b>${num(fattoSettimana("piano"))} questa sett.</b></button>
-    <button class="btn primary c3" data-act="${st.target ? "ordine" : "ordini"}"><span class="ico">${ICONE_AZIONI.ordine}+ Ordine</span><b>${num(vpMese(meseDi(oggi())))} VP · mese</b></button>
+    <button class="btn primary c3" data-act="${st.target ? "ordine" : "ordini"}"><span class="ico">${ICONE_AZIONI.ordine}+ Ordine</span><b>${vpMese(meseDi(oggi())) == null ? "nessuna mappa" : `${num(vpMese(meseDi(oggi())))} VP · mese`}</b></button>
   </div></div>`;
 }
 
@@ -3248,6 +3268,11 @@ function pulito(v){ return String(v == null ? "" : v).trim().replace(/^'/, "").t
 /* una percentuale per le barre: mai sotto 0 (VP negativi dalla mappa) né sopra 100 */
 /* «-489,17 VP da recuperare»: i VP negativi del mese dopo una chiusura con la tolleranza */
 function testoVp(v){ v = Number(v) || 0; return v < 0 ? `${num(v)} VP da recuperare` : `${num(v)} VP`; }
+/* i numeri di una riga del riepilogo, nella struttura (063: senza la mappa del mese, nessun numero) */
+function numeriRiga(r){
+  if(!r || r.vp_personali == null) return "nessuna mappa";
+  return `${testoVp(r.vp_personali)} · gruppo ${num(r.vp_gruppo)}${r.linee_attive ? ` · ${r.linee_attive} ${r.linee_attive === 1 ? "linea" : "linee"}` : ""}`;
+}
 function pctOk(v){ return Math.max(0, Math.min(100, Number(v) || 0)); }
 function numReport(v){
   /* il meno può essere «−» (segno tipografico); un trattino da solo o «N/D» vuol dire nessun valore */
@@ -6899,6 +6924,8 @@ function vOrdini(){
     ${precedenteAperto() ? `<p class="small" style="margin:10px 0 0">Fino al ${giornoChiusura()} puoi ancora correggere ${nomeMese(mesePrecedente()).split(" ")[0]}.</p>` : ""}
     <button class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
 }
+/* 063: confermato, l'ordine va nello storico; i VP arrivano solo dalla mappa */
+const TESTO_CONFERMA_MIO = "L'ordine va nello storico «I miei ordini». Non cambia i VP del mese: arrivano con la mappa Amway.";
 function vSheetMiei(s){
   if(s === "importa-amway") return vImportaAmway();
   if(s === "ordini") return vOrdini();
@@ -6911,7 +6938,7 @@ function vSheetMiei(s){
     <p class="small">${prodotti(righe.length)} · ${testoTotaliMiei(t)}</p>
     <form data-form="conferma-mio" novalidate>
       <label class="field"><span>Data dell'ordine</span><input type="date" name="data" min="${primaDataAperta()}" max="${oggi()}" value="${esc(st.dataMio || oggi())}"></label>
-      <p class="small" id="testo-conferma-mio">I ${num2(t.vp)} VP vanno nel tuo mese di ${nomeMese(m).split(" ")[0]}. Li vedi solo tu finché non arriva il report Amway.</p>
+      <p class="small" id="testo-conferma-mio">${TESTO_CONFERMA_MIO}</p>
       ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
       <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="apri-bozza">Indietro</button><button class="btn primary grow">Conferma</button></div>
     </form>`;
@@ -6920,7 +6947,7 @@ function vSheetMiei(s){
     const o = (st.mieiOrdini || []).find(x => x.id === st.mioDaTogliere); if(!o) return "";
     const righe = righeMie(o.id), vp = o.vp != null ? Number(o.vp) : totaliMiei(righe).vp;
     return `<h2>Togli l'ordine del ${esc(dataIt(o.data))}?</h2>
-    <p class="small">${prodotti(righe.length)} · ${num2(vp)} VP.${o.attivita_id ? ` I ${num2(vp)} VP escono dal tuo mese di ${nomeMese(meseDi(o.data)).split(" ")[0]}.` : ""}</p>
+    <p class="small">${prodotti(righe.length)} · ${num2(vp)} VP. I VP del mese non cambiano: sono quelli della mappa Amway.</p>
     ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
     <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="apri-miei">Indietro</button>
       <button class="btn primary grow" data-act="mio-togli-ok">Togli</button></div>`;
@@ -6998,7 +7025,7 @@ Object.assign(MODULI, {
       const o = await api.confermaOrdine(b.id, data);
       Object.assign(b, o);
       st.att = await api.activities(st.profilo.id, [settimana(), primoDelMese()].sort()[0]) || st.att;
-      st.sheet = "miei"; render(); toast(`Ordine confermato: ${num2(o.vp)} VP nel mese`);
+      st.sheet = "miei"; render(); toast("Ordine confermato: è nello storico");
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   }
 });
@@ -7007,7 +7034,7 @@ document.addEventListener("input", e => {
   if(t && t.id === "cerca-mio"){ st.cercaMio = t.value; const u = document.getElementById("risultati-mio"); if(u) u.innerHTML = risultatiMio(t.value); }
   if(t && t.name === "data" && t.closest && t.closest('[data-form="conferma-mio"]')){
     st.dataMio = t.value; const b = bozzaMia(), p = document.getElementById("testo-conferma-mio");
-    if(b && p && t.value) p.textContent = `I ${num2(totaliMiei(righeMie(b.id)).vp)} VP vanno nel tuo mese di ${nomeMese(meseDi(t.value)).split(" ")[0]}. Li vedi solo tu finché non arriva il report Amway.`;
+    if(b && p && t.value) p.textContent = TESTO_CONFERMA_MIO;
   }
 });
 
@@ -7064,7 +7091,7 @@ function vGuidaStabilita(){
       CumLaude21, Training Day e Convention li scrivi tu (tocca il numero): per Training Day e Convention vale l'ultimo evento.`)}`;
   if(!t) return `<div class="card guida-stabilita">${testa}<p class="small muted" style="margin:0">I riferimenti della tabella non sono ancora caricati.</p></div>`;
   const L = t.livelli, c = (g.conteggiMesi || {})[mese] || (inCorso ? g.conteggi : null) || {}, w = g.cl21 || {};
-  /* la percentuale del mese: dalla mappa del mese, se c'è; per il mese in corso anche dagli ordini scritti */
+  /* la percentuale del mese: dalla mappa del mese, se c'è */
   const rep = (g.reportMesi || new Map()).get(mese);
   const pct = rep ? (rep.percentuale != null ? Number(rep.percentuale) : percentualeDa(Number(rep.vpg) || 0)) : inCorso ? Number(numeriMese(mese).percentuale) || 0 : 0;
   const raggiunto = L.reduce((x, l, j) => pct >= l ? j : x, -1);
@@ -7222,8 +7249,9 @@ function azioniDelGiorno(){
   const d = daFare();
   d.ritardo.concat(d.oggi).slice(0, 3).forEach(p => out.push({ tipo:"followup", id:p.id }));
   clientiDaSentire().slice(0, 3).forEach(x => out.push({ tipo:"cliente", id:x.p.id }));
-  const vpManca = (Number(st.goalMese.obiettivo_vp) || 0) - vpMese(meseDi(oggi()));
-  if(vpManca > 0) out.push({ tipo:"vp", manca:Math.round(vpManca * 100) / 100 });
+  /* 063: solo con la mappa del mese (senza, i VP non si sanno) */
+  const vpOra = vpMese(meseDi(oggi())), vpManca = vpOra == null ? 0 : (Number(st.goalMese.obiettivo_vp) || 0) - vpOra;
+  if(vpManca > 0) out.push({ tipo:"vp", manca:Math.round(vpManca * 100) / 100, mappa:(reportMio(meseDi(oggi())) || {}).dati_al || null });
   if(obiettivoAbitudine("formazione") > 0) out.push({ tipo:"formazione" });
   if(obiettivoAbitudine("sponsor") > sett.filter(g => fattoIl("sponsor", g)).length) out.push({ tipo:"sponsor" });
   return out;
@@ -7240,8 +7268,9 @@ function azioneFatta(a){
   if(a.tipo === "contatto" || a.tipo === "followup") return passoOggi(a.id);
   if(a.tipo === "cliente") return passoOggi(a.id) || (st.ordini || []).some(o => o.persona_id === a.id && o.data === oggi())
     || !clientiDaSentire().some(x => x.p.id === a.id);
-  if(a.tipo === "vp") return vpMese(meseDi(oggi())) >= (Number(st.goalMese.obiettivo_vp) || 0)
-    || movimentiVp().some(x => x.data === oggi() && Number(x.vp) > 0);
+  /* fatta: la mappa mostra l'obiettivo raggiunto, oppure oggi ho confermato un ordine */
+  if(a.tipo === "vp") return (vpMese(meseDi(oggi())) || 0) >= (Number(st.goalMese.obiettivo_vp) || 0)
+    || (st.mieiOrdini || []).some(o => o.stato === "confermato" && o.confermato_il && fmtGiorno.format(new Date(o.confermato_il)) === oggi());
   return fattoIl(a.tipo, oggi());
 }
 function riepilogoOggi(g){
@@ -7281,7 +7310,7 @@ function vOggiPerTe(){
     if(a.tipo === "contatto" || a.tipo === "followup" || a.tipo === "cliente"){
       const n = nome(a.id); if(!n) return "";
       testo = `<button class="btn link" style="padding:0;min-height:0" data-act="${a.tipo === "cliente" ? "apri-cliente" : "apri-persona"}" data-id="${esc(a.id)}">${esc(n)}</button>`;
-    } else if(a.tipo === "vp") testo = `Mancano ${num(a.manca)} VP al tuo obiettivo del mese ·
+    } else if(a.tipo === "vp") testo = `Mancano ${num(a.manca)} VP al tuo obiettivo del mese${a.mappa ? ` (mappa ${esc(delGiorno(a.mappa))})` : ""} ·
       <button class="btn link" style="padding:0;min-height:0" data-act="apri-bozza">apri la Bozza ordine</button>`;
     else if(a.tipo === "formazione") testo = "15 minuti: un audio o 10 pagine di un libro";
     else testo = "Una chiamata questa settimana";
@@ -7566,7 +7595,7 @@ let traguardiPrima = null;
 function valoriTraguardi(){
   const p = percorso(), m = meseDi(oggi());
   const sr = serie();
-  return { fila:sr.fila, recordPrima:sr.recordPrima, contatti:fattoSettimana("contatto"), piani:fattoSettimana("piano"), vp:vpMese(m), tappa:p.indice, nomeTappa:(p.raggiunta || {}).nome,
+  return { fila:sr.fila, recordPrima:sr.recordPrima, contatti:fattoSettimana("contatto"), piani:fattoSettimana("piano"), vp:vpMese(m) || 0, tappa:p.indice, nomeTappa:(p.raggiunta || {}).nome,
     clienti:st.persone.filter(x => x.esito === "cliente").length, partner:st.persone.filter(x => x.esito === "partner").length,
     obContatti:Number(st.goal.obiettivo_contatti) || 0, obPiani:Number(st.goal.obiettivo_piani) || 0, obVp:Number(st.goalMese.obiettivo_vp) || 0, settimana:settimana(), mese:m };
 }
@@ -7607,7 +7636,8 @@ function htmlTraguardo(t){
     return `<span class="eyebrow">Tappa raggiunta · ${indice} di ${tot}</span>
       <h1 id="traguardo-titolo">${esc(t.v.nomeTappa)}</h1>
       <p>Il tuo percorso va avanti, ${nome}.</p>
-      <div class="numeri-traguardo"><div><span>VP personali</span><b>${num(n.personali)}</b></div><div><span>VP di gruppo</span><b>${num(n.gruppo)}</b></div></div>
+      ${n.mappa ? `<div class="numeri-traguardo"><div><span>VP personali</span><b>${num(n.personali)}</b></div><div><span>VP di gruppo</span><b>${num(n.gruppo)}</b></div></div>
+      <p class="small">${esc(testoMappa(m).replace(/^./, c => c.toUpperCase()))}</p>` : ""}
       ${attuale ? `<div class="riquadro"><span class="eyebrow">La prossima tappa</span><span><b>${esc(attuale.nome)}</b>${requisitiTesto(attuale) ? ` · ${esc(requisitiTesto(attuale))}` : ""}</span></div>` : ""}`;
   }
   if(t.tipo === "vp") return `<span class="eyebrow">Obiettivo del mese</span>

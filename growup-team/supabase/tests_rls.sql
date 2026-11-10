@@ -76,7 +76,7 @@ declare
   u7 constant uuid := '00000000-0000-0000-0000-0000000000a7';  -- telefono nuovo, poi D
   u8 constant uuid := '00000000-0000-0000-0000-0000000000a8';  -- E, aggiunta a mano, poi entra
   r uuid; a uuid; b uuid; c uuid; d uuid; e uuid; f uuid; g uuid; h uuid; k uuid; x record; mese_prec date;
-  pp uuid; pq uuid; att_prima int; att_nuovi int;
+  pp uuid; pq uuid; att_prima int; att_nuovi int; ca uuid; cb uuid; oc uuid;
   k_r text; k_a text; k_a2 text; k_d text; k_e text;
 begin
   begin  -- tutto quello che succede qui dentro viene annullato alla fine
@@ -170,7 +170,17 @@ begin
   -- ---- Attività ----
   perform growup_test.come(u2);  -- A
   insert into public.activities (partner_id, tipo) values (a, 'contatto');
-  insert into public.activities (partner_id, tipo, vp) values (a, 'ordine', 60);
+  -- 063: i VP vengono solo dalla mappa: niente più ordini e rettifiche scritti a mano (quelli vecchi restano)
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, vp) values (%L, 'ordine', 60)$q$, a),
+                                   '063: niente più ordini scritti a mano');
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, vp) values (%L, 'rettifica', -10)$q$, a),
+                                   '063: niente più «Aggiorna il totale»');
+  execute 'reset role';
+  insert into public.activities (partner_id, tipo, vp, inserito_da) values (a, 'ordine', 60, a);   -- un ordine di prima della 063
+  perform growup_test.come(u2);  -- A
+  perform growup_test.ok(exists (select 1 from public.activities where tipo = 'ordine' and partner_id = a), '063: gli ordini vecchi restano');
+  perform growup_test.deve_fallire(format($q$update public.activities set tipo = 'ordine', vp = 5 where tipo = 'contatto' and partner_id = %L$q$, a),
+                                   '063: un''attività non diventa un ordine');
   perform growup_test.ok((select inserito_da from public.activities where tipo = 'contatto') = a, 'inserito_da registrato dal server');
   perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'contatto')$q$, b),
                                    'A non scrive attività di B (B è attivo)');
@@ -178,10 +188,7 @@ begin
                                    'inserito_da non si sceglie dal telefono');
   perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo) values (%L, 'ordine')$q$, a), 'un ordine senza VP');
   perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, vp) values (%L, 'ordine', -5)$q$, a), 'un ordine negativo');
-  insert into public.activities (partner_id, tipo, vp) values (a, 'rettifica', -10);
-  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, vp) values (%L, 'rettifica', 0)$q$, a), 'una rettifica a zero');
   perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, vp) values (%L, 'contatto', 5)$q$, a), 'VP su un contatto');
-  delete from public.activities where tipo = 'rettifica';
   perform growup_test.ok((select ultimo_aggiornamento from public.partners where id = a) is not null, 'ultimo_aggiornamento si muove quando A scrive');
 
   perform growup_test.come(u3);  -- B
@@ -436,7 +443,7 @@ begin
 
   -- ---- Mesi chiusi e storico per chi guarda ----
   perform growup_test.come(u5);  -- A
-  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, vp, data) values (%L, 'ordine', 10, current_date - 70)$q$, a),
+  perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, vp, data) values (%L, 'contatto', null, current_date - 70)$q$, a),
                                    'niente registrazioni in un mese chiuso');
   perform growup_test.deve_fallire(format($q$insert into public.activities (partner_id, tipo, data) values (%L, 'contatto', current_date + 3)$q$, a),
                                    'niente registrazioni nel futuro');
@@ -446,10 +453,19 @@ begin
   perform growup_test.ok(not public.mese_aperto(current_date - 70), 'mese_aperto: due mesi fa no');
   perform growup_test.ok(public.mese_aperto(current_date), 'mese_aperto: oggi sì');
   execute 'reset role';
+  -- 063: si congelano solo i numeri di chi ha la mappa del mese (qui solo A)
+  insert into public.numeri_mese (partner_id, mese, vpp, vpg, dati_al) values (a, date_trunc('month', mese_prec)::date, 55, 155, now());
   perform growup_test.ok(public.chiudi_mese(mese_prec) > 0, 'chiusura del mese precedente');
+  perform growup_test.ok(not exists (select 1 from public.monthly_totals where partner_id <> a) and exists (select 1 from public.monthly_totals),
+                         '063: congelati solo i numeri di chi ha la mappa');
   perform growup_test.come(u5);  -- A
-  perform growup_test.ok((select count(*) from public.riepilogo_mese(mese_prec) where chiuso) = (select count(*) from public.monthly_totals)
-                         and (select count(*) from public.monthly_totals) > 0, 'A legge il mese chiuso come lo vedeva lei');
+  perform growup_test.ok((select count(*) from public.riepilogo_mese(mese_prec) where chiuso) > 0
+                         and (select vp_personali = 55 and vp_gruppo = 155 from public.riepilogo_mese(mese_prec) where partner_id = a)
+                         and (select vp_personali is null from public.riepilogo_mese(mese_prec) where partner_id = b),
+                         'A legge il mese chiuso: i numeri della mappa, senza mappa nessun numero');
+  execute 'reset role';
+  delete from public.numeri_mese where partner_id = a and mese = date_trunc('month', mese_prec)::date;
+  perform growup_test.come(u5);
   perform growup_test.ok(not exists (select 1 from public.monthly_totals where visto_da <> a), 'A legge solo il suo storico');
   perform growup_test.deve_fallire(format($q$insert into public.monthly_totals (visto_da, partner_id, mese) values (%L, %L, date '2026-01-01')$q$, a, a),
                                    'lo storico non si scrive dal telefono');
@@ -838,72 +854,102 @@ begin
   perform growup_test.ok(not exists (select 1 from public.numeri_mese where partner_id = b), '033: un''altra linea non vede i numeri di B');
   execute 'reset role';
 
-  -- ---- 034: gli ordini a mano di chi ha l'app li vede solo lui; per lui contano solo quelli dopo il report ----
-  perform growup_test.come(u3);  -- B: i 150 VP scritti prima del report sono già dentro il report (90)
-  perform growup_test.ok((select vp_personali from public.riepilogo_mese(current_date) where partner_id = b) = 90,
-                         '034: per B gli ordini scritti prima del report non si sommano');
+  -- ---- 063: i VP solo dalla mappa: un ordine o una rettifica non cambiano più calcola_mese ----
+  perform growup_test.come(u3);  -- B: 90 personali e 1000 di gruppo dalla mappa
+  select * into x from public.riepilogo_mese(current_date) where partner_id = b;
+  perform growup_test.ok(x.vp_personali = 90 and x.vp_gruppo = 1000 and x.da_report, '063: B ha i VP della mappa (' || x.vp_personali || ')');
   execute 'reset role';
   update public.numeri_mese set dati_al = now() - interval '1 hour' where partner_id = b and mese = date_trunc('month', current_date)::date;
-  perform growup_test.come(u3);  -- B scrive un ordine dopo il file del report (i 150 di prima li aveva scritti un altro)
-  insert into public.activities (partner_id, tipo, vp) values (b, 'ordine', 60);
-  select * into x from public.riepilogo_mese(current_date) where partner_id = b;
-  perform growup_test.ok(x.vp_personali = 150 and x.vp_gruppo = 1060, '034: B vede report + i suoi ordini dopo il report (' || x.vp_personali || ', ' || x.vp_gruppo || ')');
-  perform growup_test.ok(exists (select 1 from public.activities where partner_id = b and tipo = 'ordine'), '034: B legge i suoi ordini');
-  perform growup_test.come(u5);  -- A, sponsor di B: solo il report
-  select * into x from public.riepilogo_mese(current_date) where partner_id = b;
-  perform growup_test.ok(x.vp_personali = 90 and x.vp_gruppo = 1000, '034: lo sponsor vede di B solo il report (' || x.vp_personali || ')');
-  perform growup_test.ok(not exists (select 1 from public.activities where partner_id = b and tipo in ('ordine', 'rettifica')),
-                         '034: lo sponsor non legge gli ordini a mano di B');
-  perform growup_test.ok(exists (select 1 from public.activities where partner_id = b and tipo = 'piano'), '034: lo sponsor legge ancora i piani di B');
-  execute 'reset role';
+  -- ordini e rettifiche di prima della 063, scritti da B dopo il file della mappa: restano, ma non contano
+  insert into public.activities (partner_id, tipo, vp, inserito_da) values (b, 'ordine', 60, b), (b, 'rettifica', 15, b);
+  perform growup_test.ok((select vp_personali = 90 and vp_gruppo = 1000 from public.calcola_mese(current_date, b, b) where partner_id = b),
+                         '063: un ordine o una rettifica non cambiano più calcola_mese (per me)');
+  perform growup_test.ok((select vp_personali = 90 from public.calcola_mese(current_date, a, a) where partner_id = b)
+                         and (select vp_gruppo from public.calcola_mese(current_date, a, a) where partner_id = a)
+                             = (select vpg from public.numeri_mese where partner_id = a and mese = date_trunc('month', current_date)::date),
+                         '063: né per lo sponsor e l''upline');
   pq := (select id from public.partners where codice_amway = '3000002');  -- Fabio, sotto B, non ha l'app
-  insert into public.activities (partner_id, tipo, vp) values (pq, 'ordine', 25);
-  perform growup_test.come(u1);  -- R: gli ordini di chi non ha l'app restano visibili alla upline
-  perform growup_test.ok(exists (select 1 from public.activities where partner_id = pq and tipo = 'ordine' and vp = 25),
-                         '034: l''upline legge gli ordini di chi non ha l''app');
-  perform growup_test.ok(not exists (select 1 from public.activities where partner_id in (a, b) and tipo in ('ordine', 'rettifica')),
-                         '034: l''upline non legge gli ordini a mano di chi ha l''app');
+  insert into public.activities (partner_id, tipo, vp, inserito_da) values (pq, 'ordine', 25, b);
+  perform growup_test.ok((select vp_personali from public.calcola_mese(current_date, r, r) where partner_id = pq) = 80,
+                         '063: per chi non ha l''app contano solo i VP della mappa');
+  perform growup_test.ok(not exists (select 1 from public.numeri_mese where partner_id = c and mese = date_trunc('month', current_date)::date)
+                         and (select vp_personali is null and vp_gruppo is null and linee_attive is null and percentuale is null
+                                from public.calcola_mese(current_date, r, r) where partner_id = c),
+                         '063: senza la mappa del mese i VP non sono disponibili (null), mai uno zero');
+  perform growup_test.ok(not exists (select 1 from public.calcola_mese(mese_prec, r, r) where vp_personali is not null)
+                         and not exists (select 1 from public.numeri_mese where mese = mese_prec),
+                         '063: un mese senza mappe: nessun numero');
+  perform growup_test.come(u3);
+  perform growup_test.ok((select vp_personali from public.riepilogo_mese(current_date) where partner_id = b) = 90,
+                         '063: il riepilogo di B resta quello della mappa');
+  perform growup_test.come(u5);  -- A, sponsor di B
+  perform growup_test.ok(not exists (select 1 from public.activities where partner_id = b and tipo in ('ordine', 'rettifica')),
+                         '034: lo sponsor non legge gli ordini vecchi di B');
+  perform growup_test.ok(exists (select 1 from public.activities where partner_id = b and tipo = 'piano'), '034: lo sponsor legge ancora i piani di B');
+  insert into public.persone (nome) values ('Persona di A') returning id into ca;
   execute 'reset role';
   update public.numeri_mese set dati_al = now() where partner_id = b and mese = date_trunc('month', current_date)::date;
-  perform growup_test.come(u3);  -- B: un report nuovo assorbe gli ordini scritti prima
-  perform growup_test.ok((select vp_personali from public.riepilogo_mese(current_date) where partner_id = b) = 90,
-                         '034: con un report più nuovo il totale torna al dato del report');
 
-  -- ---- 034: la bozza d'ordine e lo storico, solo miei ----
-  insert into public.ordini_personali default values returning id into pp;
+  -- ---- 063: più bozze d'ordine, con un nome e un cliente; confermate vanno nello storico senza VP ----
+  perform growup_test.come(u3);  -- B
+  insert into public.persone (nome) values ('Cliente di B') returning id into cb;
+  insert into public.ordini_personali (nome, persona_id) values ('Per il cliente', cb) returning id into pp;
   insert into public.righe_ordine_personale (ordine_id, codice, nome, quantita, vp, prezzo_partner, prezzo_cliente)
     values (pp, '1001', 'Prodotto uno', 2, 10.5, 20, 26), (pp, '1002', 'Prodotto due', 1, 4, 9, 12);
-  perform growup_test.deve_fallire('insert into public.ordini_personali default values', '034: una sola bozza aperta');
+  insert into public.ordini_personali (nome) values ('Seconda') returning id into pq;
+  perform growup_test.ok((select count(*) from public.ordini_personali where stato = 'bozza') = 2, '063: più bozze aperte insieme');
+  perform growup_test.deve_fallire($q$insert into public.ordini_personali (nome) values (repeat('x', 61))$q$, '063: il nome della bozza al massimo 60 caratteri');
+  perform growup_test.ok(growup_test.righe(format($q$update public.ordini_personali set nome = 'Rinominata' where id = %L$q$, pq)) = 1,
+                         '063: la bozza si rinomina');
+  perform growup_test.deve_fallire(format($q$insert into public.ordini_personali (persona_id) values (%L)$q$, ca),
+                                   '063: una bozza non si collega alle persone di un altro');
+  perform growup_test.deve_fallire(format($q$update public.ordini_personali set persona_id = %L where id = %L$q$, ca, pq),
+                                   '063: neanche cambiandola');
   perform growup_test.deve_fallire(format($q$insert into public.ordini_personali (proprietario) values (%L)$q$, a), '034: la bozza è solo mia');
   perform growup_test.deve_fallire(format($q$update public.ordini_personali set stato = 'confermato' where id = %L$q$, pp),
                                    '034: la bozza si conferma solo dalla funzione');
   perform growup_test.come(u5);  -- A
   perform growup_test.ok(not exists (select 1 from public.ordini_personali) and not exists (select 1 from public.righe_ordine_personale),
-                         '034: lo sponsor non vede la bozza di B');
+                         '034: lo sponsor non vede le bozze di B');
   perform growup_test.deve_fallire(format('select public.conferma_ordine(%L, null)', pp), '034: A non conferma la bozza di B');
   perform growup_test.ok(growup_test.righe(format('delete from public.ordini_personali where id = %L', pp)) = 0, '034: A non toglie la bozza di B');
+  perform growup_test.ok(growup_test.righe(format($q$update public.ordini_personali set nome = 'A' where id = %L$q$, pp)) = 0, '063: A non rinomina la bozza di B');
   perform growup_test.come(null);
   perform growup_test.deve_fallire('select count(*) from public.ordini_personali', '034: anon non legge gli ordini');
   perform growup_test.deve_fallire(format('select public.conferma_ordine(%L, null)', pp), '034: anon non conferma');
-  perform growup_test.come(u3);  -- B conferma: 25 VP nel mese, l'ordine passa nello storico
-  att_prima := (select count(*) from public.activities where partner_id = b and tipo = 'ordine');
-  perform growup_test.ok((public.conferma_ordine(pp, null)->>'vp')::numeric = 25, '034: confermando, il totale VP dell''ordine');
-  perform growup_test.ok((select count(*) from public.activities where partner_id = b and tipo = 'ordine') = att_prima + 1
-                         and exists (select 1 from public.ordini_personali where id = pp and stato = 'confermato' and attivita_id is not null),
-                         '034: l''ordine confermato diventa un ordine del mese, collegato allo storico');
+  perform growup_test.come(u3);  -- B conferma la bozza del cliente
+  att_prima := (select count(*) from public.activities where partner_id = b);
+  perform growup_test.ok((public.conferma_ordine(pp, null)->>'vp')::numeric = 25, '063: confermando, il totale VP dei prodotti (solo da leggere)');
+  perform growup_test.ok((select count(*) from public.activities where partner_id = b) = att_prima
+                         and exists (select 1 from public.ordini_personali where id = pp and stato = 'confermato' and attivita_id is null
+                                       and confermato_il is not null and data = current_date),
+                         '063: l''ordine confermato va nello storico con la data, senza VP nel mese');
+  perform growup_test.ok((select vp_personali from public.riepilogo_mese(current_date) where partner_id = b) = 90,
+                         '063: dopo la conferma i VP restano quelli della mappa');
+  oc := (select ordine_cliente_id from public.ordini_personali where id = pp);
+  perform growup_test.ok(exists (select 1 from public.ordini where id = oc and persona_id = cb and modo = 'io' and vp = 25 and data = current_date)
+                         and (select count(*) from public.righe_ordine where ordine_id = oc) = 2
+                         and (select prezzo from public.righe_ordine where ordine_id = oc and codice = '1001') = 26,
+                         '063: con un cliente, l''ordine entra anche nella sua scheda, con i prodotti');
   perform growup_test.deve_fallire(format('select public.conferma_ordine(%L, null)', pp), '034: un ordine si conferma una volta sola');
   perform growup_test.deve_fallire(format($q$insert into public.righe_ordine_personale (ordine_id, codice, nome) values (%L, '1003', 'Tre')$q$, pp),
                                    '034: un ordine confermato non si cambia');
   perform growup_test.ok(growup_test.righe(format('update public.righe_ordine_personale set quantita = 5 where ordine_id = %L', pp)) = 0,
                          '034: le righe di un ordine confermato restano come sono');
-  insert into public.ordini_personali default values returning id into pq;
+  perform growup_test.ok(growup_test.righe(format($q$update public.ordini_personali set nome = 'Dopo' where id = %L$q$, pp)) = 0,
+                         '063: un ordine confermato non si rinomina');
   perform growup_test.deve_fallire(format('select public.conferma_ordine(%L, null)', pq), '034: una bozza vuota non si conferma');
-  perform growup_test.ok(growup_test.righe(format('delete from public.activities where id = (select attivita_id from public.ordini_personali where id = %L)', pp)) = 1,
-                         '034: B toglie l''ordine del mese collegato al suo ordine');
-  att_prima := growup_test.righe(format('delete from public.ordini_personali where id = %L', pp));
-  perform growup_test.ok(att_prima = 1
-                         and not exists (select 1 from public.righe_ordine_personale where ordine_id = pp),
-                         '034: B toglie il suo ordine dallo storico, con le sue righe');
+  insert into public.righe_ordine_personale (ordine_id, codice, nome, quantita, vp) values (pq, '1001', 'Prodotto uno', 1, 10.5);
+  perform growup_test.deve_fallire(format('select public.conferma_ordine(%L, %L)', pq, current_date + 1), '063: la data non può essere nel futuro');
+  perform growup_test.ok((public.conferma_ordine(pq, current_date - 400)->>'data')::date = current_date - 400
+                         and (select ordine_cliente_id is null from public.ordini_personali where id = pq),
+                         '063: nessun limite di mese chiuso sulla data; senza cliente nessun ordine nella scheda');
+  -- togliere un ordine dallo storico lo toglie anche dalla scheda del cliente
+  perform growup_test.ok(growup_test.righe(format('delete from public.ordini where id = %L', oc)) = 1, '063: B toglie l''ordine dalla scheda del cliente');
+  perform growup_test.ok(growup_test.righe(format('delete from public.ordini_personali where id = %L', pp)) = 1, '063: B toglie l''ordine dallo storico');
+  perform growup_test.ok(not exists (select 1 from public.righe_ordine_personale where ordine_id = pp)
+                         and not exists (select 1 from public.righe_ordine where ordine_id = oc),
+                         '063: B toglie il suo ordine dallo storico e dalla scheda del cliente, con le righe');
   execute 'reset role';
 
   -- ---- 035: la Guida (tabella Stabilità e abitudini) ----
@@ -919,6 +965,16 @@ begin
   -- 060: i nuovi in partenza di A (solo numeri) e la ×
   perform growup_test.ok((select count(*) from public.partenze() pz where pz.nome = 'Nuovo Guida' and pz.invitato_da_me and not pz.ha_perche and pz.nomi_lista = 0) = 1,
                          '060: A vede il suo nuovo in partenza, solo numeri');
+  perform growup_test.ok((select pz.vp_dal_ingresso is null from public.partenze() pz where pz.nome = 'Nuovo Guida'),
+                         '063: senza mappa il primo ordine del nuovo non c''è ancora');
+  execute 'reset role';
+  insert into public.activities (partner_id, tipo, vp, inserito_da)
+    select id, 'ordine', 70, id from public.partners where codice_amway = '8000001';   -- un ordine vecchio: non conta
+  insert into public.numeri_mese (partner_id, mese, vpp, vpg, dati_al)
+    select id, date_trunc('month', current_date)::date, 30, 30, now() from public.partners where codice_amway = '8000001';
+  perform growup_test.come(u5);
+  perform growup_test.ok((select pz.vp_dal_ingresso from public.partenze() pz where pz.nome = 'Nuovo Guida') = 30,
+                         '063: il primo ordine del nuovo dalla prima mappa che ne mostra (30 VP), non dagli ordini scritti');
   insert into public.partenza_tolti (nuovo_id, fase) select pz.id, 2 from public.partenze() pz where pz.nome = 'Nuovo Guida';
   perform growup_test.ok((select count(*) from public.partenza_tolti) = 1, '060: A toglie il suo nuovo con la ×');
   select pz.id into pq from public.partenze() pz where pz.nome = 'Nuovo Guida';
@@ -1103,6 +1159,32 @@ begin
     perform growup_test.ok(corpo39 like '3 persone da risentire · 1 cliente da sentire%', '039: alle 8:30 il riepilogo di B, senza nomi');
     perform growup_test.ok(fuori39 = 0, '039: fuori dalle 8:30 niente riepilogo');
     perform growup_test.ok(dopo39 = 0, '039: il riepilogo non si manda due volte');
+    -- 063: «mancano X VP» negli ultimi giorni del mese, dalla mappa del mese (con la sua data), mai dai numeri del telefono
+    declare
+      fine63 date := (date_trunc('month', oggi39) + interval '1 month - 2 days')::date;
+      alle63 timestamptz := (fine63 + time '08:31') at time zone 'Europe/Rome';
+      mesi63 text[] := array['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+      del63 date;
+    begin
+      insert into public.monthly_goals (partner_id, mese, obiettivo_vp) values (b, date_trunc('month', oggi39)::date, 150)
+        on conflict (partner_id, mese) do update set obiettivo_vp = 150;
+      insert into public.notifiche_previste (partner_id, giorno, vp_mancanti) values (b, fine63, 999);
+      del63 := (select (dati_al at time zone 'Europe/Rome')::date from public.numeri_mese where partner_id = b and mese = date_trunc('month', oggi39)::date);
+      execute 'set local role service_role';
+      corpo39 := (select corpo from public.notifiche_da_inviare(alle63) where partner_id = b and chiave like 'mattino-%');
+      execute 'reset role';
+      perform growup_test.ok(corpo39 like '%mancano 60 VP al tuo obiettivo (mappa '
+                               || case extract(day from del63)::int when 1 then 'del 1°' when 8 then 'dell''8' when 11 then 'dell''11'
+                                       else 'del ' || extract(day from del63)::int end
+                               || ' ' || mesi63[extract(month from del63)::int] || ')%' and corpo39 not like '%999%',
+                             '063: «mancano X VP» dalla mappa del mese con la sua data (' || coalesce(corpo39, 'niente') || ')');
+      update public.numeri_mese set mese = mese - interval '1 year' where partner_id = b and mese = date_trunc('month', oggi39)::date;
+      execute 'set local role service_role';
+      corpo39 := (select corpo from public.notifiche_da_inviare(alle63) where partner_id = b and chiave like 'mattino-%');
+      execute 'reset role';
+      perform growup_test.ok(coalesce(corpo39, '') not like '%VP%', '063: senza la mappa del mese niente «mancano X VP»');
+      update public.numeri_mese set mese = mese + interval '1 year' where partner_id = b and mese = (date_trunc('month', oggi39) - interval '1 year')::date;
+    end;
     delete from public.notifiche_telefoni; delete from public.notifiche_previste; delete from public.notifiche_inviate;
   end;
 

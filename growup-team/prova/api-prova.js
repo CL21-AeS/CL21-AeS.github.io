@@ -195,18 +195,10 @@
       const ric = visibiliRicuciti(io);
       const figliVis = id => ric.filter(p => p.sponsor_id === id);
       const num = id => numeroDi(id, m);
-      /* 034: per me il report + i miei ordini dopo il report; per chi ha l'app solo il report; per chi non l'ha i VP scritti */
-      const ordini = (id, n) => db.activities.filter(a => a.partner_id === id && (a.tipo === "ordine" || a.tipo === "rettifica") && a.data.slice(0, 7) === m
-        && (!n || (n.dati_al && a.inserito_il > n.dati_al && a.inserito_da === id))).reduce((t, a) => t + Number(a.vp), 0);
-      const pers = id => { const n = num(id), p = db.partners.find(x => x.id === id) || {};
-        if(id === io.id) return (n && n.vpp != null ? Number(n.vpp) : 0) + ordini(id, n);
-        if(n && n.vpp != null) return Number(n.vpp);
-        return p.stato === "gestito" ? ordini(id, null) : 0; };
-      const grp = id => pers(id) + figliVis(id).reduce((t, p) => t + grp(p.id), 0);
+      /* 063: solo i numeri della mappa del mese; senza mappa nessun numero (null), mai uno zero */
       return ric.map(p => { const n = num(p.id);
-        return { partner_id:p.id, sponsor_id:p.sponsor_id || null, vp_personali:pers(p.id),
-          vp_gruppo:n ? n.vpg + (p.id === io.id ? pers(p.id) - Number(n.vpp || 0) : 0) : grp(p.id),
-          linee_attive:n ? n.linee.filter(l => l.vpg >= 100).length : 0, percentuale:n ? n.percentuale : null, qualifica:null, chiuso:false,
+        return { partner_id:p.id, sponsor_id:p.sponsor_id || null, vp_personali:n ? Number(n.vpp) || 0 : null, vp_gruppo:n ? Number(n.vpg) || 0 : null,
+          linee_attive:n ? (n.linee || []).filter(l => l.vpg >= 100).length : null, percentuale:n ? n.percentuale : null, qualifica:null, chiuso:false,
           da_report:!!n, linee_report:n ? n.linee : null, linee_nascoste:n ? !!n.nascoste : false }; }); },
     storico: async pid => (db.storico || []).filter(r => r.partner_id === pid),
     livelli: async () => [[3,200],[6,600],[9,1200],[12,2400],[15,4000],[18,7000],[21,10000]].map(([percentuale, vp_gruppo]) => ({ percentuale, vp_gruppo })),
@@ -247,7 +239,11 @@
       return sotto(io.id).filter(p => p.stato !== "gestito" && p.confermato_il === null && !p.is_admin && (codici || []).includes(p.codice_amway))
         .map(p => ({ id:p.id, nome:p.nome, codice:p.codice_amway })); },
     mioReport: async (pid, dal) => (db.numeri || []).filter(x => x.partner_id === pid && x === numeroDi(pid, x.mese) && x.mese + "-01" >= dal)
-      .map(x => ({ mese:x.mese + "-01", vpp:x.vpp, vpg:x.vpg, percentuale:x.percentuale, dati_al:x.dati_al || "9999-12-31T00:00:00Z", importato_da:x.visto_da })),
+      .map(x => ({ mese:x.mese + "-01", vpp:x.vpp, vpg:x.vpg, percentuale:x.percentuale, linee:x.linee || [], dati_al:x.dati_al || "9999-12-31T00:00:00Z", importato_da:x.visto_da })),
+    /* 063: le date delle mappe di chi vedo */
+    dateMappe: async dal => { const io = mio(); if(!io) return [];
+      return visibili(io).flatMap(p => [...new Set((db.numeri || []).filter(x => x.partner_id === p.id && x.mese + "-01" >= dal).map(x => x.mese))]
+        .map(m => { const n = numeroDi(p.id, m); return { partner_id:p.id, mese:m + "-01", dati_al:n.dati_al || "9999-12-31T00:00:00Z" }; })); },
     /* 034: la bozza d'ordine e lo storico, solo miei */
     ordiniMiei: async () => (db.ordiniMiei || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
     righeMie: async () => (db.righeMie || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
@@ -267,10 +263,8 @@
       if(!o) throw new Error("non_autorizzato");
       const righe = (db.righeMie || []).filter(x => x.ordine_id === id); if(!righe.length) throw new Error("ordine_vuoto");
       const tot = Math.round(righe.reduce((t, r) => t + (Number(r.vp) || 0) * r.quantita, 0) * 100) / 100;
-      let att = null;
-      if(tot > 0){ att = uid(); db.activities.push({ id:att, partner_id:io.id, tipo:"ordine", vp:tot, quantita:1, data:data || new Date().toISOString().slice(0, 10),
-        inserito_da:io.id, inserito_il:new Date().toISOString() }); }
-      Object.assign(o, { stato:"confermato", data:data || o.data, attivita_id:att, vp:tot, confermato_il:new Date().toISOString() }); salva();
+      /* 063: confermata va nello storico, senza VP nel mese */
+      Object.assign(o, { stato:"confermato", data:data || o.data, attivita_id:null, vp:tot, confermato_il:new Date().toISOString() }); salva();
       return Object.assign({}, o); },
     /* 037: Analisi della persona e dati condivisi */
     analisiPersona: async pid => { const io = mio(); const t = db.partners.find(p => p.id === pid);
@@ -512,7 +506,10 @@
         incontro_sponsor:p.incontro_sponsor || null, partenza_completata_il:p.partenza_completata_il || null, punto_upline:p.punto_upline || null,
         punto_upline_fatto:p.punto_upline_fatto || null, ha_perche:(db.obiettivi || []).some(o => o.partner_id === p.id && String(o.perche || "").trim()),
         nomi_lista:(db.persone || []).filter(x => x.proprietario === p.id && x.esito !== "cliente").length,
-        vp_dal_ingresso:somma(p.id, ["ordine", "rettifica"], "vp", p.data_iscrizione || "2000-01-01"), contatti:somma(p.id, ["contatto"], "quantita"),
+        /* 063: i VP della prima mappa (dal mese di iscrizione) che ne mostra */
+        vp_dal_ingresso:(() => { const m0 = String(p.data_iscrizione || "2000-01-01").slice(0, 7);
+          const n = [...new Set((db.numeri || []).filter(x => x.partner_id === p.id && x.mese >= m0).map(x => x.mese))].sort()
+            .map(m => numeroDi(p.id, m)).find(x => Number(x.vpp) > 0); return n ? Number(n.vpp) : null; })(), contatti:somma(p.id, ["contatto"], "quantita"),
         invitati:(db.passi || []).filter(x => x.proprietario === p.id && x.tipo === "invito").length, piani:somma(p.id, ["piano"], "quantita"),
         clienti:somma(p.id, ["cliente"], "quantita"), ha_gruppo:db.partners.some(f => f.sponsor_id === p.id),
         mappa_importata:(db.numeri || []).some(n => n.visto_da === p.id), invitato_da_me:p.invitato_da === io.id })); },
@@ -529,7 +526,8 @@
         partner_mese:(db.passi || []).filter(x => x.proprietario === pid && x.tipo === "chiusura" && x.esito === "partner" && x.data.slice(0, 7) === m).length,
         clienti_mese:(db.passi || []).filter(x => x.proprietario === pid && x.tipo === "chiusura" && x.esito === "cliente" && x.data.slice(0, 7) === m).length,
         clienti:l.filter(x => x.esito === "cliente" && !x.non_compra).length, totale:l.length }; },
-    addActivity: async row => { const r = Object.assign({ id:uid(), inserito_il:new Date().toISOString(), inserito_da:mio().id }, row); db.activities.push(r); salva(); return r; },
+    addActivity: async row => { if(["ordine", "rettifica"].includes(row.tipo)) throw new Error("new row violates row-level security policy");
+      const r = Object.assign({ id:uid(), inserito_il:new Date().toISOString(), inserito_da:mio().id }, row); db.activities.push(r); salva(); return r; },
     deleteActivity: async id => { db.activities = db.activities.filter(a => a.id !== id); salva(); },
     lastGoal: async (pid, fino) => db.goals.filter(g => g.partner_id === pid && g.settimana <= fino).sort((a,b) => a.settimana < b.settimana ? 1 : -1).slice(0,1),
     saveGoal: async row => { db.goals = db.goals.filter(g => !(g.partner_id === row.partner_id && g.settimana === row.settimana)); db.goals.push(row); salva(); return row; },

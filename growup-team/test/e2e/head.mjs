@@ -72,6 +72,20 @@ async function apri(ctxOpts, hash){
   await page.goto(BASE + (hash || ""));
   return { ctx, page };
 }
+/* 063: i VP vengono solo dalle mappe Amway. Una mappa per una persona (mese in corso, o extra.mese «AAAA-MM»):
+   mappa() nei dati del test (per le pagine aperte dopo), mappaIn() nella pagina aperta (l'app ricarica i numeri) */
+const meseOra = () => new Intl.DateTimeFormat("en-CA", { timeZone:"Europe/Rome" }).format(new Date()).slice(0, 7);
+const rigaMappa = (pid, vpp, vpg, extra) => Object.assign({ visto_da:"R", partner_id:pid, mese:meseOra(), vpp, vpg:vpg == null ? vpp : vpg,
+  percentuale:null, linee:[], nascoste:false, dati_al:new Date().toISOString() }, extra || {});
+const mappa = (pid, vpp, vpg, extra) => { const r = rigaMappa(pid, vpp, vpg, extra);
+  DB.numeri = (DB.numeri || []).filter(x => !(x.partner_id === pid && x.mese === r.mese)).concat([r]); return r; };
+const mappaIn = async (pg, pid, vpp, vpg, extra) => { const r = rigaMappa(pid, vpp, vpg, extra);
+  await pg.evaluate(r => { const db = window.__DB; db.numeri = (db.numeri || []).filter(x => !(x.partner_id === r.partner_id && x.mese === r.mese)).concat([r]);
+    document.dispatchEvent(new Event("visibilitychange")); }, r);
+  await pg.waitForTimeout(400); return r; };
+/* «mappa del 10 novembre» per una data e ora */
+const giornoMappaIt = d => new Intl.DateTimeFormat("it-IT", { timeZone:"Europe/Rome", day:"numeric", month:"long" }).format(new Date(d));
+const delGiornoIt = d => { const g = giornoMappaIt(d), n = parseInt(g, 10); return n === 1 ? "del 1°" + g.slice(1) : n === 8 || n === 11 ? "dell'" + g : "del " + g; };
 const sync = async page => Object.assign(DB, await page.evaluate(() => JSON.parse(JSON.stringify(window.__DBOUT || window.__DB))));
 /* ottimizzazione 1: tappa e diario si aprono toccandoli; gli ordini stanno nel foglio «Ordini» */
 const apriRiga = async (pg, act) => { const b = pg.locator(`button[data-act=${act}]`).first();
