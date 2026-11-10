@@ -1730,6 +1730,9 @@ function vPrimiPassi(){
 function aiutoBtn(k){ const on = st.aiuti.has(k);
   return `<button class="aiuto-btn${on ? " on" : ""}" data-act="aiuto" data-k="${k}" aria-expanded="${on}" aria-label="${on ? "Chiudi la spiegazione" : "Spiegazione"}">?</button>`; }
 function aiutoTesto(k, html){ return st.aiuti.has(k) ? `<p class="nota aiuto-testo">${html}</p>` : ""; }
+/* il «?» dei VP (063, testo di Stefano): ogni posto ha la sua chiave, così si apre solo lì */
+const AIUTO_VP = "I VP sono quelli ufficiali di Amway, dall'ultima mappa importata (anche da chi ti segue). Le bozze ti aiutano a preparare gli ordini e la chiusura del mese, ma non cambiano i VP.";
+function aiutoVp(k){ return aiutoTesto(k, esc(AIUTO_VP)); }
 
 /* ---- Il primo obiettivo: cifra al mese, entro quando, perché ---- */
 /* la prima tappa dal Path to Bronze in su che vale almeno la cifra (oltre l'ultima con una cifra: l'ultima) */
@@ -2035,7 +2038,7 @@ function vComeArrivarci(pid, chi){
     <p class="small" style="margin:8px 0 0">${TAPPE_DI_PERCORSO.includes(t.chiave) ? "Tappa" : "Prossima tappa"}: <b>${esc(t.nome)}</b> · ${esc(s.sintesi)}</p>
     ${testi.map(x => riempi(x, s.dati)).filter(Boolean).map(x => `<p>${esc(x)}</p>`).join("")}
     ${tabella}
-    <p class="nota">Calcolato sui numeri del mese fino a oggi. Sono spunti: la strada la decidete voi.</p>
+    <p class="nota">Calcolato sui numeri della mappa del mese. Sono spunti: la strada la decidete voi.</p>
   </details>`;
 }
 
@@ -2271,7 +2274,8 @@ function vCruscotto(){
       <button class="riga-apri tappa-riga" data-act="apri-tappa" aria-expanded="${aperta}"><span class="grow">${riga}</span>
         <span class="fr" aria-hidden="true">${aperta ? "▴" : "▾"}</span></button>
     </div>
-    <p class="small mappa-riga">VP: ${esc(testoMappa(m))}</p>
+    <p class="small mappa-riga con-aiuto"><span>VP: ${esc(testoMappa(m))}</span>${aiutoBtn("vp-io")}</p>
+    ${aiutoVp("vp-io")}
     ${t.sempre}
     ${aperta ? `<div class="tappa-aperta">${t.corpo}</div>` : ""}
     ${(() => { const nn = avviato() ? nomiNuoviSettimana() : null;
@@ -2488,7 +2492,8 @@ function barraVp(m){
   return barra("VP personali", v, obj);
 }
 function rigaVp(m){
-  return `<p class="small vp-report" style="margin:4px 0 0">${esc(testoMappa(m).replace(/^./, c => c.toUpperCase()))}</p>`;
+  return `<p class="small con-aiuto" style="margin:4px 0 0"><span class="vp-report">${esc(testoMappa(m).replace(/^./, c => c.toUpperCase()))}</span>${aiutoBtn("vp-mese")}</p>
+    ${aiutoVp("vp-mese")}`;
 }
 
 /* Storico (063): i mesi dalle mappe Amway, dal più recente; un mese senza mappa: «nessuna mappa di …» */
@@ -2925,7 +2930,7 @@ function vPreferiti(){
     ];
     return { p, e, ordine: e ? e.ordine : 9, html:`<li class="preferito">
       <div class="spread"><button class="nome" data-act="apri-scheda" data-id="${esc(p.id)}"><span>${esc(p.nome)}</span>
-        <span class="small">${p.stato === "gestito" ? "senza app · numeri inseriti dallo sponsor" : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</span></button>
+        <span class="small">${p.stato === "gestito" ? "senza app · VP dalla mappa" : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</span></button>
         ${e ? `<span class="pill ${e.cl}">${e.nome}</span>` : `<span class="pill ${sp.cl}">${sp.txt}</span>`}</div>
       ${p.stato === "gestito" ? "" : `<p class="small" style="margin:2px 0 0">${rigaObiettivoDi(p.id)}</p>`}
       ${righe.map(x => `<div class="obiettivo${debole === x.k ? " debole" : ""}"><div class="spread"><span>${x.nome} <span class="small">${x.nota}</span></span>
@@ -3061,7 +3066,7 @@ function vScheda(){
       <button class="stella${st.preferiti.has(p.id) ? " on" : ""}" data-act="preferito" data-id="${esc(p.id)}" aria-pressed="${st.preferiti.has(p.id)}"
         aria-label="${st.preferiti.has(p.id) ? "Togli dai preferiti" : "Aggiungi ai preferiti"}" title="Preferiti">${st.preferiti.has(p.id) ? "★" : "☆"}</button>
       ${etichetteAccesso(p)}<span class="pill ${sp.cl}">${sp.txt}</span></span></div>
-    <p class="small" style="margin:2px 0 0">${gestito ? "importata da te dal report Amway: la vedi solo tu, i suoi numeri li aggiorni tu"
+    <p class="small" style="margin:2px 0 0">${gestito ? "importata da te dal report Amway: la vedi solo tu; i suoi VP arrivano dalla mappa"
       : sp.g === 0 ? "ha aggiornato oggi" : `ultimo aggiornamento ${plur(sp.g, "giorno", "giorni")} fa`}</p>
     <div class="schede-scheda" role="tablist" aria-label="Scheda">
       <button role="tab" class="${azioni ? "" : "on"}" aria-selected="${!azioni}" data-act="scheda-tab" data-tab="numeri">Numeri</button>
@@ -3111,7 +3116,7 @@ function vScheda(){
       ${String(a.id).startsWith("tmp") ? "" : `<button class="x" data-act="elimina" data-id="${esc(a.id)}" aria-label="Elimina">×</button>`}</li>`).join("")}</ul>`
       : `<p class="muted" style="margin:8px 0 0">Ancora niente questo mese.</p>`}
   </div>` : `<div class="card">
-    <p class="small" style="margin:0">Usa l'app: i suoi numeri li aggiorna lui.</p>
+    <p class="small" style="margin:0">Usa l'app: contatti e piani li aggiorna lui; i VP arrivano dalla mappa.</p>
     ${st.profilo.is_admin ? `<div style="margin-top:12px">${soloAdmin(`<button class="btn wide" data-act="nuovo-link" data-id="${esc(p.id)}">Nuovo link personale</button>`, true)}</div>
       <p class="nota">Solo per chi ha perso il suo link: quello vecchio smette di funzionare e i suoi telefoni vanno ricollegati.</p>` : ""}
   </div>`}
@@ -3802,7 +3807,7 @@ function vSheet(){
     const p = st.profilo;
     return `<h2>Il mio punto di partenza</h2>
     <p class="small">Hai dichiarato: <b>${esc(testoPartenza(p))}</b>. Se non è giusto, correggilo: è una tua responsabilità
-      e nessuno lo conferma al posto tuo. I numeri del mese arrivano dal report Amway.</p>
+      e nessuno lo conferma al posto tuo. I VP del mese arrivano dalla mappa Amway.</p>
     <form data-form="partenza" novalidate>
       ${campiQualifica(false, { valore:valoreQualifica(p), mese:p.qualifica_iniziale_mese ? meseDi(p.qualifica_iniziale_mese) : "",
                                pagamenti:p.pagamenti_iniziali, senzaData:true, prossima:p.prossima_qualifica })}
@@ -6104,7 +6109,7 @@ function vClienti(){
       <span class="pulsanti">${btnAmway("Importa", "small")}
       <button class="btn small primary" data-act="cliente-nuovo">+ Cliente</button></span></div>
     ${aiutoTesto("clienti", `I tuoi clienti e i loro ordini: l'app ti avvisa quando un prodotto sta per finire o è ora di risentirli. Li vedi
-      solo tu. Gli ordini scritti qui servono per i riordini e non cambiano i tuoi VP: i VP arrivano dal report Amway. Un cliente
+      solo tu. Gli ordini scritti qui servono per i riordini e non cambiano i tuoi VP: i VP arrivano dalla mappa Amway. Un cliente
       senza ordini né passi da 24 mesi si cancella da solo (30 giorni prima lo trovi segnato).`)}
     ${tutti.length ? `<div class="row filtri scelte-rapide" style="gap:6px;margin-top:10px">${FILTRI_CLIENTI.map(x =>
       `<button class="btn small${x.id === filtro.id ? " on" : ""}" data-act="filtro-clienti" data-filtro="${x.id}" aria-pressed="${x.id === filtro.id}">${x.nome} · ${tutti.filter(x.ok).filter(inC).length}</button>`).join("")}</div>
@@ -6837,7 +6842,8 @@ function vBozze(){
   const l = bozze();
   return `<div id="le-mie-bozze">
     <h2>Le mie bozze</h2>
-    <p class="small" style="margin:2px 0 10px">Preparano gli ordini e la chiusura del mese. Non cambiano i VP: arrivano dalla mappa Amway.</p>
+    <p class="small con-aiuto" style="margin:2px 0 10px"><span>Preparano gli ordini e la chiusura del mese. Non cambiano i VP: arrivano dalla mappa Amway.</span>${aiutoBtn("vp-bozze")}</p>
+    ${aiutoVp("vp-bozze")}
     <button class="btn primary wide" data-act="bozza-nuova">+ Nuova bozza</button>
     ${l.length ? `<ul class="righe-ordine elenco-bozze" style="margin-top:8px">${l.map(o => { const r = righeMie(o.id), t = totaliMiei(r);
       return `<li><button type="button" class="apri-mio" data-act="bozza-apri" data-id="${esc(o.id)}"><b>${esc(nomeBozza(o))}</b><br>
@@ -6913,7 +6919,8 @@ function vOrdini(){
   const scelta = (act, titolo, sotto) => `<button class="scelta-ordini" data-act="${act}"><span class="grow"><b>${titolo}</b>
     <span class="small">${sotto}</span></span><span class="fr" aria-hidden="true">›</span></button>`;
   return `<h2>Ordini</h2>
-    <p class="small" style="margin:2px 0 0">${nomeMese(m).replace(/^./, x => x.toUpperCase())} · ${v == null ? esc(testoMappa(m)) : `${num(v)} VP · ${esc(testoMappa(m))}`}</p>
+    <p class="small con-aiuto" style="margin:2px 0 0"><span>${nomeMese(m).replace(/^./, x => x.toUpperCase())} · ${v == null ? esc(testoMappa(m)) : `${num(v)} VP · ${esc(testoMappa(m))}`}</span>${aiutoBtn("vp-ordini")}</p>
+    ${aiutoVp("vp-ordini")}
     <div class="scelte-ordini">
       ${scelta("apri-bozze", "Le mie bozze", nb ? plur(nb, "bozza", "bozze") : "Prepara gli ordini con i prodotti del listino")}
       ${scelta("apri-miei", "I miei ordini", lista.length ? `${plur(lista.length, "ordine", "ordini")} · l'ultimo il ${dataIt(lista[0].data)}` : "Ancora nessuno")}
