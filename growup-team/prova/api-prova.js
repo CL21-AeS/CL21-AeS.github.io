@@ -247,10 +247,17 @@
     /* 034: la bozza d'ordine e lo storico, solo miei */
     ordiniMiei: async () => (db.ordiniMiei || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
     righeMie: async () => (db.righeMie || []).filter(x => x.proprietario === mio().id).map(x => Object.assign({}, x)),
-    nuovaBozzaMia: async id => { const io = mio();
-      if((db.ordiniMiei || []).some(x => x.proprietario === io.id && x.stato === "bozza")) throw new Error("duplicate key value");
+    /* 063: anche più bozze, con un nome (max 60) e un cliente (solo persone mie) */
+    nuovaBozzaMia: async (id, campi) => { const io = mio(); campi = campi || {};
+      if(campi.nome != null && String(campi.nome).length > 60) throw new Error("violates check constraint");
+      if(campi.persona_id && !(db.persone || []).some(x => x.id === campi.persona_id && x.proprietario === io.id)) throw new Error("new row violates row-level security policy");
       db.ordiniMiei = (db.ordiniMiei || []).concat([{ id, proprietario:io.id, stato:"bozza", data:new Date().toISOString().slice(0, 10), attivita_id:null, vp:null,
-        creato_il:new Date().toISOString(), confermato_il:null }]); salva(); },
+        nome:campi.nome || null, persona_id:campi.persona_id || null, ordine_cliente_id:null, creato_il:new Date().toISOString(), confermato_il:null }]); salva(); },
+    aggiornaBozzaMia: async (id, campi) => { const io = mio(), o = (db.ordiniMiei || []).find(x => x.id === id && x.proprietario === io.id && x.stato === "bozza");
+      if(!o) return;
+      if(campi.nome != null && String(campi.nome).length > 60) throw new Error("violates check constraint");
+      if(campi.persona_id && !(db.persone || []).some(x => x.id === campi.persona_id && x.proprietario === io.id)) throw new Error("new row violates row-level security policy");
+      for(const k of ["nome", "persona_id"]) if(k in campi) o[k] = campi[k]; salva(); },
     nuovaRigaMia: async r => { const o = (db.ordiniMiei || []).find(x => x.id === r.ordine_id && x.proprietario === mio().id && x.stato === "bozza");
       if(!o) throw new Error("violates row-level security");
       db.righeMie = (db.righeMie || []).concat([Object.assign({ proprietario:mio().id }, r)]); salva(); },
@@ -263,8 +270,16 @@
       if(!o) throw new Error("non_autorizzato");
       const righe = (db.righeMie || []).filter(x => x.ordine_id === id); if(!righe.length) throw new Error("ordine_vuoto");
       const tot = Math.round(righe.reduce((t, r) => t + (Number(r.vp) || 0) * r.quantita, 0) * 100) / 100;
-      /* 063: confermata va nello storico, senza VP nel mese */
-      Object.assign(o, { stato:"confermato", data:data || o.data, attivita_id:null, vp:tot, confermato_il:new Date().toISOString() }); salva();
+      /* 063: confermata va nello storico, senza VP nel mese; con un cliente, l'ordine entra anche nella sua scheda */
+      const d = data || new Date().toISOString().slice(0, 10); let oc = null;
+      if(o.persona_id && (db.persone || []).some(x => x.id === o.persona_id && x.proprietario === io.id)){
+        oc = uid();
+        db.ordini = (db.ordini || []).concat([{ id:oc, proprietario:io.id, persona_id:o.persona_id, data:d, modo:"io", vp:tot, consegnato:null, pagato:null,
+          verificato:null, nota:null, numero_amway:null, importo:null, creato_il:new Date().toISOString() }]);
+        db.righe = (db.righe || []).concat(righe.map(r => ({ id:uid(), ordine_id:oc, proprietario:io.id, codice:r.codice, nome:r.nome, quantita:r.quantita,
+          prezzo:r.prezzo_cliente, prezzo_partner:r.prezzo_partner, vp:r.vp })));
+      }
+      Object.assign(o, { stato:"confermato", data:d, attivita_id:null, vp:tot, confermato_il:new Date().toISOString(), ordine_cliente_id:oc }); salva();
       return Object.assign({}, o); },
     /* 037: Analisi della persona e dati condivisi */
     analisiPersona: async pid => { const io = mio(); const t = db.partners.find(p => p.id === pid);
