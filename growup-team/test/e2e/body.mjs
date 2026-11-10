@@ -132,7 +132,9 @@ check(await oggiCard.getByText("Contatto: Paolo Rapido").isVisible() && await og
   "Oggi: contatto e piano con il nome della persona");
 await apriOrdini(page);
 check(await page.locator(".sheet .scelta-ordini").allInnerTexts().then(l => l.map(t => t.split("\n")[0])).then(l => l.join("|"))
-  === "Ordine veloce|Bozza ordine|I miei ordini|Aggiorna il totale del mese|Importa da Amway", "+ Ordine apre il foglio Ordini con le 5 scelte");
+  === "Le mie bozze|I miei ordini|Ordini dal sito Amway", "063: + Ordine apre il foglio Ordini: Le mie bozze · I miei ordini · Ordini dal sito Amway");
+check(!(await page.locator(".sheet button[data-act=ordine], .sheet button[data-act=totale-mese]").count()) && !(await page.locator(".sheet input[name=vp]").count()),
+  "063: niente più Ordine veloce né Aggiorna il totale: nessun modo di scrivere i VP a mano");
 await page.click(".sheet button[data-act=chiudi]");
 // 063: i VP vengono solo dalla mappa Amway: senza la mappa del mese nessuna cifra, mai uno zero
 check(await page.locator("button[data-act=ordini] b").first().innerText() === "nessuna mappa", "063: senza la mappa del mese, sotto + Ordine «nessuna mappa»");
@@ -228,6 +230,8 @@ check(!(await page.locator("button[data-act=in-mezzo]").count()) && !(await page
   && !(await page.locator("button[data-act=cambia-sponsor]").count()), "niente più Manca qualcuno sopra, link personale, cambia sponsor");
 check(!(await page.locator(".azioni").count()), "niente barra delle mie azioni nella scheda");
 await azioniScheda(page);
+check(!(await page.locator(".griglia-azioni button[data-act=ordine], .griglia-azioni button[data-act=totale-mese]").count())
+  && await page.locator(".griglia-azioni button").count() === 3, "063: nella scheda di chi non ha l'app solo + Contatto, + Piano, + Cliente (niente VP a mano)");
 await page.locator(".griglia-azioni button[data-act=contatto]").click();
 await page.getByText("Contatto registrato per Marco").waitFor();
 check(await page.locator(".oggi li", { hasText:"Contatto" }).getByText("inserito da te").isVisible(), "ogni dato mostra chi l'ha inserito");
@@ -555,9 +559,6 @@ check(await page.locator(".storico li").count() >= 2, "storico: mese chiuso e me
 check(await page.locator(".storico li", { hasText:"chiuso" }).getByText("Bronze Foundation 9%").isVisible(), "qualifica del mese chiuso");
 await page.screenshot({ path: S + "/e2e/10-storico.png" });
 await page.click(".sheet button:has-text('Chiudi')");
-// l'ordine non accetta date di mesi chiusi
-await apriOrdini(page, "ordine");
-check(await page.locator(".sheet input[name=data]").getAttribute("min") >= mesePrec + "-01", "data minima dell'ordine nel mese aperto");
 await ctx.close();
 
 // 9. Blocco 3: imbuto ed etichette
@@ -2223,7 +2224,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await bozza.locator(".tot-mio").innerText()).replace(/\s+/g, " ") === "42,50 VP · Partner 96,30 € · Pubblico 123,40 €", "il totale: VP, Partner e Pubblico");
   await page.locator(".sheet-box").screenshot({ path: S + "/e2e/39-bozza-ordine.png" });
   await page.click(".sheet #bozza-ordine button[data-act=ordini]");
-  check((await page.locator(".sheet .scelta-ordini", { hasText:"Bozza ordine" }).innerText()).includes("2 prodotti · salvata"), "Indietro: il foglio Ordini dice quanti prodotti ha la bozza");
+  check((await page.locator(".sheet .scelta-ordini", { hasText:"Le mie bozze" }).innerText()).includes("2 prodotti · salvata"), "Indietro: il foglio Ordini dice quanti prodotti ha la bozza");
   await sync(page);
   check(DB.ordiniMiei.length === 1 && DB.ordiniMiei[0].stato === "bozza" && DB.righeMie.length === 2, "la bozza è salvata nel database");
   await ctx.close();
@@ -2250,7 +2251,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await storico.innerText()).includes("2 × Crema Prova"), "toccando l'ordine si vedono i prodotti");
   await page.locator(".sheet-box").screenshot({ path: S + "/e2e/39-miei-ordini.png" });
   await page.click(".sheet #miei-ordini button[data-act=ordini]");
-  check((await page.locator(".sheet .scelta-ordini", { hasText:"Bozza ordine" }).innerText()).includes("Prepara l'ordine"), "dopo la conferma la bozza è vuota");
+  check((await page.locator(".sheet .scelta-ordini", { hasText:"Le mie bozze" }).innerText()).includes("Prepara l'ordine"), "dopo la conferma la bozza è vuota");
   await page.click(".sheet [data-act=chiudi]");
   await mese2.screenshot({ path: S + "/e2e/39-mio-mese.png" });
   // rifai: i prodotti tornano in una nuova bozza
@@ -2638,22 +2639,21 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.screenshot({ path: S + "/e2e/45-il-mio-giorno.png", fullPage:true });
   await apriOrdini(page);
   await page.locator(".sheet-box").screenshot({ path: S + "/e2e/45-ordini.png" });
-  check(await page.locator(".sheet label.scelta-ordini", { hasText:"Importa da Amway" }).locator("input.file-amway").count() === 1,
-    "dal foglio Ordini: «Importa da Amway» apre subito la scelta dei file");
+  check(await page.locator(".sheet label.scelta-ordini", { hasText:"Ordini dal sito Amway" }).locator("input.file-amway").count() === 1,
+    "dal foglio Ordini: «Ordini dal sito Amway» apre subito la scelta dei file");
   await page.click(".sheet [data-act=chiudi]");
   await dfo.locator("button.riga-apri", { hasText:"Altri 3 in corso" }).click();
   check(await page.locator("button[data-act=vista-persone][aria-selected=true]").isVisible(), "la riga apre la Lista");
-  // dopo aver aperto l'ordine di un cliente, «Ordine veloce» apre sempre il suo foglio (solo VP), mai l'ordine del cliente
+  // dopo aver aperto l'ordine di un cliente, «+ Ordine» apre sempre il foglio Ordini, mai l'ordine del cliente
   await page.click("button[data-sez=clienti]"); await page.click("button[data-filtro=tutti]");
   await page.locator("button[data-act=apri-cliente]", { hasText:"Cliente Quarantacinque" }).click();
   await page.click("button[data-act=ordine-nuovo]");
   await page.locator(".sheet h2", { hasText:"Ordine di" }).waitFor();
   await page.click(".sheet button:has-text('Annulla')");
   await page.click("button[data-act=vista-io]");
-  await apriOrdini(page, "ordine");
-  check((await page.locator(".sheet h2").innerText()).trim() === "Nuovo ordine" && await page.locator(".sheet input[name=vp]").isVisible(),
-    "dopo un cliente aperto, «Ordine veloce» apre il foglio dei soli VP");
-  await page.click(".sheet button:has-text('Annulla')");
+  await apriOrdini(page);
+  check((await page.locator(".sheet h2").innerText()).trim() === "Ordini", "dopo un cliente aperto, «+ Ordine» apre il foglio Ordini");
+  await page.click(".sheet [data-act=chiudi]");
   await ctx.close();
   // senza Seguimi: i due riquadri di prima; report di 3 giorni fa: niente promemoria
   DB.seguimi.find(x => x.partner_id === "R").attivo = false;

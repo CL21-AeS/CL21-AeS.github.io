@@ -409,8 +409,6 @@ function perMese(lista, campo){
 function reportMio(m){ return (st.mioReport && st.mioReport.get(m)) || null; }
 function vpReport(m){ const r = reportMio(m); return r ? Number(r.vpp) || 0 : null; }
 function vpMese(m){ return vpReport(m); }
-/* (solo fino alla PR che toglie «Aggiorna il totale») */
-function vpAttuale(m){ return vpMese(m) || 0; }
 /* il giorno della mappa: «3 novembre» (ora italiana); con la preposizione: «del 3 novembre», «dell'8 novembre», «del 1° novembre» */
 function giornoMappa(datiAl){ return datiAl ? dataIt(fmtGiorno.format(new Date(datiAl))) : ""; }
 function delGiorno(datiAl){
@@ -3088,13 +3086,11 @@ function vScheda(){
   ${!azioni ? "" : `<button class="btn wide primary" style="margin:4px 0 12px" data-act="chiamata" data-id="${esc(p.id)}">Fissa una chiamata</button>
   ${gestito ? `<div class="card">
     <span class="con-aiuto"><span class="eyebrow">I suoi numeri · ${nomeMese(m)}</span>${aiutoBtn("gestito")}</span>
-    ${aiutoTesto("gestito", `Questa persona non usa l'app: i suoi numeri li scrivi tu con i pulsanti qui sotto. Se vuole usarla, mandale il
-      tuo link d'invito: entrando con il suo codice Amway ritrova il suo profilo e da lì i numeri li aggiorna lei.`)}
+    ${aiutoTesto("gestito", `Questa persona non usa l'app: contatti, piani e clienti li scrivi tu con i pulsanti qui sotto. I suoi VP sono
+      quelli della mappa Amway. Se vuole usare l'app, mandale il tuo link d'invito: entrando con il suo codice Amway ritrova il suo profilo.`)}
     <div class="griglia-azioni">
       <button class="btn" data-act="contatto">+ Contatto</button>
       <button class="btn" data-act="piano">+ Piano</button>
-      <button class="btn" data-act="ordine">+ Ordine</button>
-      <button class="btn" data-act="totale-mese">Aggiorna il totale</button>
       <button class="btn" data-act="cliente">+ Cliente</button>
     </div>
     ${recenti.length ? `<ul class="oggi">${recenti.map(a => `<li>
@@ -3235,7 +3231,7 @@ function vAzioni(){
   return `<div class="azioni"><div class="in">
     <button class="btn primary c1" data-act="contatto-rapido"><span class="ico">${ICONE_AZIONI.contatto}+ Contatto</span><b>${num(fattoSettimana("contatto"))} questa sett.</b></button>
     <button class="btn primary c2" data-act="piano-rapido"><span class="ico">${ICONE_AZIONI.piano}+ Piano</span><b>${num(fattoSettimana("piano"))} questa sett.</b></button>
-    <button class="btn primary c3" data-act="${st.target ? "ordine" : "ordini"}"><span class="ico">${ICONE_AZIONI.ordine}+ Ordine</span><b>${vpMese(meseDi(oggi())) == null ? "nessuna mappa" : `${num(vpMese(meseDi(oggi())))} VP · mese`}</b></button>
+    <button class="btn primary c3" data-act="ordini"><span class="ico">${ICONE_AZIONI.ordine}+ Ordine</span><b>${vpMese(meseDi(oggi())) == null ? "nessuna mappa" : `${num(vpMese(meseDi(oggi())))} VP · mese`}</b></button>
   </div></div>`;
 }
 
@@ -3664,13 +3660,6 @@ function vSheet(){
   const err = st.errore ? `<p class="errore">${esc(st.errore)}</p>` : "";
   const piede = `<div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>
         <button class="btn primary grow">Salva</button></div>`;
-  if(s === "ordine") return `<h2>Nuovo ordine${st.target ? ` di ${esc(nomeSaluto(nomeDi(st.target)))}` : ""}</h2>
-    <form data-form="ordine" novalidate>
-      <label class="field"><span>VP dell'ordine</span>
-        <input name="vp" type="text" inputmode="decimal" autocomplete="off" required autofocus value="" placeholder="0" data-vuoto></label>
-      <label class="field"><span>Data</span><input name="data" type="date" value="${oggi()}" min="${primaDataAperta()}" max="${oggi()}"></label>
-      ${piede}${err}
-    </form>`;
   if(s === "obiettivi") return `<h2>Obiettivi della settimana</h2>
     <p class="small">Valgono da lunedì ${dataIt(settimana())}. La settimana prossima ripartono da questi.</p>
     <form data-form="obiettivi" novalidate>
@@ -3678,23 +3667,6 @@ function vSheet(){
       <label class="field"><span>Piani mostrati</span><input name="piani" type="number" inputmode="numeric" min="0" max="1000" value="" placeholder="${Number(st.goal.obiettivo_piani) || 0}" data-vuoto></label>
       ${piede}${err}
     </form>`;
-  if(s === "totale-mese"){
-    const m = st.meseTotale || meseDi(oggi());
-    const scelta = precedenteAperto() ? `<div class="scelte" style="margin-top:10px">
-        ${[meseDi(oggi()), mesePrecedente()].map(x => `<label><input type="radio" name="mese" value="${x}" ${x === m ? "checked" : ""} data-act="scegli-mese">
-          ${nomeMese(x).replace(/^./, c => c.toUpperCase())}${x === mesePrecedente() ? ` <span class="small">(si chiude il ${giornoChiusura()})</span>` : ""}</label>`).join("")}
-      </div>` : "";
-    const chi = st.target ? ` di ${esc(nomeSaluto(nomeDi(st.target)))}` : "";
-    return `<h2>VP di ${nomeMese(m).split(" ")[0]}${chi}</h2>
-    <p class="small">Scrivi il totale dei VP personali del mese${st.target ? chi : ""}, per esempio quello dell'ufficio virtuale Amway.
-      L'app registra solo la differenza con quanto è già inserito (${num(vpAttuale(m))} VP).</p>
-    <form data-form="totale-mese" novalidate>
-      ${scelta}
-      <label class="field"><span>Totale VP del mese</span>
-        <input name="vp" type="text" inputmode="decimal" autocomplete="off" autofocus value="" placeholder="${num(vpAttuale(m))}" data-vuoto></label>
-      ${piede}${err}
-    </form>`;
-  }
   if(s === "storico") return vStorico();
   if(s === "importa") return vImporta();
   if(s === "invita") return `<h2>${st.invitaPlatino ? `Invita ${esc(st.invitaPlatino.titolo)}` : "Invita un nuovo partner"}</h2>
@@ -3861,9 +3833,8 @@ async function registra(tipo, extra){
   metti(prendi().concat([tmp])); render();
   const promessa = api.addActivity(riga);
   const per = perAltri ? ` per ${nomeSaluto(nomeDi(pid))}` : "";
-  const msg = tipo === "ordine" ? `Ordine da ${num(riga.vp)} VP registrato${per}`
-    : tipo === "rettifica" ? `Totale di ${nomeMese(meseDi(riga.data)).split(" ")[0]} aggiornato${per}: ${num(perAltri ? vpMese(meseDi(riga.data), prendi()) : vpMese(meseDi(riga.data)))} VP`
-    : `${ETICHETTE[tipo]} registrato${per}`;
+  /* 063: niente più ordini né correzioni dei VP scritti a mano */
+  const msg = `${ETICHETTE[tipo]} registrato${per}`;
   const dopo = () => { if(perAltri) caricaNumeri().then(render).catch(() => {}); };
   toast(msg, async () => {
     try{
@@ -3901,11 +3872,8 @@ const AZIONI = {
   async contatto(){ await registra("contatto"); },
   async piano(){ await registra("piano"); },
   async cliente(){ await registra("cliente"); },
-  ordine(){ st.errore = ""; st.sheet = "ordine"; render(); focusSheet(); },
   obiettivi(){ st.errore = ""; st.sheet = "obiettivi"; render(); },
   "obiettivo-mese"(){ st.errore = ""; st.sheet = "obiettivo-mese"; render(); },
-  "totale-mese"(){ st.errore = ""; st.meseTotale = meseDi(oggi()); st.sheet = "totale-mese"; render(); focusSheet(); },
-  "scegli-mese"(el){ st.meseTotale = el.value; render(); },
   importa(){ st.imp = null; st.errore = ""; st.sheet = "importa"; render(); },
   invita(el){ st.invitaNome = (el && el.dataset.nome) || ""; st.invitaPlatino = null; st.errore = ""; st.sheet = "invita"; render(); focusSheet(); },
   "invita-platino"(el){ st.invitaNome = ""; st.errore = ""; st.sheet = "invita";
@@ -4303,29 +4271,10 @@ const MODULI = {
       mostraErroreForm(f, messaggio(e));
     }
   },
-  async ordine(f){
-    const vp = numIt(f.vp.value);
-    const data = f.data.value || oggi();
-    if(!(vp > 0) || vp > 100000){ mostraErroreForm(f, "Scrivi i VP dell'ordine (un numero maggiore di zero)."); return; }
-    if(data > oggi()){ mostraErroreForm(f, "La data non può essere nel futuro."); return; }
-    if(data < primaDataAperta()){ mostraErroreForm(f, MESSAGGI_ERRORE.mese_chiuso); return; }
-    st.sheet = null;
-    await registra("ordine", { vp:Math.round(vp * 100) / 100, data });
-  },
   async obiettivi(f){
     const n = v => Math.max(0, Math.min(1000, Math.round(numIt(v) || 0)));
     try{ await salvaObiettivi(n(f.contatti.value), n(f.piani.value)); st.sheet = null; render(); toast("Obiettivi salvati"); }
     catch(e){ mostraErroreForm(f, messaggio(e)); }
-  },
-  async "totale-mese"(f){
-    const totale = numIt(f.vp.value);
-    if(!(totale >= 0) || totale > 100000){ mostraErroreForm(f, "Scrivi il totale dei VP del mese (un numero, anche con la virgola)."); return; }
-    const m = st.meseTotale || meseDi(oggi());
-    const diff = Math.round((totale - vpAttuale(m)) * 100) / 100;
-    st.sheet = null;
-    if(diff === 0){ render(); toast("Il totale era già questo"); return; }
-    /* nel mese precedente la correzione va all'ultimo giorno di quel mese */
-    await registra("rettifica", { vp:diff, data: m === meseDi(oggi()) ? oggi() : piuGiorni(primoDelMese(), -1) });
   },
   async "obiettivo-mese"(f){
     const vp = Math.max(0, Math.min(100000, Math.round((numIt(f.vp.value) || 0) * 100) / 100));
@@ -6905,23 +6854,21 @@ function vMieiOrdini(){
     ${indietro}
   </div>`;
 }
-/* Il foglio «Ordini» (+ Ordine nella barra in basso): un solo posto per ordine veloce, bozza, storico e totale del mese */
+/* Il foglio «Ordini» (+ Ordine nella barra in basso, 063): le mie bozze, i miei ordini e gli ordini dal sito Amway.
+   Nessun modo di scrivere i VP a mano: i VP del mese sono quelli della mappa. */
 function vOrdini(){
-  const m = meseDi(oggi()), b = bozzaMia(), nb = b ? righeMie(b.id).length : 0, lista = storicoMio();
+  const m = meseDi(oggi()), v = vpMese(m), b = bozzaMia(), nb = b ? righeMie(b.id).length : 0, lista = storicoMio();
   const scelta = (act, titolo, sotto) => `<button class="scelta-ordini" data-act="${act}"><span class="grow"><b>${titolo}</b>
     <span class="small">${sotto}</span></span><span class="fr" aria-hidden="true">›</span></button>`;
   return `<h2>Ordini</h2>
-    <p class="small" style="margin:2px 0 0">${nomeMese(m).replace(/^./, x => x.toUpperCase())} · ${num(vpMese(m))} VP nel mese</p>
+    <p class="small" style="margin:2px 0 0">${nomeMese(m).replace(/^./, x => x.toUpperCase())} · ${v == null ? esc(testoMappa(m)) : `${num(v)} VP · ${esc(testoMappa(m))}`}</p>
     <div class="scelte-ordini">
-      ${scelta("ordine", "Ordine veloce", "Scrivi solo i VP")}
-      ${scelta("apri-bozza", "Bozza ordine", nb ? `${prodotti(nb)} · salvata` : "Prepara l'ordine con i prodotti del listino")}
+      ${scelta("apri-bozza", "Le mie bozze", nb ? `${prodotti(nb)} · salvata` : "Prepara l'ordine con i prodotti del listino")}
       ${scelta("apri-miei", "I miei ordini", lista.length ? `${plur(lista.length, "ordine", "ordini")} · l'ultimo il ${dataIt(lista[0].data)}` : "Ancora nessuno")}
-      ${scelta("totale-mese", "Aggiorna il totale del mese", "La cifra dall'ufficio virtuale Amway")}
-      <label class="scelta-ordini"><span class="grow"><b>Importa da Amway</b>
+      <label class="scelta-ordini"><span class="grow"><b>Ordini dal sito Amway</b>
         <span class="small">Mappa, ordini e clienti: i file CSV scaricati dal sito Amway</span></span><span class="fr" aria-hidden="true">›</span>
         <input type="file" class="file-amway" accept=".csv,text/csv,text/comma-separated-values" multiple hidden></label>
     </div>
-    ${precedenteAperto() ? `<p class="small" style="margin:10px 0 0">Fino al ${giornoChiusura()} puoi ancora correggere ${nomeMese(mesePrecedente()).split(" ")[0]}.</p>` : ""}
     <button class="btn ghost wide" style="margin-top:12px" data-act="chiudi">Chiudi</button>`;
 }
 /* 063: confermato, l'ordine va nello storico; i VP arrivano solo dalla mappa */
