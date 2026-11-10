@@ -98,10 +98,11 @@ function creaApi(){
     mioReport:    (pid, dal) => q(sb.from("numeri_mese").select("mese,vpp,vpg,percentuale,linee,dati_al,importato_da").eq("partner_id", pid).gte("mese", dal)),
     /* 063: la data della mappa di ogni persona che vedo (solo date, per la scheda partner) */
     dateMappe:    dal => q(sb.from("numeri_mese").select("partner_id,mese,dati_al").gte("mese", dal)),
-    /* 034: la bozza d'ordine e lo storico dei miei ordini (solo miei, RLS) */
+    /* 034 e 063: le bozze d'ordine (anche più di una, con un nome e un cliente) e lo storico dei miei ordini (solo miei, RLS) */
     ordiniMiei:   () => q(sb.from("ordini_personali").select("*").order("creato_il")),
     righeMie:     () => q(sb.from("righe_ordine_personale").select("*")),
-    nuovaBozzaMia: id => q(sb.from("ordini_personali").insert({ id })),
+    nuovaBozzaMia: (id, campi) => q(sb.from("ordini_personali").insert(Object.assign({ id }, campi || {}))),
+    aggiornaBozzaMia: (id, campi) => q(sb.from("ordini_personali").update(campi).eq("id", id)),
     nuovaRigaMia: riga => q(sb.from("righe_ordine_personale").insert(riga)),
     quantitaMia:  (id, quantita) => q(sb.from("righe_ordine_personale").update({ quantita }).eq("id", id)),
     togliRigaMia: id => q(sb.from("righe_ordine_personale").delete().eq("id", id)),
@@ -2372,6 +2373,8 @@ function giorniAttivi(){
   (st.attSerie || []).concat(st.att || []).forEach(a => { if(["contatto", "piano", "cliente"].includes(a.tipo)) g.add(d(a.data)); });
   (st.passi || []).forEach(x => { if(!x.importato && x.tipo !== "riapri") g.add(d(x.data)); });
   (st.ordini || []).forEach(o => { if(!o.numero_amway) g.add(d(o.data)); });
+  /* 063: confermare una bozza conta come attività del giorno (senza VP) */
+  (st.mieiOrdini || []).forEach(o => { if(o.stato === "confermato" && o.confermato_il) g.add(fmtGiorno.format(new Date(o.confermato_il))); });
   ((st.guida || {}).fatti || []).forEach(x => g.add(d(x.giorno)));
   return g;
 }
@@ -6779,16 +6782,33 @@ document.addEventListener("input", e => {
   if(e.target && e.target.id === "cerca-listino"){ st.cercaListino = e.target.value; const u = document.getElementById("risultati-listino"); if(u) u.innerHTML = risultatiListino(e.target.value); }
 });
 
-/* ---- 11h. I miei ordini (034): la bozza d'ordine e lo storico, solo miei ----
-   La bozza resta nel database (una sola alla volta) finché non la confermo: allora il totale VP diventa un ordine del
-   mese, che vedo solo io finché non arriva il report Amway. Dallo storico si rifà un ordine o lo si toglie. */
+/* ---- 11h. I miei ordini (034, 063): le bozze d'ordine e lo storico, solo miei ----
+   Le bozze (anche più di una, con un nome e un cliente facoltativi) restano nel database finché non le confermo: allora
+   passano nello storico «I miei ordini» con la data, senza VP nel mese (i VP sono solo quelli della mappa Amway). Con un
+   cliente, l'ordine entra anche nella sua scheda. Dallo storico si rifà un ordine (in una bozza nuova) o lo si toglie. */
 async function caricaOrdiniMiei(){
   try{
     const [ordini, righe] = await Promise.all([api.ordiniMiei(), api.righeMie()]);
     st.mieiOrdini = ordini || []; st.mieRighe = righe || [];
   }catch(e){ st.mieiOrdini = st.mieiOrdini || []; st.mieRighe = st.mieRighe || []; }
 }
-function bozzaMia(){ return (st.mieiOrdini || []).find(o => o.stato === "bozza") || null; }
+function bozze(){ return (st.mieiOrdini || []).filter(o => o.stato === "bozza")
+  .sort((a, b) => String(a.creato_il || "") < String(b.creato_il || "") ? 1 : -1); }
+/* la bozza aperta */
+function bozzaMia(){ return bozze().find(o => o.id === st.bozzaId) || null; }
+function nomeBozza(o){ return o.nome || `Bozza del ${dataIt(fmtGiorno.format(new Date(o.creato_il || Date.now())))}`; }
+function nomePersona(id){ const p = id && (st.persone || []).find(x => x.id === id); return p ? p.nome : ""; }
+function clientiPerBozza(){ return (st.persone || []).filter(p => p.esito === "cliente").sort((a, b) => a.nome.localeCompare(b.nome)); }
+/* la stima per la chiusura del mese: VP della mappa + VP della bozza (non conta finché non arriva la mappa) */
+function stimaBozza(t){
+  const m = meseDi(oggi()), v = vpMese(m), obj = Number(st.goalMese.obiettivo_vp) || 0, nota = `<p class="small">stima: non conta finché non arriva la mappa</p>`;
+  if(v == null) return `<div class="stima-bozza"><p>Con questa bozza: <b>${num2(t.vp)} VP</b></p>
+    <p class="small">${esc(testoMappa(m, null).replace(/^./, c => c.toUpperCase()))}</p>${nota}</div>`;
+  const tot = Math.round((v + t.vp) * 100) / 100, manca = Math.round((obj - tot) * 100) / 100;
+  return `<div class="stima-bozza"><p>Con questa bozza arriveresti a <b>${num(tot)} VP</b></p>
+    <p class="small">${num(v)} VP della ${esc(testoMappa(m))} + ${num2(t.vp)} VP della bozza</p>
+    ${obj ? `<p>${manca > 0 ? `ti mancherebbero <b>${num(manca)} VP</b>` : "obiettivo del mese raggiunto ✓"}</p>` : ""}${nota}</div>`;
+}
 function righeMie(oid){ return (st.mieRighe || []).filter(r => r.ordine_id === oid).sort((a, b) => a.nome < b.nome ? -1 : 1); }
 function storicoMio(){ return (st.mieiOrdini || []).filter(o => o.stato === "confermato")
   .sort((a, b) => a.data < b.data ? 1 : a.data > b.data ? -1 : a.confermato_il < b.confermato_il ? 1 : -1); }
@@ -6803,24 +6823,47 @@ function testoTotaliMiei(t){ return `<b>${num2(t.vp)}</b> VP · Partner <b>${pre
 function prezziRiga(r){ return { vp:Number(r.vp) || 0, partner:Number(r.prezzo_partner) || 0, pubblico:Number(r.prezzo_cliente) || 0 }; }
 function prodotti(n){ return plur(n, "prodotto", "prodotti"); }
 
-/* La bozza ordine, nel foglio «Ordini» (ottimizzazione 1: non più nella pagina Io) */
+/* «Le mie bozze» (063): l'elenco, con nome, cliente, totale VP e prezzo; «+ Nuova bozza» */
+function vBozze(){
+  const l = bozze();
+  return `<div id="le-mie-bozze">
+    <h2>Le mie bozze</h2>
+    <p class="small" style="margin:2px 0 10px">Preparano gli ordini e la chiusura del mese. Non cambiano i VP: arrivano dalla mappa Amway.</p>
+    <button class="btn primary wide" data-act="bozza-nuova">+ Nuova bozza</button>
+    ${l.length ? `<ul class="righe-ordine elenco-bozze" style="margin-top:8px">${l.map(o => { const r = righeMie(o.id), t = totaliMiei(r);
+      return `<li><button type="button" class="apri-mio" data-act="bozza-apri" data-id="${esc(o.id)}"><b>${esc(nomeBozza(o))}</b><br>
+        <span class="small">${[nomePersona(o.persona_id) ? esc(nomePersona(o.persona_id)) : "", r.length ? `${prodotti(r.length)} · ${num2(t.vp)} VP · Partner ${prezzo(t.partner)}` : "vuota"]
+          .filter(Boolean).join(" · ")}</span></button><span class="fr" aria-hidden="true">›</span></li>`; }).join("")}</ul>`
+      : `<p class="muted" style="margin:10px 0 0">Ancora nessuna bozza.</p>`}
+    <p class="small" style="margin:8px 0 0">Le bozze le vedi solo tu.</p>
+    <button class="btn ghost wide" style="margin-top:12px" data-act="ordini">Indietro</button>
+  </div>`;
+}
+/* una bozza aperta: nome e cliente (facoltativi), i prodotti, la stima del mese, Togli e Conferma */
 function vBozzaOrdine(){
-  const b = bozzaMia(), righe = b ? righeMie(b.id) : [];
+  const b = bozzaMia();
+  if(!b) return vBozze();
+  const righe = righeMie(b.id), t = totaliMiei(righe), clienti = clientiPerBozza();
   return `<div id="bozza-ordine">
-    <div class="spread"><div><h2>Bozza ordine</h2>
+    <div class="spread"><div><h2>${esc(nomeBozza(b))}</h2>
       <p class="small" style="margin:2px 0 0">${righe.length ? prodotti(righe.length) : "Vuota"}</p></div>
       ${righe.length ? `<span class="pill">Salvata</span>` : ""}</div>
+    <label class="field"><span>Nome (facoltativo)</span><input id="bozza-nome" type="text" maxlength="60" autocomplete="off" value="${esc(b.nome || "")}" placeholder="es. Ordine di fine mese"></label>
+    <label class="field"><span>Per un cliente (facoltativo)</span><select id="bozza-cliente">
+      <option value="">Nessuno: è per me</option>
+      ${clienti.map(c => `<option value="${esc(c.id)}"${c.id === b.persona_id ? " selected" : ""}>${esc(c.nome)}</option>`).join("")}</select></label>
     <input type="search" id="cerca-mio" class="cerca" style="margin-top:10px" placeholder="Cerca un prodotto (nome o codice)…" autocomplete="off" value="${esc(st.cercaMio || "")}">
     <ul class="risultati-prodotto" id="risultati-mio">${risultatiMio(st.cercaMio)}</ul>
     ${righe.length ? `<ul class="righe-ordine" style="margin-top:6px">${righe.map(r => `<li>
       <span class="grow"><b>${esc(r.nome)}</b><br><span class="small">${testoPrezzi(prezziRiga(r))}</span></span>
       <span class="qta"><button type="button" class="btn small ghost" data-act="mio-meno" data-id="${esc(r.id)}" aria-label="Uno in meno">−</button><b>${r.quantita}</b>
         <button type="button" class="btn small ghost" data-act="mio-piu" data-id="${esc(r.id)}" aria-label="Uno in più">+</button></span></li>`).join("")}</ul>
-    <p class="tot-mio" style="margin:8px 0 0">${testoTotaliMiei(totaliMiei(righe))}</p>
-    <div class="row" style="margin-top:10px;gap:8px"><button class="btn small grow" data-act="mio-svuota">Svuota</button>
-      <button class="btn small primary grow" data-act="mio-conferma">Conferma ordine</button></div>` : ""}
+    <p class="tot-mio" style="margin:8px 0 0">${testoTotaliMiei(t)}</p>
+    ${stimaBozza(t)}` : ""}
+    <div class="row" style="margin-top:10px;gap:8px"><button class="btn small grow" data-act="mio-svuota">Togli la bozza</button>
+      ${righe.length ? `<button class="btn small primary grow" data-act="mio-conferma">Conferma ordine</button>` : ""}</div>
     <p class="small" style="margin:8px 0 0">La bozza la vedi solo tu.</p>
-    <button class="btn ghost wide" style="margin-top:12px" data-act="ordini">Indietro</button>
+    <button class="btn ghost wide" style="margin-top:12px" data-act="apri-bozze">Le mie bozze</button>
   </div>`;
 }
 function risultatiMio(q){
@@ -6837,14 +6880,14 @@ function vMieiOrdini(){
   const tutti = st.mieiTutti || lista.length <= 5, vedi = tutti ? lista : lista.slice(0, 5);
   const indietro = `<button class="btn ghost wide" style="margin-top:12px" data-act="ordini">Indietro</button>`;
   if(!lista.length) return `<div id="miei-ordini"><h2>I miei ordini</h2>
-    <p class="muted">Ancora nessun ordine confermato dalla Bozza ordine.</p>${indietro}</div>`;
+    <p class="muted">Ancora nessun ordine confermato dalle tue bozze.</p>${indietro}</div>`;
   return `<div id="miei-ordini">
     <h2>I miei ordini</h2>
     <ul class="righe-ordine" style="margin-top:6px">${vedi.map(o => { const righe = righeMie(o.id), t = totaliMiei(righe), aperto = st.mioAperto === o.id;
       return `<li style="flex-wrap:wrap">
       <button type="button" class="apri-mio" data-act="mio-apri" data-id="${esc(o.id)}" aria-expanded="${aperto}">
-        <b>${esc(dataIt(o.data))}</b> · <b class="num">${num2(o.vp != null ? o.vp : t.vp)} VP</b><br>
-        <span class="small">${prodotti(righe.length)} · Partner ${prezzo(t.partner)} · Pubblico ${prezzo(t.pubblico)}</span></button>
+        <b>${esc(dataIt(o.data))}</b>${o.nome ? ` · ${esc(o.nome)}` : ""} · <b class="num">${num2(o.vp != null ? o.vp : t.vp)} VP</b><br>
+        <span class="small">${nomePersona(o.persona_id) ? `${esc(nomePersona(o.persona_id))} · ` : ""}${prodotti(righe.length)} · Partner ${prezzo(t.partner)} · Pubblico ${prezzo(t.pubblico)}</span></button>
       <button type="button" class="btn small ghost" data-act="mio-rifai" data-id="${esc(o.id)}">Rifai</button>
       <button type="button" class="btn small ghost" data-act="mio-togli" data-id="${esc(o.id)}" aria-label="Togli l'ordine del ${esc(dataIt(o.data))}">×</button>
       ${aperto ? `<ul class="small" style="flex-basis:100%;margin:4px 0 0;padding-left:18px">${righe.map(r =>
@@ -6857,13 +6900,13 @@ function vMieiOrdini(){
 /* Il foglio «Ordini» (+ Ordine nella barra in basso, 063): le mie bozze, i miei ordini e gli ordini dal sito Amway.
    Nessun modo di scrivere i VP a mano: i VP del mese sono quelli della mappa. */
 function vOrdini(){
-  const m = meseDi(oggi()), v = vpMese(m), b = bozzaMia(), nb = b ? righeMie(b.id).length : 0, lista = storicoMio();
+  const m = meseDi(oggi()), v = vpMese(m), nb = bozze().length, lista = storicoMio();
   const scelta = (act, titolo, sotto) => `<button class="scelta-ordini" data-act="${act}"><span class="grow"><b>${titolo}</b>
     <span class="small">${sotto}</span></span><span class="fr" aria-hidden="true">›</span></button>`;
   return `<h2>Ordini</h2>
     <p class="small" style="margin:2px 0 0">${nomeMese(m).replace(/^./, x => x.toUpperCase())} · ${v == null ? esc(testoMappa(m)) : `${num(v)} VP · ${esc(testoMappa(m))}`}</p>
     <div class="scelte-ordini">
-      ${scelta("apri-bozza", "Le mie bozze", nb ? `${prodotti(nb)} · salvata` : "Prepara l'ordine con i prodotti del listino")}
+      ${scelta("apri-bozze", "Le mie bozze", nb ? plur(nb, "bozza", "bozze") : "Prepara gli ordini con i prodotti del listino")}
       ${scelta("apri-miei", "I miei ordini", lista.length ? `${plur(lista.length, "ordine", "ordini")} · l'ultimo il ${dataIt(lista[0].data)}` : "Ancora nessuno")}
       <label class="scelta-ordini"><span class="grow"><b>Ordini dal sito Amway</b>
         <span class="small">Mappa, ordini e clienti: i file CSV scaricati dal sito Amway</span></span><span class="fr" aria-hidden="true">›</span>
@@ -6877,24 +6920,26 @@ function vSheetMiei(s){
   if(s === "importa-amway") return vImportaAmway();
   if(s === "ordini") return vOrdini();
   if(s === "bozza") return vBozzaOrdine();
+  if(s === "bozze") return vBozze();
   if(s === "miei") return vMieiOrdini();
   if(s === "conferma-mio"){
     const b = bozzaMia(); if(!b) return "";
-    const righe = righeMie(b.id), t = totaliMiei(righe), m = meseDi(st.dataMio || oggi());
+    const righe = righeMie(b.id), t = totaliMiei(righe), cli = nomePersona(b.persona_id);
     return `<h2>Confermi l'ordine?</h2>
-    <p class="small">${prodotti(righe.length)} · ${testoTotaliMiei(t)}</p>
+    <p class="small"><b>${esc(nomeBozza(b))}</b> · ${prodotti(righe.length)} · ${testoTotaliMiei(t)}</p>
     <form data-form="conferma-mio" novalidate>
-      <label class="field"><span>Data dell'ordine</span><input type="date" name="data" min="${primaDataAperta()}" max="${oggi()}" value="${esc(st.dataMio || oggi())}"></label>
-      <p class="small" id="testo-conferma-mio">${TESTO_CONFERMA_MIO}</p>
+      <label class="field"><span>Data dell'ordine</span><input type="date" name="data" max="${oggi()}" value="${esc(st.dataMio || oggi())}"></label>
+      <p class="small" id="testo-conferma-mio">${TESTO_CONFERMA_MIO}${cli ? ` Entra anche nella scheda di ${esc(cli)}.` : ""}</p>
       ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
-      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="apri-bozza">Indietro</button><button class="btn primary grow">Conferma</button></div>
+      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="bozza-apri" data-id="${esc(b.id)}">Indietro</button><button class="btn primary grow">Conferma</button></div>
     </form>`;
   }
   if(s === "togli-mio"){
     const o = (st.mieiOrdini || []).find(x => x.id === st.mioDaTogliere); if(!o) return "";
     const righe = righeMie(o.id), vp = o.vp != null ? Number(o.vp) : totaliMiei(righe).vp;
     return `<h2>Togli l'ordine del ${esc(dataIt(o.data))}?</h2>
-    <p class="small">${prodotti(righe.length)} · ${num2(vp)} VP. I VP del mese non cambiano: sono quelli della mappa Amway.</p>
+    <p class="small">${prodotti(righe.length)} · ${num2(vp)} VP. I VP del mese non cambiano: sono quelli della mappa Amway.${o.ordine_cliente_id && nomePersona(o.persona_id)
+      ? ` Lo togli anche dalla scheda di ${esc(nomePersona(o.persona_id))}.` : ""}</p>
     ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
     <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="apri-miei">Indietro</button>
       <button class="btn primary grow" data-act="mio-togli-ok">Togli</button></div>`;
@@ -6902,9 +6947,15 @@ function vSheetMiei(s){
   return "";
 }
 /* aggiungo un prodotto (o ne aumento la quantità) nella bozza, creandola se non c'è */
+/* una bozza nuova, vuota, che diventa quella aperta */
+async function nuovaBozzaMia(campi){
+  const id = uuid(); await api.nuovaBozzaMia(id, campi);
+  const b = Object.assign({ id, stato:"bozza", data:oggi(), nome:null, persona_id:null, creato_il:new Date().toISOString() }, campi || {});
+  st.mieiOrdini.push(b); st.bozzaId = id; return b;
+}
 async function aggiungiMio(c, quantita){
   let b = bozzaMia();
-  if(!b){ const id = uuid(); await api.nuovaBozzaMia(id); b = { id, stato:"bozza", data:oggi(), creato_il:new Date().toISOString() }; st.mieiOrdini.push(b); }
+  if(!b) b = await nuovaBozzaMia();
   const r = righeMie(b.id).find(x => x.codice === c.codice);
   if(r){ const qn = Math.min(99, r.quantita + quantita); await api.quantitaMia(r.id, qn); r.quantita = qn; return; }
   const riga = { id:uuid(), ordine_id:b.id, codice:c.codice, nome:String(c.nome).slice(0, 160), quantita:Math.min(99, quantita),
@@ -6914,7 +6965,11 @@ async function aggiungiMio(c, quantita){
 }
 Object.assign(AZIONI, {
   ordini(){ st.errore = null; st.sheet = "ordini"; render(); },
-  "apri-bozza"(){ st.errore = null; st.sheet = "bozza"; render(); },
+  "apri-bozze"(){ st.errore = null; st.cercaMio = ""; st.sheet = "bozze"; render(); },
+  "apri-bozza"(){ st.errore = null; st.sheet = "bozze"; render(); },
+  "bozza-apri"(el){ st.errore = null; st.bozzaId = el.dataset.id; st.cercaMio = ""; st.sheet = "bozza"; render(); },
+  async "bozza-nuova"(){
+    try{ await nuovaBozzaMia(); st.cercaMio = ""; st.sheet = "bozza"; render(); }catch(e){ toast(messaggio(e)); } },
   "apri-miei"(){ st.errore = null; st.sheet = "miei"; render(); },
   "apri-tappa"(){ st.tappaAperta = !st.tappaAperta; render(); },
   "apri-diario"(){ st.diarioAperto = !st.diarioAperto; render(); },
@@ -6942,20 +6997,24 @@ Object.assign(AZIONI, {
     }catch(e){ toast(messaggio(e)); } },
   async "mio-svuota"(){ const b = bozzaMia(); if(!b) return;
     try{ await api.togliOrdineMio(b.id); st.mieiOrdini = st.mieiOrdini.filter(x => x.id !== b.id); st.mieRighe = st.mieRighe.filter(x => x.ordine_id !== b.id);
-      render(); toast("Bozza svuotata"); }catch(e){ toast(messaggio(e)); } },
+      st.bozzaId = null; st.sheet = "bozze"; render(); toast("Bozza tolta"); }catch(e){ toast(messaggio(e)); } },
   "mio-conferma"(){ st.dataMio = oggi(); st.errore = null; st.sheet = "conferma-mio"; render(); },
   "mio-apri"(el){ st.mioAperto = st.mioAperto === el.dataset.id ? null : el.dataset.id; render(); },
   "miei-tutti"(){ st.mieiTutti = true; render(); },
+  /* «Rifai»: una bozza nuova con gli stessi prodotti e quantità */
   async "mio-rifai"(el){
-    try{ for(const r of righeMie(el.dataset.id)) await aggiungiMio(r, r.quantita); render(); toast("Prodotti copiati nella bozza ordine"); }
+    try{ const righe = righeMie(el.dataset.id); await nuovaBozzaMia();
+      for(const r of righe) await aggiungiMio(r, r.quantita);
+      st.cercaMio = ""; st.sheet = "bozza"; render(); toast("Nuova bozza con gli stessi prodotti"); }
     catch(e){ await caricaOrdiniMiei(); render(); toast(messaggio(e)); }
   },
   "mio-togli"(el){ st.mioDaTogliere = el.dataset.id; st.errore = null; st.sheet = "togli-mio"; render(); },
   async "mio-togli-ok"(){
     const o = st.mieiOrdini.find(x => x.id === st.mioDaTogliere); if(!o) return;
     try{
-      /* prima i VP dal mese (se il mese è chiuso si ferma qui), poi l'ordine con i suoi prodotti */
-      if(o.attivita_id){ await api.deleteActivity(o.attivita_id); st.att = st.att.filter(a => a.id !== o.attivita_id); }
+      /* 063: l'ordine non ha VP nel mese; se è anche nella scheda di un cliente, si toglie anche da lì */
+      if(o.ordine_cliente_id){ await api.cancellaOrdine(o.ordine_cliente_id);
+        st.ordini = (st.ordini || []).filter(x => x.id !== o.ordine_cliente_id); st.righe = (st.righe || []).filter(x => x.ordine_id !== o.ordine_cliente_id); }
       await api.togliOrdineMio(o.id);
       st.mieiOrdini = st.mieiOrdini.filter(x => x.id !== o.id); st.mieRighe = st.mieRighe.filter(x => x.ordine_id !== o.id);
       st.sheet = "miei"; render(); toast("Ordine tolto");
@@ -6966,22 +7025,32 @@ Object.assign(MODULI, {
   async "conferma-mio"(f){
     const b = bozzaMia(); if(!b) return;
     const data = f.data.value || oggi();
+    /* 063: nessun limite di mese chiuso (le mappe dei mesi passati non cambiano); solo non nel futuro */
     if(data > oggi()){ mostraErroreForm(f, MESSAGGI_ERRORE.data_non_valida); return; }
-    if(data < primaDataAperta()){ mostraErroreForm(f, MESSAGGI_ERRORE.mese_chiuso); return; }
     try{
       const o = await api.confermaOrdine(b.id, data);
-      Object.assign(b, o);
-      st.att = await api.activities(st.profilo.id, [settimana(), primoDelMese()].sort()[0]) || st.att;
-      st.sheet = "miei"; render(); toast("Ordine confermato: è nello storico");
+      Object.assign(b, o); st.bozzaId = null;
+      /* con un cliente l'ordine è anche nella sua scheda (vale per il promemoria del riordino) */
+      if(o.ordine_cliente_id) await caricaClienti();
+      const cli = o.ordine_cliente_id ? nomePersona(o.persona_id) : "";
+      st.sheet = "miei"; render(); toast(cli ? `Ordine confermato: nello storico e nella scheda di ${nomeSaluto(cli)}` : "Ordine confermato: è nello storico");
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   }
+});
+/* nome e cliente della bozza aperta: si salvano appena cambiano */
+document.addEventListener("change", async e => {
+  const t = e.target, b = bozzaMia();
+  if(!t || !b || (t.id !== "bozza-nome" && t.id !== "bozza-cliente")) return;
+  const campi = t.id === "bozza-nome" ? { nome:t.value.trim().slice(0, 60) || null } : { persona_id:t.value || null };
+  try{ await api.aggiornaBozzaMia(b.id, campi); Object.assign(b, campi); render(); toast(t.id === "bozza-nome" ? "Nome della bozza salvato" : "Cliente della bozza salvato"); }
+  catch(e2){ toast(messaggio(e2)); }
 });
 document.addEventListener("input", e => {
   const t = e.target;
   if(t && t.id === "cerca-mio"){ st.cercaMio = t.value; const u = document.getElementById("risultati-mio"); if(u) u.innerHTML = risultatiMio(t.value); }
   if(t && t.name === "data" && t.closest && t.closest('[data-form="conferma-mio"]')){
     st.dataMio = t.value; const b = bozzaMia(), p = document.getElementById("testo-conferma-mio");
-    if(b && p && t.value) p.textContent = TESTO_CONFERMA_MIO;
+    if(b && p && t.value) p.textContent = TESTO_CONFERMA_MIO + (nomePersona(b.persona_id) ? ` Entra anche nella scheda di ${nomePersona(b.persona_id)}.` : "");
   }
 });
 
@@ -7258,7 +7327,7 @@ function vOggiPerTe(){
       const n = nome(a.id); if(!n) return "";
       testo = `<button class="btn link" style="padding:0;min-height:0" data-act="${a.tipo === "cliente" ? "apri-cliente" : "apri-persona"}" data-id="${esc(a.id)}">${esc(n)}</button>`;
     } else if(a.tipo === "vp") testo = `Mancano ${num(a.manca)} VP al tuo obiettivo del mese${a.mappa ? ` (mappa ${esc(delGiorno(a.mappa))})` : ""} ·
-      <button class="btn link" style="padding:0;min-height:0" data-act="apri-bozza">apri la Bozza ordine</button>`;
+      <button class="btn link" style="padding:0;min-height:0" data-act="apri-bozze">apri Le mie bozze</button>`;
     else if(a.tipo === "formazione") testo = "15 minuti: un audio o 10 pagine di un libro";
     else testo = "Una chiamata questa settimana";
     return `<li class="${fatta ? "fatta" : ""}">${segno}<span class="grow"><span class="tipo-oggi">${SEGUIMI_TIPI[a.tipo]}</span><br>${testo}</span></li>`;

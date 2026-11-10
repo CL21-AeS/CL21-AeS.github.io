@@ -2191,7 +2191,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await ctx.close();
 }
 
-// 39. I miei ordini (034): report + i miei ordini scritti dopo (solo per me), la bozza d'ordine e lo storico
+// 39. Le mie bozze (034, 063): anche più di una, con nome e cliente; la stima del mese; confermate vanno nello storico senza VP
 {
   DB.listino = [{ codice:"9100001", nome:"Crema Prova", formato:"50 ml", categoria:"Bellezza", prezzo_cliente:52.9, prezzo_partner:41.3, vp:18.2, attivo:true },
     { codice:"9100002", nome:"Detersivo Prova", formato:"1 l", categoria:"Casa", prezzo_cliente:17.6, prezzo_partner:13.7, vp:6.1, attivo:true }];
@@ -2201,17 +2201,24 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     .concat([{ visto_da:"R", partner_id:"R", mese:oggiStr.slice(0, 7), vpp:300, vpg:5000, percentuale:15, linee:[], dati_al:unOraFa }]);
   DB.activities = DB.activities.filter(a => a.partner_id !== "R")
     .concat([{ id:"prima1", partner_id:"R", tipo:"ordine", quantita:1, vp:40, data:oggiStr, inserito_da:"R", inserito_il:new Date(Date.now() - 7200000).toISOString() }]);
+  DB.mgoals = DB.mgoals.filter(x => x.partner_id !== "R").concat([{ partner_id:"R", mese:oggiStr.slice(0, 7) + "-01", obiettivo_vp:400 }]);
+  DB.persone = (DB.persone || []).concat([{ id:"cl39", proprietario:"R", nome:"Clara Bozza", fase:"contattato", esito:"cliente", lasciati:[], creato_il:unOraFa }]);
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
   await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
   await apriMese(page); const mese = page.locator(".card", { hasText:"Il mio mese" });
   const vpFatti = async () => (await mese.locator(".obiettivo", { hasText:"VP personali" }).locator(".num").innerText()).split("/")[0].trim();
   check(await vpFatti() === "300", "063: l'ordine scritto non si somma: 300 VP dalla mappa");
   check((await mese.locator(".vp-report").innerText()) === "Mappa " + delGiornoIt(unOraFa), "063: la riga dice da quale mappa viene il numero");
-  // la bozza: dal foglio «Ordini»; cerco, aggiungo, cambio le quantità
-  check(!(await page.locator("#bozza-ordine").count()) && !(await page.locator("#miei-ordini").count()), "bozza e storico non sono più nella pagina Io");
-  await apriOrdini(page, "apri-bozza");
+  check(!(await page.locator("#bozza-ordine").count()) && !(await page.locator("#miei-ordini").count()), "bozze e storico non sono nella pagina Io");
+  // «Le mie bozze»: l'elenco vuoto, «+ Nuova bozza»
+  await apriOrdini(page, "apri-bozze");
+  const elenco = page.locator(".sheet #le-mie-bozze");
+  check(await elenco.getByText("Ancora nessuna bozza.").isVisible() && await elenco.locator("button[data-act=bozza-nuova]").isVisible(), "063: Le mie bozze: vuoto, con «+ Nuova bozza»");
+  await elenco.locator("button[data-act=bozza-nuova]").click();
   const bozza = page.locator(".sheet #bozza-ordine");
-  check(await bozza.getByText("Vuota").isVisible() && await bozza.getByText("La bozza la vedi solo tu.").isVisible(), "bozza ordine vuota nel foglio Ordini");
+  await bozza.waitFor();
+  check(await bozza.getByText("Vuota").isVisible() && (await bozza.locator("h2").innerText()).startsWith("Bozza del ")
+    && await bozza.getByText("La bozza la vedi solo tu.").isVisible() && !(await bozza.locator("button[data-act=mio-conferma]").count()), "063: la bozza nuova, vuota");
   await page.fill("#cerca-mio", "crema");
   await bozza.locator("button[data-act=mio-aggiungi]").first().click();
   await bozza.getByText("1 prodotto").waitFor();
@@ -2222,65 +2229,109 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await bozza.getByText("2 prodotti").waitFor();
   check((await bozza.locator(".righe-ordine li", { hasText:"Crema Prova" }).innerText()).includes("18,20 VP · Partner 41,30 € · Pubblico 52,90 €"), "per ogni prodotto VP, Partner e Pubblico");
   check((await bozza.locator(".tot-mio").innerText()).replace(/\s+/g, " ") === "42,50 VP · Partner 96,30 € · Pubblico 123,40 €", "il totale: VP, Partner e Pubblico");
+  // la stima per la chiusura del mese: mappa + bozza, e l'obiettivo
+  const stima = (await bozza.locator(".stima-bozza").innerText()).replace(/\s+/g, " ");
+  check(stima.includes("Con questa bozza arriveresti a 342,5 VP") && stima.includes("300 VP della mappa " + delGiornoIt(unOraFa) + " + 42,50 VP della bozza")
+    && stima.includes("ti mancherebbero 57,5 VP") && stima.includes("stima: non conta finché non arriva la mappa"), "063: la stima: mappa + bozza, quanto manca all'obiettivo (" + stima + ")");
+  // il nome della bozza
+  await page.fill("#bozza-nome", "Fine mese"); await page.press("#bozza-nome", "Tab");
+  await page.getByText("Nome della bozza salvato").waitFor();
+  check((await bozza.locator("h2").innerText()).trim() === "Fine mese", "063: la bozza ha il suo nome");
   await page.locator(".sheet-box").screenshot({ path: S + "/e2e/39-bozza-ordine.png" });
-  await page.click(".sheet #bozza-ordine button[data-act=ordini]");
-  check((await page.locator(".sheet .scelta-ordini", { hasText:"Le mie bozze" }).innerText()).includes("2 prodotti · salvata"), "Indietro: il foglio Ordini dice quanti prodotti ha la bozza");
+  // una seconda bozza, per un cliente: arriva all'obiettivo
+  await page.click(".sheet #bozza-ordine button[data-act=apri-bozze]");
+  await page.click(".sheet #le-mie-bozze button[data-act=bozza-nuova]");
+  await bozza.waitFor();
+  await page.selectOption("#bozza-cliente", "cl39");
+  await page.getByText("Cliente della bozza salvato").waitFor();
+  await page.fill("#cerca-mio", "crema");
+  await bozza.locator("button[data-act=mio-aggiungi]").first().click();
+  await bozza.getByText("1 prodotto").waitFor();
+  for(let i = 0; i < 5; i++){ await bozza.locator("button[data-act=mio-piu]").click(); await page.waitForTimeout(100); }
+  await bozza.getByText(/^6$/).first().waitFor();
+  check((await bozza.locator(".stima-bozza").innerText()).includes("obiettivo del mese raggiunto ✓"), "063: con la bozza si arriverebbe all'obiettivo: ✓");
+  await page.click(".sheet #bozza-ordine button[data-act=apri-bozze]");
+  const voci = await page.locator(".sheet .elenco-bozze li").allInnerTexts();
+  check(voci.length === 2 && voci.some(t => t.includes("Fine mese") && t.includes("2 prodotti · 42,50 VP · Partner 96,30 €"))
+    && voci.some(t => t.includes("Clara Bozza") && t.includes("1 prodotto · 109,20 VP")), "063: Le mie bozze: due bozze, con nome, cliente, VP e prezzo (" + voci.join(" | ") + ")");
+  await page.locator(".sheet-box").screenshot({ path: S + "/e2e/39-le-mie-bozze.png" });
+  await page.click(".sheet #le-mie-bozze button[data-act=ordini]");
+  check((await page.locator(".sheet .scelta-ordini", { hasText:"Le mie bozze" }).innerText()).includes("2 bozze"), "il foglio Ordini dice quante bozze ci sono");
   await sync(page);
-  check(DB.ordiniMiei.length === 1 && DB.ordiniMiei[0].stato === "bozza" && DB.righeMie.length === 2, "la bozza è salvata nel database");
+  check(DB.ordiniMiei.length === 2 && DB.ordiniMiei.every(o => o.stato === "bozza") && DB.ordiniMiei.some(o => o.nome === "Fine mese")
+    && DB.ordiniMiei.some(o => o.persona_id === "cl39") && DB.righeMie.length === 3, "063: le due bozze sono salvate nel database");
+  check(!DB.activities.some(a => a.partner_id === "R" && a.id !== "prima1"), "063: le bozze non scrivono VP");
   await ctx.close();
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
   await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
-  await apriOrdini(page, "apri-bozza");
-  check(await page.locator("#bozza-ordine").getByText("2 prodotti").isVisible(), "riaprendo l'app la bozza c'è ancora");
-  // confermo: l'ordine va nello storico, i VP del mese restano quelli della mappa (063)
+  await apriOrdini(page, "apri-bozze");
+  check(await page.locator(".sheet .elenco-bozze li").count() === 2, "riaprendo l'app le bozze ci sono ancora");
+  // confermo «Fine mese» con una data del mese scorso: nessun limite di mese chiuso, va nello storico senza VP
+  await page.locator(".sheet .elenco-bozze button[data-act=bozza-apri]", { hasText:"Fine mese" }).click();
   await page.click("#bozza-ordine button[data-act=mio-conferma]");
   await page.locator(".sheet").getByText("Confermi l'ordine?").waitFor();
-  check((await page.locator("#testo-conferma-mio").innerText()).includes("Non cambia i VP del mese: arrivano con la mappa Amway"), "063: conferma: non cambia i VP");
-  await page.click(".sheet button[data-act=apri-bozza]");
-  check(await page.locator(".sheet #bozza-ordine").getByText("2 prodotti").isVisible(), "conferma, Indietro: si torna alla bozza");
+  check((await page.locator("#testo-conferma-mio").innerText()).includes("Non cambia i VP del mese: arrivano con la mappa Amway")
+    && !(await page.locator(".sheet input[name=data]").getAttribute("min")), "063: conferma: non cambia i VP, nessun limite di mese chiuso sulla data");
+  await page.click(".sheet button[data-act=bozza-apri]");
+  check((await page.locator(".sheet #bozza-ordine h2").innerText()).trim() === "Fine mese", "conferma, Indietro: si torna alla bozza");
   await page.click("#bozza-ordine button[data-act=mio-conferma]");
+  const dataPrec = mesePrec + "-15";
+  await page.fill(".sheet input[name=data]", dataPrec);
   await page.click(".sheet button.primary");
   await page.getByText("Ordine confermato: è nello storico").waitFor();
   const storico = page.locator(".sheet #miei-ordini");
-  check(await storico.isVisible(), "dopo la conferma si vede «I miei ordini»");
+  check(await storico.isVisible() && (await storico.innerText()).includes("Fine mese") && (await storico.innerText()).includes("42,50 VP"), "063: l'ordine confermato è nello storico, con il nome e la data");
   await apriMese(page); const mese2 = page.locator(".card", { hasText:"Il mio mese" });
   check((await mese2.locator(".obiettivo", { hasText:"VP personali" }).locator(".num").innerText()).startsWith("300"), "063: dopo la conferma i VP restano quelli della mappa (300)");
-  check(!(await mese2.locator(".bar.doppia").count()), "063: una sola barra, solo la mappa");
-  check((await storico.innerText()).includes("2 prodotti") && (await storico.innerText()).includes("42,50 VP"), "l'ordine è nello storico");
-  await storico.locator("button[data-act=mio-apri]").click();
-  check((await storico.innerText()).includes("2 × Crema Prova"), "toccando l'ordine si vedono i prodotti");
+  // confermo la bozza di Clara: entra anche nella sua scheda
+  await page.click(".sheet #miei-ordini button[data-act=ordini]");
+  await page.click(".sheet button[data-act=apri-bozze]");
+  await page.locator(".sheet .elenco-bozze button[data-act=bozza-apri]", { hasText:"Clara Bozza" }).click();
+  await page.click("#bozza-ordine button[data-act=mio-conferma]");
+  check((await page.locator("#testo-conferma-mio").innerText()).includes("Entra anche nella scheda di Clara Bozza"), "063: la conferma dice che entra nella scheda del cliente");
+  await page.click(".sheet button.primary");
+  await page.getByText("Ordine confermato: nello storico e nella scheda di Clara").waitFor();
+  await sync(page);
+  const ocClara = DB.ordiniMiei.find(o => o.persona_id === "cl39");
+  check(ocClara && ocClara.stato === "confermato" && ocClara.ordine_cliente_id && DB.ordini.some(o => o.id === ocClara.ordine_cliente_id && o.persona_id === "cl39" && o.modo === "io")
+    && DB.righe.filter(r => r.ordine_id === ocClara.ordine_cliente_id).length === 1, "063: con un cliente, l'ordine è anche nella sua scheda, con i prodotti");
+  check(DB.ordiniMiei.find(o => o.nome === "Fine mese").data === dataPrec && !DB.activities.some(a => a.partner_id === "R" && a.id !== "prima1"),
+    "063: confermato con la sua data, nessun VP nel mese");
+  check((await storico.innerText()).includes("Clara Bozza"), "nello storico si vede il cliente");
+  await storico.locator("button[data-act=mio-apri]").first().click();
+  check((await storico.innerText()).includes("× Crema Prova"), "toccando l'ordine si vedono i prodotti");
   await page.locator(".sheet-box").screenshot({ path: S + "/e2e/39-miei-ordini.png" });
-  await page.click(".sheet #miei-ordini button[data-act=ordini]");
-  check((await page.locator(".sheet .scelta-ordini", { hasText:"Le mie bozze" }).innerText()).includes("Prepara l'ordine"), "dopo la conferma la bozza è vuota");
-  await page.click(".sheet [data-act=chiudi]");
-  await mese2.screenshot({ path: S + "/e2e/39-mio-mese.png" });
-  // rifai: i prodotti tornano in una nuova bozza
-  await apriOrdini(page, "apri-miei");
-  await storico.locator("button[data-act=mio-rifai]").click();
-  await page.getByText("Prodotti copiati nella bozza ordine").waitFor();
-  await page.click(".sheet #miei-ordini button[data-act=ordini]");
-  await page.click(".sheet button[data-act=apri-bozza]");
+  // Rifai: una bozza nuova con gli stessi prodotti
+  await storico.locator("li", { hasText:"Fine mese" }).locator("button[data-act=mio-rifai]").click();
+  await page.getByText("Nuova bozza con gli stessi prodotti").waitFor();
   check(await page.locator("#bozza-ordine").getByText("2 prodotti").isVisible()
-    && (await page.locator("#bozza-ordine .tot-mio").innerText()).startsWith("42,50"), "Rifai: stessi prodotti e quantità nella bozza");
+    && (await page.locator("#bozza-ordine .tot-mio").innerText()).startsWith("42,50"), "Rifai: una bozza nuova con gli stessi prodotti e quantità");
   await page.click("#bozza-ordine button[data-act=mio-svuota]");
-  await page.getByText("Bozza svuotata").waitFor();
-  // togli l'ordine: chiede conferma, poi i VP escono dal mese
-  await page.click(".sheet #bozza-ordine button[data-act=ordini]");
+  await page.getByText("Bozza tolta").waitFor();
+  check(await page.locator(".sheet #le-mie-bozze").getByText("Ancora nessuna bozza.").isVisible(), "063: tolta la bozza, si torna all'elenco");
+  // togli l'ordine di Clara: anche dalla sua scheda
+  await page.click(".sheet #le-mie-bozze button[data-act=ordini]");
   await page.click(".sheet button[data-act=apri-miei]");
-  await storico.locator("button[data-act=mio-togli]").click();
+  await storico.locator("li", { hasText:"Clara Bozza" }).locator("button[data-act=mio-togli]").click();
   await page.locator(".sheet h2", { hasText:"Togli l'ordine del" }).waitFor();
-  check((await page.locator(".sheet").innerText()).includes("I VP del mese non cambiano"), "063: togli: i VP del mese non cambiano");
+  check((await page.locator(".sheet").innerText()).includes("Lo togli anche dalla scheda di Clara Bozza"), "063: togli: anche dalla scheda del cliente");
   await page.click(".sheet [data-act=apri-miei]");
-  check(await page.locator("#miei-ordini button[data-act=mio-togli]").count() === 1, "Indietro: l'ordine resta");
-  await page.locator("#miei-ordini button[data-act=mio-togli]").click();
+  check(await page.locator("#miei-ordini button[data-act=mio-togli]").count() === 2, "Indietro: l'ordine resta");
+  await storico.locator("li", { hasText:"Clara Bozza" }).locator("button[data-act=mio-togli]").click();
+  await page.click(".sheet [data-act=mio-togli-ok]");
+  await page.getByText("Ordine tolto").waitFor();
+  await sync(page);
+  check(!DB.ordini.some(o => o.id === ocClara.ordine_cliente_id) && !DB.ordiniMiei.some(o => o.id === ocClara.id), "063: tolto dallo storico e dalla scheda del cliente");
+  await storico.locator("button[data-act=mio-togli]").click();
   await page.click(".sheet [data-act=mio-togli-ok]");
   await page.getByText("Ordine tolto").waitFor();
   await apriMese(page); check(await page.locator("#miei-ordini").getByText("Ancora nessun ordine confermato").isVisible()
     && (await page.locator(".card", { hasText:"Il mio mese" }).locator(".obiettivo", { hasText:"VP personali" }).locator(".num").innerText()).startsWith("300"),
-    "ordine tolto: via dallo storico, i VP restano quelli della mappa");
+    "ordini tolti: via dallo storico, i VP restano quelli della mappa");
   await sync(page);
-  check(!DB.ordiniMiei.length && !DB.righeMie.length && !DB.activities.some(a => a.partner_id === "R" && a.vp === 42.5), "nel database: via l'ordine e i prodotti (nessun VP nel mese)");
+  check(!DB.ordiniMiei.length && !DB.righeMie.length, "nel database: via gli ordini e i prodotti");
   await ctx.close();
+  DB.persone = DB.persone.filter(x => x.id !== "cl39");
 }
 
 // 40. La barra oltre l'obiettivo e la qualifica dello storico dall'anno fiscale
