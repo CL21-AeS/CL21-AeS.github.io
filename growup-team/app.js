@@ -1374,7 +1374,7 @@ function vPrivacyPrimo(){
 
 /* Due pagine, scelte dal selettore in alto a destra: "Io" e "Gruppo". */
 /* La barra in alto resta fissa scorrendo: le pagine principali e, sotto, i pulsanti della sezione
-   (Il mio giorno · Verifica in Io; Target · Lista · Clienti in Persone). Il titolo con il nome scorre via. */
+   (Il mio giorno · Verifica in Io; Lista · Clienti · Target in Persone). Il titolo con il nome scorre via. */
 function vBarraFissa(){
   const sez = st.vista === "io" ? vSezioniIo() : st.vista === "persone" && (st.sezPersone === "target" ? !st.invitoId : !st.personaId) ? vSezioniPersone() : "";
   return `<div class="barra-fissa">${vSelettore()}${sez}</div>`;
@@ -5751,9 +5751,9 @@ function vContatto(){
 async function caricaInviti(){ try{ st.inviti = await api.invitiTarget() || []; }catch(e){ st.inviti = st.inviti || []; } }
 function vSezioniPersone(){
   return `<div class="row scelte-rapide sezioni-persone" style="gap:6px">
-    <button class="btn small${st.sezPersone === "target" ? " on" : ""}" data-act="sez-persone" data-sez="target" aria-pressed="${st.sezPersone === "target"}">Target</button>
     <button class="btn small${st.sezPersone === "lista" ? " on" : ""}" data-act="sez-persone" data-sez="lista" aria-pressed="${st.sezPersone === "lista"}">Lista</button>
-    <button class="btn small${st.sezPersone === "clienti" ? " on" : ""}" data-act="sez-persone" data-sez="clienti" aria-pressed="${st.sezPersone === "clienti"}">Clienti</button></div>`;
+    <button class="btn small${st.sezPersone === "clienti" ? " on" : ""}" data-act="sez-persone" data-sez="clienti" aria-pressed="${st.sezPersone === "clienti"}">Clienti</button>
+    <button class="btn small${st.sezPersone === "target" ? " on" : ""}" data-act="sez-persone" data-sez="target" aria-pressed="${st.sezPersone === "target"}">Target</button></div>`;
 }
 function vTarget(){
   if(st.invitoId) return vInvito();
@@ -7682,7 +7682,7 @@ document.addEventListener("click", e => {
 });
 /* Tornare indietro con il dito: chi arriva in una schermata da un collegamento (la Lista dalla Verifica, una persona da
    «Oggi per te», una scheda partner) trascinando verso destra torna da dove era partito, allo stesso punto della pagina.
-   Le schede principali e i pulsanti di sezione (Il mio giorno · Verifica, Target · Lista · Clienti) azzerano la strada. */
+   Le schede principali e i pulsanti di sezione (Il mio giorno · Verifica, Lista · Clienti · Target) azzerano la strada. */
 const AZIONI_MENU = new Set(["vista-obiettivo", "vista-io", "vista-persone", "vista-gruppo", "sez-io", "sez-persone"]);
 const CAMPI_PAGINA = ["vista", "sezIo", "sezPersone", "personaId", "invitoId", "schedaId", "target", "sotto"];
 function statoPagina(){ const f = { y:window.scrollY, schedaPila:(st.schedaPila || []).slice() }; for(const k of CAMPI_PAGINA) f[k] = st[k]; return f; }

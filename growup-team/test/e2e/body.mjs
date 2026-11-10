@@ -4934,6 +4934,23 @@ for(const tema of ["light", "dark"]){
   await ctx.close();
 }
 
+// 80. Persone: le linguette in ordine Lista | Clienti | Target; all'inizio è aperta la Lista
+for(const tema of ["light", "dark"]){
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema }, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]");
+  const sez = page.locator(".sezioni-persone button");
+  check(JSON.stringify(await sez.allInnerTexts()) === JSON.stringify(["Lista", "Clienti", "Target"]), `persone ${tema}: linguette Lista | Clienti | Target`);
+  check(await page.getAttribute(".sezioni-persone button[data-sez=lista]", "aria-pressed") === "true" && await page.locator(".testa-sezione", { hasText:"La mia lista" }).count() === 1,
+    `persone ${tema}: all'inizio è aperta la Lista`);
+  await page.screenshot({ path: S + `/e2e/80-linguette-${tema}.png`, clip:{ x:0, y:0, width:360, height:260 } });
+  await page.click("button[data-sez=target]");
+  check(await page.getAttribute(".sezioni-persone button[data-sez=target]", "aria-pressed") === "true", `persone ${tema}: Target si apre dall'ultima linguetta`);
+  check(!errori.length, `persone ${tema}: nessun errore nella pagina`);
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
