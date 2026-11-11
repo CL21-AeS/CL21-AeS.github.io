@@ -7326,8 +7326,8 @@ function serieSeguimi(fatteOggi){
 function motivoAzione(a, p){
   if(a.tipo === "contatto"){
     if(p.fase !== "lista" || p.esito) return "";
-    const dal = p.creato_il ? fmtGiorno.format(new Date(p.creato_il)) : "", fonte = FONTI.find(f => f[0] === p.fonte);
-    return ["Da contattare" + (dal ? ` · in lista dal ${esc(dataIt(dal))}` : ""), fonte ? esc(fonte[2]) : ""].filter(Boolean).join(" · ");
+    const dal = p.creato_il ? fmtGiorno.format(new Date(p.creato_il)) : "";
+    return "Da contattare" + (dal ? ` · in lista dal ${esc(dataIt(dal))}` : "");
   }
   if(a.tipo === "followup"){
     /* lo stesso testo della lista di oggi (motivoVoce); in agenda il suo «per cosa» */

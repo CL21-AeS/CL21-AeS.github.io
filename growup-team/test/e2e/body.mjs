@@ -5191,7 +5191,7 @@ for(const tema of ["light", "dark"]){
 }
 
 // 82. «Da fare oggi» (Seguimi): sotto il nome di ogni azione con una persona il motivo, calcolato quando si disegna la riga
-//     (nelle azioni salvate c'è solo l'id). Contatto: «Da contattare · in lista dal …» (e come la conosce); Follow-up: il testo
+//     (nelle azioni salvate c'è solo l'id). Contatto: «Da contattare · in lista dal …» (non come la conosce); Follow-up: il testo
 //     della lista di oggi (in ritardo dal … · prossimo passo; in agenda il suo «per cosa»); Cliente: il motivo dei clienti da
 //     sentire. Motivo cambiato: si vede quello di adesso; senza motivo solo il nome. A 360 px il motivo va a capo nella card.
 {
@@ -5222,8 +5222,8 @@ for(const tema of ["light", "dark"]){
     const motivo = async id => { const li = dfo.locator(":scope > ul > li", { has:page.locator(`button[data-id="${id}"]`) });
       return (await li.locator(".motivo-oggi").count()) ? (await li.locator(".motivo-oggi").innerText()).trim() : null; };
     if(tema === "light"){
-      check(await motivo("c82a") === `Da contattare · in lista dal ${it(anno + "-01-05")} · lo conoscevi già`, "contatto: da quando è in lista e come la conosci (" + await motivo("c82a") + ")");
-      check(await motivo("c82c") === `Da contattare · in lista dal ${it(anno + "-01-07")}`, "contatto senza «Come lo conosci?»: solo da quando è in lista");
+      check(await motivo("c82a") === `Da contattare · in lista dal ${it(anno + "-01-05")}`, "contatto: da quando è in lista, senza come la conosci (" + await motivo("c82a") + ")");
+      check(await motivo("c82c") === `Da contattare · in lista dal ${it(anno + "-01-07")}`, "contatto senza «Come lo conosci?»: lo stesso testo");
       check(await motivo("c82b") === null, "contatto già fatto (non più «In lista»): solo il nome");
       check(await motivo("f82a") === `In ritardo dal ${it(giorno(-2))} · Follow-up`, "follow-up in ritardo: lo stesso testo della lista di oggi (" + await motivo("f82a") + ")");
       check(await motivo("f82b") === `Oggi · ${it(oggiG)} · 18:30 · telefono · piano`, "follow-up in agenda: il suo «per cosa» (" + await motivo("f82b") + ")");
@@ -5239,11 +5239,10 @@ for(const tema of ["light", "dark"]){
     const geo = await page.evaluate(() => { const card = document.querySelector(".da-fare-oggi").getBoundingClientRect();
       return [...document.querySelectorAll(".da-fare-oggi > ul > li")].map(li => { const m = li.querySelector(".motivo-oggi"), s = li.querySelector(".spunta-oggi").getBoundingClientRect();
         const r = m ? m.getBoundingClientRect() : null;
-        return { dentro:!r || (r.left >= card.left - 0.5 && r.right <= card.right + 0.5), righe:r ? Math.round(r.height / parseFloat(getComputedStyle(m).lineHeight)) : 0,
+        return { dentro:!r || (r.left >= card.left - 0.5 && r.right <= card.right + 0.5),
           spunta:Math.round(s.width) === 26 && Math.round(s.height) === 26 && Math.abs(s.left - li.getBoundingClientRect().left) < 1 }; }); });
     check(geo.every(x => x.dentro), `${tema}, 360 px: ogni motivo resta dentro la card`);
     check(geo.every(x => x.spunta), `${tema}, 360 px: la spunta non si sposta e non si stringe`);
-    check(geo.some(x => x.righe >= 2), `${tema}, 360 px: il motivo lungo va su due righe`);
     check(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${tema}, 360 px: niente scorrimento orizzontale`);
     /* le barre fisse (linguette in alto, pulsanti in basso) coprirebbero la card nello screenshot */
     await page.evaluate(() => document.querySelectorAll("body *").forEach(e => { const p = getComputedStyle(e).position;
