@@ -3,6 +3,23 @@
 Ultimo aggiornamento: 11 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Da quanto è nella Lista: data e giorni (11 novembre 2026, sera, app v116, database non toccato)
+
+Scelte di Stefano. Per chi è ancora **«In lista»** (fase `lista`, nessun esito) si vede da quando è stato scritto nella
+Lista, con la data e i giorni (`inListaDa`, dal giorno di `creato_il` in ora italiana; tra numero e «giorni» uno spazio
+che non va a capo):
+- **Lista** (Persone → Lista), sotto il nome: «In lista dal 5 ottobre (37 giorni)»; scritto oggi «In lista da oggi»,
+  ieri «(1 giorno)».
+- **«Da fare oggi»** (Seguimi), righe Contatto: «Da contattare · in lista dal 5 ottobre (37 giorni)».
+- **In agenda** (data fissata con il calendario a destra del nome): solo l'appuntamento, l'azione da fare. Nella Lista
+  come prima («In lista · Domani · 12 novembre · telefono · contatto»), in «Da fare oggi» «Domani · 12 novembre ·
+  telefono · contatto», senza da quanto è in lista (scelta di Stefano: righe troppo lunghe).
+- Non cambia per chi ha già fatto un passo (Contattato, Invitato…: resta «fermo da N giorni», che conta dall'ultimo passo)
+  né per i Clienti.
+Test dell'interfaccia: 1121 controlli superati (sezione 82: data e giorni nella Lista e in «Da fare oggi», da oggi, 1 giorno,
+in agenda solo l'appuntamento, chi è già contattato senza giorni in lista; screenshot `e2e/82-lista-light.png` e `-dark.png`).
+Service worker v116.
+
 ## «Da fare oggi»: tolto «come la conosci» dal motivo del contatto (11 novembre 2026, sera, app v115, database non toccato)
 
 Scelta di Stefano dopo la v114: nelle azioni di «Da fare oggi» il motivo del contatto è solo «Da contattare · in lista dal
