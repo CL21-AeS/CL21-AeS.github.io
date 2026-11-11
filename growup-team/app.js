@@ -2289,7 +2289,9 @@ function vCruscotto(){
   </div>`;
 }
 
-/* «Il mio mese»: una riga che si apre, con i VP della mappa, il gruppo, i nuovi clienti, storico e obiettivo */
+/* «Il mio mese»: una riga che si apre, con i VP della mappa, il gruppo, i nuovi clienti, storico e obiettivo.
+   I nuovi clienti sono solo un numero: un cliente si registra da Persone → Clienti o chiudendo una persona della Lista
+   come Cliente (il passo lo conta il database). */
 function vMioMese(){
   const m = meseDi(oggi()), c = clientiMese(m), nm = numeriMese(m), aperto = !!st.meseAperto;
   const riassunto = [!nm.mappa ? testoMappa(m, null) : nm.gruppo > nm.personali || nm.linee.length ? `VP di gruppo ${num(nm.gruppo)}` : "",
@@ -2304,10 +2306,7 @@ function vMioMese(){
       ${rigaVp(m)}
       ${nm.mappa && (nm.gruppo > nm.personali || nm.linee.length)
         ? `<div class="spread" style="margin-top:10px"><span>VP di gruppo</span><b class="num">${num(nm.gruppo)}</b></div>` : ""}
-      <div class="spread" style="margin-top:10px">
-        <span>Nuovi clienti nel mese <b class="num">${num(c)}</b></span>
-        <button class="btn small" data-act="cliente" style="white-space:nowrap">+ Cliente</button>
-      </div>
+      <div class="spread" style="margin-top:10px"><span>Nuovi clienti nel mese</span><b class="num">${num(c)}</b></div>
       ${clientiTotali() >= 3 ? "" : `<p class="small" style="margin:4px 0 0">I tuoi primi 3 clienti (anche in mesi diversi) completano la tappa «Primi clienti»: ${num(clientiTotali())} su 3.</p>`}
     </div>` : ""}
   </div>

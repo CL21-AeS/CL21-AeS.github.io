@@ -1520,6 +1520,14 @@ await page.click("button[data-act=torna-clienti]");
 check(await page.getByText("Non comprano più · 1").isVisible(), "filtro: non comprano più");
 // un cliente si toglie da Io (come la lista) e si rimette dalla sua scheda
 await page.click("button[data-act=vista-io]");
+{ // «Il mio mese»: i nuovi clienti sono solo un numero (si registrano da Clienti o chiudendo una persona della Lista)
+  await sync(page); await apriMese(page);
+  const nuovi = DB.activities.filter(a => a.partner_id === "R" && a.tipo === "cliente" && String(a.data).slice(0, 7) === meseOra()).reduce((t, a) => t + (a.quantita || 1), 0);
+  const rigaC = page.locator(".mio-mese .blocco-numeri .spread", { hasText:"Nuovi clienti nel mese" });
+  check(nuovi >= 1 && (await rigaC.locator("b.num").innerText()) === String(nuovi), "Il mio mese: i nuovi clienti contano anche quelli registrati da Clienti (" + nuovi + ")");
+  check(!(await page.locator(".mio-mese button[data-act=cliente]").count()) && !(await rigaC.locator("button").count()), "Il mio mese: niente più «+ Cliente», solo il numero");
+  await page.locator("button[data-act=apri-mese]").first().click();
+}
 await page.locator('.oggi-lista button[aria-label="Togli Bea Compleanno da Io"]').click();
 await page.getByText("Bea tolto da Io").waitFor();
 check(!(await page.locator(".oggi-lista", { hasText:"Bea Compleanno" }).count()), "Io: il cliente tolto non compare più");
