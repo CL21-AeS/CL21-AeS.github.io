@@ -4488,13 +4488,20 @@ function daFare(){
   };
 }
 
+/* da quando è nella Lista (giorno di creato_il, ora italiana): «dal 5 ottobre (37 giorni)», «da oggi» */
+function inListaDa(p){
+  if(!p.creato_il) return "";
+  const d = fmtGiorno.format(new Date(p.creato_il)), g = Math.max(0, giorniTra(d, oggi()));
+  /* spazio che non va a capo: «(310 giorni)» resta tutto su una riga */
+  return g === 0 ? "da oggi" : `dal ${dataIt(d)} (${g}\u00a0${g === 1 ? "giorno" : "giorni"})`;
+}
 /* registrato come cliente sul sito Amway (ha il codice cliente) ma senza nessun ordine */
 function maiComprato(p){ return !!p.codice_cliente && p.esito !== "cliente" && !st.ordini.some(o => o.persona_id === p.id); }
 function rigaPersona(p, suIo, tag){
   const f = FASI[indiceFase(p.fase)], fermo = giorniFermo(p);
   return `<li class="${suIo ? "su-io" : "con-cal"}${fermo ? " fermo" : ""}"><button class="persona" data-act="apri-persona" data-id="${esc(p.id)}">
       <span class="grow"><b>${esc(p.nome)}</b>${tag ? ` <span class="pill mini tag tag-lista">${esc(tag)}</span>` : ""}${maiComprato(p) ? ` <span class="pill g mini">Mai comprato</span>` : ""}${p.origine
-        ? `<br><span class="small origine">${esc(p.origine)}</span>` : ""}<br><span class="small">${p.esito ? ESITI[p.esito] : f.nome}${p.prossima_data ? ` · <span class="${inAgenda(p) ? "agenda-testo" : ""}">${esc(testoProssima(p))}</span>`
+        ? `<br><span class="small origine">${esc(p.origine)}</span>` : ""}<br><span class="small">${p.esito ? ESITI[p.esito] : p.fase === "lista" && !p.prossima_data && inListaDa(p) ? esc("In lista " + inListaDa(p)) : f.nome}${p.prossima_data ? ` · <span class="${inAgenda(p) ? "agenda-testo" : ""}">${esc(testoProssima(p))}</span>`
         : fermo ? ` · <span class="fermo-testo">fermo da ${fermo} giorni</span>` : ""}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
       <span class="punti" aria-hidden="true">${FASI.map((x, i) => `<i class="${i <= indiceFase(p.fase) ? "on" : ""}"></i>`).join("")}</span>
     </button>${suIo ? `<button class="x" data-act="togli-da-io" data-id="${esc(p.id)}" aria-label="Togli ${esc(p.nome)} da Io">×</button>` : btnAgenda(p)}</li>`;
@@ -7326,8 +7333,9 @@ function serieSeguimi(fatteOggi){
 function motivoAzione(a, p){
   if(a.tipo === "contatto"){
     if(p.fase !== "lista" || p.esito) return "";
-    const dal = p.creato_il ? fmtGiorno.format(new Date(p.creato_il)) : "";
-    return "Da contattare" + (dal ? ` · in lista dal ${esc(dataIt(dal))}` : "");
+    /* solo l'azione da fare (scelta di Stefano): in agenda l'appuntamento, altrimenti «Da contattare»; niente data né
+       giorni in lista (quelli stanno nella Lista) */
+    return p.prossima_data ? esc(testoProssima(p)) : "Da contattare";
   }
   if(a.tipo === "followup"){
     /* lo stesso testo della lista di oggi (motivoVoce); in agenda il suo «per cosa» */

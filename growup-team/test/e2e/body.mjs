@@ -5191,7 +5191,8 @@ for(const tema of ["light", "dark"]){
 }
 
 // 82. «Da fare oggi» (Seguimi): sotto il nome di ogni azione con una persona il motivo, calcolato quando si disegna la riga
-//     (nelle azioni salvate c'è solo l'id). Contatto: «Da contattare · in lista dal …» (non come la conosce); Follow-up: il testo
+//     (nelle azioni salvate c'è solo l'id). Contatto: solo l'azione, «Da contattare» o in agenda l'appuntamento
+//     (e nella Lista «In lista dal … (N giorni)» per chi è ancora in lista senza agenda); Follow-up: il testo
 //     della lista di oggi (in ritardo dal … · prossimo passo; in agenda il suo «per cosa»); Cliente: il motivo dei clienti da
 //     sentire. Motivo cambiato: si vede quello di adesso; senza motivo solo il nome. A 360 px il motivo va a capo nella card.
 {
@@ -5199,17 +5200,21 @@ for(const tema of ["light", "dark"]){
   const giorno = n => fmt.format(new Date(Date.now() + n * 864e5)), anno = oggiG.slice(0, 4);
   const MESI_T = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
   const it = d => `${Number(d.slice(8))} ${MESI_T[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== anno ? " " + d.slice(0, 4) : ""}`;
+  const gg = d => Math.round((Date.parse(oggiG + "T00:00:00Z") - Date.parse(d + "T00:00:00Z")) / 864e5);
   const p82 = (id, nome, extra) => Object.assign({ id, proprietario:"R", nome, fase:"lista", esito:null, creato_il:`${anno}-01-05T10:00:00Z` }, extra);
   DB.persone = (DB.persone || []).filter(x => x.proprietario !== "R").concat([
     p82("c82a", "Nora Contattodalla Listadiprova", { fonte:"conoscenza" }),
     p82("c82b", "Ugo Giàcontattato", { fase:"contattato", creato_il:`${anno}-01-06T10:00:00Z` }),
     p82("c82c", "Ivo Senzafonte", { creato_il:`${anno}-01-07T10:00:00Z` }),
+    p82("c82d", "Dora Inagenda", { creato_il:`${anno}-01-08T10:00:00Z`, prossima_data:giorno(1), prossima_come:"telefono", prossima_per:"contatto" }),
+    p82("c82e", "Elio Nuovo", { creato_il:new Date().toISOString() }),
+    p82("c82f", "Febo Ieri", { creato_il:giorno(-1) + "T10:00:00Z" }),
     p82("f82a", "Fede Ritardo", { fase:"piano", prossima_data:giorno(-2) }),
     p82("f82b", "Gino Agenda", { fase:"invitato", prossima_data:oggiG, prossima_ora:"18:30", prossima_come:"telefono", prossima_per:"piano" }),
     p82("f82c", "Lia Spostata", { fase:"followup", prossima_data:giorno(5) }),
     p82("k82a", "Bea Compleanno", { fase:"contattato", esito:"cliente", lasciati:[], compleanno:giorno(3).slice(5), creato_il:giorno(-60) + "T10:00:00Z" }),
     p82("k82b", "Carlo Tranquillo", { fase:"contattato", esito:"cliente", lasciati:[], creato_il:giorno(-60) + "T10:00:00Z" })]);
-  const azioni82 = [["contatto", "c82a"], ["contatto", "c82b"], ["contatto", "c82c"], ["followup", "f82a"], ["followup", "f82b"], ["followup", "f82c"],
+  const azioni82 = [["contatto", "c82a"], ["contatto", "c82b"], ["contatto", "c82c"], ["contatto", "c82d"], ["followup", "f82a"], ["followup", "f82b"], ["followup", "f82c"],
     ["cliente", "k82a"], ["cliente", "k82b"]].map(([tipo, id]) => ({ tipo, id })).concat([{ tipo:"formazione" }]);
   DB.seguimi = (DB.seguimi || []).filter(x => x.partner_id !== "R").concat([{ partner_id:"R", attivo:true, condividi:false }]);
   DB.seguimiGiorni = (DB.seguimiGiorni || []).filter(x => x.partner_id !== "R").concat([{ partner_id:"R", giorno:oggiG, azioni:azioni82, proposte:azioni82.length, fatte:0, per_tipo:{} }]);
@@ -5222,8 +5227,9 @@ for(const tema of ["light", "dark"]){
     const motivo = async id => { const li = dfo.locator(":scope > ul > li", { has:page.locator(`button[data-id="${id}"]`) });
       return (await li.locator(".motivo-oggi").count()) ? (await li.locator(".motivo-oggi").innerText()).trim() : null; };
     if(tema === "light"){
-      check(await motivo("c82a") === `Da contattare · in lista dal ${it(anno + "-01-05")}`, "contatto: da quando è in lista, senza come la conosci (" + await motivo("c82a") + ")");
-      check(await motivo("c82c") === `Da contattare · in lista dal ${it(anno + "-01-07")}`, "contatto senza «Come lo conosci?»: lo stesso testo");
+      check(await motivo("c82a") === "Da contattare", "contatto: solo l'azione, senza data né giorni in lista né come la conosci (" + await motivo("c82a") + ")");
+      check(await motivo("c82c") === "Da contattare", "contatto senza «Come lo conosci?»: lo stesso testo");
+      check(await motivo("c82d") === `Domani · ${it(giorno(1))} · telefono · contatto`, "contatto in agenda: solo l'appuntamento, non da quanto è in lista (" + await motivo("c82d") + ")");
       check(await motivo("c82b") === null, "contatto già fatto (non più «In lista»): solo il nome");
       check(await motivo("f82a") === `In ritardo dal ${it(giorno(-2))} · Follow-up`, "follow-up in ritardo: lo stesso testo della lista di oggi (" + await motivo("f82a") + ")");
       check(await motivo("f82b") === `Oggi · ${it(oggiG)} · 18:30 · telefono · piano`, "follow-up in agenda: il suo «per cosa» (" + await motivo("f82b") + ")");
@@ -5251,6 +5257,23 @@ for(const tema of ["light", "dark"]){
     await new Promise(r => setTimeout(r, 400)); await sync(page);
     await ctx.close();
   }
+  // nella Lista: chi è ancora «In lista» senza agenda mostra da quando (data e giorni); in agenda solo l'appuntamento
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "a".repeat(32)));
+  await page.getByText("Ciao Stefano e Alessia").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-filtro=tutti]");
+  const sotto = async id => (await page.locator(`ul.persone button[data-act=apri-persona][data-id="${id}"] .grow > .small:last-child`).innerText()).trim();
+  check(await sotto("c82a") === `In lista dal ${it(anno + "-01-05")} (${gg(anno + "-01-05")}\u00a0giorni)`, "Lista: «In lista dal … (N giorni)» (" + await sotto("c82a") + ")");
+  check(await sotto("c82e") === "In lista da oggi", "Lista: scritto oggi, «In lista da oggi» (" + await sotto("c82e") + ")");
+  check(await sotto("c82f") === `In lista dal ${it(giorno(-1))} (1\u00a0giorno)`, "Lista: scritto ieri, «(1 giorno)» (" + await sotto("c82f") + ")");
+  check(await sotto("c82d") === `In lista · Domani · ${it(giorno(1))} · telefono · contatto`, "Lista: in agenda solo l'appuntamento, come prima (" + await sotto("c82d") + ")");
+  check(/^Contattato · fermo da \d+ giorni$/.test(await sotto("c82b")), "Lista: chi ha già fatto un passo ha «fermo da», non da quando è in lista (" + await sotto("c82b") + ")");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Lista a 360 px: niente scorrimento orizzontale");
+  await page.evaluate(() => document.querySelectorAll("body *").forEach(e => { const p = getComputedStyle(e).position;
+    if(p === "fixed" || p === "sticky") e.style.visibility = "hidden"; }));
+  for(const tema of ["light", "dark"]){ await page.emulateMedia({ colorScheme:tema });
+    const l = page.locator("ul.persone").first(); await l.screenshot({ path: S + `/e2e/82-lista-${tema}.png` }); }
+  await ctx.close();
   const g82 = DB.seguimiGiorni.find(x => x.partner_id === "R" && x.giorno === oggiG);
   check(JSON.stringify(g82.azioni) === prima82 && !JSON.stringify(g82).includes("motivo") && !JSON.stringify(g82).includes("Da contattare"),
     "nelle azioni salvate restano solo tipo e id: nessun motivo nel database");
