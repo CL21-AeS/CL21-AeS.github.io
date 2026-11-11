@@ -3,6 +3,14 @@
 Ultimo aggiornamento: 11 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## «Da fare oggi»: tolto «come la conosci» dal motivo del contatto (11 novembre 2026, sera, app v115, database non toccato)
+
+Scelta di Stefano dopo la v114: nelle azioni di «Da fare oggi» il motivo del contatto è solo «Da contattare · in lista dal
+[data]», senza «· lo conoscevi già» / «incontrato di recente» / «dai social». «Come lo conosci?» resta dov'era (modulo
+del nome, scheda della persona, conteggio del cruscotto). Follow-up e cliente come nella v114. Test dell'interfaccia: 1114 controlli superati (sezione 82
+aggiornata).
+Service worker v115.
+
 ## «Da fare oggi»: il motivo sotto il nome (11 novembre 2026, sera, app v114, database non toccato)
 
 Io → «Da fare oggi» (`vOggiPerTe`, solo con il Seguimi attivo): sotto il nome di ogni azione con una persona, in piccolo,
