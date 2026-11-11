@@ -1,7 +1,27 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 10 novembre 2026 (notte). Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 11 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
+
+## Niente più clienti, piani e contatti «senza nome» (11 novembre 2026, app v113, database non toccato)
+
+Quattro PR in fila, da unire in ordine; la versione del service worker sale una volta sola, nell'ultima.
+Decisione di Stefano: nell'app non si registrano più clienti, piani o contatti senza una persona. Un cliente si registra
+solo da **Persone → Clienti** (`cliente-nuovo`) o chiudendo una persona della Lista come Cliente (il passo `chiusura`
+con esito `cliente` lo conta il database, `passi_prima`); piani e contatti sempre con una persona.
+1. **Io → «Il mio mese»**: tolto «+ Cliente»; «Nuovi clienti nel mese» è solo una riga con il numero (`clientiMese`, come prima).
+2. **«+ Piano»** («Un piano: con chi?»): tolto «Senza nome: conta solo il piano». Si sceglie una persona della lista o si
+   scrive il nome (vuoto: «Scrivi il nome, oppure scegli una persona qui sopra.»).
+3. **«+ Contatto»**: tolto «Senza nome: conta solo il contatto». Si sceglie una persona dai suggerimenti o si scrive il
+   nome. Tolta l'azione `senza-nome`, che non usava più nessuno.
+4. **Percorso delle tappe**: tolto «+ Cliente» accanto a «I tuoi primi N clienti» (e il campo `cliente` del requisito);
+   il requisito resta con il suo conteggio. Service worker v113, questo STATO.md.
+Restano come prima: «+ Contatto», «+ Piano», «+ Cliente» nella scheda del partner senza app (griglia «I suoi numeri»:
+lo sponsor scrive i numeri al posto di chi non usa l'app; azioni `contatto`, `piano`, `cliente` → `registra`).
+Le attività già registrate senza nome restano nello storico e continuano a contare (nessun dato cancellato o cambiato).
+Nessun testo «?» citava questi pulsanti. Test dell'interfaccia: 1096 controlli superati (Il mio mese con il numero dei
+clienti registrati da Clienti, + Piano e + Contatto senza «Senza nome» e senza nome vuoto, requisito del percorso senza
+pulsante); `test/db.sh` non serve (database non toccato).
 
 ## I VP solo dalla mappa Amway e più bozze d'ordine (10 novembre 2026, notte: migrazione 063, app v112)
 

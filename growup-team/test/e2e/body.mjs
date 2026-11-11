@@ -148,6 +148,14 @@ await page.locator("button[data-act=ordini] b", { hasText:"62,5 VP · mese" }).w
 check(await page.locator(".cruscotto .anello b.num").innerText() === "62,5" && await page.locator(".cruscotto .mappa-riga > span").innerText() === "VP: mappa " + delGiornoIt(mappaAnna.dati_al),
   "063: i VP della mappa nell'anello, con la data della mappa");
 check(await page.getByText("Primi clienti").first().isVisible(), "063: primo ordine dalla mappa -> tappa 2");
+{ // la tappa «Primi clienti»: il requisito con il suo conteggio, senza «+ Cliente»
+  await sync(page); await apriTappa(page);
+  const cl = Math.min(3, DB.activities.filter(a => a.partner_id === anna.id && a.tipo === "cliente").reduce((t, a) => t + (a.quantita || 1), 0));
+  const reqC = page.locator("ul.req li", { hasText:"I tuoi primi 3 clienti" });
+  check(await reqC.isVisible() && (await reqC.locator(".num").innerText()) === cl + " / 3", "percorso: «I tuoi primi 3 clienti» con il conteggio (" + cl + " / 3)");
+  check(!(await page.locator("ul.req", { hasText:"I tuoi primi 3 clienti" }).locator("button").count()), "percorso: niente più «+ Cliente» accanto al requisito");
+  await page.locator("button[data-act=apri-tappa]").first().click();
+}
 await page.click(".cruscotto .mappa-riga .aiuto-btn");
 check((await page.locator(".cruscotto .aiuto-testo").innerText()).trim() === "I VP sono quelli ufficiali di Amway, dall'ultima mappa importata (anche da chi ti segue). "
   + "Le bozze ti aiutano a preparare gli ordini e la chiusura del mese, ma non cambiano i VP.", "063: il «?» dei VP con il testo di Stefano");
