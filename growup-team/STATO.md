@@ -3,6 +3,25 @@
 Ultimo aggiornamento: 11 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## «Da fare oggi»: il motivo sotto il nome (11 novembre 2026, sera, app v114, database non toccato)
+
+Io → «Da fare oggi» (`vOggiPerTe`, solo con il Seguimi attivo): sotto il nome di ogni azione con una persona, in piccolo,
+il **motivo**, come già in «Anche da sentire» (`motivoAzione`, classe `.motivo-oggi`):
+- **Contatto**: «Da contattare · in lista dal [data]» (giorno di `creato_il`, ora italiana) e, se c'è «Come lo conosci?»
+  (`fonte`), le stesse parole del cruscotto: «· lo conoscevi già», «· incontrato di recente», «· dai social».
+  Chi non è più «In lista» (già contattato o chiuso): solo il nome.
+- **Follow-up**: lo stesso testo della lista di oggi (`motivoVoce`): «In ritardo dal [data] · [prossimo passo]», oppure la
+  data con il prossimo passo; se è in agenda, il suo «per cosa» (`testoProssima`). Senza data o chiuso: solo il nome.
+- **Cliente**: lo stesso motivo di «clienti da sentire» (`clientiDaSentire`: compleanno, come si è trovato, riordino atteso,
+  doveva riordinare). Se non è più da sentire: solo il nome.
+Il motivo si calcola **quando si disegna la riga**: nelle azioni salvate (`seguimi_giorni.azioni`) resta solo tipo e id,
+quindi se nel frattempo è cambiato (data spostata, passo segnato) si vede quello di adesso. Nessun cambio al database e alle
+azioni salvate; all'upline nessun dato in più (vede solo i numeri, come prima). Il nome resta il pulsante che apre la
+scheda; il motivo sta fuori dal pulsante. A 360 px il motivo va a capo dentro la card e la spunta resta ferma.
+Test dell'interfaccia: 1116 controlli superati (sezione 82: i tre motivi, motivo cambiato, solo il nome senza motivo,
+niente motivo nel database, a 360 px chiaro e scuro dentro la card con la spunta al suo posto; screenshot
+`e2e/82-motivi-light.png` e `-dark.png`). `test/db.sh` non serve (database non toccato). Service worker v114.
+
 ## Niente più clienti, piani e contatti «senza nome» (11 novembre 2026, app v113, database non toccato)
 
 Quattro PR in fila, da unire in ordine; la versione del service worker sale una volta sola, nell'ultima.

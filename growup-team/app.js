@@ -7321,6 +7321,23 @@ function serieSeguimi(fatteOggi){
   }
   return n;
 }
+/* il perché di un'azione con una persona, sotto il nome. Si calcola quando si disegna la riga (nelle azioni salvate c'è
+   solo l'id): si vede sempre quello di adesso; se oggi non c'è più un motivo, solo il nome. Restituisce testo già con esc(). */
+function motivoAzione(a, p){
+  if(a.tipo === "contatto"){
+    if(p.fase !== "lista" || p.esito) return "";
+    const dal = p.creato_il ? fmtGiorno.format(new Date(p.creato_il)) : "", fonte = FONTI.find(f => f[0] === p.fonte);
+    return ["Da contattare" + (dal ? ` · in lista dal ${esc(dataIt(dal))}` : ""), fonte ? esc(fonte[2]) : ""].filter(Boolean).join(" · ");
+  }
+  if(a.tipo === "followup"){
+    /* lo stesso testo della lista di oggi (motivoVoce); in agenda il suo «per cosa» */
+    if(!p.prossima_data || !(inAgenda(p) || !p.esito || p.esito === "non_ora" || p.esito === "senza_risposta")) return "";
+    return motivoVoce({ k:"lista", p });
+  }
+  /* cliente: lo stesso motivo di «clienti da sentire» */
+  const x = clientiDaSentire().find(y => y.p.id === p.id);
+  return x ? esc(x.motivo) : "";
+}
 let salvaOggiT = null;
 function vOggiPerTe(){
   const g = st.seguimi.attivo ? oggiSeguimi() : null;
@@ -7331,7 +7348,7 @@ function vOggiPerTe(){
     clearTimeout(salvaOggiT);
     salvaOggiT = setTimeout(() => api.salvaSeguimiGiorno({ giorno:g.giorno, azioni:g.azioni, proposte:g.proposte, fatte:g.fatte, per_tipo:g.per_tipo }).catch(() => {}), 300);
   }
-  const nome = id => { const p = (st.persone || []).find(x => x.id === id); return p ? p.nome : ""; };
+  const persona = id => (st.persone || []).find(x => x.id === id) || null;
   const riga = a => {
     const fatta = azioneFatta(a), manuale = a.tipo === "formazione" || a.tipo === "sponsor";
     const segno = manuale
@@ -7339,8 +7356,10 @@ function vOggiPerTe(){
       : `<span class="spunta-oggi${fatta ? " si" : ""}" aria-label="${fatta ? "Fatto" : "Da fare"}">${fatta ? "✓" : ""}</span>`;
     let testo = "";
     if(a.tipo === "contatto" || a.tipo === "followup" || a.tipo === "cliente"){
-      const n = nome(a.id); if(!n) return "";
-      testo = `<button class="btn link" style="padding:0;min-height:0" data-act="${a.tipo === "cliente" ? "apri-cliente" : "apri-persona"}" data-id="${esc(a.id)}">${esc(n)}</button>`;
+      const p = persona(a.id); if(!p || !p.nome) return "";
+      const m = motivoAzione(a, p);
+      testo = `<button class="btn link" style="padding:0;min-height:0" data-act="${a.tipo === "cliente" ? "apri-cliente" : "apri-persona"}" data-id="${esc(a.id)}">${esc(p.nome)}</button>${
+        m ? `<br><span class="small motivo-oggi">${m}</span>` : ""}`;
     } else if(a.tipo === "vp") testo = `Mancano ${num(a.manca)} VP al tuo obiettivo del mese${a.mappa ? ` (mappa ${esc(delGiorno(a.mappa))})` : ""} ·
       <button class="btn link" style="padding:0;min-height:0" data-act="apri-bozze">apri Le mie bozze</button>`;
     else if(a.tipo === "formazione") testo = "15 minuti: un audio o 10 pagine di un libro";
