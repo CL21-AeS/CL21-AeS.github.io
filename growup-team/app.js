@@ -587,7 +587,8 @@ function requisiti(t){
   }
   if(t.clienti){
     const c = clientiTotali();
-    out.push({ ok: c >= t.clienti, txt: `I tuoi primi ${t.clienti} clienti`, val: `${num(Math.min(c, t.clienti))} / ${t.clienti}`, cliente:true });
+    /* solo il conteggio: un cliente si registra da Persone → Clienti o chiudendo una persona della Lista come Cliente */
+    out.push({ ok: c >= t.clienti, txt: `I tuoi primi ${t.clienti} clienti`, val: `${num(Math.min(c, t.clienti))} / ${t.clienti}` });
   }
   const n = numeriMese(m), c = !n.mappa;   // senza la mappa del mese: requisiti da fare, nessuna cifra
   if(Number(t.vp_personali) > 0){
@@ -2089,7 +2090,7 @@ function datiTappa(){
     ${attuale.guadagno_mese ? `<p class="small" style="margin:6px 0 0">Circa ${euro(attuale.guadagno_mese)} al mese* con ${esc(attuale.struttura_calcolo || "")}</p>` : ""}
     <ul class="req">${req.map(r => `<li class="${r.ok ? "ok" : ""} ${r.attesa ? "attesa" : ""}">
       <span class="mark">${r.ok ? "✓" : r.attesa ? "·" : "○"}</span>
-      <span class="grow">${esc(r.txt)}${r.cliente ? ` <button class="btn link small" data-act="cliente" style="min-height:0">+ Cliente</button>` : ""}</span>
+      <span class="grow">${esc(r.txt)}</span>
       ${r.val ? `<span class="num">${esc(r.val)}</span>` : ""}</li>`).join("")}</ul>
     ${distinti}
     ${linee}
