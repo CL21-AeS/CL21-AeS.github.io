@@ -5024,6 +5024,7 @@ function vSheetPersone(s){
   const annulla = `<button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>`;
   if(s === "persona-nuova" || (s === "persona-modifica" && p)){
     const m = s === "persona-modifica" ? p : {};
+    /* «+ Contatto» da Io: sempre con una persona (scelta tra i suggerimenti o scritta qui; niente più contatti «senza nome») */
     const rapido = !m.id && st.rapido === "contatto";
     if(!m.id && !rapido && st.rubricaMolti && st.rubricaMolti.length) return vRubricaMolti(annulla);
     /* il contatto preso dalla rubrica sta nello stato: il modulo lo mostra anche se l'app lo ridisegna */
@@ -5055,7 +5056,6 @@ function vSheetPersone(s){
       ${rapido ? "" : (() => { const t = st.nuovoCliente || m.esito === "cliente" ? "clienti" : "lista", sc = t === "clienti" ? st.cerchiaClienti : st.cerchiaLista;
         return campoCerchie(t, m.id ? cerchieDi(m.id) : sc ? [sc] : []); })()}
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
-      ${rapido ? `<button type="button" class="btn ghost wide" style="margin-top:8px" data-act="senza-nome" data-tipo="contatto">Senza nome: conta solo il contatto</button>` : ""}
     </form>`;
   }
   /* un piano sempre con una persona: della lista o scritta qui (niente più piani «senza nome») */
@@ -5242,7 +5242,6 @@ Object.assign(AZIONI, {
   },
   "piano-rapido"(){ st.errore = ""; st.rapido = "piano"; st.cercaPiano = ""; st.sheet = "piano-chi"; render(); },
   "piano-con"(el){ st.personaId = el.dataset.id; st.passoTipo = "piano"; st.sheet = "passo"; render(); },
-  async "senza-nome"(el){ const tipo = el.dataset.tipo; st.rapido = null; st.sheet = null; render(); await registra(tipo); },
   "persone-tante"(){ st.errore = ""; st.sheet = "persone-tante"; render(); },
   /* 053: le cerchie della Lista */
   "filtro-cerchia"(el){ scegliCerchia(!el.dataset.id || idCerchia() === el.dataset.id ? null : el.dataset.id); render(); },
