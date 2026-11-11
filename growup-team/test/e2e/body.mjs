@@ -5190,6 +5190,76 @@ for(const tema of ["light", "dark"]){
   check(!errori.length, "incontro: nessun errore nella pagina");
 }
 
+// 82. «Da fare oggi» (Seguimi): sotto il nome di ogni azione con una persona il motivo, calcolato quando si disegna la riga
+//     (nelle azioni salvate c'è solo l'id). Contatto: «Da contattare · in lista dal …» (e come la conosce); Follow-up: il testo
+//     della lista di oggi (in ritardo dal … · prossimo passo; in agenda il suo «per cosa»); Cliente: il motivo dei clienti da
+//     sentire. Motivo cambiato: si vede quello di adesso; senza motivo solo il nome. A 360 px il motivo va a capo nella card.
+{
+  const fmt = new Intl.DateTimeFormat("en-CA", { timeZone:"Europe/Rome" }), oggiG = fmt.format(new Date());
+  const giorno = n => fmt.format(new Date(Date.now() + n * 864e5)), anno = oggiG.slice(0, 4);
+  const MESI_T = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
+  const it = d => `${Number(d.slice(8))} ${MESI_T[Number(d.slice(5, 7)) - 1]}${d.slice(0, 4) !== anno ? " " + d.slice(0, 4) : ""}`;
+  const p82 = (id, nome, extra) => Object.assign({ id, proprietario:"R", nome, fase:"lista", esito:null, creato_il:`${anno}-01-05T10:00:00Z` }, extra);
+  DB.persone = (DB.persone || []).filter(x => x.proprietario !== "R").concat([
+    p82("c82a", "Nora Contattodalla Listadiprova", { fonte:"conoscenza" }),
+    p82("c82b", "Ugo Giàcontattato", { fase:"contattato", creato_il:`${anno}-01-06T10:00:00Z` }),
+    p82("c82c", "Ivo Senzafonte", { creato_il:`${anno}-01-07T10:00:00Z` }),
+    p82("f82a", "Fede Ritardo", { fase:"piano", prossima_data:giorno(-2) }),
+    p82("f82b", "Gino Agenda", { fase:"invitato", prossima_data:oggiG, prossima_ora:"18:30", prossima_come:"telefono", prossima_per:"piano" }),
+    p82("f82c", "Lia Spostata", { fase:"followup", prossima_data:giorno(5) }),
+    p82("k82a", "Bea Compleanno", { fase:"contattato", esito:"cliente", lasciati:[], compleanno:giorno(3).slice(5), creato_il:giorno(-60) + "T10:00:00Z" }),
+    p82("k82b", "Carlo Tranquillo", { fase:"contattato", esito:"cliente", lasciati:[], creato_il:giorno(-60) + "T10:00:00Z" })]);
+  const azioni82 = [["contatto", "c82a"], ["contatto", "c82b"], ["contatto", "c82c"], ["followup", "f82a"], ["followup", "f82b"], ["followup", "f82c"],
+    ["cliente", "k82a"], ["cliente", "k82b"]].map(([tipo, id]) => ({ tipo, id })).concat([{ tipo:"formazione" }]);
+  DB.seguimi = (DB.seguimi || []).filter(x => x.partner_id !== "R").concat([{ partner_id:"R", attivo:true, condividi:false }]);
+  DB.seguimiGiorni = (DB.seguimiGiorni || []).filter(x => x.partner_id !== "R").concat([{ partner_id:"R", giorno:oggiG, azioni:azioni82, proposte:azioni82.length, fatte:0, per_tipo:{} }]);
+  const prima82 = JSON.stringify(azioni82);
+  for(const tema of ["light", "dark"]){
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema }, "#chiave=" + "a".repeat(32)));
+    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+    const dfo = page.locator(".da-fare-oggi"); await dfo.waitFor();
+    const motivo = async id => { const li = dfo.locator(":scope > ul > li", { has:page.locator(`button[data-id="${id}"]`) });
+      return (await li.locator(".motivo-oggi").count()) ? (await li.locator(".motivo-oggi").innerText()).trim() : null; };
+    if(tema === "light"){
+      check(await motivo("c82a") === `Da contattare · in lista dal ${it(anno + "-01-05")} · lo conoscevi già`, "contatto: da quando è in lista e come la conosci (" + await motivo("c82a") + ")");
+      check(await motivo("c82c") === `Da contattare · in lista dal ${it(anno + "-01-07")}`, "contatto senza «Come lo conosci?»: solo da quando è in lista");
+      check(await motivo("c82b") === null, "contatto già fatto (non più «In lista»): solo il nome");
+      check(await motivo("f82a") === `In ritardo dal ${it(giorno(-2))} · Follow-up`, "follow-up in ritardo: lo stesso testo della lista di oggi (" + await motivo("f82a") + ")");
+      check(await motivo("f82b") === `Oggi · ${it(oggiG)} · 18:30 · telefono · piano`, "follow-up in agenda: il suo «per cosa» (" + await motivo("f82b") + ")");
+      check(await motivo("f82c") === `${it(giorno(5))} · Chiusura`, "follow-up spostato: si vede la data di adesso (" + await motivo("f82c") + ")");
+      check(/^Compleanno il \d+ \w+$/.test(await motivo("k82a") || ""), "cliente: il motivo dei clienti da sentire (" + await motivo("k82a") + ")");
+      check(await motivo("k82b") === null, "cliente che non è più da sentire: solo il nome");
+      check(await dfo.locator(":scope > ul button[data-act=apri-persona]", { hasText:"Lista" }).count() === 1
+        && (await dfo.locator(":scope > ul button[data-act=apri-persona][data-id=c82a]").innerText()).trim() === "Nora Contattodalla Listadiprova",
+        "il nome resta il pulsante, il motivo sta fuori");
+      check(await dfo.locator("li", { hasText:"15 minuti" }).locator(".motivo-oggi").count() === 0, "formazione: niente motivo");
+    }
+    // a 360 px: il motivo resta nella card, la spunta resta al suo posto e della sua misura
+    const geo = await page.evaluate(() => { const card = document.querySelector(".da-fare-oggi").getBoundingClientRect();
+      return [...document.querySelectorAll(".da-fare-oggi > ul > li")].map(li => { const m = li.querySelector(".motivo-oggi"), s = li.querySelector(".spunta-oggi").getBoundingClientRect();
+        const r = m ? m.getBoundingClientRect() : null;
+        return { dentro:!r || (r.left >= card.left - 0.5 && r.right <= card.right + 0.5), righe:r ? Math.round(r.height / parseFloat(getComputedStyle(m).lineHeight)) : 0,
+          spunta:Math.round(s.width) === 26 && Math.round(s.height) === 26 && Math.abs(s.left - li.getBoundingClientRect().left) < 1 }; }); });
+    check(geo.every(x => x.dentro), `${tema}, 360 px: ogni motivo resta dentro la card`);
+    check(geo.every(x => x.spunta), `${tema}, 360 px: la spunta non si sposta e non si stringe`);
+    check(geo.some(x => x.righe >= 2), `${tema}, 360 px: il motivo lungo va su due righe`);
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${tema}, 360 px: niente scorrimento orizzontale`);
+    /* le barre fisse (linguette in alto, pulsanti in basso) coprirebbero la card nello screenshot */
+    await page.evaluate(() => document.querySelectorAll("body *").forEach(e => { const p = getComputedStyle(e).position;
+      if((p === "fixed" || p === "sticky") && !e.closest(".da-fare-oggi")) e.style.visibility = "hidden"; }));
+    await dfo.screenshot({ path: S + `/e2e/82-motivi-${tema}.png` });
+    await new Promise(r => setTimeout(r, 400)); await sync(page);
+    await ctx.close();
+  }
+  const g82 = DB.seguimiGiorni.find(x => x.partner_id === "R" && x.giorno === oggiG);
+  check(JSON.stringify(g82.azioni) === prima82 && !JSON.stringify(g82).includes("motivo") && !JSON.stringify(g82).includes("Da contattare"),
+    "nelle azioni salvate restano solo tipo e id: nessun motivo nel database");
+  DB.persone = DB.persone.filter(x => !/^[cfk]82/.test(String(x.id)));
+  DB.seguimiGiorni = DB.seguimiGiorni.filter(x => x.partner_id !== "R"); DB.seguimi = DB.seguimi.filter(x => x.partner_id !== "R");
+  check(!errori.length, "motivi in «Da fare oggi»: nessun errore nella pagina");
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
