@@ -5058,6 +5058,7 @@ function vSheetPersone(s){
       ${rapido ? `<button type="button" class="btn ghost wide" style="margin-top:8px" data-act="senza-nome" data-tipo="contatto">Senza nome: conta solo il contatto</button>` : ""}
     </form>`;
   }
+  /* un piano sempre con una persona: della lista o scritta qui (niente più piani «senza nome») */
   if(s === "piano-chi") return `<h2>Un piano: con chi?</h2>
     <p class="small">Scegli la persona e compila il piano: conta nei piani della settimana.</p>
     <input type="search" id="cerca-piano" class="cerca" placeholder="Cerca nella tua lista…" autocomplete="off" value="${esc(st.cercaPiano || "")}">
@@ -5065,8 +5066,7 @@ function vSheetPersone(s){
     <form data-form="piano-nuovo" novalidate style="margin-top:10px">
       <label class="field"><span>Non è nella lista? Scrivi il nome</span><input name="nome" maxlength="80" autocomplete="off"></label>
       <div class="row" style="margin-top:8px">${annulla}<button class="btn primary grow">Avanti</button></div>
-    </form>
-    <button type="button" class="btn ghost wide" style="margin-top:8px" data-act="senza-nome" data-tipo="piano">Senza nome: conta solo il piano</button>`;
+    </form>`;
   if(s === "cerchia-nuova" || s === "cerchia-rinomina"){
     const c = s === "cerchia-rinomina" ? cerchiaScelta() : null, cl = tipoCerchie() === "clienti";
     return `<h2>${c ? "Rinomina la cerchia" : cl ? "Una nuova cerchia di clienti" : "Una nuova cerchia"}</h2>

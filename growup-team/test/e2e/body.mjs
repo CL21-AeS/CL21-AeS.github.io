@@ -117,14 +117,16 @@ await page.getByText("Piano segnato").waitFor();
 await page.locator("button[data-act=piano-rapido] b", { hasText:"1 questa sett." }).waitFor();
 await sync(page);
 check(DB.persone.find(x => x.id === paoloR.id).fase === "piano" && DB.activities.filter(a => a.partner_id === paoloR.proprietario && a.tipo === "piano").length === 1, "piano +1, Paolo a Piano fatto");
-// senza nome: conta solo il piano, poi si annulla
+// un piano sempre con una persona: niente più «Senza nome: conta solo il piano»
 await page.click("button[data-act=piano-rapido]");
-await page.click(".sheet button[data-act=senza-nome]");
-await page.getByText("Piano mostrato registrato").waitFor();
-check(await page.locator("button[data-act=piano-rapido] b").innerText() === "2 questa sett.", "senza nome: piano +1");
-await page.getByRole("button", { name:"Annulla" }).last().click();
-await page.getByText("Annullato").waitFor();
-check(await page.locator("button[data-act=piano-rapido] b").innerText() === "1 questa sett.", "annullato: di nuovo 1");
+check(await page.locator(".sheet h2", { hasText:"Un piano: con chi?" }).isVisible() && await page.locator("#cerca-piano").isVisible()
+  && await page.locator(".sheet form[data-form=piano-nuovo] input[name=nome]").isVisible(), "+ Piano: si sceglie una persona o si scrive il nome");
+check(!(await page.locator(".sheet button[data-act=senza-nome]").count()) && !(await page.locator(".sheet", { hasText:"Senza nome" }).count()), "+ Piano: niente più «Senza nome»");
+await page.click(".sheet form[data-form=piano-nuovo] button.primary");
+check((await page.locator(".sheet form[data-form=piano-nuovo] .errore").innerText()) === "Scrivi il nome, oppure scegli una persona qui sopra.", "+ Piano senza persona: chiede il nome");
+await page.click(".sheet button[data-act=chiudi]");
+await page.locator("#sheet .sheet").waitFor({ state:"detached" });
+check(await page.locator("button[data-act=piano-rapido] b").innerText() === "1 questa sett.", "chiuso senza scegliere: nessun piano in più");
 check(!(await page.locator("ul.oggi").count()), "Diario di oggi chiuso di base");
 await apriDiario(page);
 const oggiCard = page.locator(".card.diario");
