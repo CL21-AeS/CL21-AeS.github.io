@@ -7333,10 +7333,9 @@ function serieSeguimi(fatteOggi){
 function motivoAzione(a, p){
   if(a.tipo === "contatto"){
     if(p.fase !== "lista" || p.esito) return "";
-    /* in agenda: solo l'appuntamento (l'azione da fare), come nella Lista */
-    if(p.prossima_data) return esc(testoProssima(p));
-    const da = inListaDa(p);
-    return "Da contattare" + (da ? ` · in lista ${esc(da)}` : "");
+    /* solo l'azione da fare (scelta di Stefano): in agenda l'appuntamento, altrimenti «Da contattare»; niente data né
+       giorni in lista (quelli stanno nella Lista) */
+    return p.prossima_data ? esc(testoProssima(p)) : "Da contattare";
   }
   if(a.tipo === "followup"){
     /* lo stesso testo della lista di oggi (motivoVoce); in agenda il suo «per cosa» */

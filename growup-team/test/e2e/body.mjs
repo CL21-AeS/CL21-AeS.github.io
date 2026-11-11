@@ -5191,7 +5191,7 @@ for(const tema of ["light", "dark"]){
 }
 
 // 82. «Da fare oggi» (Seguimi): sotto il nome di ogni azione con una persona il motivo, calcolato quando si disegna la riga
-//     (nelle azioni salvate c'è solo l'id). Contatto: «Da contattare · in lista dal … (N giorni)», in agenda solo l'appuntamento
+//     (nelle azioni salvate c'è solo l'id). Contatto: solo l'azione, «Da contattare» o in agenda l'appuntamento
 //     (e nella Lista «In lista dal … (N giorni)» per chi è ancora in lista senza agenda); Follow-up: il testo
 //     della lista di oggi (in ritardo dal … · prossimo passo; in agenda il suo «per cosa»); Cliente: il motivo dei clienti da
 //     sentire. Motivo cambiato: si vede quello di adesso; senza motivo solo il nome. A 360 px il motivo va a capo nella card.
@@ -5227,8 +5227,8 @@ for(const tema of ["light", "dark"]){
     const motivo = async id => { const li = dfo.locator(":scope > ul > li", { has:page.locator(`button[data-id="${id}"]`) });
       return (await li.locator(".motivo-oggi").count()) ? (await li.locator(".motivo-oggi").innerText()).trim() : null; };
     if(tema === "light"){
-      check(await motivo("c82a") === `Da contattare · in lista dal ${it(anno + "-01-05")} (${gg(anno + "-01-05")}\u00a0giorni)`, "contatto: da quando è in lista, con i giorni, senza come la conosci (" + await motivo("c82a") + ")");
-      check(await motivo("c82c") === `Da contattare · in lista dal ${it(anno + "-01-07")} (${gg(anno + "-01-07")}\u00a0giorni)`, "contatto senza «Come lo conosci?»: lo stesso testo");
+      check(await motivo("c82a") === "Da contattare", "contatto: solo l'azione, senza data né giorni in lista né come la conosci (" + await motivo("c82a") + ")");
+      check(await motivo("c82c") === "Da contattare", "contatto senza «Come lo conosci?»: lo stesso testo");
       check(await motivo("c82d") === `Domani · ${it(giorno(1))} · telefono · contatto`, "contatto in agenda: solo l'appuntamento, non da quanto è in lista (" + await motivo("c82d") + ")");
       check(await motivo("c82b") === null, "contatto già fatto (non più «In lista»): solo il nome");
       check(await motivo("f82a") === `In ritardo dal ${it(giorno(-2))} · Follow-up`, "follow-up in ritardo: lo stesso testo della lista di oggi (" + await motivo("f82a") + ")");

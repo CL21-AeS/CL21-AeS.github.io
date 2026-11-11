@@ -10,13 +10,14 @@ Lista, con la data e i giorni (`inListaDa`, dal giorno di `creato_il` in ora ita
 che non va a capo):
 - **Lista** (Persone → Lista), sotto il nome: «In lista dal 5 ottobre (37 giorni)»; scritto oggi «In lista da oggi»,
   ieri «(1 giorno)».
-- **«Da fare oggi»** (Seguimi), righe Contatto: «Da contattare · in lista dal 5 ottobre (37 giorni)».
+- **«Da fare oggi»** (Seguimi), righe Contatto: **solo l'azione** che il partner deve fare, «Da contattare», senza data né
+  giorni in lista (scelta di Stefano: quelli stanno nella Lista).
 - **In agenda** (data fissata con il calendario a destra del nome): solo l'appuntamento, l'azione da fare. Nella Lista
   come prima («In lista · Domani · 12 novembre · telefono · contatto»), in «Da fare oggi» «Domani · 12 novembre ·
-  telefono · contatto», senza da quanto è in lista (scelta di Stefano: righe troppo lunghe).
+  telefono · contatto» (scelta di Stefano: righe troppo lunghe).
 - Non cambia per chi ha già fatto un passo (Contattato, Invitato…: resta «fermo da N giorni», che conta dall'ultimo passo)
   né per i Clienti.
-Test dell'interfaccia: 1121 controlli superati (sezione 82: data e giorni nella Lista e in «Da fare oggi», da oggi, 1 giorno,
+Test dell'interfaccia: 1121 controlli superati (sezione 82: data e giorni nella Lista, in «Da fare oggi» solo «Da contattare», da oggi, 1 giorno,
 in agenda solo l'appuntamento, chi è già contattato senza giorni in lista; screenshot `e2e/82-lista-light.png` e `-dark.png`).
 Service worker v116.
 
