@@ -967,6 +967,20 @@ async function vaiHome(profilo){
     if(p){ st.vista = "persone"; st.sezPersone = p.esito === "cliente" ? "clienti" : "lista"; st.invitoId = null; st.personaId = p.id; }
     try{ history.replaceState(null, "", location.pathname + location.hash); }catch(e){}
   }
+  /* 065: il tocco sugli avvisi del gruppo (nuovo entrato, al suo posto nella mappa, fasi del percorso): «./?partner=<id>»
+     (solo l'id interno) apre la scheda di quella persona; se non si può aprire (non la vedo, non è ancora al suo posto,
+     o altro) si apre il Gruppo su «I tuoi nuovi in partenza». Se l'app era già aperta, il service worker la ricarica con
+     questo indirizzo. */
+  const daAvviso = (location.search.match(/[?&]partner=([0-9a-f-]{36})/) || [])[1];
+  if(/[?&]partner=/.test(location.search)){
+    if(st.fase === "home"){
+      st.sheet = null;
+      if(daAvviso && (st.struttura || []).some(x => x.id === daAvviso) && daAvviso !== profilo.id)
+        setTimeout(() => AZIONI["apri-scheda"]({ dataset:{ id:daAvviso } }), 0);
+      else { st.vista = "gruppo"; st.vaiNuoviPartenza = true; }
+    }
+    try{ history.replaceState(null, "", location.pathname + location.hash); }catch(e){}
+  }
   /* «Condividi → Growup» dall'app Contatti: il service worker ha messo da parte nomi e numeri; si apre l'elenco */
   if(/[?&]condivisi=1/.test(location.search)){
     if(st.fase === "home") await prendiCondivisi();
@@ -1153,6 +1167,9 @@ function render(){
   muoviDopo(prima);
   aggiornaPreviste();
   allineaStoria();
+  /* 065: aperto dal tocco su un avviso, la scheda non si poteva aprire: si va a «I tuoi nuovi in partenza» */
+  if(st.vaiNuoviPartenza && st.vista === "gruppo"){ st.vaiNuoviPartenza = false;
+    const np = document.querySelector(".card.nuovi-partenza"); if(np) np.scrollIntoView({ block:"start" }); }
 }
 /* le righe di filtri che scorrono di lato: il filtro acceso resta sempre in vista (anche dopo un ridisegno) */
 function filtroInVista(){

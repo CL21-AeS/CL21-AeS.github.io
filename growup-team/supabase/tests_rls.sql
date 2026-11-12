@@ -1980,6 +1980,118 @@ begin
     delete from public.persone where id = so;
   end;
 
+  -- ---- 065: l'avviso allo sponsor quando il nuovo chiude una fase (una volta sola, senza nomi, con la scheda) ----
+  declare
+    un  constant uuid := '00000000-0000-0000-0000-0000000000f8';   -- il nuovo
+    un2 constant uuid := '00000000-0000-0000-0000-0000000000f9';   -- un secondo nuovo
+    nf uuid; nf2 uuid; kn text;
+    fase2 text; fase3 text; fase4 text;
+  begin
+    execute 'reset role';
+    insert into auth.users (id, aud, role) values (un, 'authenticated', 'authenticated'), (un2, 'authenticated', 'authenticated');
+    -- A invita un nuovo, iscritto da 3 giorni; la mappa lo mette sotto B (sponsor reale, usa l'app)
+    kn := growup_test.invito(a, 'Nuovo Fasi', '8000065');
+    perform growup_test.come(un);
+    nf := (public.entra_con_invito(kn, current_date - 3)->'profilo'->>'id')::uuid;
+    execute 'reset role';
+    update public.partners set sponsor_id = b where id = nf;
+    fase2 := 'fase2-' || nf; fase3 := 'fase3-' || nf; fase4 := 'fase4-' || nf;
+    perform growup_test.ok((select url from public.notifiche_eventi where partner_id = a and chiave = 'entrato-' || nf) = './?partner=' || nf,
+                           '065: anche l''avviso «è entrata in Growup» apre la scheda della persona (solo l''id)');
+    -- fase 2: incontro fissato, poi i nomi: con 29 niente, al 30° l'avviso
+    perform growup_test.come(un);
+    update public.partners set incontro_sponsor = current_date + 1 where id = nf;
+    insert into public.persone (nome) select 'Nome fasi ' || i from generate_series(1, 29) i;
+    execute 'reset role';
+    perform growup_test.ok(not exists (select 1 from public.notifiche_eventi where chiave = fase2), '065: con 29 nomi la fase 2 non è chiusa');
+    perform growup_test.come(un);
+    insert into public.persone (nome) values ('Nome fasi 30');
+    execute 'reset role';
+    perform growup_test.ok((select corpo from public.notifiche_eventi where partner_id = a and chiave = fase2)
+                             = 'Una persona che hai invitato ha fissato il primo incontro con il suo sponsor e scritto 30 nomi nella Lista.',
+                           '065: fase 2 chiusa, l''avviso a chi ha invitato');
+    perform growup_test.ok((select corpo from public.notifiche_eventi where partner_id = b and chiave = fase2)
+                             = 'Un nuovo partner del tuo gruppo, sotto di te, ha fissato il primo incontro con il suo sponsor e scritto 30 nomi nella Lista.',
+                           '065: e allo sponsor reale che usa l''app');
+    perform growup_test.ok((select url from public.notifiche_eventi where partner_id = a and chiave = fase2) = './?partner=' || nf,
+                           '065: l''avviso apre la scheda della persona (solo l''id interno)');
+    perform growup_test.come(un);
+    insert into public.persone (nome) values ('Nome fasi 31');
+    update public.partners set incontro_sponsor = current_date + 2 where id = nf;
+    execute 'reset role';
+    perform growup_test.ok((select count(*) from public.notifiche_eventi where chiave = fase2) = 2, '065: la fase 2 si annuncia una volta sola');
+    -- fase 4 prima della 3 (ogni fase da sola): il primo piano, poi il primo cliente
+    perform growup_test.come(un);
+    insert into public.activities (partner_id, tipo) values (nf, 'piano');
+    execute 'reset role';
+    perform growup_test.ok(not exists (select 1 from public.notifiche_eventi where chiave = fase4), '065: con il solo piano la fase 4 non è chiusa');
+    perform growup_test.come(un);
+    insert into public.activities (partner_id, tipo) values (nf, 'cliente');
+    execute 'reset role';
+    perform growup_test.ok((select corpo from public.notifiche_eventi where partner_id = a and chiave = fase4)
+                             = 'Una persona che hai invitato ha mostrato il primo piano e ha il primo cliente: è il momento di un complimento.'
+                           and (select count(*) from public.notifiche_eventi where chiave = fase4) = 2,
+                           '065: fase 4 chiusa (anche prima della 3): l''avviso a chi ha invitato e allo sponsor');
+    -- fase 3: la mappa mostra il primo ordine. Il controllo è alla fine dell'import, non per ogni riga della mappa
+    insert into public.numeri_mese (partner_id, mese, vpp, vpg, dati_al) values (nf, date_trunc('month', current_date)::date, 60, 60, now());
+    perform growup_test.ok(not exists (select 1 from public.notifiche_eventi where chiave = fase3), '065: una riga della mappa da sola non fa partire niente');
+    perform growup_test.ok(not exists (select 1 from pg_trigger t join pg_proc f on f.oid = t.tgfoid
+                                        where t.tgrelid = 'public.numeri_mese'::regclass and not t.tgisinternal and f.prosrc ~ 'avvisa'),
+                           '065: nessun trigger della mappa fa partire gli avvisi (non una volta per riga)');
+    perform growup_test.ok((select prosrc from pg_proc where oid = 'public.importa_mappa(date, timestamptz, jsonb, jsonb, text[], uuid[], text[])'::regprocedure)
+                             ~ 'perform public\.avvisa_primi_ordini\(\);\s+return jsonb_build_object'
+                           and (select prosrc from pg_proc where oid = 'public.salva_mese_passato(date, timestamptz, jsonb, jsonb)'::regprocedure)
+                             ~ 'perform public\.avvisa_primi_ordini\(\);\s+return n;',
+                           '065: il controllo parte una volta alla fine di importa_mappa e di salva_mese_passato');
+    perform public.avvisa_primi_ordini();
+    perform growup_test.ok((select corpo from public.notifiche_eventi where partner_id = a and chiave = fase3)
+                             = 'Una persona che hai invitato ha fatto il primo ordine: è il momento di un complimento.'
+                           and (select corpo from public.notifiche_eventi where partner_id = b and chiave = fase3)
+                             = 'Un nuovo partner del tuo gruppo, sotto di te, ha fatto il primo ordine: è il momento di un complimento.',
+                           '065: fase 3 chiusa dalla mappa (anche importata da un upline): gli avvisi');
+    perform public.avvisa_primi_ordini();
+    perform growup_test.ok((select count(*) from public.notifiche_eventi where chiave = fase3) = 2, '065: la fase 3 si annuncia una volta sola');
+    perform growup_test.ok(not exists (select 1 from public.notifiche_eventi where chiave in (fase2, fase3, fase4)
+                                        and (corpo ~ 'Fasi|8000065|Nome fasi' or url ~ 'Fasi|8000065')),
+                           '065: negli avvisi né il nome né il codice Amway');
+    -- lo sponsor cambia dopo: le fasi già annunciate non si ripetono al nuovo sponsor
+    update public.partners set sponsor_id = c where id = nf;
+    perform growup_test.come(un);
+    insert into public.activities (partner_id, tipo) values (nf, 'piano');
+    execute 'reset role';
+    perform growup_test.ok(not exists (select 1 from public.notifiche_eventi where partner_id = c and chiave in (fase2, fase3, fase4)),
+                           '065: a un nuovo sponsor le fasi già annunciate non arrivano');
+    -- fase 2 chiusa dall'incontro fissato dopo i 30 nomi (trigger sui partner); poi la partenza completata: niente più
+    kn := growup_test.invito(a, 'Nuovo Fasi Due', '8000066');
+    perform growup_test.come(un2);
+    nf2 := (public.entra_con_invito(kn, current_date - 2)->'profilo'->>'id')::uuid;
+    insert into public.persone (nome) select 'Nome due ' || i from generate_series(1, 30) i;
+    execute 'reset role';
+    perform growup_test.ok(not exists (select 1 from public.notifiche_eventi where chiave = 'fase2-' || nf2), '065: 30 nomi senza incontro: la fase 2 non è chiusa');
+    perform growup_test.come(un2);
+    update public.partners set incontro_sponsor = current_date + 1 where id = nf2;
+    execute 'reset role';
+    perform growup_test.ok((select count(*) from public.notifiche_eventi where chiave = 'fase2-' || nf2) = 1,
+                           '065: l''incontro fissato chiude la fase 2 (solo a chi ha invitato: lo sponsor è lui)');
+    update public.partners set partenza_completata_il = now() where id = nf2;
+    perform growup_test.come(un2);
+    insert into public.activities (partner_id, tipo) values (nf2, 'piano'), (nf2, 'cliente');
+    execute 'reset role';
+    perform growup_test.ok(not exists (select 1 from public.notifiche_eventi where chiave = 'fase4-' || nf2), '065: chi ha finito la partenza non manda avvisi');
+    -- chi non è un nuovo (A, iscritta da tempo): nessun avviso
+    perform growup_test.come(u5);
+    insert into public.activities (partner_id, tipo) values (a, 'piano'), (a, 'cliente');
+    insert into public.persone (nome) select 'Nome A ' || i from generate_series(1, 30) i;
+    execute 'reset role';
+    perform growup_test.ok(not exists (select 1 from public.notifiche_eventi where chiave ~ ('^fase[234]-' || a)), '065: chi non è un nuovo non manda avvisi');
+    -- le funzioni non si chiamano dal telefono
+    perform growup_test.come(u5);
+    perform growup_test.deve_fallire(format('select public.avvisa_fasi_partenza(%L)', nf), '065: un telefono non chiama avvisa_fasi_partenza');
+    perform growup_test.deve_fallire('select public.avvisa_primi_ordini()', '065: un telefono non chiama avvisa_primi_ordini');
+    perform growup_test.deve_fallire('select count(*) from public.notifiche_eventi', '065: un telefono non legge gli avvisi');
+    execute 'reset role';
+  end;
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),

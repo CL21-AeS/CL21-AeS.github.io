@@ -3,7 +3,7 @@
 Ultimo aggiornamento: 12 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
-## Condivisione, primo ordine in attesa, avvisi allo sponsor, qualifica (13 novembre 2026, migrazione 064, in corso)
+## Condivisione, primo ordine in attesa, avvisi allo sponsor, qualifica (13 novembre 2026, migrazioni 064 e 065, in corso)
 
 Quattro PR in fila, da unire in ordine (una per punto); la versione del service worker sale una volta sola, nell'ultima.
 Scelte di Stefano.
@@ -40,6 +40,32 @@ Scelte di Stefano.
    senza festa, sponsor nella lista e nella scheda, festa quando arriva la mappa; anteprime a 360 px
    `e2e/87-percorso-attesa-light/dark.png`, `87-solo-mappa-*.png`, `87-prossima-solo-mappa-*.png`, `87-sponsor-*.png`);
    sezione 85 aggiornata (l'ordine in attesa non toglie più «La prossima cosa»).
+3. **L'avviso allo sponsor quando il nuovo chiude una fase** (migrazione 065): una notifica quando il nuovo chiude la
+   **fase 2** (incontro fissato e 30 nomi), la **fase 3** (primo ordine nella mappa) e la **fase 4** (primo piano e primo
+   cliente). Ogni fase da sola, in qualunque ordine (scelta di Stefano); **una volta sola per fase**: se è già stata
+   annunciata non si ripete, nemmeno a un nuovo sponsor. La ricevono **chi l'ha invitato** e, se lo **sponsor reale** è un
+   altro e usa l'app, anche lui (la regola di `partners_avvisi`). Testi senza nomi (titolo «Growup · il tuo gruppo»):
+   «Una persona che hai invitato ha fissato il primo incontro con il suo sponsor e scritto 30 nomi nella Lista.» /
+   «… ha fatto il primo ordine: è il momento di un complimento.» / «… ha mostrato il primo piano e ha il primo cliente: è
+   il momento di un complimento.»; allo sponsor reale «Un nuovo partner del tuo gruppo, sotto di te, …».
+   **Lato server**, anche se il nuovo non apre l'app: `avvisa_fasi_partenza(id)` (esce subito se non è un nuovo nel
+   percorso non finito, `in_percorso`, come `percorsoAttivo()`), chiamata dai trigger sull'incontro fissato (per riga, con
+   la condizione nel trigger), sui nomi della Lista e sulle attività piano/cliente (una volta per istruzione, con le righe
+   nuove); per la mappa **una volta sola per import**, alla fine di `importa_mappa` e `salva_mese_passato`
+   (`avvisa_primi_ordini`: sono le stesse funzioni della 052 e della 033 con una riga in più; un errore negli avvisi non
+   ferma mai l'import). Scrive in `notifiche_eventi` con `public.avvisa`, come gli avvisi di oggi; l'invio è quello di
+   sempre (entro 15 minuti, finestra di 2 giorni). Nessuna tabella nuova; un indice su `notifiche_eventi(chiave)`.
+   **Il tocco apre la scheda**: un trigger su `notifiche_eventi` mette l'indirizzo `./?partner=<id interno>` (mai nome o
+   codice Amway) agli avvisi su una persona, anche ai due che c'erano già («è entrata in Growup», «è ora al suo posto nella
+   mappa»). L'app, aprendosi con quell'indirizzo, apre la scheda di quella persona; se non si può (non la vedo, non è
+   ancora al suo posto nella mappa, id sconosciuto) apre il Gruppo su «I tuoi nuovi in partenza», senza errori. Con l'app
+   già aperta il service worker la ricarica con l'indirizzo (com'era già per `?persona=`).
+   **Tempo dell'import** (Postgres 16 locale, mappa di prova da 600 righe con 5 nuovi nel percorso, 10 giri alternati):
+   primo import (595 persone nuove) mediana 711 ms prima e 686 ms dopo; secondo import (601 aggiornate) 1117 ms prima e
+   1188 ms dopo: differenze dentro le oscillazioni da un giro all'altro. Il controllo alla fine dell'import da solo: meno
+   di 1 ms. Controlli 065 in `tests_rls.sql` (fasi 2, 3 e 4, una volta sola, testi senza nomi né codice, indirizzo, nuovo
+   sponsor, partenza finita, non nuovo, funzioni chiuse ai telefoni, nessun avviso per riga dalla mappa). Test
+   dell'interfaccia: sezione 88 (tocco con app chiusa, con app aperta, persona in attesa, persona non visibile).
 
 ## «La prossima cosa» dal percorso: sempre quello che manca (13 novembre 2026, app v119, database non toccato)
 
