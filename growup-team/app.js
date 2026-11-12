@@ -1593,8 +1593,8 @@ function corpoInstalla(){
 }
 
 /* ---- «Primi passi» (ottimizzazione 2): le cose da fare una volta sola, in un riquadro solo che sparisce a tutto fatto.
-   Con la × si nasconde su questo telefono (tranne se il link personale non è ancora salvato). ---- */
-const NOMI_PRIMI_PASSI = 30;
+   Con la × si nasconde su questo telefono (tranne se il link personale non è ancora salvato). «Scrivi 30 nomi nella tua
+   Lista» non c'è più (scelta di Stefano, 12 novembre 2026): i 30 nomi restano solo nella fase 2 del percorso dei nuovi. ---- */
 const chiavePrimiPassiNo = () => "growup-team.primi-passi-no." + st.profilo.id;
 function nomiInLista(){ return (st.persone || []).filter(p => p.esito !== "cliente").length; }
 function primiPassi(){
@@ -1609,10 +1609,6 @@ function primiPassi(){
       sotto:"Un'icona sul telefono, come le altre app", corpo:corpoInstalla });
   l.push({ k:"obiettivo", nome:"Scrivi il tuo obiettivo", fatto:!!st.obiettivo, sotto:"Quanto vorresti guadagnare al mese, e per quando",
     corpo:() => `<button class="btn primary wide" data-act="obiettivo-modifica">Scrivi il tuo obiettivo</button>` });
-  const n = nomiInLista();
-  l.push({ k:"lista", nome:`Scrivi ${NOMI_PRIMI_PASSI} nomi nella tua Lista`, fatto:n >= NOMI_PRIMI_PASSI, sotto:`${num(Math.min(n, NOMI_PRIMI_PASSI))} / ${NOMI_PRIMI_PASSI}`,
-    corpo:() => `<p class="small" style="margin:0">Senza decidere tu chi potrebbe essere interessato: parenti, amici, colleghi, vicini.</p>
-      <button class="btn primary" style="margin-top:8px" data-act="guida-vai" data-dove="lista">Apri la Lista</button>` });
   if(figli(io).length) l.push({ k:"import", nome:"Importa il tuo primo report", sotto:"Il report mappe dal sito Amway",
     fatto:[...(st.mioReport || new Map()).values()].some(r => r.importato_da === io),
     corpo:() => btnAmway("Importa da Amway", "primary") });
