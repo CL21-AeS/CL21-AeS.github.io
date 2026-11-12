@@ -20,6 +20,13 @@ apre comunque.
    **promemoria dell'import** della mappa. Test dell'interfaccia: 1179 controlli superati (sezione 84: nuovo con «Inizio»,
    nuovo con un partner sotto, nuovo dopo 30 giorni con il percorso in cima, partenza completata, avviato, admin;
    anteprima di Io a 360 px, `e2e/84-io-semplice-light.png` e `-dark.png`).
+2. **Obiettivo**: restano la card del suo obiettivo, una **riga compatta con la tappa che vale la cifra** (tappa e cifra,
+   con la nota «Cifre indicative» come prima) e il riquadro **«La prossima tappa»** (la tappa a cui sta lavorando, con i
+   requisiti ✓/○, `vProssimaTappa`). Il **percorso fino a Diamante** (`vPercorsoDiamante`, lo stesso di prima) e **«Come
+   arrivarci»** stanno dietro **«Vedi tutto il percorso»** (si apre e si richiude sulla stessa pagina, `percorso-tutto`).
+   Prossima qualifica e report da importare non riguardano chi inizia: non si vedono. **Persone non cambia**: Lista,
+   Clienti e Target come per tutti. Test dell'interfaccia: 1197 controlli superati (sezione 84; anteprima
+   `e2e/84-obiettivo-semplice-light.png` e `-dark.png`).
 
 ## Avviati: meno cose all'inizio e il Seguimi acceso (12 novembre 2026, app v117, database non toccato)
 

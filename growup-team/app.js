@@ -1814,11 +1814,10 @@ function vObiettivo(){
     <h2 style="margin-top:4px">Quanto vorresti guadagnare al mese?</h2>
     <p class="small">Scrivi la cifra e per quando: qui vedrai la tappa che la vale e il percorso per arrivarci.</p>
     <button class="btn primary wide" style="margin-top:8px" data-act="obiettivo-modifica">Scrivi il tuo obiettivo</button>
-  </div>${vProssimaQualifica()}${vReportDaImportare()}${vComeArrivarci(st.profilo.id, "io")}`;
+  </div>${versioneSemplice() ? `${vProssimaTappa()}${vVediTutto(vComeArrivarci(st.profilo.id, "io"))}`
+    : `${vProssimaQualifica()}${vReportDaImportare()}${vComeArrivarci(st.profilo.id, "io")}`}`;
   const t = tappaPerCifra(o.cifra_mese), S = st.stages, { indice, attuale } = percorso();
   const fino = t ? S.findIndex(s => s.chiave === t.tappa.chiave) : -1;
-  /* il percorso si vede tutto, fino a Diamante (le qualifiche «Fondatore» valgono come la stessa senza) */
-  const finoDiamante = Math.max(fino, S.findIndex(s => s.chiave === "diamante") >= 0 ? S.findIndex(s => s.chiave === "diamante") : S.length - 1);
   const giaFatto = fino >= 0 && indice > fino;
   const mancano = fino >= indice ? fino - indice + 1 : 0;
   return `<div class="card tight visione">
@@ -1828,6 +1827,11 @@ function vObiettivo(){
     ${o.perche ? `<p class="perche">«${esc(o.perche)}»</p><p class="nota" style="margin-top:2px">Il perché lo vedi solo tu.</p>` : ""}
     <button class="btn" style="margin-top:10px;min-height:38px" data-act="obiettivo-modifica">Modifica</button>
   </div>
+  ${versioneSemplice() ? `${t ? `<div class="card tight tappa-cifra">
+    <div class="spread"><span><span class="small">La tappa che vale la tua cifra</span><br><b>${esc(t.tappa.nome)}</b></span>
+      <span class="num">${euro(t.tappa.guadagno_mese)}<span class="small"> /mese*</span></span></div>
+    <p class="nota" style="margin-top:6px">* ${notaGuadagni()}</p>
+  </div>` : ""}${vProssimaTappa()}${vVediTutto(`${t ? vPercorsoDiamante(t) : ""}${vComeArrivarci(st.profilo.id, "io")}`)}` : `
   ${t ? `<div class="card">
     <span class="eyebrow">La tappa che vale la tua cifra</span>
     <div class="spread" style="margin-top:4px"><h2>${esc(t.tappa.nome)}</h2><span class="num">${euro(t.tappa.guadagno_mese)}<span class="small"> /mese*</span></span></div>
@@ -1837,7 +1841,18 @@ function vObiettivo(){
       : mancano === 1 ? "È la tua tappa attuale." : `Da qui: ${mancano} tappe, compresa quella attuale.`}</p>
     <p class="nota">* ${notaGuadagni()}</p>
   </div>
-  <div class="card">
+  ${vPercorsoDiamante(t)}` : ""}
+  ${vProssimaQualifica()}
+  ${vReportDaImportare()}
+  ${vComeArrivarci(st.profilo.id, "io")}`}`;
+}
+/* «Il tuo percorso fino a Diamante», con la tappa dell'obiettivo evidenziata (t = tappaPerCifra) */
+function vPercorsoDiamante(t){
+  const S = st.stages, { indice, attuale } = percorso();
+  const fino = S.findIndex(s => s.chiave === t.tappa.chiave);
+  /* il percorso si vede tutto, fino a Diamante (le qualifiche «Fondatore» valgono come la stessa senza) */
+  const finoDiamante = Math.max(fino, S.findIndex(s => s.chiave === "diamante") >= 0 ? S.findIndex(s => s.chiave === "diamante") : S.length - 1);
+  return `<div class="card">
     <span class="eyebrow">Il tuo percorso fino a Diamante</span>
     <p class="small" style="margin:4px 0 0">Tutto il percorso, con la tappa del tuo obiettivo evidenziata.</p>
     <ol class="percorso">${S.map((s, i) => ({ s, i })).filter(({ s, i }) => i <= finoDiamante && !/_fondatore$/.test(s.chiave)).map(({ s, i }, n) => {
@@ -1852,10 +1867,26 @@ function vObiettivo(){
           ${stato === "attuale" ? `<ul class="req">${req.map(r => `<li class="${r.ok ? "ok" : ""}"><span class="mark">${r.ok ? "✓" : "○"}</span>
               <span class="grow">${esc(r.txt)}</span>${r.val ? `<span class="num">${esc(r.val)}</span>` : ""}</li>`).join("")}</ul>`
             : stato === "dopo" ? `<p class="small" style="margin:2px 0 0">${esc(requisitiTesto(s) || s.descrizione || "")}</p>` : ""}</div></li>`; }).join("")}</ol>
-  </div>` : ""}
-  ${vProssimaQualifica()}
-  ${vReportDaImportare()}
-  ${vComeArrivarci(st.profilo.id, "io")}`;
+  </div>`;
+}
+/* ---- Versione semplificata (punto 2): in Obiettivo restano l'obiettivo, una riga con la tappa che vale la cifra e
+   «La prossima tappa» (quella a cui sta lavorando, con i requisiti). Il percorso fino a Diamante e «Come arrivarci» stanno
+   dietro «Vedi tutto il percorso»; prossima qualifica e report da importare non riguardano chi inizia e non si vedono. ---- */
+function vProssimaTappa(){
+  const { attuale, indice } = percorso();
+  if(!attuale) return "";
+  const tot = (st.stages.findIndex(s => s.chiave === "platino") + 1) || st.stages.length, req = requisiti(attuale);
+  return `<div class="card prossima-tappa">
+    <div class="spread"><span class="eyebrow">La prossima tappa</span><span class="small">Tappa ${indice + 1} di ${tot}</span></div>
+    <h2 style="margin-top:4px">${esc(attuale.nome)}</h2>
+    <ul class="req">${req.map(r => `<li class="${r.ok ? "ok" : ""}"><span class="mark">${r.ok ? "✓" : "○"}</span>
+      <span class="grow">${esc(r.txt)}</span>${r.val ? `<span class="num">${esc(r.val)}</span>` : ""}</li>`).join("")}</ul>
+  </div>`;
+}
+function vVediTutto(dentro){
+  const aperto = !!st.percorsoTutto;
+  return `<button class="btn wide vedi-tutto" data-act="percorso-tutto" aria-expanded="${aperto}">${aperto ? "Chiudi il percorso ▴" : "Vedi tutto il percorso ▾"}</button>
+  ${aperto ? dentro : ""}`;
 }
 
 /* Volume Rubino del mese (da Platino in su): il VPG del report mappe importato, che non conta le linee al 21% */
@@ -3935,6 +3966,7 @@ const AZIONI = {
   },
   "vista-obiettivo"(){ st.vista = "obiettivo"; st.sotto = null; st.target = null; render(); window.scrollTo(0, 0); },
   /* dal cruscotto di Io: la stessa pagina, ma come sotto-pagina (Indietro torna a Io) */
+  "percorso-tutto"(){ st.percorsoTutto = !st.percorsoTutto; render(); },
   "obiettivo-da-io"(){ st.sotto = livelloDi(st); st.vista = "obiettivo"; st.target = null; render(); window.scrollTo(0, 0); },
   "scheda-tab"(el){ st.schedaTab = el.dataset.tab; render(); },
   "vista-profilo"(){ if(st.vista === "profilo") return; st.sotto = livelloDi(st); st.vista = "profilo"; st.target = null; render(); window.scrollTo(0, 0); },
