@@ -2276,12 +2276,27 @@ function vPercorso(){
     ${corpo}
   </div>`;
 }
-/* la prossima cosa del percorso, prima della lista di oggi */
+/* la prossima cosa del percorso, prima della lista di oggi: sempre quello che manca nella fase in corso (13 novembre 2026,
+   scelta di Stefano), con i dati del percorso (quanto manca, la scadenza), senza dire come farlo. Niente quando non c'è
+   niente da fare (primo ordine confermato in attesa della mappa, festa). */
 function prossimaPercorso(){
   if(!percorsoAttivo()) return null;
-  const x = fasiPercorso(), f = x.fasi[x.qui];
-  if(f.k === "sponsor" && !st.profilo.incontro_sponsor) return { titolo:"Fissa l'incontro con il tuo sponsor",
+  const x = fasiPercorso(), f = x.fasi[x.qui], p = st.profilo;
+  if(f.k === "sponsor" && !p.incontro_sponsor) return { titolo:"Fissa l'incontro con il tuo sponsor",
     motivo:"Insieme scegliete i prodotti del primo ordine e preparate i primi contatti.", act:"incontro-fissa", btn:"Scegli il giorno" };
+  if(f.k === "sponsor" && x.nomi < NOMI_PARTENZA){
+    const entro = piuGiorni(String(p.privacy_accettata_il || p.creato_il || oggi()).slice(0, 10), ORE_NOMI / 24);
+    return { titolo:"Scrivi i prossimi nomi nella Lista", motivo:`${num(x.nomi)} di ${NOMI_PARTENZA} nomi · entro ${riassuntoAgenda(entro < oggi() ? oggi() : entro)}`,
+      act:"guida-vai", dove:"lista", btn:"Lista ›" };
+  }
+  if(f.k === "ordine" && !x.ord.attesa) return { titolo:"Il tuo primo ordine",
+    motivo:`${num(x.ord.vp)} di ${num(x.ord.min)} VP · ${x.ord.restano >= 0 ? `restano ${x.ord.restano === 1 ? "1 giorno" : `${x.ord.restano} giorni`}` : "oltre i 30 giorni"}`,
+    act:"ordini", btn:"Ordini ›" };
+  if(f.k === "binari"){ const piano = !x.piani.length, cliente = !x.clienti.length;
+    if(piano) return { titolo:"Il tuo primo piano", motivo:`I due binari · ${cliente ? "mancano il primo piano e il primo cliente" : "manca solo il primo piano"}`,
+      act:"piano-rapido", btn:"+ Piano" };
+    if(cliente) return { titolo:"Il tuo primo cliente", motivo:"I due binari · manca solo il primo cliente", act:"guida-vai", dove:"clienti", btn:"Clienti ›" };
+  }
   return null;
 }
 /* finita la fase 4 la festa, una volta sola */
@@ -2407,7 +2422,7 @@ function vOggiLista(){
   const testa = dalPercorso ? `<div class="spread"><span class="eyebrow pesca">La prossima cosa</span><span class="small">dal tuo percorso</span></div>
     <span class="prossima-titolo" role="heading" aria-level="3">${esc(dalPercorso.titolo)}</span>
     <p class="small" style="margin:0">${esc(dalPercorso.motivo)}</p>
-    <div class="prossima-azioni"><button class="btn primary" data-act="${dalPercorso.act}">${esc(dalPercorso.btn)}</button></div>`
+    <div class="prossima-azioni"><button class="btn primary" data-act="${dalPercorso.act}"${dalPercorso.dove ? ` data-dove="${dalPercorso.dove}"` : ""}>${esc(dalPercorso.btn)}</button></div>`
     : prima ? `<div class="spread"><span class="eyebrow pesca">La prossima cosa</span>
       <span class="row" style="gap:6px;align-items:center"><span class="small">1 di ${totale} oggi</span>
       <button class="x" data-act="togli-da-io" data-id="${esc(prima.p.id)}" aria-label="Togli ${esc(prima.p.nome)} da Io">×</button></span></div>
