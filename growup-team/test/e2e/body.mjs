@@ -3673,12 +3673,19 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.passi = (DB.passi || []).filter(x => x.proprietario !== "R"); DB.guidaFatti = [];
 }
 
-// 60. Consegna 6: il perché per tutti, gli avviati («Per iniziare», il punto con l'upline), i nomi nuovi con la fonte
+// 60. Consegna 6: il perché per tutti, gli avviati («Per iniziare»: perché e mappa; il punto con l'upline tolto il 12 novembre),
+//     i nomi nuovi con la fonte
 {
   const giorniFa = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
   const ora = new Date().toISOString();
+  // Ada ha un punto con l'upline salvato prima (fissato per oggi, non fatto): i dati restano, l'app non li mostra più
   DB.partners.push({ id:"av6", nome:"Ada Avviata", sponsor_id:"R", stato:"attivo", chiave:"a6".repeat(16), codice_invito:"AV6AV6", codice_amway:"7900001",
-    data_iscrizione:giorniFa(60), privacy_accettata_il:ora, conPercorso:true, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora });
+    data_iscrizione:giorniFa(60), privacy_accettata_il:ora, conPercorso:true, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, punto_upline:giorniFa(0) });
+  // Gea è avviata e ha un gruppo (Ugo, sotto di lei)
+  DB.partners.push({ id:"ag6", nome:"Gea Avviata", sponsor_id:"R", stato:"attivo", chiave:"d6".repeat(16), codice_invito:"AG6AG6", codice_amway:"7900004",
+    data_iscrizione:giorniFa(120), privacy_accettata_il:ora, conPercorso:true, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, punto_upline:giorniFa(1) });
+  DB.partners.push({ id:"ag6u", nome:"Ugo Sotto", sponsor_id:"ag6", stato:"gestito", gestore_id:"ag6", codice_invito:"AG6UUU", codice_amway:"7900005",
+    data_iscrizione:giorniFa(400), creato_il:ora });
   DB.partners.push({ id:"nu6", nome:"Nino Nuovo", sponsor_id:"R", stato:"attivo", chiave:"b6".repeat(16), codice_invito:"NU6NU6", codice_amway:"7900002",
     data_iscrizione:giorniFa(5), privacy_accettata_il:ora, conPercorso:true, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora });
   DB.partners.push({ id:"pe6", nome:"Pia Senzaperche", sponsor_id:"R", stato:"attivo", chiave:"c6".repeat(16), codice_invito:"PE6PE6", codice_amway:"7900003",
@@ -3695,29 +3702,18 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await sync(page);
   check(DB.obiettivi.find(o => o.partner_id === "pe6").perche === "Per i miei figli", "il perché è salvato e si entra in Io");
   await ctx.close();
-  // l'avviata: «Per iniziare», il punto con l'upline, la tessera dei nomi nuovi e la fonte
+  // l'avviata senza gruppo: il perché è fatto, quindi niente «Per iniziare»; il punto con l'upline non c'è più da nessuna parte
   ({ ctx, page } = await apri({}, "#chiave=" + "a6".repeat(16)));
   await page.getByText("Ciao Ada").waitFor();
   if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
-  const pi = page.locator(".card.per-iniziare");
-  check(await pi.isVisible() && (await pi.locator(".eyebrow").textContent()).trim() === "Per iniziare · 1 di 2", "avviata: «Per iniziare · 1 di 2» (perché fatto, punto con l'upline)");
-  check(await pi.locator("li.fatto", { hasText:"Il mio perché" }).count() === 1 && !(await pi.locator("li", { hasText:"Importa la tua mappa" }).count()), "senza gruppo niente import della mappa");
+  check(!(await page.locator(".card.per-iniziare").count()), "avviata senza gruppo: niente «Per iniziare» (resta solo il perché, già fatto)");
+  check(!/punto con la tua upline/i.test(await page.locator("#app").innerText()) && !(await page.locator("[data-act=punto-fissa], [data-act=punto-fatto]").count()),
+    "avviata senza gruppo: il punto con l'upline non c'è né in «Per iniziare» né in «La prossima cosa» (anche con un giorno salvato per oggi)");
+  check(!(await page.locator(".oggi-lista .prossima-titolo", { hasText:"upline" }).count()), "avviata: «La prossima cosa» non è il punto con l'upline");
   check(await page.locator(".cruscotto .tessera.nomi-nuovi").isVisible(), "avviata: nel cruscotto la tessera dei nomi nuovi");
   await page.screenshot({ path: S + "/e2e/60-avviata.png", fullPage:true });
-  await pi.locator("button[data-act=punto-fissa]").click();
-  await page.locator(".sheet h2", { hasText:"Il punto con la tua upline" }).waitFor();
-  await page.click(".sheet button.primary");
-  await page.locator(".sheet .errore", { hasText:"Scegli il giorno" }).waitFor(); check(true, "punto: senza giorno chiede il giorno");
-  const oggiG = new Date().toISOString().slice(0, 10);
-  await page.check(`.sheet input[name=quando][value="${oggiG}"]`, { force:true });
-  await page.click(".sheet button.primary");
-  await page.getByText("Punto con l'upline: oggi").waitFor();
-  check((await page.locator(".oggi-lista .prossima-titolo").innerText()).trim() === "Il punto con la tua upline", "il giorno fissato il punto è la prossima cosa");
-  await page.click(".oggi-lista button[data-act=punto-fatto]");
-  await page.getByText("Punto con l'upline fatto").waitFor();
-  check(!(await page.locator(".card.per-iniziare").count()), "tutto fatto: «Per iniziare» sparisce");
   await sync(page);
-  check((p => p.punto_upline === oggiG && p.punto_upline_fatto === oggiG)(DB.partners.find(p => p.id === "av6")), "nel database: giorno del punto e fatto");
+  check((p => p.punto_upline === giorniFa(0) && !p.punto_upline_fatto)(DB.partners.find(p => p.id === "av6")), "nel database: il punto con l'upline salvato prima resta com'era");
   // un nome nuovo con la fonte
   await page.click("button[data-act=vista-persone]");
   await page.click("button[data-act=persona-nuova]");
@@ -3733,6 +3729,18 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(DB.persone.some(x => x.nome === "Nome Dal Vivo" && x.fonte === "dal_vivo"), "nel database la fonte del nome");
   check(!errori.length, "consegna 6: nessun errore nella pagina");
   await ctx.close();
+  // l'avviata con un gruppo: «Per iniziare · 1 di 2» con il perché e la mappa, senza il punto con l'upline
+  ({ ctx, page } = await apri({}, "#chiave=" + "d6".repeat(16)));
+  await page.getByText("Ciao Gea").waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  const pi = page.locator(".card.per-iniziare");
+  check(await pi.isVisible() && (await pi.locator(".eyebrow").textContent()).trim() === "Per iniziare · 1 di 2", "avviata con gruppo: «Per iniziare · 1 di 2» (perché fatto, mappa da importare)");
+  check(await pi.locator("li.fatto", { hasText:"Il mio perché" }).count() === 1 && await pi.locator("li:not(.fatto)", { hasText:"Importa la tua mappa" }).count() === 1
+    && await pi.locator("li").count() === 2, "avviata con gruppo: solo il perché e la mappa");
+  check(!/punto con la tua upline/i.test(await page.locator("#app").innerText()) && !(await page.locator("[data-act=punto-fissa], [data-act=punto-fatto]").count()),
+    "avviata con gruppo: niente punto con l'upline (anche con un giorno passato salvato)");
+  check(!errori.length, "avviata con gruppo: nessun errore nella pagina");
+  await ctx.close();
   // il nuovo (iscritto da 5 giorni): niente «Per iniziare» né nomi nuovi (avrà il suo percorso); «Come lo conosci?» sì, come per tutti
   ({ ctx, page } = await apri({}, "#chiave=" + "b6".repeat(16)));
   await page.getByText("Ciao Nino").waitFor();
@@ -3742,7 +3750,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.click("button[data-act=persona-nuova]");
   check(await page.locator(".sheet input[name=fonte]").count() === 3, "nuovo: anche lui ha «Come lo conosci?»");
   await ctx.close();
-  DB.partners = DB.partners.filter(p => !["av6", "nu6", "pe6"].includes(p.id));
+  DB.partners = DB.partners.filter(p => !["av6", "nu6", "pe6", "ag6", "ag6u"].includes(p.id));
 }
 
 // 61. Consegna 7: il percorso di partenza di un nuovo, fase per fase, fino alla festa
@@ -3840,9 +3848,14 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     data_iscrizione:giorniFa(200), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true });
   DB.partners.push({ id:"sp8g", nome:"Gino Mappa", sponsor_id:"R", stato:"gestito", gestore_id:"R", codice_invito:"SP8GGG", codice_amway:"7920003",
     data_iscrizione:giorniFa(6), creato_il:ora, conPercorso:true });
+  // Aldo ha un gruppo (Carlo); Silvio è avviato senza gruppo, con un punto con l'upline salvato prima e non fatto
+  DB.partners.push({ id:"sp8c", nome:"Carlo Sottoaldo", sponsor_id:"sp8a", stato:"gestito", gestore_id:"sp8a", codice_invito:"SP8CCC", codice_amway:"7920004",
+    data_iscrizione:giorniFa(500), creato_il:ora });
+  DB.partners.push({ id:"sp8s", nome:"Silvio Senzagruppo", sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:"g8".repeat(16), codice_invito:"SP8SSS", codice_amway:"7920005",
+    data_iscrizione:giorniFa(200), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true, punto_upline:giorniFa(2) });
   mappa("sp8g", 0);   // 063: nella mappa del mese, ancora senza ordine
-  DB.obiettivi = (DB.obiettivi || []).filter(o => !["sp8n", "sp8a"].includes(o.partner_id))
-    .concat(["sp8n", "sp8a"].map(id => ({ partner_id:id, cifra_mese:300, entro:"2027-06-01", perche:"Segreto suo" })));
+  DB.obiettivi = (DB.obiettivi || []).filter(o => !["sp8n", "sp8a", "sp8s"].includes(o.partner_id))
+    .concat(["sp8n", "sp8a", "sp8s"].map(id => ({ partner_id:id, cifra_mese:300, entro:"2027-06-01", perche:"Segreto suo" })));
   DB.persone = (DB.persone || []).concat(Array.from({ length:12 }, (_, i) => ({ id:"sp8p" + i, proprietario:"sp8n", nome:"Nome Sara " + i, fase:"lista", esito:null, creato_il:ora })));
   DB.partenzaTolti = [];
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
@@ -3856,7 +3869,10 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     "sponsor: i nuovi in partenza, solo chi ha invitato e usa l'app");
   check((await riga("Sara Nuova").innerText()).includes("Fase 2 di 5") && (await riga("Sara Nuova").innerText()).includes("Manca: la data del vostro primo incontro · Lista 12 / 30"),
     "il nuovo: fase 2 di 5 e cosa manca");
-  check((await riga("Aldo Avviato").innerText()).includes("Per iniziare 1 di 2"), "l'avviato: per iniziare 1 di 2");
+  check((await riga("Aldo Avviato").innerText()).includes("Per iniziare 1 di 2") && await riga("Aldo Avviato").locator(".barre-partenza i").count() === 2,
+    "l'avviato con gruppo: per iniziare 1 di 2 (perché e mappa)");
+  check(!(await riga("Silvio Senzagruppo").count()), "l'avviato senza gruppo con il perché: non è tra i nuovi in partenza (il punto con l'upline non conta più)");
+  check(!/punto con la sua upline/i.test(await np.innerText()), "nei nuovi in partenza niente punto con l'upline");
   check(!(await np.innerText()).includes("Segreto suo") && !(await np.innerText()).includes("Nome Sara"), "mai il perché né i nomi della sua Lista");
   await page.screenshot({ path: S + "/e2e/62-sponsor.png", fullPage:true });
   // la × con Annulla, poi di nuovo
@@ -3891,8 +3907,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     "scheda senza app: il primo ordine e «Invitalo in Growup»");
   check(!errori.length, "sponsor: nessun errore nella pagina");
   await ctx.close();
-  // l'avviato tolto torna se va avanti (fa il punto con l'upline)
-  Object.assign(DB.partners.find(p => p.id === "sp8a"), { punto_upline:giorniFa(0), punto_upline_fatto:giorniFa(0) });
+  // l'avviato tolto torna se va avanti: importa la sua mappa, e ha finito «Per iniziare»
+  mappa("sp8c", 0, null, { visto_da:"sp8a" });
   DB.partners.find(p => p.id === "sp8n").incontro_sponsor = giorniFa(-1);
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
   await page.getByText("Ciao Stefano e Alessia").waitFor();
@@ -3914,8 +3930,8 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await page.locator(".percorso-scheda li", { hasText:"Il primo ordine" }).innerText()).includes("fatto · 30 VP, sotto i 50: iscrizione a pagamento")
     && await page.locator(".percorso-scheda li.fatto", { hasText:"Il primo ordine" }).count() === 1, "063: scheda del nuovo: il primo ordine fatto, con la nota");
   await ctx.close();
-  DB.numeri = DB.numeri.filter(x => !["sp8n", "sp8g"].includes(x.partner_id));
-  DB.partners = DB.partners.filter(p => !["sp8n", "sp8a", "sp8g"].includes(p.id)); DB.persone = DB.persone.filter(x => x.proprietario !== "sp8n");
+  DB.numeri = DB.numeri.filter(x => !["sp8n", "sp8g", "sp8c"].includes(x.partner_id));
+  DB.partners = DB.partners.filter(p => !["sp8n", "sp8a", "sp8g", "sp8c", "sp8s"].includes(p.id)); DB.persone = DB.persone.filter(x => x.proprietario !== "sp8n");
 }
 
 // 63. Consegna 9: i traguardi grandi a tutto schermo (il primo cliente e la nuova tappa, dall'app)
@@ -5103,7 +5119,7 @@ for(const tema of ["light", "dark"]){
   await ctx.close();
 }
 
-// 81. Il primo incontro con lo sponsor (e il punto con l'upline, e «Partenza con te» vista dallo sponsor): data nel futuro →
+// 81. Il primo incontro con lo sponsor (e «Partenza con te» vista dallo sponsor): data nel futuro →
 //     «fissato per» senza spunta; data di oggi o passata → ✓ «fatto [giorno mese]». Lo sblocco della fase non cambia.
 //     «Da dove parti?» subito dopo il passo 1: «Passo 2 di 2» sopra il titolo.
 {
@@ -5148,32 +5164,28 @@ for(const tema of ["light", "dark"]){
   await page.getByText("Ciao Nina").waitFor();
   check((await page.locator(".percorso-partenza .fase-titolo").innerText()).trim() === "Il primo ordine", "incontro fissato + 30 nomi: la fase si sblocca come prima");
   await ctx.close();
-  // il punto con l'upline di un avviato: passato e non confermato → «era fissato per il …», niente spunta, «Cambia»
-  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "c1".repeat(16)));
-  await page.getByText("Ciao Pio").waitFor();
-  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
-  const pu = page.locator(".card.per-iniziare li", { hasText:"Il punto con la tua upline" });
-  check(!(await pu.evaluate(e => e.classList.contains("fatto"))) && (await pu.innerText()).includes(`era fissato per il ${it(giorno(-2))}`)
-    && await pu.locator("button[data-act=punto-fissa]", { hasText:"Cambia" }).count() === 1, "punto con l'upline passato e non confermato: «era fissato per il …», «Cambia»");
-  check(await page.locator(".oggi-lista button[data-act=punto-fatto]").count() === 1, "punto con l'upline: resta la domanda in «Il mio giorno»");
-  await ctx.close();
-  DB.partners.find(p => p.id === "pu81").punto_upline = giorno(4);
-  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "c1".repeat(16)));
-  await page.getByText("Ciao Pio").waitFor();
-  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
-  check((await page.locator(".card.per-iniziare li", { hasText:"Il punto con la tua upline" }).innerText()).includes("fissato per "), "punto con l'upline nel futuro: «fissato per …»");
-  await ctx.close();
-  // lo sponsor, nella scheda di Pio: lo stesso testo del punto con la sua upline
+  // il punto con l'upline di un avviato (tolto il 12 novembre 2026): anche con un giorno salvato (passato o futuro) non si vede
+  for(const n of [-2, 4]){
+    DB.partners.find(p => p.id === "pu81").punto_upline = giorno(n);
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "c1".repeat(16)));
+    await page.getByText("Ciao Pio").waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+    check(!(await page.locator(".card.per-iniziare").count()) && !/punto con la tua upline/i.test(await page.locator("#app").innerText())
+      && !(await page.locator("[data-act=punto-fissa], [data-act=punto-fatto]").count()), `punto con l'upline ${n < 0 ? "passato" : "nel futuro"}: non c'è più (né «Per iniziare» né «La prossima cosa»)`);
+    await ctx.close();
+  }
+  // lo sponsor, nella scheda di Pio: niente «Per iniziare» (ha il perché e non ha un gruppo), niente punto con la sua upline
   Object.assign(DB.partners.find(p => p.id === "pu81"), { punto_upline:giorno(-1), punto_upline_fatto:null });
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
   await page.getByText("Ciao Stefano e Alessia").waitFor();
   if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
   await page.click("button[data-act=vista-gruppo]");
+  check(!(await page.locator(".nuovi-partenza li", { hasText:"Pio Upline" }).count()), "sponsor: Pio (avviato senza gruppo) non è tra i nuovi in partenza");
   await page.locator(".albero.struttura button[data-act=apri-scheda]", { hasText:"Pio Upline" }).first().click();
-  const pp = page.locator(".partenza-scheda li", { hasText:"Il punto con la sua upline" });
-  await pp.waitFor();
-  check((await pp.innerText()).includes(`era fissato per il ${it(giorno(-1))}`) && !(await pp.evaluate(e => e.classList.contains("fatto"))),
-    "sponsor: il punto con l'upline passato e non confermato, «era fissato per il …»");
+  await page.locator("button[data-act=scheda-tab]").first().waitFor();
+  await page.waitForTimeout(300);
+  check(!(await page.locator(".partenza-scheda").count()) && !/punto con la sua upline/i.test(await page.locator("#app").innerText()),
+    "sponsor, scheda di Pio: niente «Per iniziare» né punto con la sua upline");
   await ctx.close();
   // «Passo 2 di 2»: chi ha appena fatto il passo 1; chi è nell'app da tempo senza perché no
   for(const [id, nome, privacy, si, tema, k] of [["ob81", "Olga Passo", ora, true, "light", "9a"], ["ob82", "Otto Vecchio", "2026-01-01T00:00:00Z", false, "dark", "8b"]]){
