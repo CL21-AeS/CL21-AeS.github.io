@@ -5682,6 +5682,128 @@ for(const tema of ["light", "dark"]){
   DB.partners = DB.partners.filter(p => !["pn85", "av85"].includes(p.id));
 }
 
+// 86. La domanda sulla condivisione (13 novembre 2026): quando il Seguimi si accende, una volta sola in cima a Io.
+//     Nuovo dopo la festa («Vai al cruscotto») → «Sì, condividi»; avviato al primo ingresso → «Non ora» (non torna, anche
+//     ricaricando). Non a chi condivide già, a chi ha il Seguimi spento, né nella versione semplificata. Nell'informativa la
+//     riga sulla condivisione. Anteprima della card a 360 px, chiaro e scuro.
+{
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), ora = new Date().toISOString();
+  const nuovo86 = (id, nome, k, extra) => DB.partners.push(Object.assign({ id, nome, sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:k.repeat(16),
+    codice_invito:id.toUpperCase() + "XX", codice_amway:"7986" + id.slice(-3), data_iscrizione:giorno(-200), privacy_accettata_il:ora, confermato_il:ora,
+    partenza_confermata_il:ora, creato_il:ora, conPercorso:true }, extra || {}));
+  // i nuovi con le fasi 1-4 fatte: la festa
+  const pronto86 = id => { DB.persone = (DB.persone || []).concat(Array.from({ length:30 }, (_, i) => ({ id:id + "n" + i, proprietario:id, nome:"Nome " + (i + 1),
+      fase:"lista", esito:null, creato_il:ora })));
+    mappa(id, 60);
+    DB.activities.push({ id:id + "p", partner_id:id, tipo:"piano", quantita:1, data:giorno(0), inserito_il:ora },
+      { id:id + "c", partner_id:id, tipo:"cliente", quantita:1, data:giorno(0), inserito_il:ora }); };
+  nuovo86("fl86", "Flora Festa", "a8", { data_iscrizione:giorno(-5), incontro_sponsor:giorno(-1) }); pronto86("fl86");
+  nuovo86("fd86", "Fido Festa", "b8", { data_iscrizione:giorno(-5), incontro_sponsor:giorno(-1) }); pronto86("fd86");
+  nuovo86("av86", "Ada Avviata", "c8", { senzaObiettivo:true });
+  nuovo86("cd86", "Cico Condivide", "d8");
+  nuovo86("sp86", "Spino Spento", "e8");
+  nuovo86("ns86", "Nina Semplice", "f8", { data_iscrizione:giorno(-3), incontro_sponsor:giorno(1) });
+  nuovo86("pr86", "Pio Profilo", "7c");
+  DB.seguimi = (DB.seguimi || []).filter(x => !x.partner_id.endsWith("86")).concat([
+    { partner_id:"cd86", attivo:true, condividi:true }, { partner_id:"sp86", attivo:false, condividi:false },
+    { partner_id:"ns86", attivo:true, condividi:false }, { partner_id:"pr86", attivo:true, condividi:false }]);
+  const riga = id => JSON.stringify((DB.seguimi || []).filter(x => x.partner_id === id).map(x => ({ attivo:x.attivo, condividi:x.condividi })));
+  const entra86 = async (k, nome, tema) => {
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema || "light", deviceScaleFactor:2 }, "#chiave=" + k.repeat(16)));
+    await page.getByText("Ciao " + nome).waitFor();
+  };
+  const card = () => page.locator(".card.domanda-condividi");
+  const TESTO = "Vuoi che il tuo sponsor e la tua upline vedano come va il tuo Seguimi? Così possono aiutarti quando ti fermi. Vedono i numeri, mai i nomi.";
+  // il nuovo: dopo la festa, «Vai al cruscotto» → la domanda in cima a Io (chiaro e scuro)
+  for(const [k, nome, id, tema] of [["a8", "Flora", "fl86", "light"], ["b8", "Fido", "fd86", "dark"]]){
+    await entra86(k, nome, tema);
+    await page.locator(".festa").waitFor();
+    check(!(await card().count()), `nuovo (${tema}): durante la festa niente domanda`);
+    await page.click(".festa button[data-act=festa-fine]");
+    await page.locator(".festa").waitFor({ state:"detached" });
+    await card().waitFor();
+    check((await card().locator("h3, p").allInnerTexts()).join(" ").replace(/\s+/g, " ").trim() === TESTO, `nuovo (${tema}): il testo della domanda`);
+    const primo = await page.evaluate(() => { const c = document.querySelector("#app .card"); return c && c.classList.contains("domanda-condividi"); });
+    check(primo, `nuovo (${tema}): la domanda è in cima a Io`);
+    check(await card().locator("button").count() === 2 && (await card().locator("button.primary").innerText()).trim() === "Sì, condividi"
+      && (await card().locator("button:not(.primary)").innerText()).trim() === "Non ora" && !(await card().locator("[role=switch], .toggle, input").count()),
+      `nuovo (${tema}): «Sì, condividi» e «Non ora», nessun interruttore già acceso`);
+    const misure = await card().locator("button").evaluateAll(l => l.map(b => { const r = b.getBoundingClientRect(), c = getComputedStyle(b);
+      return { w:Math.round(r.width), h:Math.round(r.height), bordo:c.borderTopWidth, peso:c.fontWeight, colore:c.borderTopColor, fondo:c.backgroundColor }; }));
+    check(Math.abs(misure[0].w - misure[1].w) <= 2 && misure[0].h === misure[1].h && misure[0].bordo === misure[1].bordo && misure[0].peso === misure[1].peso
+      && misure[1].colore !== misure[1].fondo, `nuovo (${tema}): i due pulsanti hanno lo stesso peso (larghezza, altezza, bordo, carattere) e «Non ora» si vede`);
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `nuovo (${tema}), 360 px: niente scroll orizzontale`);
+    await page.locator(".annuncio-festa").waitFor({ state:"detached" });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: S + `/e2e/86-domanda-${tema}.png` });
+    if(tema === "light"){
+      await page.click(".domanda-condividi button[data-act=condividi-si]");
+      await card().waitFor({ state:"detached" });
+      await sync(page);
+      check(riga("fl86") === JSON.stringify([{ attivo:true, condividi:true }]), "«Sì, condividi»: nel database «condividi» acceso");
+      await page.click("button[data-act=vista-profilo]"); await page.locator(".guida-condividi").waitFor();
+      check(await page.locator("button[data-act=seguimi-condividi]").getAttribute("aria-checked") === "true", "«Sì, condividi»: nel Profilo l'interruttore è acceso");
+    }
+    await ctx.close();
+  }
+  // da un altro telefono, con «condividi» acceso: niente domanda
+  await entra86("a8", "Flora");
+  check(!(await card().count()), "nuovo che ha condiviso, da un altro telefono: niente domanda");
+  await ctx.close();
+  // l'avviato al primo ingresso: Seguimi acceso da solo e la domanda; «Non ora» la toglie per sempre su questo telefono
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "c8".repeat(16)));
+  await perche(page);
+  await page.getByText("Ciao Ada").waitFor();
+  await card().waitFor();
+  check(await page.locator(".da-fare-oggi").count() === 1, "avviato al primo ingresso: Seguimi acceso e la domanda");
+  await page.click(".domanda-condividi button[data-act=condividi-no]");
+  await card().waitFor({ state:"detached" });
+  await sync(page);
+  check(riga("av86") === JSON.stringify([{ attivo:true, condividi:false }]), "«Non ora»: nel database «condividi» resta spento");
+  // lo stesso telefono (la memoria del telefono resta), riaprendo l'app
+  const stato86 = await ctx.storageState(); await ctx.close();
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, storageState:stato86 }, "#chiave=" + "c8".repeat(16)));
+  await page.getByText("Ciao Ada").waitFor();
+  check(await page.locator(".da-fare-oggi").count() === 1 && !(await card().count()), "«Non ora»: riaprendo l'app sullo stesso telefono la domanda non torna");
+  await page.click("button[data-act=vista-profilo]"); await page.locator(".guida-condividi").waitFor();
+  check(await page.locator("button[data-act=seguimi-condividi]").getAttribute("aria-checked") === "false", "«Non ora»: nel Profilo l'interruttore resta, spento");
+  await ctx.close();
+  // chi condivide già, chi ha il Seguimi spento, il nuovo nella versione semplificata: niente domanda
+  for(const [k, nome, perche] of [["d8", "Cico", "condivide già"], ["e8", "Spino", "Seguimi spento"], ["f8", "Nina", "versione semplificata"]]){
+    await entra86(k, nome);
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+    check(!(await card().count()), `${perche}: niente domanda`);
+    await ctx.close();
+  }
+  // una scelta dall'interruttore del Profilo vale come risposta: acceso e rispento, la domanda non torna
+  await entra86("7c", "Pio");
+  await card().waitFor();
+  await page.click("button[data-act=vista-profilo]"); await page.locator(".guida-condividi").waitFor();
+  await page.click("button[data-act=seguimi-condividi]");
+  await page.locator("button[data-act=seguimi-condividi][aria-checked=true]").waitFor();
+  await page.click("button[data-act=seguimi-condividi]");
+  await page.locator("button[data-act=seguimi-condividi][aria-checked=false]").waitFor();
+  await page.click("button[data-act=vista-io]");
+  await page.getByText("Ciao Pio").waitFor();
+  check(!(await card().count()), "scelta dal Profilo (acceso e poi spento): la domanda non torna");
+  // l'informativa: la riga sulla condivisione
+  await page.evaluate(() => { const b = document.createElement("button"); b.dataset.act = "privacy"; document.querySelector("#app").append(b); b.click(); });
+  await page.locator(".sheet h2", { hasText:"Informativa privacy" }).waitFor();
+  const priv = (await page.locator(".sheet").innerText()).replace(/\s+/g, " ");
+  check(priv.includes("Se scegli di condividere. Se lo scegli tu, dal Profilo, il tuo sponsor e la tua upline vedono anche i numeri del Seguimi, i numeri che scrivi a mano (app CumLaude21, Training Day, Convention) e le tue abitudini. Mai i nomi. Lo spegni quando vuoi."),
+    "informativa: la riga sulla condivisione");
+  await ctx.close();
+  check(!errori.length, "domanda sulla condivisione: nessun errore nella pagina");
+  const tutti86 = ["fl86", "fd86", "av86", "cd86", "sp86", "ns86", "pr86"];
+  DB.seguimi = DB.seguimi.filter(x => !tutti86.includes(x.partner_id));
+  DB.seguimiGiorni = (DB.seguimiGiorni || []).filter(x => !tutti86.includes(x.partner_id));
+  DB.persone = DB.persone.filter(x => !tutti86.includes(x.proprietario));
+  DB.activities = DB.activities.filter(a => !tutti86.includes(a.partner_id));
+  DB.numeri = DB.numeri.filter(x => !tutti86.includes(x.partner_id));
+  DB.obiettivi = (DB.obiettivi || []).filter(o => !tutti86.includes(o.partner_id));
+  DB.partners = DB.partners.filter(p => !tutti86.includes(p.id));
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
