@@ -3820,10 +3820,10 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   DB.ordiniMiei = (DB.ordiniMiei || []).concat([{ id:"np7b", proprietario:"np7", stato:"confermato", data:giorniFa(0), vp:60, attivita_id:null, nome:null,
     persona_id:null, ordine_cliente_id:null, creato_il:ora, confermato_il:ora }]);
   await entra();
-  check((await page.locator(".percorso-partenza .fase-titolo").innerText()).trim() === "Il primo ordine"
+  check((await page.locator(".percorso-partenza .fase-titolo").innerText()).trim() === "I due binari"
     && (await page.locator(".percorso-partenza .ordine-attesa").innerText()).replace(/\s+/g, " ").trim() === "! Ordine confermato · in attesa della mappa"
-    && (await page.locator(".percorso-ordine").innerText()).includes("0 / 50 VP") && (await page.locator(".percorso-ordine").innerText()).includes("restano"),
-    "063: bozza confermata: «Ordine confermato · in attesa della mappa» con «!», la barra solo dalla mappa (0 / 50)");
+    && await page.locator(".percorso-partenza ol.fasi li.con-attesa:not(.fatta)", { hasText:"Ordine" }).count() === 1,
+    "063: bozza confermata: «Ordine confermato · in attesa della mappa» con «!», non spuntato; il percorso va avanti ai due binari (13 novembre)");
   await page.locator(".percorso-partenza").screenshot({ path: S + "/e2e/61-in-attesa-mappa.png" });
   await ctx.close();
   // la mappa mostra il primo ordine, sotto i 50 VP: il passo è fatto, con la nota (scelta di Stefano); niente più 30 giorni
@@ -5602,7 +5602,7 @@ for(const tema of ["light", "dark"]){
 
 // 85. «La prossima cosa» dal percorso (13 novembre 2026): sempre quello che manca nella fase in corso, con i dati del percorso.
 //     Fase 2 con l'incontro fissato: i nomi (12 di 30, entro…) → Lista; fase 3: il primo ordine (VP e giorni) → Ordini;
-//     ordine confermato in attesa della mappa: niente dal percorso; fase 4: il primo piano → + Piano, poi il primo cliente →
+//     ordine confermato in attesa della mappa: si va avanti (sezione 87); fase 4: il primo piano → + Piano, poi il primo cliente →
 //     Clienti. Gli avviati non hanno niente dal percorso.
 {
   const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), ora = new Date().toISOString();
@@ -5646,8 +5646,8 @@ for(const tema of ["light", "dark"]){
   DB.ordiniMiei = (DB.ordiniMiei || []).concat([{ id:"pn85b", proprietario:"pn85", stato:"confermato", data:giorno(0), vp:60, attivita_id:null, nome:null,
     persona_id:null, ordine_cliente_id:null, creato_il:ora, confermato_il:ora }]);
   await entra85("2a", "Pina");
-  check(await page.locator(".percorso-partenza .ordine-attesa").isVisible() && !(await page.locator(".card.oggi-lista .small", { hasText:"dal tuo percorso" }).count()),
-    "ordine in attesa della mappa: niente «La prossima cosa» dal percorso");
+  check(await page.locator(".percorso-partenza .ordine-attesa").isVisible() && await titolo() === "Il tuo primo piano",
+    "ordine in attesa della mappa: il ritmo non si ferma, «La prossima cosa» è il primo piano (sezione 87)");
   await ctx.close();
   // fase 4: la mappa mostra l'ordine → il primo piano
   mappa("pn85", 60);
@@ -5802,6 +5802,117 @@ for(const tema of ["light", "dark"]){
   DB.numeri = DB.numeri.filter(x => !tutti86.includes(x.partner_id));
   DB.obiettivi = (DB.obiettivi || []).filter(o => !tutti86.includes(o.partner_id));
   DB.partners = DB.partners.filter(p => !tutti86.includes(p.id));
+}
+
+// 87. Il primo ordine non ferma il ritmo (13 novembre 2026): confermato ma non ancora nella mappa, la fase 3 resta non fatta
+//     con «!» e la fase in corso è la 4 («I due binari»); «La prossima cosa» indica il primo piano o il primo cliente. Con i
+//     due binari fatti manca solo la mappa: fase 3 e «Manca solo la mappa del primo ordine», senza pulsante, niente festa.
+//     Lo sponsor in «I tuoi nuovi in partenza» e nella scheda vede la stessa fase e lo stesso «!». La festa arriva con la mappa.
+{
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), ora = new Date().toISOString();
+  DB.partners.push({ id:"pn87", nome:"Olga Ordine", sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:"3c".repeat(16), codice_invito:"PN87XX",
+    codice_amway:"7987001", data_iscrizione:giorno(-4), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora,
+    conPercorso:true, incontro_sponsor:giorno(-1) });
+  DB.persone = (DB.persone || []).concat(Array.from({ length:30 }, (_, i) => ({ id:"pn87n" + i, proprietario:"pn87", nome:"Nome Olga " + (i + 1), fase:"lista",
+    esito:null, creato_il:ora })));
+  DB.ordiniMiei = (DB.ordiniMiei || []).concat([{ id:"pn87o", proprietario:"pn87", stato:"confermato", data:giorno(0), vp:60, attivita_id:null, nome:null,
+    persona_id:null, ordine_cliente_id:null, creato_il:ora, confermato_il:ora }]);
+  DB.partenzaTolti = (DB.partenzaTolti || []).filter(x => x.nuovo_id !== "pn87");
+  const radice = DB.partners.find(p => p.id === "R"); if(!radice.privacy_accettata_il) radice.privacy_accettata_il = ora;   // anche lanciata da sola
+  const entra87 = async (tema, k, nome) => {
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema || "light", deviceScaleFactor:2 }, "#chiave=" + (k || "3c".repeat(16))));
+    await page.getByText("Ciao " + (nome || "Olga")).waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  };
+  const pc = () => page.locator(".card.percorso-partenza"), pr = () => page.locator(".card.oggi-lista");
+  const fase = async () => (await pc().locator(".spread .small").first().innerText()).trim();
+  const titoloFase = async () => (await pc().locator(".fase-titolo").innerText()).trim();
+  const prossima = async () => (await pr().locator(".prossima-titolo").innerText()).trim();
+  const motivo = async () => (await pr().locator(".prossima-titolo + p.small").innerText()).replace(/\s+/g, " ").trim();
+  const ordineConAttesa = async () => { const li = pc().locator("ol.fasi li", { hasText:"Ordine" });
+    return !(await li.getAttribute("class")).includes("fatta") && await li.locator(".segno-attesa").count() === 1 && !(await li.locator(".lucchetto").count()); };
+  // fase 4: i due binari, con il «!» sulla fase 3
+  for(const tema of ["light", "dark"]){
+    await entra87(tema);
+    check(await fase() === "Fase 4 di 5" && await titoloFase() === "I due binari", `ordine in attesa (${tema}): la fase in corso è la 4, «I due binari»`);
+    check(await ordineConAttesa() && await pc().locator(".ordine-attesa", { hasText:"Ordine confermato · in attesa della mappa" }).isVisible()
+      && await pc().locator(".binari").isVisible(), `ordine in attesa (${tema}): la fase 3 non fatta con «!», sopra i numeri dei due binari`);
+    check(await prossima() === "Il tuo primo piano" && await motivo() === "I due binari · mancano il primo piano e il primo cliente",
+      `ordine in attesa (${tema}): «La prossima cosa» è il primo piano`);
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `ordine in attesa (${tema}), 360 px: niente scroll orizzontale`);
+    await pc().screenshot({ path: S + `/e2e/87-percorso-attesa-${tema}.png` });
+    await ctx.close();
+  }
+  // con il primo piano: il primo cliente
+  DB.activities.push({ id:"pn87p", partner_id:"pn87", tipo:"piano", quantita:1, data:giorno(0), inserito_il:ora });
+  await entra87();
+  check(await fase() === "Fase 4 di 5" && await prossima() === "Il tuo primo cliente" && await motivo() === "I due binari · manca solo il primo cliente",
+    "ordine in attesa, con il piano: «La prossima cosa» è il primo cliente");
+  await ctx.close();
+  // i due binari fatti: manca solo la mappa (fase 3), niente festa
+  DB.activities.push({ id:"pn87c", partner_id:"pn87", tipo:"cliente", quantita:1, data:giorno(0), inserito_il:ora });
+  for(const tema of ["light", "dark"]){
+    await entra87(tema);
+    check(!(await page.locator(".festa").count()), `manca solo la mappa (${tema}): niente festa`);
+    check(await fase() === "Fase 3 di 5" && await titoloFase() === "Il primo ordine" && await ordineConAttesa()
+      && (await pc().locator(".solo-mappa").innerText()).trim() === "Manca solo la mappa del primo ordine"
+      && await pc().locator("ol.fasi .lucchetto").count() === 1,
+      `manca solo la mappa (${tema}): la fase in corso dice «Manca solo la mappa del primo ordine»`);
+    check(await prossima() === "Manca solo la mappa del primo ordine" && await motivo() === "Ordine confermato · in attesa della mappa"
+      && !(await pr().locator(".prossima-azioni").count()), `manca solo la mappa (${tema}): «La prossima cosa» lo dice, senza pulsante`);
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `manca solo la mappa (${tema}), 360 px: niente scroll orizzontale`);
+    await pc().screenshot({ path: S + `/e2e/87-solo-mappa-${tema}.png` });
+    await pr().screenshot({ path: S + `/e2e/87-prossima-solo-mappa-${tema}.png` });
+    await ctx.close();
+  }
+  // lo sponsor: la stessa fase e lo stesso «!», nei nuovi in partenza e nella scheda
+  const sponsor = async (tema) => {
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema || "light", deviceScaleFactor:2 }, "#chiave=" + "a".repeat(32)));
+    await page.getByText("Ciao Stefano e Alessia").waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+    await page.click("button[data-act=vista-gruppo]");
+    await page.locator(".card.nuovi-partenza").waitFor();
+    return page.locator(".card.nuovi-partenza .partenze-l li", { hasText:"Olga Ordine" });
+  };
+  DB.activities = DB.activities.filter(a => a.id !== "pn87c");   // prima con il solo piano: fase 4
+  let riga = await sponsor();
+  check((await riga.innerText()).includes("Fase 4 di 5") && await riga.locator(".ordine-attesa", { hasText:"Ordine confermato · in attesa della mappa" }).count() === 1
+    && await riga.locator(".barre-partenza i.attesa").count() === 1 && (await riga.innerText()).includes("Manca: primo piano fatto · primo cliente"),
+    "sponsor: fase 4 di 5, il «!» del primo ordine in attesa e cosa manca");
+  await riga.locator("button[data-act=apri-scheda]").click();
+  const ps = page.locator(".card.partenza-scheda");
+  await ps.locator(".percorso-scheda li.attesa", { hasText:"Il primo ordine" }).waitFor();
+  check((await ps.locator(".eyebrow").innerText()).toLowerCase().includes("fase 4 di 5")
+    && (await ps.locator(".percorso-scheda li.attesa .segno").innerText()).trim() === "!"
+    && (await ps.locator(".percorso-scheda li.attesa").innerText()).includes("Ordine confermato · in attesa della mappa"),
+    "sponsor, scheda: fase 4 di 5 e il primo ordine con «!»");
+  check(!(await page.locator("#app").innerText()).includes("Nome Olga") && !/60 VP/.test(await ps.innerText()), "sponsor: né i nomi della sua Lista né i VP dell'ordine");
+  await ctx.close();
+  DB.activities.push({ id:"pn87c", partner_id:"pn87", tipo:"cliente", quantita:1, data:giorno(0), inserito_il:ora });
+  for(const tema of ["light", "dark"]){
+    riga = await sponsor(tema);
+    check((await riga.innerText()).includes("Fase 3 di 5") && (await riga.innerText()).includes("Manca solo la mappa del primo ordine")
+      && await riga.locator(".ordine-attesa").count() === 1 && await riga.locator(".barre-partenza i").nth(2).getAttribute("class") === "qui",
+      `sponsor (${tema}): con i due binari fatti, fase 3 di 5 e «Manca solo la mappa del primo ordine»`);
+    await page.locator(".card.nuovi-partenza").screenshot({ path: S + `/e2e/87-sponsor-${tema}.png` });
+    await ctx.close();
+  }
+  // la mappa mostra l'ordine: per il nuovo la festa, per lo sponsor il primo ordine fatto, niente più «!»
+  mappa("pn87", 60);
+  await entra87();
+  check(await page.locator(".festa").isVisible(), "la mappa mostra il primo ordine: la festa");
+  await ctx.close();
+  riga = await sponsor();
+  check(!(await riga.count()) || (!(await riga.locator(".ordine-attesa").count()) && !(await riga.innerText()).includes("in attesa della mappa")),
+    "sponsor, con la mappa: niente più ordine in attesa");
+  await ctx.close();
+  check(!errori.length, "primo ordine in attesa della mappa: nessun errore nella pagina");
+  DB.persone = DB.persone.filter(x => x.proprietario !== "pn87");
+  DB.activities = DB.activities.filter(a => a.partner_id !== "pn87");
+  DB.ordiniMiei = DB.ordiniMiei.filter(x => x.proprietario !== "pn87");
+  DB.numeri = DB.numeri.filter(x => x.partner_id !== "pn87");
+  DB.obiettivi = (DB.obiettivi || []).filter(o => o.partner_id !== "pn87");
+  DB.partners = DB.partners.filter(p => p.id !== "pn87");
 }
 
 await browser.close();

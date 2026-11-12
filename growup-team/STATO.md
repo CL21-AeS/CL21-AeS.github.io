@@ -3,7 +3,7 @@
 Ultimo aggiornamento: 12 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
-## Condivisione, primo ordine in attesa, avvisi allo sponsor, qualifica (13 novembre 2026, in corso)
+## Condivisione, primo ordine in attesa, avvisi allo sponsor, qualifica (13 novembre 2026, migrazione 064, in corso)
 
 Quattro PR in fila, da unire in ordine (una per punto); la versione del service worker sale una volta sola, nell'ultima.
 Scelte di Stefano.
@@ -23,6 +23,23 @@ Scelte di Stefano.
    «Non ora» e riapertura sullo stesso telefono, chi condivide già, Seguimi spento, versione semplificata, scelta dal
    Profilo, informativa; anteprima di Io a 360 px `e2e/86-domanda-light.png` e `-dark.png`).
    Da sapere: su un telefono nuovo chi aveva risposto «Non ora» rivede la domanda una volta.
+2. **Il primo ordine non ferma il ritmo** (migrazione 064, solo una funzione nuova): se il primo ordine è confermato ma la
+   mappa non lo mostra ancora, la fase 3 resta **non fatta con «!»** (nella barra delle fasi il «!» al posto del lucchetto)
+   e la fase in corso diventa la **4, «I due binari»**, con i suoi numeri e sopra «! Ordine confermato · in attesa della
+   mappa» (`faseInCorso`, la stessa regola per il nuovo e per lo sponsor). **«La prossima cosa»** segue la stessa regola:
+   il primo piano o il primo cliente, non più il primo ordine. Con i due binari fatti e solo la mappa che manca, la fase in
+   corso è la 3 e lei e «La prossima cosa» dicono **«Manca solo la mappa del primo ordine»** (senza pulsante: non c'è niente
+   da fare). La **festa** resta com'è: parte solo quando la mappa mostra il primo ordine.
+   **Lo sponsor** in «I tuoi nuovi in partenza» e nella scheda vede la stessa fase e lo stesso «!» (barra ambra, riga «!
+   Ordine confermato · in attesa della mappa», «Manca solo la mappa del primo ordine»). Gli ordini del nuovo restano
+   privati: la **064** aggiunge `ordini_in_attesa(p_partner)`, che dice solo **quali** nuovi (gli id) hanno un ordine
+   confermato, senza cliente, dalla data di iscrizione, che nessuna mappa dal mese di iscrizione mostra ancora; né VP, né
+   prodotti, né date. Stesse regole di `partenze()` (i nuovi che ho invitato; per la scheda uno che vedo o che ho invitato);
+   chiusa ad anon. Se la funzione non risponde l'app va avanti senza «!» per lo sponsor. Controlli 064 in `tests_rls.sql`.
+   Test dell'interfaccia: sezione 87 (fase 4 con il «!», primo piano e primo cliente in «La prossima cosa», solo la mappa
+   senza festa, sponsor nella lista e nella scheda, festa quando arriva la mappa; anteprime a 360 px
+   `e2e/87-percorso-attesa-light/dark.png`, `87-solo-mappa-*.png`, `87-prossima-solo-mappa-*.png`, `87-sponsor-*.png`);
+   sezione 85 aggiornata (l'ordine in attesa non toglie più «La prossima cosa»).
 
 ## «La prossima cosa» dal percorso: sempre quello che manca (13 novembre 2026, app v119, database non toccato)
 

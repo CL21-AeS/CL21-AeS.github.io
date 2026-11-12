@@ -829,6 +829,16 @@ form:has(input[name=modo][value=filtri]:checked) .imp-filtri{display:block}
 .mappa-riga{margin:8px 0 0}
 .ordine-attesa{display:flex;gap:8px;align-items:center;margin:8px 0 6px}
 .segno-attesa{width:22px;height:22px;border-radius:50%;background:var(--azione);color:#fff;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex:none}
+/* il primo ordine confermato in attesa della mappa (13 novembre 2026): la fase resta non fatta, con «!», e il ritmo va avanti */
+.segno-attesa.piccolo{width:15px;height:15px;font-size:10px;vertical-align:-2px}
+.percorso-partenza ol.fasi li.con-attesa i{background:var(--azione);opacity:.55}
+.percorso-partenza ol.fasi li.attesa{color:#fff}
+.percorso-partenza ol.fasi li.qui.con-attesa i{opacity:1}
+.solo-mappa{margin:4px 0}
+.barre-partenza i.attesa{background:var(--azione);opacity:.55}
+.partenze-l .ordine-attesa{margin:6px 0 2px;font-size:13px}
+.partenze-l .ordine-attesa .segno-attesa{width:18px;height:18px;font-size:11px}
+.percorso-scheda li.attesa .segno{background:var(--azione);border-color:var(--azione)}
 .settimana-riga{margin:10px 0 0}
 .settimana-riga .btn.link{min-height:0;padding:0 2px}
 .proposta-obiettivi{margin:6px 0 0}
