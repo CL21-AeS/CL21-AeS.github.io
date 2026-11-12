@@ -177,6 +177,8 @@ function creaApi(){
     numeriPersone: pid => q(sb.rpc("numeri_persone", { p_partner:pid })),
     /* 060: i numeri della partenza (senza argomento: chi ho invitato io) e chi ho tolto con la × */
     partenze:     pid => q(sb.rpc("partenze", pid ? { p_partner:pid } : {})),
+    /* 064: solo sì/no (gli id) per i nuovi con il primo ordine confermato che la mappa non mostra ancora */
+    ordiniInAttesa: pid => q(sb.rpc("ordini_in_attesa", pid ? { p_partner:pid } : {})),
     partenzaTolti: () => q(sb.from("partenza_tolti").select("nuovo_id,fase")),
     togliPartenza: (nuovo_id, fase) => q(sb.from("partenza_tolti").upsert({ nuovo_id, fase }, { onConflict:"partner_id,nuovo_id" })),
     rimettiPartenza: nuovo_id => q(sb.from("partenza_tolti").delete().eq("nuovo_id", nuovo_id)),
@@ -223,6 +225,7 @@ const st = {
   ingressi: new Map(),    // la data di ingresso di chi vedo (filtro «Nuovi» del Gruppo)
   filtroGruppo: "tutti",  // il filtro scelto nel Gruppo
   partenze: [], partenzaTolti: new Map(), partenzaScheda: {},   // consegna 8: i nuovi in partenza
+  ordiniAttesa: new Set(),   // 064: i nuovi con il primo ordine confermato in attesa della mappa
   linkGestito: null,      // { nome, chiave }: nuovo link personale creato dall'admin per chi l'ha perso
   nascosti: new Set(),    // persone nascoste dalla mia struttura (solo loro: chi sta sotto resta)
   persone: [], passi: [], // la mia lista (solo mia) e i suoi passi
@@ -985,6 +988,7 @@ async function caricaStruttura(){
   try{ st.inAttesa = await api.inAttesa() || []; }catch(e){ st.inAttesa = []; }
   try{ st.partenze = await api.partenze() || []; st.partenzaTolti = new Map((await api.partenzaTolti() || []).map(r => [r.nuovo_id, Number(r.fase)])); }
   catch(e){ st.partenze = st.partenze || []; st.partenzaTolti = st.partenzaTolti || new Map(); }
+  try{ st.ordiniAttesa = new Set((await api.ordiniInAttesa() || []).map(r => r.id)); }catch(e){ st.ordiniAttesa = st.ordiniAttesa || new Set(); }
   try{ st.invitiMiei = await api.inviti() || []; }catch(e){ st.invitiMiei = []; }
 }
 
@@ -2256,12 +2260,23 @@ function fasiPercorso(){
   const fasi = [
     { k:"perche", nome:"Perché", titolo:"Il mio perché", fatto:!senzaPerche() },
     { k:"sponsor", nome:"Sponsor", titolo:"Partenza con lo sponsor", fatto:!!p.incontro_sponsor && nomi >= NOMI_PARTENZA },
-    { k:"ordine", nome:"Ordine", titolo:"Il primo ordine", fatto:ord.fatto },
+    { k:"ordine", nome:"Ordine", titolo:"Il primo ordine", fatto:ord.fatto, attesa:!ord.fatto && ord.attesa },
     { k:"binari", nome:"Binari", titolo:"I due binari", fatto:piani.length > 0 && clienti.length > 0 },
     { k:"via", nome:"Via!", titolo:"Via!", fatto:!!p.partenza_completata_il }];
-  const qui = fasi.findIndex(f => !f.fatto);
-  return { fasi, qui:qui < 0 ? fasi.length - 1 : qui, nomi, ord, piani, clienti };
+  return { fasi, qui:faseInCorso(fasi), nomi, ord, piani, clienti };
 }
+/* la fase in corso (13 novembre 2026, scelta di Stefano): il primo ordine confermato in attesa della mappa non ferma il
+   ritmo. La fase resta non fatta, con «!», e si va avanti alla prima fase che manca; se manca solo la mappa, la fase in
+   corso è quella del primo ordine («Manca solo la mappa del primo ordine»). Vale per il nuovo e per lo sponsor. */
+function faseInCorso(fasi){
+  const primi = fasi.slice(0, 4);
+  let qui = primi.findIndex(f => !f.fatto && !f.attesa);
+  if(qui < 0) qui = primi.findIndex(f => !f.fatto);
+  if(qui < 0) qui = fasi.findIndex(f => !f.fatto);
+  return qui < 0 ? fasi.length - 1 : qui;
+}
+const SOLO_MAPPA = "Manca solo la mappa del primo ordine";
+const rigaAttesa = () => `<p class="ordine-attesa"><span class="segno-attesa" aria-hidden="true">!</span><span><b>Ordine confermato</b> · in attesa della mappa</span></p>`;
 function vPercorso(){
   const x = fasiPercorso(), f = x.fasi[x.qui], p = st.profilo;
   const riga = (ok, titolo, sotto, extra) => `<li class="${ok ? "fatto" : ""}"><span class="segno" aria-hidden="true">${ok ? "✓" : ""}</span>
@@ -2274,16 +2289,17 @@ function vPercorso(){
           fatto ? "" : `<button class="btn small" data-act="incontro-fissa">${d ? "Cambia" : "Fissa ›"}</button>`); })()}
       ${riga(x.nomi >= NOMI_PARTENZA, `${NOMI_PARTENZA} nomi nella Lista`, `${num(Math.min(x.nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}${x.nomi < NOMI_PARTENZA ? ` · entro ${esc(riassuntoAgenda(entro < oggi() ? oggi() : entro))}` : ""}`,
         x.nomi < NOMI_PARTENZA ? `<button class="btn small" data-act="guida-vai" data-dove="lista">Lista ›</button>` : "")}</ul>`;
+  else if(f.k === "ordine" && f.attesa) corpo = `${rigaAttesa()}<p class="solo-mappa"><b>${SOLO_MAPPA}</b></p>
+      <p class="small" style="margin:0">Primo piano e primo cliente fatti. I VP sono quelli della mappa Amway.</p>`;
   else if(f.k === "ordine"){ const o = x.ord, pct = pctOk(Math.round(o.vp / o.min * 100));
-    corpo = `${o.attesa ? `<p class="ordine-attesa"><span class="segno-attesa" aria-hidden="true">!</span><span><b>Ordine confermato</b> · in attesa della mappa</span></p>` : ""}
-      <div class="percorso-ordine"><b class="num">${num(o.vp)}<small> / ${num(o.min)} VP</small></b>
+    corpo = `<div class="percorso-ordine"><b class="num">${num(o.vp)}<small> / ${num(o.min)} VP</small></b>
       <span class="small">${o.restano >= 0 ? `restano ${o.restano === 1 ? "1 giorno" : `${o.restano} giorni`} (entro il ${dataIt(o.fine)})` : "oltre i 30 giorni: il percorso aspetta il tuo primo ordine"}</span></div>
       <div class="bar" role="progressbar" aria-label="VP del primo ordine" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
       <p class="small" style="margin:0">Scegli con il tuo sponsor i prodotti che ti servono in casa: almeno ${num(o.min)} VP entro 30 giorni dall'iscrizione.
         I VP sono quelli della mappa Amway.</p>`; }
   else if(f.k === "binari"){ const conta = t => attivitaTutte(t).reduce((n, a) => n + (Number(a.quantita) || 1), 0);
     const invitati = (st.passi || []).filter(s => !s.importato && s.tipo === "invito").length;
-    corpo = `<div class="binari">
+    corpo = `${x.fasi[2].attesa ? rigaAttesa() : ""}<div class="binari">
       <div><span class="eyebrow">Contatti</span><span class="small">Contattati <b>${num(conta("contatto"))}</b><br>Invitati <b>${num(invitati)}</b><br>Piani <b>${num(conta("piano"))}</b></span>
         <span class="binario${x.piani.length ? " ok" : ""}">${x.piani.length ? "✓ " : ""}Primo piano</span></div>
       <div><span class="eyebrow">Prodotto</span><span class="small">Clienti <b>${num(conta("cliente"))}</b></span>
@@ -2291,15 +2307,16 @@ function vPercorso(){
   const fatto = x.fasi[2].fatto ? `<span class="small">✓ primo ordine · ${num(x.ord.vp)} VP${x.ord.sotto ? `, sotto i ${num(x.ord.min)}: iscrizione a pagamento` : ""}</span>` : "";
   return `<div class="card cruscotto percorso-partenza">
     <div class="spread"><span class="eyebrow">Percorso di partenza</span><span class="small">Fase ${x.qui + 1} di ${x.fasi.length}</span></div>
-    <ol class="fasi" aria-label="Le fasi del percorso">${x.fasi.map((y, i) => `<li class="${y.fatto ? "fatta" : i === x.qui ? "qui" : "poi"}"><i></i>
-      <span>${i > x.qui ? `<span class="lucchetto" aria-label="non ancora">🔒</span> ` : ""}${esc(y.nome)}</span></li>`).join("")}</ol>
+    <ol class="fasi" aria-label="Le fasi del percorso">${x.fasi.map((y, i) => `<li class="${y.fatto ? "fatta" : i === x.qui ? "qui" : y.attesa ? "attesa" : "poi"}${!y.fatto && y.attesa ? " con-attesa" : ""}"><i></i>
+      <span>${!y.fatto && y.attesa ? `<span class="segno-attesa piccolo" aria-label="in attesa della mappa">!</span> ` : i > x.qui && !y.fatto ? `<span class="lucchetto" aria-label="non ancora">🔒</span> ` : ""}${esc(y.nome)}</span></li>`).join("")}</ol>
     <div class="spread"><h3 class="fase-titolo">${esc(f.titolo)}</h3>${f.k === "binari" ? fatto : ""}</div>
     ${corpo}
   </div>`;
 }
 /* la prossima cosa del percorso, prima della lista di oggi: sempre quello che manca nella fase in corso (13 novembre 2026,
-   scelta di Stefano), con i dati del percorso (quanto manca, la scadenza), senza dire come farlo. Niente quando non c'è
-   niente da fare (primo ordine confermato in attesa della mappa, festa). */
+   scelta di Stefano), con i dati del percorso (quanto manca, la scadenza), senza dire come farlo. Il primo ordine
+   confermato in attesa della mappa non ferma il ritmo: si passa al primo piano o al primo cliente; se manca solo la mappa,
+   «Manca solo la mappa del primo ordine», senza pulsante. Niente alla festa. */
 function prossimaPercorso(){
   if(!percorsoAttivo()) return null;
   const x = fasiPercorso(), f = x.fasi[x.qui], p = st.profilo;
@@ -2310,6 +2327,7 @@ function prossimaPercorso(){
     return { titolo:"Scrivi i prossimi nomi nella Lista", motivo:`${num(x.nomi)} di ${NOMI_PARTENZA} nomi · entro ${riassuntoAgenda(entro < oggi() ? oggi() : entro)}`,
       act:"guida-vai", dove:"lista", btn:"Lista ›" };
   }
+  if(f.k === "ordine" && f.attesa) return { titolo:SOLO_MAPPA, motivo:"Ordine confermato · in attesa della mappa" };
   if(f.k === "ordine" && !x.ord.attesa) return { titolo:"Il tuo primo ordine",
     motivo:`${num(x.ord.vp)} di ${num(x.ord.min)} VP · ${x.ord.restano >= 0 ? `restano ${x.ord.restano === 1 ? "1 giorno" : `${x.ord.restano} giorni`}` : "oltre i 30 giorni"}`,
     act:"ordini", btn:"Ordini ›" };
@@ -2443,7 +2461,7 @@ function vOggiLista(){
   const testa = dalPercorso ? `<div class="spread"><span class="eyebrow pesca">La prossima cosa</span><span class="small">dal tuo percorso</span></div>
     <span class="prossima-titolo" role="heading" aria-level="3">${esc(dalPercorso.titolo)}</span>
     <p class="small" style="margin:0">${esc(dalPercorso.motivo)}</p>
-    <div class="prossima-azioni"><button class="btn primary" data-act="${dalPercorso.act}"${dalPercorso.dove ? ` data-dove="${dalPercorso.dove}"` : ""}>${esc(dalPercorso.btn)}</button></div>`
+    ${dalPercorso.act ? `<div class="prossima-azioni"><button class="btn primary" data-act="${dalPercorso.act}"${dalPercorso.dove ? ` data-dove="${dalPercorso.dove}"` : ""}>${esc(dalPercorso.btn)}</button></div>` : ""}`
     : prima ? `<div class="spread"><span class="eyebrow pesca">La prossima cosa</span>
       <span class="row" style="gap:6px;align-items:center"><span class="small">1 di ${totale} oggi</span>
       <button class="x" data-act="togli-da-io" data-id="${esc(prima.p.id)}" aria-label="Togli ${esc(prima.p.nome)} da Io">×</button></span></div>
@@ -2863,21 +2881,22 @@ function partenzaDi(x){
   if(nuovo){
     if(x.partenza_completata_il) return null;
     const nomi = Number(x.nomi_lista) || 0, vp = Number(x.vp_dal_ingresso) || 0, restano = GIORNI_NUOVO - giorniTra(isc, oggi());
+    const attesa = !(vp > 0) && st.ordiniAttesa.has(x.id);   // 064: confermato, la mappa non lo mostra ancora
     const fasi = [
       { nome:"Il suo perché", fatto:!!x.ha_perche, sotto:x.ha_perche ? "obiettivo scritto" : "obiettivo da scrivere" },
       { nome:"Partenza con te", fatto:!!x.incontro_sponsor && nomi >= NOMI_PARTENZA,
         sotto:`${!x.incontro_sponsor ? "Incontro: data da fissare" : giornoFatto(x.incontro_sponsor) ? `Incontro fatto ${dataIt(String(x.incontro_sponsor).slice(0, 10))}`
           : `Incontro fissato per ${riassuntoAgenda(String(x.incontro_sponsor).slice(0, 10))}`} · Lista ${num(Math.min(nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}` },
-      { nome:"Il primo ordine", fatto:vp > 0,
+      { nome:"Il primo ordine", fatto:vp > 0, attesa,
         sotto:vp >= PRIMO_ORDINE_VP ? `fatto · ${num(vp)} VP` : vp > 0 ? `fatto · ${num(vp)} VP, sotto i ${PRIMO_ORDINE_VP}: iscrizione a pagamento`
-          : `0 / ${PRIMO_ORDINE_VP} VP · ${restano >= 0 ? `restano ${restano} giorni` : "oltre i 30 giorni"}` },
+          : attesa ? "Ordine confermato · in attesa della mappa" : `0 / ${PRIMO_ORDINE_VP} VP · ${restano >= 0 ? `restano ${restano} giorni` : "oltre i 30 giorni"}` },
       { nome:"I due binari", fatto:Number(x.piani) > 0 && Number(x.clienti) > 0,
         sotto:`${Number(x.piani) > 0 ? "primo piano fatto" : "primo piano"} · ${Number(x.clienti) > 0 ? "primo cliente fatto" : "primo cliente"}` },
       { nome:"Partenza completata", fatto:false, sotto:"poi il Seguimi" }];
-    const qui = fasi.findIndex(f => !f.fatto);
-    const manca = fasi.slice(0, 4).filter(f => !f.fatto);
-    return { tipo:"nuovo", fase:qui + 1, tot:5, fasi, qui,
-      manca:manca.length ? `Manca: ${manca[0].nome === "Partenza con te" ? (x.incontro_sponsor ? "" : "la data del vostro primo incontro · ") + `Lista ${num(Math.min(nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}`
+    const qui = faseInCorso(fasi);
+    const manca = fasi.slice(0, 4).filter(f => !f.fatto && !f.attesa);
+    return { tipo:"nuovo", fase:qui + 1, tot:5, fasi, qui, attesa,
+      manca:!manca.length && attesa ? SOLO_MAPPA : manca.length ? `Manca: ${manca[0].nome === "Partenza con te" ? (x.incontro_sponsor ? "" : "la data del vostro primo incontro · ") + `Lista ${num(Math.min(nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}`
         : manca[0].nome === "I due binari" ? fasi[3].sotto : manca[0].sotto}` : "" };
   }
   /* avviato: «Per iniziare» (il perché e la mappa se ha un gruppo; il punto con l'upline non c'è più) */
@@ -2899,8 +2918,8 @@ function vNuoviInPartenza(){
         <div class="spread"><span><b>${esc(x.nome)}</b> <span class="small">· ${g <= 0 ? "da oggi" : g === 1 ? "da 1 giorno" : `da ${num(g)} giorni`}</span></span>
           <span class="row" style="gap:4px;align-items:center">${apri ? `<button class="btn link small" data-act="apri-scheda" data-id="${esc(x.id)}">${fase} ›</button>` : `<span class="small">${fase}</span>`}
             <button class="x" data-act="togli-partenza" data-id="${esc(x.id)}" data-fase="${z.fase}" aria-label="Togli ${esc(x.nome)} dai nuovi in partenza">×</button></span></div>
-        <div class="barre-partenza" aria-hidden="true">${z.fasi.map((f, i) => `<i class="${f.fatto ? "fatta" : i === z.qui ? "qui" : ""}"></i>`).join("")}</div>
-        ${z.manca ? `<span class="small">${esc(z.manca)}</span>` : ""}</li>`; }).join("")}</ul>
+        <div class="barre-partenza" aria-hidden="true">${z.fasi.map((f, i) => `<i class="${f.fatto ? "fatta" : i === z.qui ? "qui" : f.attesa ? "attesa" : ""}"></i>`).join("")}</div>
+        ${z.attesa ? rigaAttesa() : ""}${z.manca ? `<span class="small">${esc(z.manca)}</span>` : ""}</li>`; }).join("")}</ul>
   </div>`;
 }
 /* nella scheda: il percorso del nuovo (con l'app) o il primo ordine dalla mappa (senza app) */
@@ -2923,7 +2942,7 @@ function vPartenzaScheda(p){
   if(!z) return "";
   return `<div class="card partenza-scheda">
     <span class="eyebrow">${z.tipo === "nuovo" ? `Percorso di partenza · fase ${z.fase} di ${z.tot}` : `Per iniziare · ${z.fase} di ${z.tot}`}</span>
-    <ul class="percorso-scheda">${z.fasi.map((f, i) => `<li class="${f.fatto ? "fatto" : i === z.qui ? "qui" : ""}"><span class="segno" aria-hidden="true">${f.fatto ? "✓" : ""}</span>
+    <ul class="percorso-scheda">${z.fasi.map((f, i) => `<li class="${f.fatto ? "fatto" : f.attesa ? "attesa" : i === z.qui ? "qui" : ""}"><span class="segno" aria-hidden="true">${f.fatto ? "✓" : f.attesa ? "!" : ""}</span>
       <span class="grow"><b>${esc(f.nome)}</b>${f.sotto ? `<br><span class="small">${esc(f.sotto)}</span>` : ""}</span></li>`).join("")}</ul>
     <p class="nota" style="margin:0">Vedi solo i numeri della sua Lista, mai i nomi.</p>
   </div>`;
@@ -4085,6 +4104,7 @@ const AZIONI = {
     catch(e){ toast(messaggio(e)); }
     if(p.stato !== "gestito") api.numeriPersone(p.id).then(n => { st.numeriLista[p.id] = n; render(); }).catch(() => {});
     if(p.stato !== "gestito") api.partenze(p.id).then(l => { st.partenzaScheda[p.id] = (l || [])[0] || null; render(); }).catch(() => {});
+    if(p.stato !== "gestito") api.ordiniInAttesa(p.id).then(l => { if((l || []).length) st.ordiniAttesa.add(p.id); else st.ordiniAttesa.delete(p.id); render(); }).catch(() => {});
     if(p.stato !== "gestito") api.seguimiDi(p.id).then(g => { st.seguimiScheda[p.id] = g || []; render(); }).catch(() => {});
     api.mesiReport(p.id).then(m => { st.mesiScheda[p.id] = m || []; render(); }).catch(() => {});
   },

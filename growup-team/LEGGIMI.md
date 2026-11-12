@@ -140,6 +140,8 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 41n. `supabase/063_vp_solo_mappa.sql` — i VP solo dalle mappe Amway (`calcola_mese`, `riepilogo_mese`, `chiudi_mese`, `partenze`;
      senza mappa nessun numero), niente più ordini e rettifiche scritti a mano, più bozze d'ordine con nome e cliente, la
      notifica «mancano X VP» dalla mappa con la sua data
+41o. `supabase/064_ordine_in_attesa.sql` — `ordini_in_attesa`: lo sponsor sa solo quali suoi nuovi hanno il primo ordine
+     confermato che la mappa non mostra ancora (né VP né prodotti); una funzione nuova, nient'altro
 41n. `supabase/055b_contatti_cron.sql` — l'attività pianificata della cancellazione, ogni notte (solo su Supabase, come la 050b)
 42. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente

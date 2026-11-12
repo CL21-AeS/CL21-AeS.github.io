@@ -528,6 +528,13 @@
         invitati:(db.passi || []).filter(x => x.proprietario === p.id && x.tipo === "invito").length, piani:somma(p.id, ["piano"], "quantita"),
         clienti:somma(p.id, ["cliente"], "quantita"), ha_gruppo:db.partners.some(f => f.sponsor_id === p.id),
         mappa_importata:(db.numeri || []).some(n => n.visto_da === p.id), invitato_da_me:p.invitato_da === io.id })); },
+    /* 064: solo gli id dei nuovi con il primo ordine confermato che la mappa non mostra ancora */
+    ordiniInAttesa: async pid => { const io = mio(); if(!io) throw new Error("non_autenticato");
+      if(pid){ const t = db.partners.find(p => p.id === pid); if(!t || (!vedo(io, t) && t.invitato_da !== io.id)) throw new Error("non_autorizzato"); }
+      return db.partners.filter(p => p.stato !== "gestito" && (pid ? p.id === pid : p.invitato_da === io.id)).filter(p => {
+        const dal = String(p.data_iscrizione || "2000-01-01").slice(0, 10);
+        return (db.ordiniMiei || []).some(o => o.proprietario === p.id && o.stato === "confermato" && !o.persona_id && String(o.data || "") >= dal)
+          && !(db.numeri || []).some(n => n.partner_id === p.id && n.mese >= dal.slice(0, 7) && Number(n.vpp) > 0); }).map(p => ({ id:p.id })); },
     partenzaTolti: async () => (db.partenzaTolti || []).filter(x => x.partner_id === (mio() || {}).id).map(x => ({ nuovo_id:x.nuovo_id, fase:x.fase })),
     togliPartenza: async (nuovo_id, fase) => { const io = mio();
       db.partenzaTolti = (db.partenzaTolti || []).filter(x => !(x.partner_id === io.id && x.nuovo_id === nuovo_id)).concat([{ partner_id:io.id, nuovo_id, fase }]); salva(); },

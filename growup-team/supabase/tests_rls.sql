@@ -967,12 +967,35 @@ begin
                          '060: A vede il suo nuovo in partenza, solo numeri');
   perform growup_test.ok((select pz.vp_dal_ingresso is null from public.partenze() pz where pz.nome = 'Nuovo Guida'),
                          '063: senza mappa il primo ordine del nuovo non c''è ancora');
+  -- 064: il primo ordine confermato in attesa della mappa: lo sponsor sa solo sì/no, gli ordini restano privati
+  select pz.id into pq from public.partenze() pz where pz.nome = 'Nuovo Guida';   -- A lo vede da qui (non è ancora nella sua struttura)
+  perform growup_test.ok(not exists (select 1 from public.ordini_in_attesa()), '064: senza ordine confermato nessun nuovo in attesa');
+  execute 'reset role';
+  insert into public.ordini_personali (proprietario, stato, data, vp, confermato_il)
+    select id, 'confermato', current_date, 60, now() from public.partners where codice_amway = '8000001';
+  perform growup_test.come(u5);
+  perform growup_test.ok((select count(*) from public.ordini_in_attesa() oa where oa.id = pq) = 1,
+                         '064: A sa che il suo nuovo ha il primo ordine confermato in attesa della mappa');
+  perform growup_test.ok((select count(*) from public.ordini_in_attesa(pq)) = 1,
+                         '064: anche per la scheda del suo nuovo');
+  perform growup_test.ok(not exists (select 1 from public.ordini_personali o where o.proprietario = pq),
+                         '064: A non legge l''ordine del nuovo (né VP né prodotti)');
+  perform growup_test.ok((select pg_get_function_result('public.ordini_in_attesa(uuid)'::regprocedure)) = 'TABLE(id uuid)',
+                         '064: la funzione dà solo gli id');
+  perform growup_test.come(u4);  -- C, altra linea
+  perform growup_test.ok(not exists (select 1 from public.ordini_in_attesa()), '064: un''altra linea non vede i nuovi in attesa di A');
+  perform growup_test.deve_fallire(format('select * from public.ordini_in_attesa(%L)', pq),
+                                   '064: un''altra linea non chiede del nuovo di A');
+  perform growup_test.come(null);
+  perform growup_test.deve_fallire('select * from public.ordini_in_attesa()', '064: anon non chiede');
+  perform growup_test.come(u5);
   execute 'reset role';
   insert into public.activities (partner_id, tipo, vp, inserito_da)
     select id, 'ordine', 70, id from public.partners where codice_amway = '8000001';   -- un ordine vecchio: non conta
   insert into public.numeri_mese (partner_id, mese, vpp, vpg, dati_al)
     select id, date_trunc('month', current_date)::date, 30, 30, now() from public.partners where codice_amway = '8000001';
   perform growup_test.come(u5);
+  perform growup_test.ok(not exists (select 1 from public.ordini_in_attesa()), '064: quando la mappa mostra il primo ordine non è più in attesa');
   perform growup_test.ok((select pz.vp_dal_ingresso from public.partenze() pz where pz.nome = 'Nuovo Guida') = 30,
                          '063: il primo ordine del nuovo dalla prima mappa che ne mostra (30 VP), non dagli ordini scritti');
   insert into public.partenza_tolti (nuovo_id, fase) select pz.id, 2 from public.partenze() pz where pz.nome = 'Nuovo Guida';
