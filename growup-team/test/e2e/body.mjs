@@ -353,6 +353,11 @@ check(!(await page.locator("button[data-act=conferma]").count()), "nessuna confe
 check(await page.locator(".in-attesa li", { hasText:"Bea Verdi" }).isVisible() && !(await page.locator(".albero.struttura li", { hasText:"Bea Verdi" }).count()),
   "033: chi è appena entrato è «In attesa della mappa», fuori dalla struttura");
 await sync(page); await ctx.close();
+/* 12 novembre 2026: chi entra da avviato (qui senza data di iscrizione) trova il Seguimi acceso dopo «Da dove parti?».
+   I test che seguono guardano «Il mio giorno» senza Seguimi (il loro Seguimi lo accendono da sé): si riparte senza righe. */
+check(JSON.stringify((DB.seguimi || []).filter(x => x.partner_id === "R")) === JSON.stringify([{ partner_id:"R", attivo:true, condividi:false }]),
+  "avviato al primo ingresso (la radice, senza data di iscrizione): Seguimi acceso, «condividi» spento");
+DB.seguimi = []; DB.seguimiGiorni = [];
 DB.partners.find(p => p.nome === "Bea Verdi").confermato_il = new Date().toISOString();   // come dopo un import della mappa
 ({ ctx, page } = await apri({ colorScheme:"dark" }, "#chiave=" + "a".repeat(32)));
 await page.getByText("Ciao Stefano e Alessia").waitFor(); await apriTappa(page);
@@ -5308,6 +5313,88 @@ for(const tema of ["light", "dark"]){
   DB.persone = DB.persone.filter(x => !/^[cfk]82/.test(String(x.id)));
   DB.seguimiGiorni = DB.seguimiGiorni.filter(x => x.partner_id !== "R"); DB.seguimi = DB.seguimi.filter(x => x.partner_id !== "R");
   check(!errori.length, "motivi in «Da fare oggi»: nessun errore nella pagina");
+}
+
+// 83. Avviati (12 novembre 2026): Seguimi acceso da solo al primo ingresso, dopo «Da dove parti?», solo senza una riga in
+//     «seguimi»; «condividi» spento. Chi l'ha spento resta spento; il nuovo nel percorso come prima (Seguimi alla festa).
+//     Anteprima di Io di un avviato appena entrato a 360 px, chiaro e scuro.
+{
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), ora = new Date().toISOString();
+  const MSG = "Ogni mattina trovi le azioni del giorno in «Il mio giorno». Lo togli dal Profilo.";
+  const nuovo83 = (id, nome, k, extra) => DB.partners.push(Object.assign({ id, nome, sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:k.repeat(16),
+    codice_invito:id.toUpperCase() + "XX", codice_amway:"7983" + id.slice(-3), data_iscrizione:giorno(-200), privacy_accettata_il:ora, confermato_il:ora,
+    partenza_confermata_il:ora, creato_il:ora, conPercorso:true, senzaObiettivo:true }, extra || {}));
+  nuovo83("as83", "Alba Senzagruppo", "a3");
+  nuovo83("ag83", "Gilda Congruppo", "b3");
+  DB.partners.push({ id:"ag83u", nome:"Ugo Gilda", sponsor_id:"ag83", stato:"gestito", gestore_id:"ag83", codice_invito:"AG83UU", codice_amway:"7983901",
+    data_iscrizione:giorno(-500), creato_il:ora });
+  nuovo83("sp83", "Spina Spento", "c3");
+  nuovo83("nu83", "Nora Nuova", "d3", { data_iscrizione:giorno(-3) });
+  nuovo83("vc83", "Vito Vecchio", "e3", { privacy_accettata_il:"2026-01-01T00:00:00Z" });
+  DB.seguimi = (DB.seguimi || []).filter(x => !["as83", "ag83", "sp83", "nu83", "vc83"].includes(x.partner_id))
+    .concat([{ partner_id:"sp83", attivo:false, condividi:false }]);
+  const riga = id => JSON.stringify((DB.seguimi || []).filter(x => x.partner_id === id).map(x => ({ attivo:x.attivo, condividi:x.condividi })));
+  const entra83 = async (k, tema) => {
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema || "light" }, "#chiave=" + k.repeat(16)));
+    await perche(page);
+  };
+  // l'avviata senza gruppo, appena entrata
+  await entra83("a3");
+  await page.getByText("Ciao Alba").waitFor();
+  check(await page.locator("#toast .toast", { hasText:MSG }).isVisible(), "avviata senza gruppo: dopo «Da dove parti?» il messaggio del Seguimi");
+  check(await page.locator(".da-fare-oggi").count() === 1, "avviata senza gruppo: «Da fare oggi» in «Il mio giorno»");
+  check(!(await page.locator(".card.per-iniziare").count()) && !/punto con la tua upline|nomi nella tua Lista/i.test(await page.locator("#app").innerText()),
+    "avviata appena entrata: niente «Per iniziare», niente punto con l'upline, niente «Scrivi 30 nomi»");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "avviata appena entrata, 360 px: niente scroll orizzontale");
+  await page.screenshot({ path: S + "/e2e/83-io-avviato-light.png", fullPage:true });
+  await sync(page);
+  check(riga("as83") === JSON.stringify([{ attivo:true, condividi:false }]), "nel database: Seguimi acceso, «condividi» spento");
+  await page.click("button[data-act=vista-profilo]"); await page.locator(".guida-seguimi").waitFor();
+  check(await page.locator("button[data-act=seguimi-attivo]").getAttribute("aria-checked") === "true"
+    && await page.locator("button[data-act=seguimi-condividi]").getAttribute("aria-checked") === "false", "Profilo: Seguimi acceso (si toglie da qui), condividi spento");
+  check(!errori.length, "avviata appena entrata: nessun errore nella pagina");
+  await ctx.close();
+  // la stessa Io in tema scuro (si rientra: il Seguimi resta acceso, nessun messaggio)
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:"dark" }, "#chiave=" + "a3".repeat(16)));
+  await page.getByText("Ciao Alba").waitFor();
+  check(await page.locator(".da-fare-oggi").count() === 1 && !(await page.locator("#toast .toast", { hasText:MSG }).count()), "rientrando: Seguimi acceso, il messaggio non torna");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "avviata, tema scuro a 360 px: niente scroll orizzontale");
+  await page.screenshot({ path: S + "/e2e/83-io-avviato-dark.png", fullPage:true });
+  await ctx.close();
+  // l'avviata con un gruppo: Seguimi acceso e «Per iniziare · 1 di 2» (perché e mappa)
+  await entra83("b3");
+  await page.getByText("Ciao Gilda").waitFor();
+  check(await page.locator("#toast .toast", { hasText:MSG }).isVisible() && await page.locator(".da-fare-oggi").count() === 1, "avviata con gruppo: Seguimi acceso e il messaggio");
+  check((await page.locator(".card.per-iniziare .eyebrow").textContent()).trim() === "Per iniziare · 1 di 2"
+    && await page.locator(".card.per-iniziare li", { hasText:"Importa la tua mappa" }).count() === 1, "avviata con gruppo: «Per iniziare · 1 di 2» con la mappa");
+  await page.screenshot({ path: S + "/e2e/83-io-avviato-gruppo-light.png", fullPage:true });
+  await sync(page); await ctx.close();
+  check(riga("ag83") === JSON.stringify([{ attivo:true, condividi:false }]), "avviata con gruppo, nel database: Seguimi acceso, «condividi» spento");
+  // l'avviata che l'aveva spento: resta spento
+  await entra83("c3");
+  await page.getByText("Ciao Spina").waitFor();
+  check(await page.locator("#toast .toast", { hasText:"Obiettivo salvato" }).isVisible() && !(await page.locator("#toast .toast", { hasText:MSG }).count())
+    && !(await page.locator(".da-fare-oggi").count()), "avviata che l'ha spento: niente Seguimi, solo «Obiettivo salvato»");
+  await sync(page); await ctx.close();
+  check(riga("sp83") === JSON.stringify([{ attivo:false, condividi:false }]), "avviata che l'ha spento, nel database: resta spento");
+  // il nuovo nel percorso: come prima, niente Seguimi (si accende alla festa)
+  await entra83("d3");
+  await page.getByText("Ciao Nora").waitFor();
+  check(await page.locator(".card.percorso-partenza").isVisible() && !(await page.locator(".da-fare-oggi").count())
+    && !(await page.locator("#toast .toast", { hasText:MSG }).count()), "nuovo nel percorso: il percorso di partenza, niente Seguimi");
+  await sync(page); await ctx.close();
+  check(riga("nu83") === "[]", "nuovo nel percorso, nel database: nessuna riga del Seguimi");
+  // chi è nell'app da tempo e scrive il perché solo ora: non è il primo ingresso, niente Seguimi
+  await entra83("e3");
+  await page.getByText("Ciao Vito").waitFor();
+  check(!(await page.locator(".da-fare-oggi").count()) && !(await page.locator("#toast .toast", { hasText:MSG }).count()), "avviato nell'app da tempo senza perché: niente Seguimi");
+  await sync(page); await ctx.close();
+  check(riga("vc83") === "[]", "avviato nell'app da tempo, nel database: nessuna riga del Seguimi");
+  check(!errori.length, "Seguimi degli avviati: nessun errore nella pagina");
+  DB.seguimi = DB.seguimi.filter(x => !["as83", "ag83", "sp83", "nu83", "vc83"].includes(x.partner_id));
+  DB.seguimiGiorni = (DB.seguimiGiorni || []).filter(x => !["as83", "ag83"].includes(x.partner_id));
+  DB.obiettivi = DB.obiettivi.filter(o => !["as83", "ag83", "sp83", "nu83", "vc83"].includes(o.partner_id));
+  DB.partners = DB.partners.filter(p => !["as83", "ag83", "ag83u", "sp83", "nu83", "vc83"].includes(p.id));
 }
 
 await browser.close();

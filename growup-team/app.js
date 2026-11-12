@@ -307,7 +307,7 @@ function leggiLocale(k){ try{ return localStorage.getItem(LOCALE_PREFISSO + k); 
 function nomeSaluto(n){ n = String(n || "").trim(); return / e /i.test(n) ? n : n.split(" ")[0]; }
 
 let toastT = null, toastAnnulla = null;
-function toast(msg, annulla){
+function toast(msg, annulla, ms){
   const t = document.getElementById("toast");
   clearTimeout(toastT);
   toastAnnulla = annulla || null;
@@ -315,7 +315,7 @@ function toast(msg, annulla){
   const el = t.firstElementChild;
   anima(el, [{ opacity:0, transform:"translate(-50%, 18px)" }, { opacity:1, transform:"translate(-50%, 0)" }], VIVACE);
   toastT = setTimeout(() => { anima(el, [{ opacity:1 }, { opacity:0 }], { dur:180 }).then(() => { if(t.firstElementChild === el){ t.innerHTML = ""; toastAnnulla = null; } }); },
-    annulla ? 5000 : 3000);
+    annulla ? 5000 : ms || 3000);
 }
 
 const MESSAGGI_ERRORE = {
@@ -1774,9 +1774,12 @@ function campiObiettivo(o, primo){
 /* «Da dove parti?» (consegna 6): il perché per tutti, blocco vero. Senza obiettivo con il suo perché le altre pagine
    non si aprono; chi è già nell'app senza perché la vede una volta. Sotto, per chi è appena entrato, il link da salvare. */
 function senzaPerche(){ return !st.obiettivo || !String(st.obiettivo.perche || "").trim(); }
+/* il primo ingresso: privacy accettata negli ultimi 7 giorni (l'ingresso con l'invito, o la privacy per chi è stato aggiunto
+   a mano). Chi è nell'app da tempo e vede «Da dove parti?» solo perché manca il perché non è al primo ingresso. */
+function primoIngresso(){ const pr = st.profilo && st.profilo.privacy_accettata_il; return !!pr && giorniTra(String(pr).slice(0, 10), oggi()) <= 7; }
 function vObiettivoPrimo(){
-  /* subito dopo il passo 1 (l'ingresso con l'invito, o la privacy per chi è stato aggiunto a mano): «Passo 2 di 2» */
-  const pr = st.profilo && st.profilo.privacy_accettata_il, dopoPasso1 = !!pr && giorniTra(String(pr).slice(0, 10), oggi()) <= 7;
+  /* subito dopo il passo 1: «Passo 2 di 2» */
+  const dopoPasso1 = primoIngresso();
   return `<div>
     ${marchio()}
     ${dopoPasso1 ? `<div class="spread passo-ingresso" style="margin-top:12px"><span class="eyebrow">Passo 2 di 2</span>
@@ -4197,9 +4200,11 @@ const MODULI = {
       await api.salvaObiettivo(o);
       st.obiettivo = { cifra_mese:cifra, entro:o.entro, perche:o.perche };
       const primo = st.fase === "obiettivo_primo";
+      const seguimi = primo && await seguimiAlPrimoIngresso();
       if(primo){ st.fase = "home"; setTimeout(riconosciPlatino, 0); }
       st.sheet = null; st.vista = primo ? "io" : "obiettivo"; if(primo) st.sezIo = "giorno"; render(); window.scrollTo(0, 0);
-      toast("Obiettivo salvato");
+      if(seguimi) toast("Ogni mattina trovi le azioni del giorno in «Il mio giorno». Lo togli dal Profilo.", null, 6000);
+      else toast("Obiettivo salvato");
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
   async "privacy-primo"(f){
@@ -7392,6 +7397,19 @@ function vSeguimiScheda(p){
       </tbody></table></div>
     <p class="nota">Questa settimana. Solo i numeri: i nomi della sua Lista e dei suoi clienti restano suoi.</p>
   </div>`;
+}
+/* 12 novembre 2026 (scelta di Stefano): l'avviato, al primo ingresso, dopo «Da dove parti?» trova il Seguimi già acceso,
+   ma solo se non ha mai avuto una riga in «seguimi» (mai acceso né spento: chi l'ha spento resta spento). «Condividi»
+   resta spento. Si guarda il database in quel momento; se la lettura non riesce, non si accende niente. I nuovi lo
+   trovano acceso alla festa della partenza, come prima. */
+async function seguimiAlPrimoIngresso(){
+  if(!avviato() || !primoIngresso()) return false;
+  try{
+    if(((await api.seguimi()) || []).length) return false;
+    const r = { attivo:true, condividi:false };
+    await api.salvaSeguimi(r); st.seguimi = r; await preparaOggi();
+    return true;
+  }catch(e){ return false; }
 }
 Object.assign(AZIONI, {
   async "seguimi-attivo"(){

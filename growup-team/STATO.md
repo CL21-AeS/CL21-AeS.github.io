@@ -3,7 +3,7 @@
 Ultimo aggiornamento: 12 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
-## Avviati: meno cose all'inizio (12 novembre 2026, database non toccato)
+## Avviati: meno cose all'inizio e il Seguimi acceso (12 novembre 2026, app v117, database non toccato)
 
 Tre PR in fila, da unire in ordine; la versione del service worker sale una volta sola, nell'ultima. Solo per gli **avviati**
 (iscritti da più di 30 giorni, `avviato()`): il **percorso di partenza dei nuovi non cambia**.
@@ -24,6 +24,19 @@ Tre PR in fila, da unire in ordine; la versione del service worker sale una volt
    la voce sparisce anche per chi l'ha già finito (che i 30 nomi li ha scritti nella fase 2). Test dell'interfaccia:
    1126 controlli superati (sezione 46: niente voce dei 30 nomi, sparisce con tutto fatto e 0 nomi, la × con un avviato
    che ha un gruppo; sezione 13: dopo l'installazione i Primi passi sono tutti fatti e spariscono).
+3. **Seguimi acceso da solo per gli avviati al primo ingresso** (scelta di Stefano): subito dopo «Da dove parti?», se è
+   avviato, è al **primo ingresso** (privacy accettata negli ultimi 7 giorni, lo stesso criterio di «Passo 2 di 2»:
+   `primoIngresso`) e **non ha mai avuto una riga in «seguimi»** (letta dal database in quel momento; se la lettura non
+   riesce non si accende niente), l'app accende il Seguimi con «condividi» spento (`seguimiAlPrimoIngresso`) e mostra
+   per 6 secondi «Ogni mattina trovi le azioni del giorno in «Il mio giorno». Lo togli dal Profilo.» al posto di
+   «Obiettivo salvato» (`toast` ha ora la durata facoltativa). Chi l'ha spento resta spento; chi è nell'app da tempo e
+   scrive il perché solo ora non è al primo ingresso; i nuovi come prima (il Seguimi si accende alla festa della
+   partenza). Nessuna regola nuova: la riga la scrive il partner sulla propria riga, come dall'interruttore del Profilo.
+   Da sapere: per un avviato appena entrato, con la Lista vuota, «Da fare oggi» propone la formazione e la chiamata con
+   lo sponsor della settimana (le abitudini del Seguimi, come prima). Test dell'interfaccia: 1146 controlli superati
+   (sezione 83: avviato senza gruppo, avviato con gruppo, avviato che l'aveva spento, nuovo nel percorso, avviato
+   nell'app da tempo; Io a 360 px in chiaro e scuro, screenshot `e2e/83-io-avviato-light.png` e `-dark.png`; sezione 7:
+   la radice di prova, senza data di iscrizione, trova il Seguimi acceso). Service worker v117.
 
 ## Da quanto è nella Lista: data e giorni (11 novembre 2026, sera, app v116, database non toccato)
 
