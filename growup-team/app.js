@@ -1513,12 +1513,12 @@ function vHome(){
   return `
   <div class="testata">
     <div>${marchio()}<h1>${st.vista === "scheda" ? "Scheda partner" : gruppo ? "Il mio gruppo" : `Ciao ${esc(nomeSaluto(p.nome))}`}</h1>
-      ${st.vista === "gruppo" ? `<p class="small" style="margin:0"><span>${persone === 1 ? "1 persona" : `${num(persone)} persone`}</span>
+      ${st.vista === "gruppo" && !gruppoSemplice() ? `<p class="small" style="margin:0"><span>${persone === 1 ? "1 persona" : `${num(persone)} persone`}</span>
         · <span class="mappa-gruppo">VP: ${esc(testoMappa(meseDi(oggi())))}</span></p>` : ""}</div>
     ${omino()}
   </div>
   ${vBarraFissa()}
-  ${st.vista === "scheda" ? vScheda() : gruppo ? `
+  ${st.vista === "scheda" ? vScheda() : gruppo && gruppoSemplice() ? vGruppoSemplice() : gruppo ? `
   ${vNuoviInPartenza()}
   ${vPreferiti()}
   ${vStruttura()}
@@ -3250,6 +3250,15 @@ function rigaInvito(x){
   return `<li><span class="grow"><b>${esc(x.nome)}</b><br><span class="small">${esc(x.codice_amway)} · ${esc(statoInvitoPersonale(x))}</span></span>
     ${x.usato_il ? "" : `<button class="btn small" data-act="rigenera-invito" data-id="${esc(x.id)}">Nuovo link</button>`}
     ${aperto ? `<button class="btn small ghost" data-act="annulla-invito" data-id="${esc(x.id)}">Annulla</button>` : ""}</li>`;
+}
+/* ---- Versione semplificata (punto 3): nel Gruppo restano «Invita» e una frase; struttura, preferiti, in attesa e storico
+   del gruppo non si vedono. Con almeno un partner sotto (nella mappa, in attesa della mappa o un suo nuovo in partenza) il
+   Gruppo si vede intero. ---- */
+function haPartnerSotto(){ return figli(st.profilo.id).length > 0 || (st.inAttesa || []).length > 0 || (st.partenze || []).length > 0; }
+function gruppoSemplice(){ return versioneSemplice() && !haPartnerSotto(); }
+function vGruppoSemplice(){
+  return `<div class="card tight gruppo-semplice"><p style="margin:0">Qui vedrai le persone che inviterai.</p></div>
+  ${vInvita()}`;
 }
 function vInvita(){
   const miei = st.invitiMiei || [];

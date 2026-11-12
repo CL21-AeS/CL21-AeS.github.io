@@ -27,6 +27,12 @@ apre comunque.
    Prossima qualifica e report da importare non riguardano chi inizia: non si vedono. **Persone non cambia**: Lista,
    Clienti e Target come per tutti. Test dell'interfaccia: 1197 controlli superati (sezione 84; anteprima
    `e2e/84-obiettivo-semplice-light.png` e `-dark.png`).
+3. **Gruppo**: restano **«Invita»** (con i suoi inviti e le immagini, come prima) e la frase **«Qui vedrai le persone che
+   inviterai.»** (`vGruppoSemplice`); non si vedono struttura, preferiti, in attesa, nuovi in partenza, storico del gruppo
+   e, sotto il titolo, «N persone · VP: mappa…». Con **almeno un partner sotto** il Gruppo si vede intero
+   (`haPartnerSotto`, scelta di Stefano: un partner sotto di lui nella mappa, un invitato entrato nell'app ma in attesa
+   della mappa, oppure un suo nuovo in partenza). Test dell'interfaccia: 1209 controlli superati (sezione 84: anche nuovo
+   con un partner nella mappa e con un invitato in attesa; anteprima `e2e/84-gruppo-semplice-light.png` e `-dark.png`).
 
 ## Avviati: meno cose all'inizio e il Seguimi acceso (12 novembre 2026, app v117, database non toccato)
 
