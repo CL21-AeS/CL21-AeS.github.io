@@ -5402,6 +5402,8 @@ for(const tema of ["light", "dark"]){
 //     admin, avviati, partenza completata e chi è oltre i 30 giorni vedono tutto. Si nasconde e basta.
 //     Punto 1, Io: restano percorso, «La prossima cosa», la lista di oggi e la serie; niente Verifica, niente Storico in
 //     «Il mio mese», niente promemoria dell'import.
+//     Punto 2, Obiettivo: restano l'obiettivo, la riga della tappa che vale la cifra e «La prossima tappa»; il percorso
+//     fino a Diamante e «Come arrivarci» dietro «Vedi tutto il percorso». Persone non cambia.
 {
   const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), ora = new Date().toISOString();
   const quando = n => new Date(Date.now() + n * 864e5).toISOString();
@@ -5442,12 +5444,40 @@ for(const tema of ["light", "dark"]){
     check(await page.locator("button[data-act=storico]").isVisible(), chi + ": «Il mio mese» con lo Storico");
     if(percorso != null) check(await page.locator(".card.percorso-partenza").count() === (percorso ? 1 : 0), chi + (percorso ? ": il percorso resta in cima" : ": niente percorso"));
   };
+  const DIAMANTE = "Il tuo percorso fino a Diamante";
+  const obiettivoSemplice = async (chi, foto) => {
+    await page.click("button[data-act=vista-obiettivo]"); await page.locator(".card.visione").waitFor();
+    check(await page.locator(".card.tappa-cifra", { hasText:"La tappa che vale la tua cifra" }).isVisible()
+      && await page.locator(".card.tappa-cifra .nota").isVisible(), chi + ", Obiettivo: la riga della tappa che vale la cifra, con la nota delle cifre");
+    const pt = page.locator(".card.prossima-tappa");
+    check(await pt.isVisible() && (await pt.locator("h2").innerText()).trim() === "Primo ordine" && await pt.locator(".req li").count() >= 1,
+      chi + ", Obiettivo: «La prossima tappa» con i requisiti (" + (await pt.locator("h2").count() ? await pt.locator("h2").innerText() : "–") + ")");
+    check(!(await page.getByText(DIAMANTE).count()) && !(await page.locator("details.consigli").count()), chi + ", Obiettivo: percorso fino a Diamante e «Come arrivarci» non in vista");
+    const vt = page.locator("button[data-act=percorso-tutto]");
+    check(await vt.getAttribute("aria-expanded") === "false" && (await vt.innerText()).includes("Vedi tutto il percorso"), chi + ", Obiettivo: «Vedi tutto il percorso» chiuso");
+    if(foto) await foto84(foto);
+    await vt.click();
+    check(await page.getByText(DIAMANTE).isVisible() && await page.locator("details.consigli").count() === 1
+      && await vt.getAttribute("aria-expanded") === "true", chi + ", Obiettivo: «Vedi tutto il percorso» apre il percorso fino a Diamante e «Come arrivarci»");
+    await vt.click();
+    check(!(await page.getByText(DIAMANTE).count()), chi + ", Obiettivo: si richiude");
+    await page.click("button[data-act=vista-persone]"); await page.locator("button[data-act=sez-persone][data-sez=target]").waitFor();
+    check(await page.locator("button[data-act=sez-persone]").count() === 3, chi + ", Persone: Lista, Clienti e Target come per tutti");
+    await page.click("button[data-act=vista-io]");
+  };
+  const obiettivoIntero = async chi => {
+    await page.click("button[data-act=vista-obiettivo]"); await page.locator(".card.visione").waitFor();
+    check(await page.getByText(DIAMANTE).isVisible() && !(await page.locator("button[data-act=percorso-tutto]").count())
+      && !(await page.locator(".card.prossima-tappa").count()), chi + ", Obiettivo: tutto il percorso in vista, come prima");
+    await page.click("button[data-act=vista-io]");
+  };
   // il nuovo con «Inizio»: Io semplificata, a 360 px in chiaro e scuro
   for(const tema of ["light", "dark"]){
     await entra84("a4", "Ivo", { colorScheme:tema });
     await ioSemplice("nuovo «Inizio» (" + tema + ")");
     check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Io semplificata a 360 px (${tema}): niente scroll orizzontale`);
     await foto84(`io-semplice-${tema}`);
+    await obiettivoSemplice("nuovo «Inizio» (" + tema + ")", `obiettivo-semplice-${tema}`);
     await ctx.close();
   }
   // il nuovo con un partner sotto: Io resta semplificata (anche senza il promemoria dell'import, che altrimenti vedrebbe)
@@ -5457,20 +5487,23 @@ for(const tema of ["light", "dark"]){
   // dopo 30 giorni con il percorso non finito: l'app tutta, il percorso ancora in cima
   await entra84("c4", "Teo");
   await ioIntera("nuovo dopo 30 giorni", true);
+  await obiettivoIntero("nuovo dopo 30 giorni");
   const primaCard = await page.evaluate(() => [...document.querySelectorAll("#app .card")].find(c => !c.classList.contains("domanda-notifiche")).className);
   check(/percorso-partenza/.test(primaCard), "nuovo dopo 30 giorni: il percorso è il primo riquadro di Io (" + primaCard + ")");
   await ctx.close();
   // partenza completata, avviato, admin: tutto come prima
-  await entra84("d4", "Cora"); await ioIntera("partenza completata", false); await ctx.close();
-  await entra84("e4", "Alvise"); await ioIntera("avviato", false); await ctx.close();
+  await entra84("d4", "Cora"); await ioIntera("partenza completata", false); await obiettivoIntero("partenza completata"); await ctx.close();
+  await entra84("e4", "Alvise"); await ioIntera("avviato", false); await obiettivoIntero("avviato"); await ctx.close();
   const R84 = DB.partners.find(p => p.id === "R");
   if(!R84.privacy_accettata_il) R84.privacy_accettata_il = ora;   // solo se la sezione gira da sola
   ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "a".repeat(32)));
   await page.locator("button[data-act=sez-io]").first().waitFor();
   if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
   await ioIntera("admin");
+  await page.click("button[data-act=vista-obiettivo]"); await page.locator(".card.visione, button[data-act=obiettivo-modifica]").first().waitFor();
+  check(!(await page.locator("button[data-act=percorso-tutto]").count()) && !(await page.locator(".card.prossima-tappa").count()), "admin, Obiettivo: come prima");
   await ctx.close();
-  check(!errori.length, "versione semplificata, Io: nessun errore nella pagina");
+  check(!errori.length, "versione semplificata, Io e Obiettivo: nessun errore nella pagina");
   DB.numeri = DB.numeri.filter(x => !["ig84", "ig84u"].includes(x.partner_id));
   DB.obiettivi = DB.obiettivi.filter(o => !ID84.includes(o.partner_id));
   DB.partners = DB.partners.filter(p => !ID84.includes(p.id));
