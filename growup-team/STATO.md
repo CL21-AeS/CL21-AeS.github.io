@@ -3,7 +3,7 @@
 Ultimo aggiornamento: 12 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
-## Condivisione, primo ordine in attesa, avvisi allo sponsor, qualifica (13 novembre 2026, migrazioni 064 e 065, in corso)
+## Condivisione, primo ordine in attesa, avvisi allo sponsor, qualifica (13 novembre 2026, migrazioni 064 e 065, app v120)
 
 Quattro PR in fila, da unire in ordine (una per punto); la versione del service worker sale una volta sola, nell'ultima.
 Scelte di Stefano.
@@ -66,6 +66,21 @@ Scelte di Stefano.
    di 1 ms. Controlli 065 in `tests_rls.sql` (fasi 2, 3 e 4, una volta sola, testi senza nomi né codice, indirizzo, nuovo
    sponsor, partenza finita, non nuovo, funzioni chiuse ai telefoni, nessun avviso per riga dalla mappa). Test
    dell'interfaccia: sezione 88 (tocco con app chiusa, con app aperta, persona in attesa, persona non visibile).
+4. **L'etichetta della qualifica** (database non toccato): dove si dichiara la qualifica (`campiQualifica`: ingresso con
+   l'invito e «Il mio punto di partenza») l'etichetta è **«La tua qualifica attuale»** e sotto una riga piccola:
+   «Percentuale: del mese scorso. Da Platino in su: dell'ultimo anno fiscale (settembre–agosto).»
+   La proposta iniziale («Il livello più alto che hai raggiunto») cambiava il significato del campo: Stefano ha scelto che
+   il **significato resti «oggi»**, come deciso il 22 ottobre (l'app usa il valore come punto di partenza di oggi). A 360
+   px l'etichetta sta su una riga e la riga piccola (12 px) su due, con «(settembre–agosto)» intero (scelta di Stefano:
+   la frase ridotta, perché quella lunga andava su tre righe). Il resto del campo non cambia. Test dell'interfaccia: sezione 89 (anteprima
+   `e2e/89-qualifica-light.png` e `-dark.png`), sezione dell'ingresso aggiornata.
+5. Service worker **v120**, questo STATO.md.
+**Migrazioni 064 e 065 applicate su Supabase da Claude il 13 novembre**, prima di unire le PR. Prima di applicare la 065
+si è controllato che `importa_mappa` e `salva_mese_passato` sul progetto fossero le stesse del repository (stesso codice:
+sul progetto mancano solo i commenti); dopo, impronte del codice, permessi (le funzioni interne non si chiamano dal
+telefono) e trigger attivi uguali al repository. Gli avvisi di sicurezza di Supabase: niente di nuovo (solo il solito
+«eseguibile da authenticated» per le funzioni che l'app chiama, `ordini_in_attesa`, `importa_mappa`, `salva_mese_passato`,
+che controllano dentro chi le chiama).
 
 ## «La prossima cosa» dal percorso: sempre quello che manca (13 novembre 2026, app v119, database non toccato)
 

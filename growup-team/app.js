@@ -1257,7 +1257,8 @@ function vChiaveErrata(){
   </div>`;
 }
 
-/* "La tua qualifica oggi": Inizio, i pin (3%…21%) e le qualifiche Bronze/Argento.
+/* "La tua qualifica attuale" (13 novembre 2026; il significato resta «oggi», come deciso il 22 ottobre): Inizio, i pin
+   (3%…21%) e le qualifiche Bronze/Argento. Sotto, quale percentuale e quale qualifica dichiarare.
    Primo ordine e primi clienti sono tappe del percorso, non qualifiche: non si dichiarano. */
 function campiQualifica(obbligoData, scelta){
   scelta = scelta || {};
@@ -1267,10 +1268,11 @@ function campiQualifica(obbligoData, scelta){
   const pin = PIN.map(n => `<option value="pin:${n}"${sel("pin:" + n)}>${n}%</option>`).join("");
   const tappa = st.stages.find(s => s.chiave === scelta.valore);
   return `
-      <label class="field"><span>La tua qualifica oggi</span>
+      <label class="field"><span>La tua qualifica attuale</span>
         <select name="qualifica"><option value=""${sel("")}>Inizio (nessuna qualifica)</option>
           <optgroup label="Percentuale raggiunta">${pin}</optgroup>
-          <optgroup label="Qualifiche">${qual}</optgroup></select></label>
+          <optgroup label="Qualifiche">${qual}</optgroup></select>
+        <span class="nota-qualifica">Percentuale: del mese scorso. Da Platino in su: dell'ultimo anno fiscale <span class="nowrap">(settembre–agosto).</span></span></label>
       <div data-mostra="prossima" ${daPlatino(scelta.valore) ? "" : "hidden"}>
         <label class="field"><span>Prossima qualifica che vuoi ottenere</span>
           <select name="prossima">${opzioniProssima(scelta.valore, scelta.prossima)}</select></label>

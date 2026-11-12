@@ -11,7 +11,8 @@
 -- * Toccando la notifica si apre la scheda della persona: l'indirizzo è «./?partner=<id interno>» (mai nome o codice
 --   Amway). Vale anche per gli avvisi che c'erano già («è entrata in Growup», «è ora al suo posto nella mappa»).
 -- Solo aggiunte: funzioni, trigger e un indice nuovi; importa_mappa e salva_mese_passato sono quelle di prima (052 e 033)
--- con una riga in più alla fine. Nessuna tabella nuova, nessun dato cancellato o cambiato, nessun drop.
+-- con una riga in più alla fine. Nessuna tabella nuova, nessun dato cancellato o cambiato, nessun oggetto esistente tolto
+-- (i «drop trigger if exists» riguardano solo i trigger nuovi e servono a poterla rilanciare).
 -- ============================================================
 
 -- ---- Chi è un nuovo nel percorso di partenza (come percorsoAttivo() nell'app) ----
