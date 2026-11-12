@@ -5397,6 +5397,85 @@ for(const tema of ["light", "dark"]){
   DB.partners = DB.partners.filter(p => !["as83", "ag83", "ag83u", "sp83", "nu83", "vc83"].includes(p.id));
 }
 
+// 84. Versione semplificata per chi inizia (12 novembre 2026): UNA regola (versioneSemplice) usata da tutte le pagine.
+//     Attiva con il percorso di partenza attivo, nei primi 30 giorni dal primo ingresso e con «Mostra tutta l'app» spento;
+//     admin, avviati, partenza completata e chi è oltre i 30 giorni vedono tutto. Si nasconde e basta.
+//     Punto 1, Io: restano percorso, «La prossima cosa», la lista di oggi e la serie; niente Verifica, niente Storico in
+//     «Il mio mese», niente promemoria dell'import.
+{
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), ora = new Date().toISOString();
+  const quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const ID84 = ["in84", "ig84", "ig84u", "tr84", "co84", "av84", "pc84"];
+  const p84 = (id, nome, k, extra) => DB.partners.push(Object.assign({ id, nome, sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:k.repeat(16),
+    codice_invito:id.toUpperCase() + "XX", codice_amway:"79840" + (ID84.indexOf(id) + 10), data_iscrizione:giorno(-3), privacy_accettata_il:ora,
+    confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true }, extra || {}));
+  p84("in84", "Ivo Inizio", "a4");                                                      // nuovo, «Inizio»
+  p84("ig84", "Ida Gruppo", "b4");                                                      // nuovo con un partner sotto e la mappa importata 8 giorni fa
+  DB.partners.push({ id:"ig84u", nome:"Ugo Ida", sponsor_id:"ig84", stato:"gestito", gestore_id:"ig84", codice_invito:"IG84UU", codice_amway:"7984901",
+    data_iscrizione:giorno(-500), creato_il:ora });
+  mappa("ig84", 60, 160, { visto_da:"ig84", dati_al:quando(-8) });
+  mappa("ig84u", 100, 100, { visto_da:"ig84", dati_al:quando(-8) });
+  p84("tr84", "Teo Trenta", "c4", { data_iscrizione:giorno(-40), privacy_accettata_il:quando(-35), creato_il:quando(-35) });   // percorso non finito, 35 giorni
+  p84("co84", "Cora Completa", "d4", { data_iscrizione:giorno(-10), privacy_accettata_il:quando(-5), partenza_completata_il:quando(-1) });
+  p84("av84", "Alvise Avviato", "e4", { data_iscrizione:giorno(-200) });
+  const entra84 = async (k, nome, opz) => {
+    ({ ctx, page } = await apri(Object.assign({ viewport:{ width:360, height:780 } }, opz || {}), "#chiave=" + k.repeat(16)));
+    await page.getByText("Ciao " + nome).waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  };
+  /* anteprima a pagina intera: i pulsanti fissi in basso vanno in fondo alla pagina, così non coprono niente */
+  const foto84 = async nome => { await page.evaluate(() => { window.scrollTo(0, 0); document.querySelectorAll(".azioni").forEach(e => e.style.position = "static"); });
+    await page.screenshot({ path: S + `/e2e/84-${nome}.png`, fullPage:true });
+    await page.evaluate(() => document.querySelectorAll(".azioni").forEach(e => e.style.position = "")); };
+  const ioSemplice = async chi => {
+    check(!(await page.locator(".sezioni-io").count()) && !(await page.locator("button[data-act=sez-io][data-sez=guida]").count()), chi + ": niente linguetta Verifica");
+    check(await page.locator(".card.percorso-partenza").isVisible(), chi + ": il riquadro del percorso di partenza");
+    check(await page.locator(".card .eyebrow", { hasText:"La prossima cosa" }).count() === 1, chi + ": «La prossima cosa»");
+    check(await page.locator(".card.serie").isVisible(), chi + ": la serie");
+    check(!(await page.locator(".promemoria-import").count()), chi + ": niente promemoria dell'import");
+    await apriMese(page);
+    check(await page.locator(".mio-mese .blocco-numeri").isVisible() && !(await page.locator("button[data-act=storico]").count()), chi + ": «Il mio mese» senza Storico");
+  };
+  const ioIntera = async (chi, percorso) => {
+    check(await page.locator("button[data-act=sez-io][data-sez=guida]").isVisible(), chi + ": la linguetta Verifica c'è");
+    await apriMese(page);
+    check(await page.locator("button[data-act=storico]").isVisible(), chi + ": «Il mio mese» con lo Storico");
+    if(percorso != null) check(await page.locator(".card.percorso-partenza").count() === (percorso ? 1 : 0), chi + (percorso ? ": il percorso resta in cima" : ": niente percorso"));
+  };
+  // il nuovo con «Inizio»: Io semplificata, a 360 px in chiaro e scuro
+  for(const tema of ["light", "dark"]){
+    await entra84("a4", "Ivo", { colorScheme:tema });
+    await ioSemplice("nuovo «Inizio» (" + tema + ")");
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Io semplificata a 360 px (${tema}): niente scroll orizzontale`);
+    await foto84(`io-semplice-${tema}`);
+    await ctx.close();
+  }
+  // il nuovo con un partner sotto: Io resta semplificata (anche senza il promemoria dell'import, che altrimenti vedrebbe)
+  await entra84("b4", "Ida");
+  await ioSemplice("nuovo con un partner sotto");
+  await ctx.close();
+  // dopo 30 giorni con il percorso non finito: l'app tutta, il percorso ancora in cima
+  await entra84("c4", "Teo");
+  await ioIntera("nuovo dopo 30 giorni", true);
+  const primaCard = await page.evaluate(() => [...document.querySelectorAll("#app .card")].find(c => !c.classList.contains("domanda-notifiche")).className);
+  check(/percorso-partenza/.test(primaCard), "nuovo dopo 30 giorni: il percorso è il primo riquadro di Io (" + primaCard + ")");
+  await ctx.close();
+  // partenza completata, avviato, admin: tutto come prima
+  await entra84("d4", "Cora"); await ioIntera("partenza completata", false); await ctx.close();
+  await entra84("e4", "Alvise"); await ioIntera("avviato", false); await ctx.close();
+  const R84 = DB.partners.find(p => p.id === "R");
+  if(!R84.privacy_accettata_il) R84.privacy_accettata_il = ora;   // solo se la sezione gira da sola
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "a".repeat(32)));
+  await page.locator("button[data-act=sez-io]").first().waitFor();
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  await ioIntera("admin");
+  await ctx.close();
+  check(!errori.length, "versione semplificata, Io: nessun errore nella pagina");
+  DB.numeri = DB.numeri.filter(x => !["ig84", "ig84u"].includes(x.partner_id));
+  DB.obiettivi = DB.obiettivi.filter(o => !ID84.includes(o.partner_id));
+  DB.partners = DB.partners.filter(p => !ID84.includes(p.id));
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

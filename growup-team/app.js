@@ -1400,7 +1400,8 @@ function vPrivacyPrimo(){
 /* La barra in alto resta fissa scorrendo: le pagine principali e, sotto, i pulsanti della sezione
    (Il mio giorno · Verifica in Io; Lista · Clienti · Target in Persone). Il titolo con il nome scorre via. */
 function vBarraFissa(){
-  const sez = st.vista === "io" ? vSezioniIo() : st.vista === "persone" && (st.sezPersone === "target" ? !st.invitoId : !st.personaId) ? vSezioniPersone() : "";
+  /* versione semplificata: la linguetta Verifica non c'è (se ci si arriva lo stesso, le linguette tornano per uscirne) */
+  const sez = st.vista === "io" ? (versioneSemplice() && st.sezIo !== "guida" ? "" : vSezioniIo()) : st.vista === "persone" && (st.sezPersone === "target" ? !st.invitoId : !st.personaId) ? vSezioniPersone() : "";
   return `<div class="barra-fissa">${vSelettore()}${sez}</div>`;
 }
 function vSelettore(){
@@ -2142,6 +2143,23 @@ function percorsoAttivo(){
   const ingresso = String(p.privacy_accettata_il || p.creato_il || oggi()).slice(0, 10);
   return giorniTra(String(p.data_iscrizione).slice(0, 10), ingresso) <= GIORNI_NUOVO;
 }
+/* ---- Versione semplificata per chi inizia (12 novembre 2026). UNA sola regola, usata da tutte le pagine: è attiva quando
+   il percorso di partenza è attivo, non sono passati 30 giorni dal primo ingresso (privacy_accettata_il, altrimenti
+   creato_il) e l'interruttore «Mostra tutta l'app» del Profilo è spento. Gli admin vedono sempre tutto; gli avviati non
+   sono mai in percorso. Si nasconde e basta: niente lucchetti, nessun dato cambiato, niente nel database (l'interruttore
+   è una preferenza di questo telefono). Dopo i 30 giorni l'app si apre tutta anche col percorso non finito. ---- */
+const GIORNI_SEMPLICE = 30;
+const chiaveTuttaApp = () => "growup-team.tutta-app." + st.profilo.id;
+function giorniDaIngresso(){ const p = st.profilo;
+  return giorniTra(String(p.privacy_accettata_il || p.creato_il || oggi()).slice(0, 10), oggi()); }
+/* nei primi 30 giorni del percorso (senza guardare l'interruttore) */
+function inPartenzaSemplice(){ const p = st.profilo; return !!p && !p.is_admin && percorsoAttivo() && giorniDaIngresso() < GIORNI_SEMPLICE; }
+/* l'interruttore c'è solo per chi all'ingresso ha dichiarato almeno il 3% (una percentuale o una qualifica): chi ha scelto
+   «Inizio» non lo vede, e per lui una preferenza rimasta sul telefono non conta */
+function puoMostrareTutto(){ const p = st.profilo;
+  return inPartenzaSemplice() && ((!!p.qualifica_iniziale && !TAPPE_DI_PERCORSO.includes(p.qualifica_iniziale)) || Number(p.percentuale_iniziale) >= 3); }
+function tuttaAppAccesa(){ return puoMostrareTutto() && leggiLocale(chiaveTuttaApp()) === "1"; }
+function versioneSemplice(){ return inPartenzaSemplice() && !tuttaAppAccesa(); }
 /* le attività di sempre (fino a un anno), senza doppioni */
 function attivitaTutte(tipo){ const v = new Map(); (st.attSerie || []).concat(st.att || []).forEach(a => { if(a.tipo === tipo) v.set(a.id || JSON.stringify(a), a); });
   return [...v.values()].sort((a, b) => a.data < b.data ? -1 : 1); }
@@ -2290,7 +2308,7 @@ function vMioMese(){
     <button class="riga-apri prima" data-act="apri-mese" aria-expanded="${aperto}"><span class="grow"><span class="eyebrow">Il mio mese</span>
       <span class="small">${esc(nomeMese(m).replace(/^./, x => x.toUpperCase()))} · ${riassunto}</span></span><span class="fr" aria-hidden="true">${aperto ? "▴" : "▾"}</span></button>
     ${aperto ? `<div class="blocco-numeri">
-      <div class="row" style="gap:6px;justify-content:flex-end"><button class="btn small ghost" data-act="storico">Storico</button>
+      <div class="row" style="gap:6px;justify-content:flex-end">${versioneSemplice() ? "" : `<button class="btn small ghost" data-act="storico">Storico</button>`}
         <button class="btn small ghost" data-act="obiettivo-mese">Obiettivo</button></div>
       ${barraVp(m)}
       ${rigaVp(m)}
@@ -2408,6 +2426,7 @@ function vSerie(){
 /* Il promemoria dell'import (solo per chi ha un gruppo e ha già importato): l'ultimo report ha più di 7 giorni */
 const GIORNI_PROMEMORIA_IMPORT = 7;
 function vPromemoriaImport(){
+  if(versioneSemplice()) return "";
   const io = st.profilo.id, righe = [...(st.mioReport || new Map()).values()];
   if(!figli(io).length || !righe.some(r => r.importato_da === io)) return "";
   const ultimo = righe.map(r => String(r.dati_al || "")).sort().pop();

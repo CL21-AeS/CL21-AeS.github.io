@@ -3,6 +3,24 @@
 Ultimo aggiornamento: 12 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Versione semplificata per chi inizia (12 novembre 2026, database non toccato)
+
+Quattro PR in fila, da unire in ordine (una per punto); la versione del service worker sale una volta sola, nell'ultima.
+Scelte di Stefano. **Si nasconde e basta**: niente lucchetti, nessun dato cancellato o cambiato, nessuna modifica al database.
+**La regola, in una sola funzione** (`versioneSemplice()`, usata da tutte le pagine): è attiva quando il percorso di partenza
+è attivo (`percorsoAttivo()`), **non sono passati 30 giorni dal primo ingresso** (`privacy_accettata_il`, altrimenti
+`creato_il`: giorni 0-29, `GIORNI_SEMPLICE`) e l'interruttore «Mostra tutta l'app» è spento. Gli **admin** vedono sempre
+tutto; gli **avviati** non sono mai in percorso, quindi non cambiano; chi non è in partenza non vede nessuna differenza.
+Dopo i 30 giorni l'app si apre tutta anche se il percorso non è finito: il riquadro del percorso resta in cima a Io come
+prima, finché non è completato. Una pagina nascosta a cui si arriva lo stesso (un collegamento, la pagina ricaricata) si
+apre comunque.
+1. **Io**: restano il riquadro del percorso di partenza, «La prossima cosa», la lista di oggi / «Da fare oggi» e la serie
+   (e, come prima, «Il mio mese» e il Diario di oggi). Si nascondono la **linguetta Verifica** (con la Guida e la tabella
+   Stabilità: se ci si arriva lo stesso, le linguette tornano per uscirne), lo **Storico** in «Il mio mese» e il
+   **promemoria dell'import** della mappa. Test dell'interfaccia: 1179 controlli superati (sezione 84: nuovo con «Inizio»,
+   nuovo con un partner sotto, nuovo dopo 30 giorni con il percorso in cima, partenza completata, avviato, admin;
+   anteprima di Io a 360 px, `e2e/84-io-semplice-light.png` e `-dark.png`).
+
 ## Avviati: meno cose all'inizio e il Seguimi acceso (12 novembre 2026, app v117, database non toccato)
 
 Tre PR in fila, da unire in ordine; la versione del service worker sale una volta sola, nell'ultima. Solo per gli **avviati**
