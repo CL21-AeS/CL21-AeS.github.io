@@ -775,8 +775,9 @@ await page.screenshot({ path: S + "/e2e/18-installa-iphone.png" });
 await page.click("button[data-act=copia-chiave]");
 check((await page.evaluate(() => navigator.clipboard.readText())).endsWith("#chiave=" + "a".repeat(32)), "iPhone: link personale copiato");
 await page.click("button[data-act=installa-no]");
-check(await page.locator(".voci-passi li.fatta", { hasText:"Installa l'app" }).isVisible() && !(await page.getByText("Aggiungi alla schermata Home").count()),
-  "Non ora: la guida si chiude e la voce è fatta");
+// (12 novembre 2026: senza «Scrivi 30 nomi», con l'installazione fatta i Primi passi sono tutti fatti e il riquadro sparisce)
+check(!(await page.locator(".primi-passi").count()) && !(await page.getByText("Aggiungi alla schermata Home").count()),
+  "Non ora: la guida si chiude e la voce è fatta (tutto fatto: Primi passi sparisce)");
 await page.click("button[data-act=vista-profilo]");
 await page.click("button[data-act=installa-si]");
 check(await page.getByText("Aggiungi alla schermata Home").first().isVisible(), "dal fondo pagina si riapre");
@@ -806,7 +807,7 @@ await page.screenshot({ path: S + "/e2e/19-installa-android.png" });
 await page.click("button[data-act=installa]");
 await page.waitForFunction(() => !document.querySelector("button[data-act=installa]"));
 check(await page.evaluate(() => window.__promptato) === true, "Android: il pulsante Installa apre la proposta del browser");
-check(await page.locator(".voci-passi li.fatta", { hasText:"Installa l'app" }).isVisible(), "installata: la voce è fatta");
+check(!(await page.locator(".primi-passi").count()), "installata: la voce è fatta (tutto fatto: Primi passi sparisce)");
 await ctx.close();
 
 // app installata (iPhone): ingresso con il link copiato
@@ -2758,18 +2759,13 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const pp = page.locator(".primi-passi");
   check(await pp.isVisible() && await pp.getByText("Fatto, l'ho salvato").isVisible(), "Primi passi: il link da salvare è aperto");
   check(!(await pp.locator("button[data-act=primi-passi-no]").count()), "finché il link non è salvato, niente ×");
-  check((await pp.locator("li", { hasText:"Scrivi 30 nomi nella tua Lista" }).innerText()).includes("12 / 30"), "Lista: il contatore dei 30 nomi");
-  check(await pp.locator("li.fatta", { hasText:"Scrivi il tuo obiettivo" }).isVisible(), "obiettivo scritto: voce fatta");
+  check(!(await pp.locator("li", { hasText:"nomi nella tua Lista" }).count()) && !(await pp.locator("button[data-act=passo-apri][data-k=lista]").count()),
+    "12 nomi nella Lista: in Primi passi niente più «Scrivi 30 nomi nella tua Lista» (12 novembre 2026)");
+  check(await pp.locator("li.fatta", { hasText:"Scrivi il tuo obiettivo" }).isVisible() && (await pp.locator(".pill").innerText()).startsWith("2 su 3"),
+    "obiettivo scritto: voce fatta, 2 su 3 (link, obiettivo, import)");
   await page.screenshot({ path: S + "/e2e/46-primi-passi.png", fullPage:true });
   await pp.getByText("Fatto, l'ho salvato").click();
-  check((await pp.locator(".pill").innerText()).startsWith("3 su"), "dopo il link: 3 su 4 (link, obiettivo, import)");
-  await pp.locator("button[data-act=passo-apri][data-k=lista]").click();
-  check(await pp.getByText("Senza decidere tu chi potrebbe essere interessato").isVisible(), "la voce della Lista si apre con la frase della Guida");
-  await pp.locator("button[data-act=primi-passi-no]").click();
-  check(!(await page.locator(".primi-passi").count()), "× nasconde Primi passi");
-  await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor();
-  check(!(await page.locator(".primi-passi").count()) && await page.evaluate(() => localStorage.getItem("growup-team.primi-passi-no.R")) === "1",
-    "resta nascosto (salvato su questo telefono)");
+  check(!(await page.locator(".primi-passi").count()), "salvato il link, tutto fatto con 12 nomi: Primi passi sparisce");
   // il «?»: si apre e si richiude
   await page.click("button[data-act=vista-gruppo]");
   check(!(await page.getByText("Il numero a sinistra è il livello").count()), "Struttura: la spiegazione è chiusa");
@@ -2795,14 +2791,34 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
       && !!(t.compareDocumentPosition(righe[0]) & Node.DOCUMENT_POSITION_FOLLOWING); });
   check(sopra, "abitudini: la spiegazione si apre sotto il titolo, sopra le righe");
   await ctx.close();
-  // con 30 nomi e tutto fatto, il riquadro non c'è
-  DB.persone = DB.persone.filter(x => x.proprietario !== "R").concat(nomi46(30));
+  // senza nomi nella Lista e tutto il resto fatto, il riquadro non c'è (i 30 nomi non contano più)
+  DB.persone = DB.persone.filter(x => x.proprietario !== "R");
   ({ ctx, page } = await apri({}, "#chiave=" + "a".repeat(32)));
   await page.getByText("Ciao Stefano e Alessia").waitFor();
   await page.evaluate(() => localStorage.setItem("growup-team.chiave-salvata", "1"));
   await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Stefano e Alessia").waitFor();
-  check(!(await page.locator(".primi-passi").count()), "tutto fatto (30 nomi, obiettivo, link, import): Primi passi sparisce");
+  check(!(await page.locator(".primi-passi").count()), "tutto fatto (obiettivo, link, import) con 0 nomi: Primi passi sparisce");
   await ctx.close();
+  // la × di Primi passi: un avviato con un gruppo e la mappa non ancora importata
+  { const ora = new Date().toISOString(), gfa = n => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+    DB.partners.push({ id:"pp46", nome:"Pina Passi", sponsor_id:"R", stato:"attivo", chiave:"4b".repeat(16), codice_invito:"PP46PP", codice_amway:"7946001",
+      data_iscrizione:gfa(90), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true });
+    DB.partners.push({ id:"pp46u", nome:"Ugo Pina", sponsor_id:"pp46", stato:"gestito", gestore_id:"pp46", codice_invito:"PP46UU", codice_amway:"7946002",
+      data_iscrizione:gfa(400), creato_il:ora });
+    ({ ctx, page } = await apri({}, "#chiave=" + "4b".repeat(16)));
+    await page.getByText("Ciao Pina").waitFor();
+    const pq = page.locator(".primi-passi");
+    await pq.getByText("Fatto, l'ho salvato").click();
+    check((await pq.locator(".pill").innerText()).startsWith("2 su 3") && !(await pq.locator("li", { hasText:"nomi nella tua Lista" }).count()),
+      "avviata con gruppo: 2 su 3 (link, obiettivo, import), senza i 30 nomi");
+    await pq.locator("button[data-act=primi-passi-no]").click();
+    check(!(await page.locator(".primi-passi").count()), "× nasconde Primi passi");
+    await page.click("button[data-act=vista-gruppo]"); await page.click("button[data-act=vista-io]"); await page.getByText("Ciao Pina").waitFor();
+    check(!(await page.locator(".primi-passi").count()) && await page.evaluate(() => localStorage.getItem("growup-team.primi-passi-no.pp46")) === "1",
+      "resta nascosto (salvato su questo telefono)");
+    check(!errori.length, "Primi passi: nessun errore nella pagina");
+    await ctx.close();
+    DB.partners = DB.partners.filter(p => !["pp46", "pp46u"].includes(p.id)); }
   DB.persone = DB.persone.filter(x => !String(x.id).startsWith("n46"));
 }
 

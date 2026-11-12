@@ -17,6 +17,13 @@ Tre PR in fila, da unire in ordine; la versione del service worker sale una volt
    dati già salvati (`partenze()` li restituisce ancora, l'app non li mostra). Test dell'interfaccia: 1125 controlli
    superati (sezioni 60, 62 e 81: avviato senza gruppo, avviato con gruppo, vista dello sponsor, punto salvato prima
    che non si vede e resta nel database; il primo incontro del nuovo come prima).
+2. **Tolto «Scrivi 30 nomi nella tua Lista» dai Primi passi** (scelta di Stefano): restano il link personale, «Installa
+   l'app», l'obiettivo e (con un gruppo) il primo import. Con il resto fatto, il riquadro sparisce anche con meno di 30
+   nomi. Restano come prima i 30 nomi della fase 2 del percorso dei nuovi (`NOMI_PARTENZA`, «Lista 12 / 30») e la
+   tessera «Nomi nuovi questa settimana» nel cruscotto degli avviati. I Primi passi non li vede chi segue il percorso;
+   la voce sparisce anche per chi l'ha già finito (che i 30 nomi li ha scritti nella fase 2). Test dell'interfaccia:
+   1126 controlli superati (sezione 46: niente voce dei 30 nomi, sparisce con tutto fatto e 0 nomi, la × con un avviato
+   che ha un gruppo; sezione 13: dopo l'installazione i Primi passi sono tutti fatti e spariscono).
 
 ## Da quanto è nella Lista: data e giorni (11 novembre 2026, sera, app v116, database non toccato)
 
