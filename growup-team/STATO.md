@@ -1,7 +1,22 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 11 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 12 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
+
+## Avviati: meno cose all'inizio (12 novembre 2026, database non toccato)
+
+Tre PR in fila, da unire in ordine; la versione del service worker sale una volta sola, nell'ultima. Solo per gli **avviati**
+(iscritti da più di 30 giorni, `avviato()`): il **percorso di partenza dei nuovi non cambia**.
+1. **Tolto «Il punto con la tua upline»** (scelta di Stefano): non c'è più in «Per iniziare» (`perIniziare`: restano il
+   perché e, se ha un gruppo, «Importa la tua mappa»), in «La prossima cosa» (tolto `puntoDaFare`) e nella vista dello
+   sponsor («I tuoi nuovi in partenza» e la scheda: «Per iniziare N di M» con il perché e la mappa, `partenzaDi`).
+   Un avviato senza gruppo, con il perché scritto, non ha più «Per iniziare» e non compare tra i nuovi in partenza.
+   Resta com'è «Il primo incontro con il tuo sponsor» della fase 2 del nuovo (il foglio è ora solo suo, `vSheetIncontro`).
+   Tolti il foglio del punto, le azioni `punto-fissa` e `punto-fatto`, il modulo `punto`, `testoPunto` e `conUpline`
+   (nessun altro li usava). **Database non toccato**: le colonne `punto_upline` e `punto_upline_fatto` restano, con i
+   dati già salvati (`partenze()` li restituisce ancora, l'app non li mostra). Test dell'interfaccia: 1125 controlli
+   superati (sezioni 60, 62 e 81: avviato senza gruppo, avviato con gruppo, vista dello sponsor, punto salvato prima
+   che non si vede e resta nel database; il primo incontro del nuovo come prima).
 
 ## Da quanto è nella Lista: data e giorni (11 novembre 2026, sera, app v116, database non toccato)
 

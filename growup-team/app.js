@@ -53,7 +53,7 @@ function creaApi(){
     join:         args => q(sb.rpc("entra_con_invito", args)),
     cambiaChiave: () => q(sb.rpc("cambia_chiave")),
     accettaPrivacy: pid => q(sb.from("partners").update({ privacy_accettata_il:new Date().toISOString() }).eq("id", pid)),
-    /* 058-059: date del punto con l'upline, del primo incontro e della partenza completata (solo la propria riga) */
+    /* 059: date del primo incontro con lo sponsor e della partenza completata (solo la propria riga) */
     aggiornaMio: (pid, campi) => q(sb.from("partners").update(campi).eq("id", pid)),
     /* io e tutta la mia downline: la RLS restituisce solo quella */
     /* io e chi vedo, ognuno sotto il primo sopra di lui che vedo (struttura "ricucita" nel database) */
@@ -2107,30 +2107,20 @@ function datiTappa(){
    con i requisiti, contatti e piani della settimana. Sotto «La prossima cosa» con la lista unica di oggi (Lista e
    Clienti), poi le righe che si aprono: Primi passi, Il mio mese, il promemoria dell'import, il diario. */
 const GIRO_ANELLO = 2 * Math.PI * 46;
-/* ---- Avviati (consegna 6): iscritti da più di 30 giorni. «Per iniziare» senza scadenze: il perché, il punto con la
-   propria upline (generico: sceglie lui con chi; si segnano il giorno e quando è fatto) e l'import della mappa se ha un
-   gruppo. Sparisce quando è fatto. I nuovi (30 giorni o meno) avranno il loro percorso di partenza (consegna 7). ---- */
+/* ---- Avviati (consegna 6): iscritti da più di 30 giorni. «Per iniziare» senza scadenze: il perché e l'import della mappa
+   se ha un gruppo. Sparisce quando è fatto. I nuovi (30 giorni o meno) hanno il loro percorso di partenza (consegna 7).
+   Il punto con l'upline non c'è più (scelta di Stefano, 12 novembre 2026): le colonne punto_upline e punto_upline_fatto
+   restano nel database con i dati già salvati, l'app non le mostra più. ---- */
 const GIORNI_NUOVO = 30;
 function avviato(){ const p = st.profilo, d = p && p.data_iscrizione;
   return !!p && !percorsoAttivo() && !p.partenza_completata_il && (!d || giorniTra(String(d).slice(0, 10), oggi()) > GIORNI_NUOVO); }
-function conUpline(){ return !!(st.profilo && st.profilo.sponsor_id); }
 /* il giorno di un incontro: nel futuro è «fissato per …», da oggi in poi è fatto («fatto 10 novembre») */
 function giornoFatto(d){ return !!d && String(d).slice(0, 10) <= oggi(); }
-function puntoDaFare(){ const p = st.profilo; return avviato() && conUpline() && p.punto_upline && !p.punto_upline_fatto && p.punto_upline <= oggi(); }
 function perIniziare(){
-  const p = st.profilo, io = p.id, l = [{ k:"perche", nome:"Il mio perché", fatto:!senzaPerche() }];
-  if(conUpline()) l.push({ k:"punto", nome:"Il punto con la tua upline", fatto:!!p.punto_upline_fatto,
-    sotto:testoPunto(p),
-    azione:p.punto_upline_fatto ? "" : `<button class="btn small" data-act="punto-fissa">${p.punto_upline ? "Cambia" : "Fissa ›"}</button>` });
+  const io = st.profilo.id, l = [{ k:"perche", nome:"Il mio perché", fatto:!senzaPerche() }];
   if(figli(io).length) l.push({ k:"mappa", nome:"Importa la tua mappa", fatto:[...(st.mioReport || new Map()).values()].some(r => r.importato_da === io),
     azione:btnAmway("Importa ›", "small") });
   return l;
-}
-/* il punto con l'upline: la spunta viene da «L'ho già fatto»; arrivato il giorno senza conferma resta «era fissato per» */
-function testoPunto(p){
-  const d = p.punto_upline ? String(p.punto_upline).slice(0, 10) : "";
-  return p.punto_upline_fatto ? `fatto ${dataIt(String(p.punto_upline_fatto).slice(0, 10))}` : !d ? ""
-    : d < oggi() ? `era fissato per il ${dataIt(d)}` : `fissato per ${riassuntoAgenda(d)}`;
 }
 function vPerIniziare(){
   if(!avviato()) return "";
@@ -2338,20 +2328,14 @@ function rigaCliente(x){
       <button class="x" data-act="togli-da-io" data-id="${esc(x.p.id)}" aria-label="Togli ${esc(x.p.nome)} da Io">×</button></li>`;
 }
 function vOggiLista(){
-  const v = vociOggi(), altri = v.presto.length + v.corso.length, aperto = !!st.dopoAperto, punto = puntoDaFare(), dalPercorso = prossimaPercorso();
-  if(!v.oggi.length && !altri && !punto && !dalPercorso) return "";
-  const [prima, ...poi] = punto || dalPercorso ? [null].concat(v.oggi) : v.oggi;
-  const totale = v.oggi.length + (punto || dalPercorso ? 1 : 0);
+  const v = vociOggi(), altri = v.presto.length + v.corso.length, aperto = !!st.dopoAperto, dalPercorso = prossimaPercorso();
+  if(!v.oggi.length && !altri && !dalPercorso) return "";
+  const [prima, ...poi] = dalPercorso ? [null].concat(v.oggi) : v.oggi;
+  const totale = v.oggi.length + (dalPercorso ? 1 : 0);
   const testa = dalPercorso ? `<div class="spread"><span class="eyebrow pesca">La prossima cosa</span><span class="small">dal tuo percorso</span></div>
     <span class="prossima-titolo" role="heading" aria-level="3">${esc(dalPercorso.titolo)}</span>
     <p class="small" style="margin:0">${esc(dalPercorso.motivo)}</p>
     <div class="prossima-azioni"><button class="btn primary" data-act="${dalPercorso.act}">${esc(dalPercorso.btn)}</button></div>`
-    : punto ? `<div class="spread"><span class="eyebrow pesca">La prossima cosa</span><span class="small">per iniziare · 1 di ${totale} oggi</span></div>
-    <span class="prossima-titolo" role="heading" aria-level="3">Il punto con la tua upline</span>
-    <p class="small" style="margin:0">${String(st.profilo.punto_upline).slice(0, 10) < oggi() ? `Era fissato per il ${dataIt(String(st.profilo.punto_upline).slice(0, 10))}` : "Fissato per oggi"} · per impostare il mese</p>
-    <div class="prossima-azioni">
-      <button class="btn primary" data-act="punto-fatto">Fatto</button>
-      <button class="btn" data-act="punto-fissa">Scegli il giorno</button></div>`
     : prima ? `<div class="spread"><span class="eyebrow pesca">La prossima cosa</span>
       <span class="row" style="gap:6px;align-items:center"><span class="small">1 di ${totale} oggi</span>
       <button class="x" data-act="togli-da-io" data-id="${esc(prima.p.id)}" aria-label="Togli ${esc(prima.p.nome)} da Io">×</button></span></div>
@@ -2787,9 +2771,8 @@ function partenzaDi(x){
       manca:manca.length ? `Manca: ${manca[0].nome === "Partenza con te" ? (x.incontro_sponsor ? "" : "la data del vostro primo incontro · ") + `Lista ${num(Math.min(nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}`
         : manca[0].nome === "I due binari" ? fasi[3].sotto : manca[0].sotto}` : "" };
   }
-  /* avviato: «Per iniziare» (il perché, il punto con l'upline, la mappa se ha un gruppo) */
-  const fasi = [{ nome:"Il suo perché", fatto:!!x.ha_perche, sotto:"" },
-    { nome:"Il punto con la sua upline", fatto:!!x.punto_upline_fatto, sotto:testoPunto(x) }];
+  /* avviato: «Per iniziare» (il perché e la mappa se ha un gruppo; il punto con l'upline non c'è più) */
+  const fasi = [{ nome:"Il suo perché", fatto:!!x.ha_perche, sotto:"" }];
   if(x.ha_gruppo) fasi.push({ nome:"Importa la sua mappa", fatto:!!x.mappa_importata, sotto:"" });
   const fatti = fasi.filter(f => f.fatto).length;
   if(fatti === fasi.length) return null;
@@ -3665,7 +3648,7 @@ function toastImport(e){
 /* ---- 10. Fogli in basso ---- */
 function vSheet(){
   const s = st.sheet;
-  const sp = vSheetAgenda(s) || vSheetPunto(s) || vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s) || vSheetListino(s) || vSheetMiei(s) || vSheetGuida(s);
+  const sp = vSheetAgenda(s) || vSheetIncontro(s) || vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s) || vSheetListino(s) || vSheetMiei(s) || vSheetGuida(s);
   if(sp) return sp;
   if(s === "codici-tolti") return `<h2>Codici Amway tolti</h2>
     <p class="small">Le persone tolte dalla struttura prima della conferma: con questi codici non si entra finché non li sblocchi.</p>
@@ -4686,23 +4669,20 @@ function vSheetAgenda(s){
       ${p.prossima_data ? `<button type="button" class="btn ghost wide" style="margin-top:8px" data-act="agenda-togli" data-id="${esc(p.id)}">Togli dall'agenda</button>` : ""}
     </form>`;
 }
-/* il punto con l'upline (consegna 6): si sceglie solo il giorno; con chi lo decide il partner */
-function vSheetPunto(s){
-  if(s !== "punto-upline" && s !== "incontro-sponsor") return "";
-  const inc = s === "incontro-sponsor", campo = inc ? "incontro_sponsor" : "punto_upline";
-  const p = st.profilo, scelto = p[campo] && String(p[campo]).slice(0, 10) >= oggi() ? String(p[campo]).slice(0, 10) : "";
+/* il primo incontro con lo sponsor (percorso di partenza, fase 2): si sceglie solo il giorno */
+function vSheetIncontro(s){
+  if(s !== "incontro-sponsor") return "";
+  const p = st.profilo, d = p.incontro_sponsor ? String(p.incontro_sponsor).slice(0, 10) : "", scelto = d >= oggi() ? d : "";
   const giorni = [0, 1, 2].map(i => piuGiorni(oggi(), i));
   const etichetta = (d, i) => i === 0 ? "Oggi" : i === 1 ? "Domani" : GIORNI_SETT[new Date(d + "T12:00:00").getDay()].replace(/^./, x => x.toUpperCase());
-  return `<h2>${inc ? "Il primo incontro con il tuo sponsor" : "Il punto con la tua upline"}</h2>
-    <p class="small">${inc ? "Insieme scegliete i prodotti del primo ordine e preparate i primi contatti. Qui segni il giorno."
-      : "Una chiamata o un incontro con chi ti segue, per impostare il mese. Scegli tu con chi: qui segni solo il giorno."}</p>
-    <form data-form="${inc ? "incontro" : "punto"}" novalidate>
+  return `<h2>Il primo incontro con il tuo sponsor</h2>
+    <p class="small">Insieme scegliete i prodotti del primo ordine e preparate i primi contatti. Qui segni il giorno.</p>
+    <form data-form="incontro" novalidate>
       <fieldset class="field"><legend>Quando</legend><div class="opzioni">${giorni.map((d, i) =>
         `<label class="chip"><input type="radio" name="quando" value="${d}"${d === scelto ? " checked" : ""}><span>${etichetta(d, i)}</span></label>`).join("")}</div>
         <label class="giorno-scelto"><span class="small">Oppure scegli il giorno</span><input type="date" name="giorno" min="${oggi()}" value="${giorni.includes(scelto) ? "" : esc(scelto)}"></label></fieldset>
       ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
       <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button><button class="btn primary grow">Salva</button></div>
-      ${!inc && p.punto_upline ? `<button type="button" class="btn ghost wide" style="margin-top:8px" data-act="punto-fatto">L'ho già fatto</button>` : ""}
     </form>`;
 }
 async function salvaPunto(campi, msg){
@@ -4711,21 +4691,9 @@ async function salvaPunto(campi, msg){
   st.sheet = null; render(); toast(msg);
 }
 Object.assign(AZIONI, {
-  "punto-fissa"(){ st.errore = ""; st.sheet = "punto-upline"; render(); },
-  "incontro-fissa"(){ st.errore = ""; st.sheet = "incontro-sponsor"; render(); },
-  async "punto-fatto"(){
-    try{ await salvaPunto({ punto_upline:st.profilo.punto_upline || oggi(), punto_upline_fatto:oggi() }, "Punto con l'upline fatto"); }
-    catch(e){ toast(messaggio(e)); }
-  }
+  "incontro-fissa"(){ st.errore = ""; st.sheet = "incontro-sponsor"; render(); }
 });
 Object.assign(MODULI, {
-  async punto(f){
-    const giorno = f.giorno.value || (f.querySelector("input[name=quando]:checked") || {}).value;
-    if(!giorno){ mostraErroreForm(f, "Scegli il giorno."); return; }
-    if(giorno < oggi()){ mostraErroreForm(f, "Scegli oggi o un giorno che deve ancora venire."); return; }
-    try{ await salvaPunto({ punto_upline:giorno, punto_upline_fatto:null }, `Punto con l'upline: ${riassuntoAgenda(giorno)}`); }
-    catch(e){ mostraErroreForm(f, messaggio(e)); }
-  },
   async incontro(f){
     const giorno = f.giorno.value || (f.querySelector("input[name=quando]:checked") || {}).value;
     if(!giorno){ mostraErroreForm(f, "Scegli il giorno."); return; }
