@@ -17,3 +17,7 @@
   giorno» solo per chi ha scelto «Seguimi giorno per giorno» nel **Profilo** (dove c'è anche la scelta di condividere
   con l'upline). L'«Analisi della persona» è una pagina a parte, aperta solo a richiesta (dalla Verifica e dalla scheda
   partner): solo dati, senza calcoli né consigli.
+- **Versione semplificata per chi inizia**: nei primi 30 giorni del percorso di partenza una parte dell'app si nasconde
+  (Verifica, Storico, promemoria dell'import, percorso completo dell'Obiettivo, Gruppo senza partner sotto). La regola sta
+  in una sola funzione, `versioneSemplice()` in `app.js`: ogni cosa nuova da nascondere a chi inizia passa da lì. Si
+  nasconde e basta (niente lucchetti, niente database); admin, avviati e chi ha finito il percorso vedono tutto.

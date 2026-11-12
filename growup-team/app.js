@@ -954,6 +954,7 @@ async function vaiHome(profilo){
   /* chi è stato aggiunto a mano, la prima volta che entra, legge e accetta la privacy */
   st.fase = !profilo.privacy_accettata_il ? "privacy_primo" : senzaPerche() ? "obiettivo_primo" : "home";
   if(st.fase === "home") setTimeout(riconosciPlatino, 0);
+  if(st.fase === "home") setTimeout(avvisoTuttaApp, 0);
   if(st.fase === "home") statoNotifiche().then(() => { render(); aggiornaPreviste(); });
   /* la scorciatoia sull'icona (pressione lunga): «Importa da Amway» */
   /* il tocco sull'avviso del prossimo passo (040): apre la scheda della persona, nella Lista o nei Clienti */
@@ -1454,6 +1455,7 @@ function vProfilo(){
     <div class="riga-profilo"><span>Punto di partenza <b>${esc(testoPartenza(p))}</b></span>
       <button class="btn small ghost" data-act="partenza">Modifica</button></div>
   </div>
+  ${vTuttaAppProfilo()}
   ${vSeguimiProfilo()}
   <div class="card voci-profilo">
     ${vNotificheProfilo()}
@@ -2191,6 +2193,27 @@ function puoMostrareTutto(){ const p = st.profilo;
   return inPartenzaSemplice() && ((!!p.qualifica_iniziale && !TAPPE_DI_PERCORSO.includes(p.qualifica_iniziale)) || Number(p.percentuale_iniziale) >= 3); }
 function tuttaAppAccesa(){ return puoMostrareTutto() && leggiLocale(chiaveTuttaApp()) === "1"; }
 function versioneSemplice(){ return inPartenzaSemplice() && !tuttaAppAccesa(); }
+/* punto 4: nel Profilo l'interruttore «Mostra tutta l'app», solo per chi può averlo */
+function vTuttaAppProfilo(){
+  if(!puoMostrareTutto()) return "";
+  const on = tuttaAppAccesa();
+  return `<div class="card tutta-app">
+    <span class="eyebrow">Per chi inizia</span>
+    <button class="interruttore" data-act="tutta-app" role="switch" aria-checked="${on}">
+      <span class="grow" style="text-align:left">Mostra tutta l'app<br><span class="small">Nei primi 30 giorni vedi solo quello che serve per partire.
+        Vale su questo telefono.</span></span><span class="toggle${on ? " on" : ""}"></span></button>
+  </div>`;
+}
+/* finiti i 30 giorni con il percorso non finito, una volta sola (su questo telefono): «Da oggi vedi tutta l'app.».
+   Non a chi aveva già acceso «Mostra tutta l'app» (vedeva già tutto). */
+const chiaveAvvisoTuttaApp = () => "growup-team.tutta-app-avviso." + st.profilo.id;
+function avvisoTuttaApp(){
+  const p = st.profilo;
+  if(st.fase !== "home" || !p || p.is_admin || !percorsoAttivo() || giorniDaIngresso() < GIORNI_SEMPLICE) return;
+  if(leggiLocale(chiaveAvvisoTuttaApp()) === "1") return;
+  salvaLocale(chiaveAvvisoTuttaApp(), "1");
+  if(leggiLocale(chiaveTuttaApp()) !== "1") toast("Da oggi vedi tutta l'app.", null, 6000);
+}
 /* le attività di sempre (fino a un anno), senza doppioni */
 function attivitaTutte(tipo){ const v = new Map(); (st.attSerie || []).concat(st.att || []).forEach(a => { if(a.tipo === tipo) v.set(a.id || JSON.stringify(a), a); });
   return [...v.values()].sort((a, b) => a.data < b.data ? -1 : 1); }
@@ -2272,6 +2295,7 @@ function vFesta(){
     <span class="eyebrow">Percorso di partenza</span>
     <h1 id="festa-titolo">Si parte,<br>${esc(nomeSaluto(p.nome))}!</h1>
     <p>In ${giorni === 1 ? "1 giorno" : `${num(giorni)} giorni`} hai fatto i tre passi che contano.</p>
+    ${versioneSemplice() ? `<p class="festa-tutta-app"><b>Ora hai tutta l'app.</b></p>` : ""}
     <ul class="festa-l">${voci.map(([t, d]) => `<li><span class="segno" aria-hidden="true">✓</span><span><b>${t}</b>${d ? `<br><span class="small">${esc(d)}</span>` : ""}</span></li>`).join("")}</ul>
     <p class="small">Da oggi la pagina Io è il tuo cruscotto e il Seguimi ti accompagna giorno per giorno, con le azioni di ogni giorno.
       Se non lo vuoi, lo togli dal Profilo.</p>
@@ -3975,6 +3999,7 @@ const AZIONI = {
   },
   "vista-obiettivo"(){ st.vista = "obiettivo"; st.sotto = null; st.target = null; render(); window.scrollTo(0, 0); },
   /* dal cruscotto di Io: la stessa pagina, ma come sotto-pagina (Indietro torna a Io) */
+  "tutta-app"(){ salvaLocale(chiaveTuttaApp(), tuttaAppAccesa() ? null : "1"); render(); },
   "percorso-tutto"(){ st.percorsoTutto = !st.percorsoTutto; render(); },
   "obiettivo-da-io"(){ st.sotto = livelloDi(st); st.vista = "obiettivo"; st.target = null; render(); window.scrollTo(0, 0); },
   "scheda-tab"(el){ st.schedaTab = el.dataset.tab; render(); },
