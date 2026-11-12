@@ -142,6 +142,9 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
      notifica «mancano X VP» dalla mappa con la sua data
 41o. `supabase/064_ordine_in_attesa.sql` — `ordini_in_attesa`: lo sponsor sa solo quali suoi nuovi hanno il primo ordine
      confermato che la mappa non mostra ancora (né VP né prodotti); una funzione nuova, nient'altro
+41p. `supabase/065_avvisi_fasi.sql` — l'avviso a chi ha invitato (e allo sponsor reale) quando il nuovo chiude le fasi 2, 3 e
+     4 del percorso, una volta sola, senza nomi; per la mappa una volta per import (`importa_mappa`, `salva_mese_passato`
+     con una riga in più); gli avvisi su una persona aprono la sua scheda (`./?partner=<id>`)
 41n. `supabase/055b_contatti_cron.sql` — l'attività pianificata della cancellazione, ogni notte (solo su Supabase, come la 050b)
 42. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente

@@ -5915,6 +5915,50 @@ for(const tema of ["light", "dark"]){
   DB.partners = DB.partners.filter(p => p.id !== "pn87");
 }
 
+// 88. Il tocco sugli avvisi del gruppo (13 novembre 2026, 065): «./?partner=<id>» apre la scheda di quella persona, con
+//     l'app chiusa e con l'app già aperta su un'altra pagina (il service worker la ricarica con l'indirizzo). Se la scheda
+//     non si può aprire (persona che non vedo, in attesa della mappa, id inventato) si apre il Gruppo su «I tuoi nuovi in
+//     partenza», senza errori. L'indirizzo si ripulisce subito.
+{
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), ora = new Date().toISOString();
+  DB.partners.push({ id:"88888888-0000-4000-8000-000000000001", nome:"Nadia Notifica", sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:"4d".repeat(16), codice_invito:"PN88XX",
+    codice_amway:"7988001", data_iscrizione:giorno(-4), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora,
+    conPercorso:true, incontro_sponsor:giorno(-1) });
+  DB.partners.push({ id:"88888888-0000-4000-8000-000000000002", nome:"Attilio Attesa", sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:"5e".repeat(16), codice_invito:"AT88XX",
+    codice_amway:"7988002", data_iscrizione:giorno(-2), privacy_accettata_il:ora, confermato_il:null, creato_il:ora, conPercorso:true });
+  const radice = DB.partners.find(p => p.id === "R"); if(!radice.privacy_accettata_il) radice.privacy_accettata_il = ora;   // anche lanciata da sola
+  const sid = "88888888-0000-4000-8000-000000000001";
+  const scheda = async () => { await page.locator(".testata h1", { hasText:"Scheda partner" }).waitFor();
+    return (await page.locator(".card.partenza-scheda").count()) === 1 || (await page.locator("#app").innerText()).includes("Nadia Notifica"); };
+  // l'app chiusa: il tocco apre la scheda della persona
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "?partner=" + sid + "#chiave=" + "a".repeat(32)));
+  check(await scheda() && (await page.locator("#app").innerText()).includes("Nadia Notifica"), "avviso, app chiusa: si apre la scheda della persona");
+  check(!(await page.evaluate(() => location.search)), "avviso: l'indirizzo si ripulisce (niente ?partner=)");
+  // l'app già aperta su un'altra pagina (Persone): il service worker la porta all'indirizzo dell'avviso
+  await page.click("button[data-act=vista-persone]"); await page.locator("button[data-act=sez-persone]").first().waitFor();
+  // il service worker ricarica la finestra aperta con l'indirizzo dell'avviso (stessa memoria del telefono, senza #chiave)
+  await sync(page); const stato88 = await ctx.storageState(); await ctx.close();
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, storageState:stato88 }, "?partner=" + sid));
+  check(await scheda() && (await page.locator("#app").innerText()).includes("Nadia Notifica"), "avviso, app già aperta su un'altra pagina: si apre la scheda");
+  await ctx.close();
+  // la persona non si vede (un id che non è nel mio gruppo), è in attesa della mappa, o l'id è inventato: il Gruppo
+  for(const [id, cosa] of [["88888888-0000-4000-8000-000000000002", "in attesa della mappa"], ["00000000-0000-4000-8000-000000000088", "persona non visibile"]]){
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "?partner=" + id + "#chiave=" + "a".repeat(32)));
+    await page.locator(".testata h1", { hasText:"Il mio gruppo" }).waitFor();
+    check(await page.locator(".card.nuovi-partenza").isVisible() && !(await page.locator(".testata h1", { hasText:"Scheda partner" }).count())
+      && !(await page.evaluate(() => location.search)), `avviso, ${cosa}: si apre il Gruppo con «I tuoi nuovi in partenza»`);
+    await ctx.close();
+  }
+  // un altro partner che vede l'avviso di una persona di un'altra linea: il Gruppo, nessun errore
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "?partner=" + sid + "#chiave=" + "4d".repeat(16)));
+  await page.locator(".testata h1", { hasText:"Il mio gruppo" }).waitFor();
+  check(!(await page.locator(".testata h1", { hasText:"Scheda partner" }).count()), "avviso su sé stessi o una persona che non si vede: niente scheda, il Gruppo");
+  await ctx.close();
+  check(!errori.length, "tocco sugli avvisi: nessun errore nella pagina");
+  DB.obiettivi = (DB.obiettivi || []).filter(o => !["88888888-0000-4000-8000-000000000001", "88888888-0000-4000-8000-000000000002"].includes(o.partner_id));
+  DB.partners = DB.partners.filter(p => !["88888888-0000-4000-8000-000000000001", "88888888-0000-4000-8000-000000000002"].includes(p.id));
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
