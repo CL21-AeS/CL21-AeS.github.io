@@ -3,7 +3,7 @@
 Ultimo aggiornamento: 12 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
-## Versione semplificata per chi inizia (12 novembre 2026, database non toccato)
+## Versione semplificata per chi inizia (12 novembre 2026, app v118, database non toccato)
 
 Quattro PR in fila, da unire in ordine (una per punto); la versione del service worker sale una volta sola, nell'ultima.
 Scelte di Stefano. **Si nasconde e basta**: niente lucchetti, nessun dato cancellato o cambiato, nessuna modifica al database.
@@ -33,6 +33,24 @@ apre comunque.
    (`haPartnerSotto`, scelta di Stefano: un partner sotto di lui nella mappa, un invitato entrato nell'app ma in attesa
    della mappa, oppure un suo nuovo in partenza). Test dell'interfaccia: 1209 controlli superati (sezione 84: anche nuovo
    con un partner nella mappa e con un invitato in attesa; anteprima `e2e/84-gruppo-semplice-light.png` e `-dark.png`).
+4. **Profilo e uscita**:
+   - Nel Profilo, sotto i dati, il riquadro «Per chi inizia» con l'interruttore **«Mostra tutta l'app»** (`vTuttaAppProfilo`,
+     azione `tutta-app`): una **preferenza di questo telefono** (`growup-team.tutta-app.<id>`, letta e scritta con try/catch;
+     nessuna colonna nuova). Compare **solo** nei primi 30 giorni del percorso e solo a chi all'ingresso ha dichiarato
+     **almeno il 3%** (una percentuale, oppure una qualifica: anche Path to Bronze, scelta di Stefano; `puoMostrareTutto`).
+     Chi ha scelto «Inizio» non lo vede e per lui una preferenza rimasta sul telefono non conta. Acceso: tutta l'app
+     (il percorso resta in cima a Io); spento: di nuovo la versione semplificata.
+   - **Festa** della partenza completata: se era nella versione semplificata dice anche **«Ora hai tutta l'app.»**.
+   - **Finiti i 30 giorni** con il percorso non finito, una volta sola su questo telefono (`growup-team.tutta-app-avviso.<id>`),
+     il messaggio in basso **«Da oggi vedi tutta l'app.»** per 6 secondi (`avvisoTuttaApp`, all'apertura dell'app);
+     non a chi aveva già acceso l'interruttore.
+   - Una pagina nascosta raggiunta lo stesso (es. dalla Verifica al Profilo, interruttore spento, Indietro) si apre comunque.
+   All'upline nessun dato nuovo (vede già la fase del percorso). Service worker v118. Test dell'interfaccia: 1249 controlli
+   superati (sezione 84: nuovo con «Inizio» senza interruttore, nuovo con il 3% con l'interruttore acceso e spento, anche
+   ricaricando, nuovo con Path to Bronze, nuovo dopo 30 giorni con il percorso non finito e l'avviso una volta sola,
+   partenza completata, avviato, admin, niente nel database; sezione 61: la festa con «Ora hai tutta l'app.»; anteprima
+   `e2e/84-profilo-semplice-light.png` e `-dark.png`). `test/db.sh` non serve (database non toccato).
+   Da sapere: interruttore e avviso valgono per telefono; su un telefono nuovo l'interruttore riparte spento.
 
 ## Avviati: meno cose all'inizio e il Seguimi acceso (12 novembre 2026, app v117, database non toccato)
 

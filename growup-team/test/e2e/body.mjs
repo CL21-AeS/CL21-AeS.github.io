@@ -3844,10 +3844,12 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.screenshot({ path: S + "/e2e/61-festa.png" });
   check(await festa.locator("button").count() === 1 && (await festa.locator("button").innerText()).trim() === "Vai al cruscotto"
     && (await festa.innerText()).includes("lo togli dal Profilo"), "la festa: un solo pulsante, il Seguimi si toglie dal Profilo");
+  check(await festa.locator(".festa-tutta-app").innerText() === "Ora hai tutta l'app.", "84: la festa dice anche «Ora hai tutta l'app.»");
   await festa.locator("button[data-act=festa-fine]").click();
   await festa.waitFor({ state:"detached" });
   await page.getByText("Seguimi attivo").waitFor();
   check(await page.locator(".card.cruscotto:not(.percorso-partenza)").isVisible() && !(await page.locator(".percorso-partenza").count()), "dopo la festa: il cruscotto di tutti");
+  check(await page.locator("button[data-act=sez-io][data-sez=guida]").isVisible(), "84: dopo la festa tutta l'app (la linguetta Verifica c'è)");
   await sync(page);
   check(!!DB.partners.find(p => p.id === "np7").partenza_completata_il && DB.seguimi.some(x => x.partner_id === "np7" && x.attivo), "nel database: partenza completata e Seguimi acceso da solo");
   check(!errori.length, "percorso: nessun errore nella pagina");
@@ -5406,10 +5408,12 @@ for(const tema of ["light", "dark"]){
 //     fino a Diamante e «Come arrivarci» dietro «Vedi tutto il percorso». Persone non cambia.
 //     Punto 3, Gruppo: restano «Invita» e «Qui vedrai le persone che inviterai.»; con almeno un partner sotto (nella mappa,
 //     in attesa o un suo nuovo in partenza) il Gruppo si vede intero.
+//     Punto 4, Profilo e uscita: l'interruttore «Mostra tutta l'app» (preferenza del telefono) solo per chi ha dichiarato
+//     almeno il 3% (anche Path to Bronze); dopo i 30 giorni, una volta sola, «Da oggi vedi tutta l'app.». La festa: sez. 61.
 {
   const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), ora = new Date().toISOString();
   const quando = n => new Date(Date.now() + n * 864e5).toISOString();
-  const ID84 = ["in84", "ig84", "ig84u", "tr84", "co84", "av84", "pc84", "ia84", "ia84a"];
+  const ID84 = ["in84", "ig84", "ig84u", "tr84", "co84", "av84", "pc84", "ia84", "ia84a", "pb84"];
   const p84 = (id, nome, k, extra) => DB.partners.push(Object.assign({ id, nome, sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:k.repeat(16),
     codice_invito:id.toUpperCase() + "XX", codice_amway:"79840" + (ID84.indexOf(id) + 10), data_iscrizione:giorno(-3), privacy_accettata_il:ora,
     confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true }, extra || {}));
@@ -5422,7 +5426,9 @@ for(const tema of ["light", "dark"]){
   p84("tr84", "Teo Trenta", "c4", { data_iscrizione:giorno(-40), privacy_accettata_il:quando(-35), creato_il:quando(-35) });   // percorso non finito, 35 giorni
   p84("co84", "Cora Completa", "d4", { data_iscrizione:giorno(-10), privacy_accettata_il:quando(-5), partenza_completata_il:quando(-1) });
   p84("av84", "Alvise Avviato", "e4", { data_iscrizione:giorno(-200) });
-  p84("ia84", "Iris Attesa", "f4");                                                     // nuovo: chi ha invitato è entrato, in attesa della mappa
+  p84("ia84", "Iris Attesa", "f4");
+  p84("pc84", "Pia Tre", "1a", { percentuale_iniziale:3 });                              // nuovo che ha dichiarato il 3%
+  p84("pb84", "Bruno Path", "1b", { qualifica_iniziale:"path_to_bronze" });               // nuovo che ha dichiarato Path to Bronze                                                     // nuovo: chi ha invitato è entrato, in attesa della mappa
   p84("ia84a", "Aldo Iris", "g4", { sponsor_id:"ia84", invitato_da:"ia84", confermato_il:null, partenza_completata_il:quando(-1), conPercorso:false });
   const entra84 = async (k, nome, opz) => {
     ({ ctx, page } = await apri(Object.assign({ viewport:{ width:360, height:780 } }, opz || {}), "#chiave=" + k.repeat(16)));
@@ -5492,6 +5498,12 @@ for(const tema of ["light", "dark"]){
       && await page.locator(".mappa-gruppo").count() === 1 && (!cosa || await page.locator(cosa).count() > 0), chi + ", Gruppo intero, come prima");
     await page.click("button[data-act=vista-io]");
   };
+  const AVVISO = "Da oggi vedi tutta l'app.";
+  const avviso = () => page.locator("#toast .toast", { hasText:AVVISO }).count();
+  const profilo84 = async () => { await page.click("button[data-act=vista-profilo]"); await page.locator(".card.voci-profilo").waitFor(); };
+  const senzaInterruttore = async chi => { await profilo84();
+    check(!(await page.locator(".card.tutta-app, button[data-act=tutta-app]").count()), chi + ", Profilo: niente interruttore «Mostra tutta l'app»");
+    await page.click("button[data-act=profilo-indietro]"); };
   // il nuovo con «Inizio»: Io semplificata, a 360 px in chiaro e scuro
   for(const tema of ["light", "dark"]){
     await entra84("a4", "Ivo", { colorScheme:tema });
@@ -5500,6 +5512,7 @@ for(const tema of ["light", "dark"]){
     await foto84(`io-semplice-${tema}`);
     await obiettivoSemplice("nuovo «Inizio» (" + tema + ")", `obiettivo-semplice-${tema}`);
     await gruppoSemplice84("nuovo «Inizio» (" + tema + ")", `gruppo-semplice-${tema}`);
+    if(tema === "light"){ check(!(await avviso()), "nuovo «Inizio» nei 30 giorni: nessun avviso"); await senzaInterruttore("nuovo «Inizio»"); }
     await ctx.close();
   }
   // il nuovo con un partner sotto: Io resta semplificata (anche senza il promemoria dell'import, che altrimenti vedrebbe)
@@ -5510,17 +5523,66 @@ for(const tema of ["light", "dark"]){
   await entra84("f4", "Iris");
   await gruppoIntero("nuovo con un invitato in attesa della mappa", ".card.in-attesa");
   await ctx.close();
+  // il nuovo che ha dichiarato il 3%: l'interruttore c'è, spento; acceso → tutta l'app (anche ricaricando); spento → di nuovo semplice
+  for(const tema of ["light", "dark"]){
+    await entra84("1a", "Pia", { colorScheme:tema });
+    await profilo84();
+    const sw = page.locator(".card.tutta-app button[data-act=tutta-app]");
+    check(await sw.isVisible() && await sw.getAttribute("aria-checked") === "false" && (await sw.innerText()).includes("Mostra tutta l'app"),
+      `nuovo con il 3% (${tema}), Profilo: l'interruttore «Mostra tutta l'app», spento`);
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Profilo a 360 px (${tema}): niente scroll orizzontale`);
+    await foto84(`profilo-semplice-${tema}`);
+    await ctx.close();
+  }
+  await entra84("1a", "Pia");
+  await ioSemplice("nuovo con il 3%, interruttore spento");
+  await profilo84();
+  await page.click("button[data-act=tutta-app]");
+  check(await page.locator("button[data-act=tutta-app]").getAttribute("aria-checked") === "true", "nuovo con il 3%: l'interruttore si accende");
+  await page.click("button[data-act=profilo-indietro]");
+  await ioIntera("nuovo con il 3%, interruttore acceso", true);
+  await obiettivoIntero("nuovo con il 3%, interruttore acceso");
+  await gruppoIntero("nuovo con il 3%, interruttore acceso");
+  await page.goto("about:blank"); await page.goto(BASE + "#chiave=" + "1a".repeat(16)); await page.getByText("Ciao Pia").waitFor();   // stesso telefono, si riapre
+  if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  check(await page.locator("button[data-act=sez-io][data-sez=guida]").isVisible(), "nuovo con il 3%: ricaricando l'interruttore resta acceso (preferenza del telefono)");
+  // dalla Verifica al Profilo, si spegne, Indietro: si torna sulla Verifica, che si apre comunque (con le linguette per uscirne)
+  await page.click("button[data-act=sez-io][data-sez=guida]"); await page.getByText("Stabilità della tua rete").waitFor();
+  await profilo84();
+  await page.click("button[data-act=tutta-app]");
+  check(await page.locator("button[data-act=tutta-app]").getAttribute("aria-checked") === "false", "nuovo con il 3%: l'interruttore si spegne");
+  await page.click("button[data-act=profilo-indietro]");
+  check(await page.getByText("Stabilità della tua rete").isVisible() && await page.locator("button[data-act=sez-io][data-sez=giorno]").isVisible(),
+    "pagina nascosta raggiunta con Indietro: la Verifica si apre comunque, con «Il mio giorno» per uscirne");
+  await page.click("button[data-act=sez-io][data-sez=giorno]");
+  await ioSemplice("nuovo con il 3%, interruttore di nuovo spento");
+  await sync(page);
+  const pia = DB.partners.find(p => p.id === "pc84");
+  check(!Object.keys(pia).some(k => /tutta/i.test(k)) && !JSON.stringify(DB.seguimi || []).includes("pc84"), "interruttore: niente nel database");
+  await ctx.close();
+  await entra84("1b", "Bruno"); await profilo84();
+  check(await page.locator("button[data-act=tutta-app]").isVisible(), "nuovo con Path to Bronze: l'interruttore c'è");
+  await ctx.close();
   // dopo 30 giorni con il percorso non finito: l'app tutta, il percorso ancora in cima
   await entra84("c4", "Teo");
+  await page.locator("#toast .toast").first().waitFor({ timeout:3000 }).catch(() => {});
+  check(await avviso() === 1, "nuovo dopo 30 giorni: l'avviso «" + AVVISO + "»");
+  await senzaInterruttore("nuovo dopo 30 giorni");
   await ioIntera("nuovo dopo 30 giorni", true);
   await obiettivoIntero("nuovo dopo 30 giorni");
   await gruppoIntero("nuovo dopo 30 giorni");
   const primaCard = await page.evaluate(() => [...document.querySelectorAll("#app .card")].find(c => !c.classList.contains("domanda-notifiche")).className);
   check(/percorso-partenza/.test(primaCard), "nuovo dopo 30 giorni: il percorso è il primo riquadro di Io (" + primaCard + ")");
+  await page.goto("about:blank"); await page.goto(BASE + "#chiave=" + "c4".repeat(16)); await page.getByText("Ciao Teo").waitFor(); await page.waitForTimeout(500);
+  check(!(await avviso()), "nuovo dopo 30 giorni: l'avviso si vede una volta sola");
   await ctx.close();
   // partenza completata, avviato, admin: tutto come prima
-  await entra84("d4", "Cora"); await ioIntera("partenza completata", false); await obiettivoIntero("partenza completata"); await gruppoIntero("partenza completata"); await ctx.close();
-  await entra84("e4", "Alvise"); await ioIntera("avviato", false); await obiettivoIntero("avviato"); await gruppoIntero("avviato"); await ctx.close();
+  for(const [k, nome, chi] of [["d4", "Cora", "partenza completata"], ["e4", "Alvise", "avviato"]]){
+    await entra84(k, nome); await page.waitForTimeout(300);
+    check(!(await avviso()), chi + ": nessun avviso");
+    await ioIntera(chi, false); await obiettivoIntero(chi); await gruppoIntero(chi); await senzaInterruttore(chi);
+    await ctx.close();
+  }
   const R84 = DB.partners.find(p => p.id === "R");
   if(!R84.privacy_accettata_il) R84.privacy_accettata_il = ora;   // solo se la sezione gira da sola
   ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "a".repeat(32)));
@@ -5530,8 +5592,9 @@ for(const tema of ["light", "dark"]){
   await page.click("button[data-act=vista-obiettivo]"); await page.locator(".card.visione, button[data-act=obiettivo-modifica]").first().waitFor();
   check(!(await page.locator("button[data-act=percorso-tutto]").count()) && !(await page.locator(".card.prossima-tappa").count()), "admin, Obiettivo: come prima");
   await page.click("button[data-act=vista-io]"); await gruppoIntero("admin", ".albero.struttura");
+  check(!(await avviso()), "admin: nessun avviso"); await senzaInterruttore("admin");
   await ctx.close();
-  check(!errori.length, "versione semplificata, Io, Obiettivo e Gruppo: nessun errore nella pagina");
+  check(!errori.length, "versione semplificata (Io, Obiettivo, Gruppo, Profilo): nessun errore nella pagina");
   DB.numeri = DB.numeri.filter(x => !["ig84", "ig84u"].includes(x.partner_id));
   DB.obiettivi = DB.obiettivi.filter(o => !ID84.includes(o.partner_id));
   DB.partners = DB.partners.filter(p => !ID84.includes(p.id));
