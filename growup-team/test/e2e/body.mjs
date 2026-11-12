@@ -5404,10 +5404,12 @@ for(const tema of ["light", "dark"]){
 //     «Il mio mese», niente promemoria dell'import.
 //     Punto 2, Obiettivo: restano l'obiettivo, la riga della tappa che vale la cifra e «La prossima tappa»; il percorso
 //     fino a Diamante e «Come arrivarci» dietro «Vedi tutto il percorso». Persone non cambia.
+//     Punto 3, Gruppo: restano «Invita» e «Qui vedrai le persone che inviterai.»; con almeno un partner sotto (nella mappa,
+//     in attesa o un suo nuovo in partenza) il Gruppo si vede intero.
 {
   const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), ora = new Date().toISOString();
   const quando = n => new Date(Date.now() + n * 864e5).toISOString();
-  const ID84 = ["in84", "ig84", "ig84u", "tr84", "co84", "av84", "pc84"];
+  const ID84 = ["in84", "ig84", "ig84u", "tr84", "co84", "av84", "pc84", "ia84", "ia84a"];
   const p84 = (id, nome, k, extra) => DB.partners.push(Object.assign({ id, nome, sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:k.repeat(16),
     codice_invito:id.toUpperCase() + "XX", codice_amway:"79840" + (ID84.indexOf(id) + 10), data_iscrizione:giorno(-3), privacy_accettata_il:ora,
     confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true }, extra || {}));
@@ -5420,6 +5422,8 @@ for(const tema of ["light", "dark"]){
   p84("tr84", "Teo Trenta", "c4", { data_iscrizione:giorno(-40), privacy_accettata_il:quando(-35), creato_il:quando(-35) });   // percorso non finito, 35 giorni
   p84("co84", "Cora Completa", "d4", { data_iscrizione:giorno(-10), privacy_accettata_il:quando(-5), partenza_completata_il:quando(-1) });
   p84("av84", "Alvise Avviato", "e4", { data_iscrizione:giorno(-200) });
+  p84("ia84", "Iris Attesa", "f4");                                                     // nuovo: chi ha invitato è entrato, in attesa della mappa
+  p84("ia84a", "Aldo Iris", "g4", { sponsor_id:"ia84", invitato_da:"ia84", confermato_il:null, partenza_completata_il:quando(-1), conPercorso:false });
   const entra84 = async (k, nome, opz) => {
     ({ ctx, page } = await apri(Object.assign({ viewport:{ width:360, height:780 } }, opz || {}), "#chiave=" + k.repeat(16)));
     await page.getByText("Ciao " + nome).waitFor();
@@ -5471,6 +5475,23 @@ for(const tema of ["light", "dark"]){
       && !(await page.locator(".card.prossima-tappa").count()), chi + ", Obiettivo: tutto il percorso in vista, come prima");
     await page.click("button[data-act=vista-io]");
   };
+  const FRASE = "Qui vedrai le persone che inviterai.";
+  const gruppoSemplice84 = async (chi, foto) => {
+    await page.click("button[data-act=vista-gruppo]"); await page.locator(".card.invita").waitFor();
+    check(await page.locator(".card.gruppo-semplice", { hasText:FRASE }).isVisible(), chi + ", Gruppo: la frase «" + FRASE + "»");
+    check(!(await page.locator(".albero.struttura").count()) && !(await page.locator(".card .eyebrow", { hasText:"Preferiti" }).count())
+      && !(await page.locator(".card.in-attesa, .nuovi-partenza").count()) && !(await page.getByText("Storico del gruppo").count())
+      && !(await page.locator(".mappa-gruppo").count()), chi + ", Gruppo: niente struttura, preferiti, in attesa, storico del gruppo");
+    check(await page.locator(".card.invita").count() === 1, chi + ", Gruppo: «Invita» c'è");
+    if(foto) await foto84(foto);
+    await page.click("button[data-act=vista-io]");
+  };
+  const gruppoIntero = async (chi, cosa) => {
+    await page.click("button[data-act=vista-gruppo]"); await page.locator(".card.invita").waitFor();
+    check(!(await page.locator(".card.gruppo-semplice").count()) && await page.locator(".card .eyebrow", { hasText:"Preferiti" }).count() === 1
+      && await page.locator(".mappa-gruppo").count() === 1 && (!cosa || await page.locator(cosa).count() > 0), chi + ", Gruppo intero, come prima");
+    await page.click("button[data-act=vista-io]");
+  };
   // il nuovo con «Inizio»: Io semplificata, a 360 px in chiaro e scuro
   for(const tema of ["light", "dark"]){
     await entra84("a4", "Ivo", { colorScheme:tema });
@@ -5478,22 +5499,28 @@ for(const tema of ["light", "dark"]){
     check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Io semplificata a 360 px (${tema}): niente scroll orizzontale`);
     await foto84(`io-semplice-${tema}`);
     await obiettivoSemplice("nuovo «Inizio» (" + tema + ")", `obiettivo-semplice-${tema}`);
+    await gruppoSemplice84("nuovo «Inizio» (" + tema + ")", `gruppo-semplice-${tema}`);
     await ctx.close();
   }
   // il nuovo con un partner sotto: Io resta semplificata (anche senza il promemoria dell'import, che altrimenti vedrebbe)
   await entra84("b4", "Ida");
   await ioSemplice("nuovo con un partner sotto");
+  await gruppoIntero("nuovo con un partner nella mappa", ".albero.struttura li:has-text('Ugo Ida')");
+  await ctx.close();
+  await entra84("f4", "Iris");
+  await gruppoIntero("nuovo con un invitato in attesa della mappa", ".card.in-attesa");
   await ctx.close();
   // dopo 30 giorni con il percorso non finito: l'app tutta, il percorso ancora in cima
   await entra84("c4", "Teo");
   await ioIntera("nuovo dopo 30 giorni", true);
   await obiettivoIntero("nuovo dopo 30 giorni");
+  await gruppoIntero("nuovo dopo 30 giorni");
   const primaCard = await page.evaluate(() => [...document.querySelectorAll("#app .card")].find(c => !c.classList.contains("domanda-notifiche")).className);
   check(/percorso-partenza/.test(primaCard), "nuovo dopo 30 giorni: il percorso è il primo riquadro di Io (" + primaCard + ")");
   await ctx.close();
   // partenza completata, avviato, admin: tutto come prima
-  await entra84("d4", "Cora"); await ioIntera("partenza completata", false); await obiettivoIntero("partenza completata"); await ctx.close();
-  await entra84("e4", "Alvise"); await ioIntera("avviato", false); await obiettivoIntero("avviato"); await ctx.close();
+  await entra84("d4", "Cora"); await ioIntera("partenza completata", false); await obiettivoIntero("partenza completata"); await gruppoIntero("partenza completata"); await ctx.close();
+  await entra84("e4", "Alvise"); await ioIntera("avviato", false); await obiettivoIntero("avviato"); await gruppoIntero("avviato"); await ctx.close();
   const R84 = DB.partners.find(p => p.id === "R");
   if(!R84.privacy_accettata_il) R84.privacy_accettata_il = ora;   // solo se la sezione gira da sola
   ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "a".repeat(32)));
@@ -5502,8 +5529,9 @@ for(const tema of ["light", "dark"]){
   await ioIntera("admin");
   await page.click("button[data-act=vista-obiettivo]"); await page.locator(".card.visione, button[data-act=obiettivo-modifica]").first().waitFor();
   check(!(await page.locator("button[data-act=percorso-tutto]").count()) && !(await page.locator(".card.prossima-tappa").count()), "admin, Obiettivo: come prima");
+  await page.click("button[data-act=vista-io]"); await gruppoIntero("admin", ".albero.struttura");
   await ctx.close();
-  check(!errori.length, "versione semplificata, Io e Obiettivo: nessun errore nella pagina");
+  check(!errori.length, "versione semplificata, Io, Obiettivo e Gruppo: nessun errore nella pagina");
   DB.numeri = DB.numeri.filter(x => !["ig84", "ig84u"].includes(x.partner_id));
   DB.obiettivi = DB.obiettivi.filter(o => !ID84.includes(o.partner_id));
   DB.partners = DB.partners.filter(p => !ID84.includes(p.id));
