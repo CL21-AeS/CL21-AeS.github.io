@@ -115,7 +115,8 @@ Controlla e riporta, per ognuno, "in linea / da sistemare / da decidere con Stef
    veda l'informativa e cosa è stato inserito su di lei.
 6. **Dati di persone esterne (contatti, prospect)**: nomi e note su persone che non sanno di essere
    nell'app sono il punto più delicato. Minimizza (solo nome e stato, niente note su salute, soldi,
-   famiglia), visibili solo a chi li ha inseriti, cancellazione automatica dopo un periodo deciso.
+   famiglia), visibili solo a chi li ha inseriti, cancellazione automatica secondo la regola dei 24 mesi
+   (punto 10).
 7. **Minimizzazione**: ogni campo serve davvero? Telefono, email, data di nascita, codice Amway: chiedere
    solo ciò che si usa.
 8. **Dati particolari**: in un'app che parla di prodotti per il benessere possono finire nelle note dati sulla
@@ -123,8 +124,17 @@ Controlla e riporta, per ognuno, "in linea / da sistemare / da decidere con Stef
 9. **Diritti delle persone**: dall'app o su richiesta, ognuno deve poter **vedere** i propri dati,
    **correggerli**, **scaricarli** (portabilità) e **cancellarsi**. La cancellazione deve togliere davvero i
    dati personali (o renderli anonimi nei calcoli del gruppo), non solo nascondere il profilo.
-10. **Tempi di conservazione**: per partner che lasciano il gruppo, contatti chiusi, storico mensile,
-    copie di sicurezza. Meglio se automatici (pg_cron).
+10. **Tempi di conservazione**: per partner che lasciano il gruppo, contatti, storico mensile, copie di
+    sicurezza. Meglio se automatici (pg_cron).
+    - **Contatti, deciso da Stefano**: Lista, Target e Clienti si cancellano **24 mesi dopo l'ultima cosa
+      fatta sulla persona** (inserimento, modifica, passo, ordine: la più recente; qualsiasi esito, anche "No"
+      o "Chiuso senza risposta"); ogni passo o ordine fa **ripartire** i 24 mesi (clienti, scelta A: chi
+      compra resta). In Growup Team: migrazione 055 e attività della notte 055b.
+      Controlla che: la data dell'ultima cosa fatta si aggiorni davvero a ogni inserimento, modifica, passo e
+      ordine; la cancellazione automatica esista, giri ogni notte solo sul server (non chiamabile dall'app) e
+      tolga anche le note; un promemoria "ricordamelo tra X mesi" non superi la scadenza; l'informativa dica
+      la regola in parole semplici; chi ha inserito il contatto veda l'avviso «si cancella tra N giorni» 30
+      giorni prima, così può fare un passo se lo sta ancora seguendo.
 11. **Cookie e memoria del browser**: se l'app usa solo memoria tecnica (accesso, preferenze) e nessun
     sistema di statistiche o pubblicità, non serve il banner dei cookie; va però citata nell'informativa.
     Se si aggiungono statistiche, serve rivedere.
@@ -154,7 +164,7 @@ Livello: rapido / completo
 - Chi potrebbe farlo: (un estraneo / un partner di un'altra linea / un downline)
 - Cosa rischiamo: …
 - Come l'ho verificato: …
-- Correzione proposta: … (tempo stimato: …)
+- Correzione fatta o proposta: … (tempo stimato: …)
 ### 🟠 Medio — …
 ### 🟡 Basso / migliorie — …
 
