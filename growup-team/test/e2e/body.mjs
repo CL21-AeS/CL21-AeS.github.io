@@ -5961,9 +5961,9 @@ for(const tema of ["light", "dark"]){
 
 // 89. La qualifica dichiarata (13 novembre 2026): l'etichetta «La tua qualifica attuale» (il significato resta «oggi») e sotto
 //     la riga piccola su quale percentuale e qualifica. All'ingresso con l'invito e nel «Mio punto di partenza». A 360 px
-//     l'etichetta sta su una riga; la riga piccola (12 px) va su tre, con «(settembre–agosto)» intero. Anteprima dell'ingresso in chiaro e scuro.
+//     l'etichetta sta su una riga; la riga piccola (12 px) al massimo su due, con «(settembre–agosto)» intero. Anteprima dell'ingresso in chiaro e scuro.
 {
-  const NOTA = "Percentuale: quella del mese scorso. Da Platino in su: quella dell'ultimo anno fiscale chiuso (settembre–agosto).";
+  const NOTA = "Percentuale: del mese scorso. Da Platino in su: dell'ultimo anno fiscale (settembre–agosto).";
   const misura = sel => page.locator(sel).first().evaluate(el => { const lh = parseFloat(getComputedStyle(el).lineHeight) || 18;
     return { righe:Math.round(el.getBoundingClientRect().height / lh), testo:el.textContent.replace(/\s+/g, " ").trim() }; });
   for(const tema of ["light", "dark"]){
@@ -5972,7 +5972,7 @@ for(const tema of ["light", "dark"]){
     const et = await misura("form[data-form=ingresso] label.field:has(select[name=qualifica]) > span:first-child");
     const nota = await misura("form[data-form=ingresso] .nota-qualifica");
     check(et.testo === "La tua qualifica attuale" && et.righe === 1, `ingresso (${tema}): «La tua qualifica attuale» su una riga a 360 px`);
-    check(nota.testo === NOTA && nota.righe <= 3 && (await page.locator("form[data-form=ingresso] .nota-qualifica .nowrap").innerText()) === "(settembre–agosto).", `ingresso (${tema}): sotto la riga piccola su percentuale e Platino (${nota.righe} righe)`);
+    check(nota.testo === NOTA && nota.righe <= 2 && (await page.locator("form[data-form=ingresso] .nota-qualifica .nowrap").innerText()) === "(settembre–agosto).", `ingresso (${tema}): sotto la riga piccola su percentuale e Platino (${nota.righe} righe)`);
     check(!(await page.getByText("La tua qualifica oggi").count()) && !(await page.getByText("Il livello più alto").count()), `ingresso (${tema}): niente etichette vecchie`);
     check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `ingresso (${tema}), 360 px: niente scroll orizzontale`);
     const campo = page.locator("form[data-form=ingresso] label.field:has(select[name=qualifica])");

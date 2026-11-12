@@ -1272,7 +1272,7 @@ function campiQualifica(obbligoData, scelta){
         <select name="qualifica"><option value=""${sel("")}>Inizio (nessuna qualifica)</option>
           <optgroup label="Percentuale raggiunta">${pin}</optgroup>
           <optgroup label="Qualifiche">${qual}</optgroup></select>
-        <span class="nota-qualifica">Percentuale: quella del mese scorso. Da Platino in su: quella dell'ultimo anno fiscale chiuso <span class="nowrap">(settembre–agosto).</span></span></label>
+        <span class="nota-qualifica">Percentuale: del mese scorso. Da Platino in su: dell'ultimo anno fiscale <span class="nowrap">(settembre–agosto).</span></span></label>
       <div data-mostra="prossima" ${daPlatino(scelta.valore) ? "" : "hidden"}>
         <label class="field"><span>Prossima qualifica che vuoi ottenere</span>
           <select name="prossima">${opzioniProssima(scelta.valore, scelta.prossima)}</select></label>

@@ -68,14 +68,19 @@ Scelte di Stefano.
    dell'interfaccia: sezione 88 (tocco con app chiusa, con app aperta, persona in attesa, persona non visibile).
 4. **L'etichetta della qualifica** (database non toccato): dove si dichiara la qualifica (`campiQualifica`: ingresso con
    l'invito e «Il mio punto di partenza») l'etichetta è **«La tua qualifica attuale»** e sotto una riga piccola:
-   «Percentuale: quella del mese scorso. Da Platino in su: quella dell'ultimo anno fiscale chiuso (settembre–agosto).»
+   «Percentuale: del mese scorso. Da Platino in su: dell'ultimo anno fiscale (settembre–agosto).»
    La proposta iniziale («Il livello più alto che hai raggiunto») cambiava il significato del campo: Stefano ha scelto che
    il **significato resti «oggi»**, come deciso il 22 ottobre (l'app usa il valore come punto di partenza di oggi). A 360
-   px l'etichetta sta su una riga; la riga piccola a 12 px va su tre righe, con «(settembre–agosto)» intero (in due righe
-   servirebbero meno di 11 px). Il resto del campo non cambia. Test dell'interfaccia: sezione 89 (anteprima
+   px l'etichetta sta su una riga e la riga piccola (12 px) su due, con «(settembre–agosto)» intero (scelta di Stefano:
+   la frase ridotta, perché quella lunga andava su tre righe). Il resto del campo non cambia. Test dell'interfaccia: sezione 89 (anteprima
    `e2e/89-qualifica-light.png` e `-dark.png`), sezione dell'ingresso aggiornata.
 5. Service worker **v120**, questo STATO.md.
-Da fare prima di unire: applicare su Supabase la **064** (prima della PR 2) e la **065** (prima della PR 3).
+**Migrazioni 064 e 065 applicate su Supabase da Claude il 13 novembre**, prima di unire le PR. Prima di applicare la 065
+si è controllato che `importa_mappa` e `salva_mese_passato` sul progetto fossero le stesse del repository (stesso codice:
+sul progetto mancano solo i commenti); dopo, impronte del codice, permessi (le funzioni interne non si chiamano dal
+telefono) e trigger attivi uguali al repository. Gli avvisi di sicurezza di Supabase: niente di nuovo (solo il solito
+«eseguibile da authenticated» per le funzioni che l'app chiama, `ordini_in_attesa`, `importa_mappa`, `salva_mese_passato`,
+che controllano dentro chi le chiama).
 
 ## «La prossima cosa» dal percorso: sempre quello che manca (13 novembre 2026, app v119, database non toccato)
 
