@@ -5600,6 +5600,88 @@ for(const tema of ["light", "dark"]){
   DB.partners = DB.partners.filter(p => !ID84.includes(p.id));
 }
 
+// 85. «La prossima cosa» dal percorso (13 novembre 2026): sempre quello che manca nella fase in corso, con i dati del percorso.
+//     Fase 2 con l'incontro fissato: i nomi (12 di 30, entro…) → Lista; fase 3: il primo ordine (VP e giorni) → Ordini;
+//     ordine confermato in attesa della mappa: niente dal percorso; fase 4: il primo piano → + Piano, poi il primo cliente →
+//     Clienti. Gli avviati non hanno niente dal percorso.
+{
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), ora = new Date().toISOString();
+  DB.partners.push({ id:"pn85", nome:"Pina Prossima", sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:"2a".repeat(16), codice_invito:"PN85XX",
+    codice_amway:"7985001", data_iscrizione:giorno(-3), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora,
+    conPercorso:true, incontro_sponsor:giorno(1) });
+  DB.partners.push({ id:"av85", nome:"Aldo Avviato", sponsor_id:"R", invitato_da:"R", stato:"attivo", chiave:"2b".repeat(16), codice_invito:"AV85XX",
+    codice_amway:"7985002", data_iscrizione:giorno(-200), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true });
+  const nomi85 = n => { DB.persone = (DB.persone || []).filter(x => x.proprietario !== "pn85")
+    .concat(Array.from({ length:n }, (_, i) => ({ id:"pn85n" + i, proprietario:"pn85", nome:"Nome Pina " + (i + 1), fase:"lista", esito:null, creato_il:ora }))); };
+  const entra85 = async (k, nome, opz) => {
+    ({ ctx, page } = await apri(Object.assign({ viewport:{ width:360, height:780 } }, opz || {}), "#chiave=" + k.repeat(16)));
+    await page.getByText("Ciao " + nome).waitFor();
+    if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]");
+  };
+  const card = () => page.locator(".card.oggi-lista");
+  const dalPercorso = async () => await card().locator(".small", { hasText:"dal tuo percorso" }).count() === 1;
+  const titolo = async () => (await card().locator(".prossima-titolo").innerText()).trim();
+  const motivo = async () => (await card().locator(".prossima-titolo + p.small").innerText()).replace(/\s+/g, " ").trim();
+  const tocca = () => card().locator(".prossima-azioni button.primary").click();
+  // fase 2, incontro fissato, 12 nomi su 30
+  nomi85(12);
+  for(const tema of ["light", "dark"]){
+    await entra85("2a", "Pina", { colorScheme:tema });
+    check(await dalPercorso() && await titolo() === "Scrivi i prossimi nomi nella Lista" && /^12 di 30 nomi · entro \S+/.test(await motivo()),
+      `fase 2 (${tema}): «Scrivi i prossimi nomi nella Lista · 12 di 30 nomi · entro …» (${await motivo()})`);
+    await card().screenshot({ path: S + `/e2e/85-prossima-nomi-${tema}.png` });
+    if(tema === "light"){ await tocca();
+      check(await page.locator("button[data-act=sez-persone][data-sez=lista][aria-pressed=true]").isVisible(), "fase 2: il pulsante apre la Lista"); }
+    await ctx.close();
+  }
+  // fase 3: il primo ordine
+  nomi85(30);
+  await entra85("2a", "Pina");
+  check(await titolo() === "Il tuo primo ordine" && await motivo() === "0 di 50 VP · restano 27 giorni", "fase 3: «Il tuo primo ordine · 0 di 50 VP · restano 27 giorni» (" + await motivo() + ")");
+  await card().screenshot({ path: S + "/e2e/85-prossima-ordine-light.png" });
+  await tocca();
+  check(await page.locator(".sheet").isVisible() && await page.locator(".sheet", { hasText:"bozz" }).count() === 1, "fase 3: il pulsante apre gli Ordini");
+  await ctx.close();
+  // ordine confermato, in attesa della mappa: niente dal percorso
+  DB.ordiniMiei = (DB.ordiniMiei || []).concat([{ id:"pn85b", proprietario:"pn85", stato:"confermato", data:giorno(0), vp:60, attivita_id:null, nome:null,
+    persona_id:null, ordine_cliente_id:null, creato_il:ora, confermato_il:ora }]);
+  await entra85("2a", "Pina");
+  check(await page.locator(".percorso-partenza .ordine-attesa").isVisible() && !(await page.locator(".card.oggi-lista .small", { hasText:"dal tuo percorso" }).count()),
+    "ordine in attesa della mappa: niente «La prossima cosa» dal percorso");
+  await ctx.close();
+  // fase 4: la mappa mostra l'ordine → il primo piano
+  mappa("pn85", 60);
+  await entra85("2a", "Pina");
+  check(await titolo() === "Il tuo primo piano" && await motivo() === "I due binari · mancano il primo piano e il primo cliente", "fase 4: il primo piano, mancano tutti e due (" + await motivo() + ")");
+  await tocca();
+  check(await page.locator(".sheet").isVisible() && await page.locator(".sheet", { hasText:"con chi?" }).count() === 1, "fase 4: il pulsante apre «+ Piano»");
+  await ctx.close();
+  // con il primo piano: il primo cliente
+  DB.activities.push({ id:"pn85p", partner_id:"pn85", tipo:"piano", quantita:1, data:giorno(0), inserito_il:ora });
+  await entra85("2a", "Pina");
+  check(await titolo() === "Il tuo primo cliente" && await motivo() === "I due binari · manca solo il primo cliente", "fase 4: con il piano, il primo cliente (" + await motivo() + ")");
+  await tocca();
+  check(await page.locator("button[data-act=sez-persone][data-sez=clienti][aria-pressed=true]").isVisible(), "fase 4: il pulsante apre i Clienti");
+  await ctx.close();
+  // con il cliente ma senza piano: solo il primo piano
+  DB.activities = DB.activities.filter(a => a.id !== "pn85p");
+  DB.activities.push({ id:"pn85c", partner_id:"pn85", tipo:"cliente", quantita:1, data:giorno(0), inserito_il:ora });
+  await entra85("2a", "Pina");
+  check(await titolo() === "Il tuo primo piano" && await motivo() === "I due binari · manca solo il primo piano", "fase 4: con il cliente, manca solo il piano (" + await motivo() + ")");
+  await ctx.close();
+  // l'avviato: niente dal percorso
+  await entra85("2b", "Aldo");
+  check(!(await page.locator(".card.oggi-lista .small", { hasText:"dal tuo percorso" }).count()), "avviato: niente «La prossima cosa» dal percorso");
+  await ctx.close();
+  check(!errori.length, "«La prossima cosa» dal percorso: nessun errore nella pagina");
+  DB.persone = DB.persone.filter(x => x.proprietario !== "pn85");
+  DB.activities = DB.activities.filter(a => a.partner_id !== "pn85");
+  DB.ordiniMiei = DB.ordiniMiei.filter(x => x.proprietario !== "pn85");
+  DB.numeri = DB.numeri.filter(x => x.partner_id !== "pn85");
+  DB.obiettivi = (DB.obiettivi || []).filter(o => !["pn85", "av85"].includes(o.partner_id));
+  DB.partners = DB.partners.filter(p => !["pn85", "av85"].includes(p.id));
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

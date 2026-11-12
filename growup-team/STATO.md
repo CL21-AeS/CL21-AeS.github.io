@@ -3,6 +3,23 @@
 Ultimo aggiornamento: 12 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## «La prossima cosa» dal percorso: sempre quello che manca (13 novembre 2026, app v119, database non toccato)
+
+Idea proposta da Claude, scelta di Stefano. Per chi è nel percorso di partenza (anche oltre i 30 giorni, finché non lo
+finisce) il riquadro «La prossima cosa» in Io mostra **sempre quello che manca nella fase in corso** (`prossimaPercorso`),
+con i dati del percorso e senza dire come farlo. Prima c'era solo «Fissa l'incontro con il tuo sponsor»; dopo, il riquadro
+spariva se non c'era una persona della Lista da sentire oggi.
+- Fase 2, incontro senza data: «Fissa l'incontro con il tuo sponsor» (come prima).
+- Fase 2, incontro fissato: «Scrivi i prossimi nomi nella Lista · 12 di 30 nomi · entro sabato 14» → «Lista ›».
+- Fase 3: «Il tuo primo ordine · 0 di 50 VP · restano 27 giorni» (oltre: «oltre i 30 giorni») → «Ordini ›».
+  Ordine confermato in attesa della mappa: niente dal percorso (non c'è niente da fare).
+- Fase 4: «Il tuo primo piano» («mancano il primo piano e il primo cliente» / «manca solo il primo piano») → «+ Piano»;
+  con il piano fatto «Il tuo primo cliente · manca solo il primo cliente» → «Clienti ›».
+Le persone della Lista da sentire oggi restano sotto, come prima. Avviati e chi ha finito il percorso: niente cambia.
+All'upline nessun dato nuovo. Service worker v119. Test dell'interfaccia: 1262 controlli superati (sezione 85: tutte le
+fasi con il pulsante, ordine in attesa della mappa, avviato; anteprima `e2e/85-prossima-nomi-light.png` e `-dark.png`,
+`85-prossima-ordine-light.png`).
+
 ## Versione semplificata per chi inizia (12 novembre 2026, app v118, database non toccato)
 
 Quattro PR in fila, da unire in ordine (una per punto); la versione del service worker sale una volta sola, nell'ultima.
