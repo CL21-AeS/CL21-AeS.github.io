@@ -1368,6 +1368,9 @@ function testoPrivacy(){
         loro ordini) li vedi <b>solo tu</b>: né la tua upline né Stefano e Alessia. A chi ti segue arrivano soltanto i numeri
         (quanti in lista, piani, sì, clienti). Inserisci solo persone
         che conosci, con i dati che servono a ricontattarle; le togli quando vuoi.</p>
+      <p><b>Se scegli di condividere.</b> Se lo scegli tu, dal Profilo, il tuo sponsor e la tua upline vedono anche i numeri
+        del Seguimi, i numeri che scrivi a mano (app CumLaude21, Training Day, Convention) e le tue abitudini. Mai i nomi.
+        Lo spegni quando vuoi.</p>
       <p><b>A cosa servono.</b> A pianificare la tua settimana e a farti aiutare da chi ti segue.</p>
       <p><b>Dove stanno.</b> In un database ospitato nell'Unione Europea (Supabase).</p>
       <p><b>Per quanto.</b> Il tuo profilo resta finché sei nella mappa Amway del gruppo; se ne esci, i tuoi dati si
@@ -1527,6 +1530,7 @@ function vHome(){
   ${vInAttesa()}
   ${vStoricoGruppo()}
   ${vInvita()}` : st.sezIo === "guida" ? vGuida() : `
+  ${vDomandaCondividi()}
   ${vDomandaNotifiche()}
   ${festaDaFare() ? vFesta() : ""}
   ${linkDaSalvare() && !percorsoAttivo() ? vPrimiPassi() : ""}
@@ -1667,6 +1671,23 @@ function vDomandaNotifiche(){
     <div class="row" style="gap:8px;margin-top:10px">${iosSenzaHome()
       ? `<button class="btn grow" data-act="notifiche-no">Ho capito</button>`
       : `<button class="btn primary grow" data-act="notifiche-si">Sì, attiva</button><button class="btn grow" data-act="notifiche-no">Non ora</button>`}</div>
+  </div>`;
+}
+/* 13 novembre 2026 (scelta di Stefano): quando il Seguimi si accende (i nuovi alla festa della partenza, gli avviati al primo
+   ingresso), una volta sola, in cima a Io la domanda sulla condivisione con lo sponsor e l'upline. Nessuna scelta già fatta:
+   «Sì, condividi» accende «condividi» in seguimi; «Non ora» lo lascia spento. Dopo una risposta (o una scelta
+   dall'interruttore del Profilo) non torna: è ricordata su questo telefono. Non a chi condivide già, a chi ha il Seguimi
+   spento, né nella versione semplificata. */
+const chiaveDomandaCondividi = () => "growup-team.domanda-condividi." + st.profilo.id;
+function vDomandaCondividi(){
+  const s = st.seguimi || {};
+  if(!s.attivo || s.condividi || versioneSemplice() || leggiLocale(chiaveDomandaCondividi()) === "1") return "";
+  return `<div class="card domanda-condividi">
+    <span class="eyebrow">Seguimi</span>
+    <h3 style="margin-top:4px">Vuoi che il tuo sponsor e la tua upline vedano come va il tuo Seguimi?</h3>
+    <p class="small" style="margin:6px 0 0">Così possono aiutarti quando ti fermi. Vedono i numeri, mai i nomi.</p>
+    <div class="row" style="gap:8px;margin-top:10px"><button class="btn primary grow" data-act="condividi-si">Sì, condividi</button>
+      <button class="btn grow" data-act="condividi-no">Non ora</button></div>
   </div>`;
 }
 function vNotificheProfilo(){
@@ -7519,9 +7540,16 @@ Object.assign(AZIONI, {
   },
   async "seguimi-condividi"(){
     const r = { attivo:!!st.seguimi.attivo, condividi:!st.seguimi.condividi };
-    try{ await api.salvaSeguimi(r); st.seguimi = r; render();
+    try{ await api.salvaSeguimi(r); st.seguimi = r; salvaLocale(chiaveDomandaCondividi(), "1"); render();
       toast(r.condividi ? "Il tuo sponsor e la tua upline vedono i tuoi dati (mai i nomi)" : "I tuoi dati li vedi solo tu"); }catch(e){ toast(messaggio(e)); }
-  }
+  },
+  /* la domanda in cima a Io: la risposta si ricorda su questo telefono solo quando è salvata */
+  async "condividi-si"(){
+    const r = { attivo:!!st.seguimi.attivo, condividi:true };
+    try{ await api.salvaSeguimi(r); st.seguimi = r; salvaLocale(chiaveDomandaCondividi(), "1"); render();
+      toast("Il tuo sponsor e la tua upline vedono i numeri del tuo Seguimi, mai i nomi. Lo cambi dal Profilo.", null, 6000); }catch(e){ toast(messaggio(e)); }
+  },
+  "condividi-no"(){ salvaLocale(chiaveDomandaCondividi(), "1"); render(); toast("Va bene: i tuoi numeri li vedi solo tu. Lo cambi dal Profilo."); }
 });
 
 /* ---- 11k. Analisi della persona (037): di sé (dalla Verifica) e di chi è nel gruppo (dalla scheda partner). Pagina a parte,

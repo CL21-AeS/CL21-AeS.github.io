@@ -3,6 +3,27 @@
 Ultimo aggiornamento: 12 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Condivisione, primo ordine in attesa, avvisi allo sponsor, qualifica (13 novembre 2026, in corso)
+
+Quattro PR in fila, da unire in ordine (una per punto); la versione del service worker sale una volta sola, nell'ultima.
+Scelte di Stefano.
+1. **La domanda sulla condivisione** (database non toccato): quando il Seguimi si accende (i nuovi dopo la festa della
+   partenza, con «Vai al cruscotto»; gli avviati al primo ingresso, dove si accende da solo dalla v117), in cima a Io la
+   card «Vuoi che il tuo sponsor e la tua upline vedano come va il tuo Seguimi? Così possono aiutarti quando ti fermi.
+   Vedono i numeri, mai i nomi.» (`vDomandaCondividi`) con **«Sì, condividi»** (pesca) e **«Non ora»** con lo stesso peso
+   (stessa misura, bordo pieno): nessuna scelta già fatta, nessun interruttore acceso. «Sì» accende «condividi» in seguimi
+   (la colonna di sempre, `condividi-si`); «Non ora» lo lascia spento (`condividi-no`). Dopo una risposta la card non torna:
+   è ricordata **su questo telefono** (`growup-team.domanda-condividi.<id>`, con try/catch), anche quando la scelta si fa
+   dall'interruttore del Profilo, che resta com'è. Non compare a chi ha già «condividi» acceso, a chi ha il Seguimi spento,
+   né nella versione semplificata (`versioneSemplice()`). In concreto compare a chiunque abbia il Seguimi acceso e
+   «condividi» spento e non abbia ancora risposto su quel telefono (anche a chi accende il Seguimi a mano dal Profilo).
+   Nell'**informativa** (`testoPrivacy`) la riga «Se scegli di condividere»: dal Profilo, sponsor e upline vedono anche i
+   numeri del Seguimi, i numeri scritti a mano (app CumLaude21, Training Day, Convention) e le abitudini; mai i nomi; si
+   spegne quando si vuole. Test dell'interfaccia: sezione 86 (nuovo dopo la festa con «Sì», avviato al primo ingresso con
+   «Non ora» e riapertura sullo stesso telefono, chi condivide già, Seguimi spento, versione semplificata, scelta dal
+   Profilo, informativa; anteprima di Io a 360 px `e2e/86-domanda-light.png` e `-dark.png`).
+   Da sapere: su un telefono nuovo chi aveva risposto «Non ora» rivede la domanda una volta.
+
 ## «La prossima cosa» dal percorso: sempre quello che manca (13 novembre 2026, app v119, database non toccato)
 
 Idea proposta da Claude, scelta di Stefano. Per chi è nel percorso di partenza (anche oltre i 30 giorni, finché non lo
