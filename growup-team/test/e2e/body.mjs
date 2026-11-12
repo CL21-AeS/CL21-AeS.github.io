@@ -2156,7 +2156,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check((await riga("Linea Prima").nth(1).innerText()) === String(mesiPY.length) && (await riga("Linea Prima").nth(2).innerText()) === "21%"
     && (await riga("Linea Seconda").nth(1).innerText()) === "1" && (await riga("Linea Terza").nth(1).innerText()) === "0", "le linee nel Performance Year: mesi al 21%");
   await page.click(".prossima-qualifica button[data-act=partenza]");
-  check(await page.locator(".sheet .field span", { hasText:"La tua qualifica oggi" }).isVisible(), "l'etichetta: La tua qualifica oggi");
+  check(await page.locator(".sheet .field span", { hasText:"La tua qualifica attuale" }).isVisible(), "l'etichetta: La tua qualifica attuale");
   await page.selectOption(".sheet select[name=prossima]", "zaffiro");
   await page.click(".sheet button.primary");
   await page.getByText("Punto di partenza aggiornato").waitFor();
@@ -5957,6 +5957,30 @@ for(const tema of ["light", "dark"]){
   check(!errori.length, "tocco sugli avvisi: nessun errore nella pagina");
   DB.obiettivi = (DB.obiettivi || []).filter(o => !["88888888-0000-4000-8000-000000000001", "88888888-0000-4000-8000-000000000002"].includes(o.partner_id));
   DB.partners = DB.partners.filter(p => !["88888888-0000-4000-8000-000000000001", "88888888-0000-4000-8000-000000000002"].includes(p.id));
+}
+
+// 89. La qualifica dichiarata (13 novembre 2026): l'etichetta «La tua qualifica attuale» (il significato resta «oggi») e sotto
+//     la riga piccola su quale percentuale e qualifica. All'ingresso con l'invito e nel «Mio punto di partenza». A 360 px
+//     l'etichetta sta su una riga; la riga piccola (12 px) va su tre, con «(settembre–agosto)» intero. Anteprima dell'ingresso in chiaro e scuro.
+{
+  const NOTA = "Percentuale: quella del mese scorso. Da Platino in su: quella dell'ultimo anno fiscale chiuso (settembre–agosto).";
+  const misura = sel => page.locator(sel).first().evaluate(el => { const lh = parseFloat(getComputedStyle(el).lineHeight) || 18;
+    return { righe:Math.round(el.getBoundingClientRect().height / lh), testo:el.textContent.replace(/\s+/g, " ").trim() }; });
+  for(const tema of ["light", "dark"]){
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema, deviceScaleFactor:2 }, invitoPer("R", "Quinto Qualifica", "7989001")));
+    await page.locator("form[data-form=ingresso]").waitFor();
+    const et = await misura("form[data-form=ingresso] label.field:has(select[name=qualifica]) > span:first-child");
+    const nota = await misura("form[data-form=ingresso] .nota-qualifica");
+    check(et.testo === "La tua qualifica attuale" && et.righe === 1, `ingresso (${tema}): «La tua qualifica attuale» su una riga a 360 px`);
+    check(nota.testo === NOTA && nota.righe <= 3 && (await page.locator("form[data-form=ingresso] .nota-qualifica .nowrap").innerText()) === "(settembre–agosto).", `ingresso (${tema}): sotto la riga piccola su percentuale e Platino (${nota.righe} righe)`);
+    check(!(await page.getByText("La tua qualifica oggi").count()) && !(await page.getByText("Il livello più alto").count()), `ingresso (${tema}): niente etichette vecchie`);
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `ingresso (${tema}), 360 px: niente scroll orizzontale`);
+    const campo = page.locator("form[data-form=ingresso] label.field:has(select[name=qualifica])");
+    await campo.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: S + `/e2e/89-qualifica-${tema}.png` });
+    await ctx.close();
+  }
+  check(!errori.length, "qualifica: nessun errore nella pagina");
 }
 
 await browser.close();
