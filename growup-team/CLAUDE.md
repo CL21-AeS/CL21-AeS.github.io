@@ -4,6 +4,9 @@
 - `ADMIN.md` elenca tutto quello che può fare un admin: aggiornalo quando aggiungi o togli una funzione da admin.
 - Tutto in italiano. Prima il piano e l'ok di Stefano, poi il codice; una PR per consegna, la unisce Stefano.
 - Lavora solo in `growup-team/`: le altre cartelle del repository non si toccano.
+- **Chi usa l'app oggi** (12 novembre 2026): solo Stefano (admin). Nessun partner ha ancora fatto il primo ingresso:
+  entreranno tutti più avanti, prima alcuni tester e poi tutti. Non servono passaggi, adattamenti o migrazioni per
+  utenti già esistenti; il primo ingresso (nuovi iscritti e partner in attività da anni) è l'esperienza più importante.
 - Sicurezza: RLS su ogni tabella, nel codice solo la chiave publishable, ogni regola nuova in `supabase/tests_rls.sql`.
 - Il repository è pubblico: mai dati reali (nomi, codici Amway, numeri, codici d'invito) in file, test, commit o PR.
   Controlli di sicurezza in `SICUREZZA.md`.
