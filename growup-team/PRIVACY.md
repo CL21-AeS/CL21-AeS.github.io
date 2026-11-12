@@ -65,6 +65,6 @@ un admin dall'SQL Editor (`ADMIN.md`). La Lista si scarica dall'app («Scarica u
 - [x] Informativa con conservazione, fornitori, reclamo al Garante e solo maggiorenni (3 novembre, v84).
 - [ ] Nomi e contatto dei titolari nell'informativa (in attesa di Stefano).
 - [x] Cancellazione automatica dei contatti e dei clienti 24 mesi dopo l'ultimo passo o ordine, con avviso 30 giorni prima (055).
-- [ ] Decidere per quanto tenere le copie di sicurezza.
+- [x] Copie di sicurezza: le gestisce Stefano su Drive (cartella privata), compresi i tempi.
 - [ ] Verificare con le regole Amway per gli incaricati l'uso dei dati del gruppo e delle mappe.
 - [ ] Far rileggere questo file e l'informativa da un consulente privacy.
