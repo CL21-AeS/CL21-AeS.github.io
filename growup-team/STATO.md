@@ -3,7 +3,7 @@
 Ultimo aggiornamento: 13 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
-## «Da seguire oggi» per gli upline (13 novembre 2026, database non toccato)
+## «Da seguire oggi» per gli upline (13 novembre 2026, app v121, database non toccato)
 
 Tre PR in fila, da unire in ordine (una per punto); la versione del service worker sale una volta sola, nell'ultima.
 Richiesta e scelte di Stefano. Un riquadro in Io → Il mio giorno, sotto la lista di oggi, con le persone che seguo e che
@@ -52,6 +52,13 @@ partner, mai il testo del perché (solo se c'è).
    Test dell'interfaccia: 1381 controlli superati (sezione 91: tre righe nell'ordine, parola e segno, niente WhatsApp, sotto la lista di oggi,
    Apri scheda, Fatto con Annulla e dopo la riapertura, in attesa della mappa → Gruppo, chi non ha nessuno sotto, nessun
    motivo → nessun riquadro, versione semplificata; anteprime a 360 px `e2e/91-da-seguire-light.png` e `-dark.png`).
+3. **Il «?»** accanto al titolo (`testoAiutoDaSeguire`, chiuso finché non lo si apre): in righe brevi chi compare (prima
+   linea, chi ho invitato, più in profondità sotto uno sponsor senza app o fermo da più di 14 giorni), i motivi in ordine
+   (con le soglie dalle impostazioni), che si vedono solo numeri e date già visibili, mai i nomi della Lista o dei Clienti, e
+   cosa fa «Fatto». Nessuna frase che leghi contatti o piani alla percentuale. Test dell'interfaccia: 1394 controlli
+   superati (sezione 92: si apre e
+   si richiude, il testo, nessuna promessa, tre righe; anteprime a 360 px `e2e/92-da-seguire-aiuto-light.png` e `-dark.png`).
+4. Service worker **v121**, questo STATO.md.
 
 ## Condivisione, primo ordine in attesa, avvisi allo sponsor, qualifica (13 novembre 2026, migrazioni 064 e 065, app v120)
 

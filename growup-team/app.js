@@ -3190,13 +3190,28 @@ function daSeguireOggi(giorno){
    nella versione semplificata); senza nomi non c'è. Ambra «! Da sentire» per chi ha bisogno, verde «✓ Complimento»: sempre
    la parola e il segno oltre al colore. «Apri scheda» come il tocco sulle notifiche; WhatsApp no (il numero di un partner
    non è mai visibile all'upline). */
+/* il «?»: chi compare e perché, in parole semplici (le soglie sono quelle delle impostazioni) */
+function testoAiutoDaSeguire(){
+  return `Le persone che segui e che oggi hanno un motivo. Segui la tua prima linea e chi hai invitato tu; più in profondità,
+    chi ha sopra uno sponsor che non usa l'app o non aggiorna da più di ${giorniPresaInCarico()} giorni.<br>
+    I motivi, in quest'ordine:<br>
+    • un nuovo che hai invitato si è fermato: obiettivo non scritto o incontro con lo sponsor non fissato da 3 giorni,
+      oppure primo ordine non fatto a meno di 7 giorni dalla fine dei 30;<br>
+    • non aggiorna da più di ${soglieEtichette().giorni_da_chiamare} giorni;<br>
+    • negli ultimi 10 giorni del mese, la mappa dice che gli manca meno del 10% dei VP di gruppo per la percentuale successiva;<br>
+    • un complimento: primo ordine nella mappa, percentuale più alta del mese prima, partenza completata.<br>
+    Vedi solo numeri e date che vedi già, mai i nomi della sua Lista o dei suoi Clienti. «Fatto» toglie la persona per
+    7 giorni, solo su questo telefono, salvo una novità.`;
+}
 function vDaSeguire(){
   if(!haPartnerSotto()) return "";
   let l;
   try{ l = daSeguireOggi(); }catch(e){ l = []; }
   if(!l.length) return "";
   return `<div class="card da-seguire">
-    <div class="spread"><span class="eyebrow">Da seguire oggi</span><span class="small">${l.length === 1 ? "1 persona" : `${num(l.length)} persone`}</span></div>
+    <div class="spread"><span class="con-aiuto"><span class="eyebrow">Da seguire oggi</span>${aiutoBtn("da-seguire")}</span>
+      <span class="small">${l.length === 1 ? "1 persona" : `${num(l.length)} persone`}</span></div>
+    ${aiutoTesto("da-seguire", testoAiutoDaSeguire())}
     <ul class="da-seguire-l">${l.map(r => `<li class="ds-${r.tipo}" data-id="${esc(r.id)}">
       <div class="ds-testa"><b class="ds-nome">${esc(r.nome)}</b>
         <span class="pill ${r.tipo === "complimento" ? "v" : "g"} ds-tag">${r.tipo === "complimento" ? "✓ Complimento" : "! Da sentire"}</span></div>
