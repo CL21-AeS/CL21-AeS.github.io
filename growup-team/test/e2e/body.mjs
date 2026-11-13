@@ -6000,7 +6000,7 @@ for(const tema of ["light", "dark"]){
     codice_amway:"7990" + String(n).padStart(3, "0"), partenza_confermata_il:ora, creato_il:quando(-200) }, extra));
   const nuovo = (iscritto, entrato) => ({ invitato_da:U, data_iscrizione:giorno(-iscritto), privacy_accettata_il:quando(-entrato), creato_il:quando(-entrato), ultimo_aggiornamento:ora, conPercorso:true });
   const perche = n => { DB.obiettivi = (DB.obiettivi || []).concat([{ partner_id:id(n), cifra_mese:300, entro:"2027-06-01", perche:"Per la famiglia" }]); };
-  app(1, "Ugo Upline", "R", { chiave:"9a".repeat(16), data_iscrizione:giorno(-400) });
+  app(1, "Ugo Upline", "R", { chiave:"c9".repeat(16), data_iscrizione:giorno(-400) }); perche(1);
   app(2, "Anna Avvio", U, nuovo(5, 4));                                                            // 1: obiettivo e incontro
   app(3, "Bruno Binario", U, Object.assign(nuovo(25, 24), { incontro_sponsor:giorno(-20) })); perche(3);   // 1: primo ordine, restano 5
   app(4, "Carla Conferma", U, Object.assign(nuovo(25, 24), { incontro_sponsor:giorno(-20) })); perche(4);  // ordine in attesa: niente
@@ -6022,7 +6022,7 @@ for(const tema of ["light", "dark"]){
   app(16, "Nora Nascosta", U, { ultimo_aggiornamento:quando(-12) });                               // nascosta: no
   DB.nascosti = (DB.nascosti || []).concat([{ partner_id:U, nascosto_id:id(16) }]);
 
-  ({ ctx, page } = await apri({}, "#chiave=" + "9a".repeat(16)));
+  ({ ctx, page } = await apri({}, "#chiave=" + "c9".repeat(16)));
   await page.locator(".testata h1").waitFor();
   const calcola = g => page.evaluate(g => GROWUP_TEST.daSeguireOggi(g), g || null);
   const nomi = l => l.map(r => r.nome);

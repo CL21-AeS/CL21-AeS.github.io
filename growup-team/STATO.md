@@ -37,7 +37,7 @@ partner, mai il testo del perché (solo se c'è).
      interni, motivi e date, mai nomi) con tutti i motivi che la persona ha quel giorno; non torna per 7 giorni, salvo un
      motivo che allora non c'era. La memoria si ripulisce da sola (Fatto scaduti, complimenti visti da più di 2 mesi).
    - Per i test, `window.GROWUP_TEST` (lo mette solo il test, come `GROWUP_API`) espone il calcolo; nell'app vera non c'è.
-   Test dell'interfaccia: sezione 90 (ogni criterio, la profondità, nessun limite e l'ordine, Fatto e fatto nuovo, il
+   Test dell'interfaccia: 1358 controlli superati (sezione 90: ogni criterio, la profondità, nessun limite e l'ordine, Fatto e fatto nuovo, il
    complimento dopo 7 giorni, la memoria del telefono bloccata).
 
 ## Condivisione, primo ordine in attesa, avvisi allo sponsor, qualifica (13 novembre 2026, migrazioni 064 e 065, app v120)
