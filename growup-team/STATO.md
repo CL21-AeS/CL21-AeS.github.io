@@ -39,6 +39,19 @@ partner, mai il testo del perché (solo se c'è).
    - Per i test, `window.GROWUP_TEST` (lo mette solo il test, come `GROWUP_API`) espone il calcolo; nell'app vera non c'è.
    Test dell'interfaccia: 1358 controlli superati (sezione 90: ogni criterio, la profondità, nessun limite e l'ordine, Fatto e fatto nuovo, il
    complimento dopo 7 giorni, la memoria del telefono bloccata).
+2. **Il riquadro** (`vDaSeguire` in «Il mio giorno», subito sotto la lista di oggi o «Da fare oggi» del Seguimi). Lo vede
+   solo chi ha almeno una persona sotto (`haPartnerSotto`: nella mappa, in attesa della mappa o in partenza), anche nella
+   versione semplificata; senza nomi non c'è (niente riquadro vuoto). Titolo «Da seguire oggi» e quante persone; ogni riga:
+   nome, motivo in piccolo sotto, «Apri scheda» e «Fatto». Colori con il significato fisso e sempre con parola e segno:
+   bordo e etichetta ambra **«! Da sentire»** per chi ha bisogno, verde **«✓ Complimento»**; un complimento della stessa
+   persona sta in una riga piccola «✓ Complimento: …». **WhatsApp no**: il numero di un partner non è mai visibile
+   all'upline. **«Apri scheda»** (`ds-apri`) apre la stessa scheda del tocco sulle notifiche; chi è in attesa della mappa
+   non ha ancora la scheda: si apre il Gruppo su «I tuoi nuovi in partenza» (come per le notifiche). **«Fatto»**
+   (`ds-fatto`) toglie la riga con il messaggio «… fatto. Torna tra 7 giorni, o prima se c'è una novità.» e Annulla.
+   CLAUDE.md: aggiunta l'eccezione (scelta di Stefano) alla regola «niente suggerimenti nelle schermate di tutti i giorni».
+   Test dell'interfaccia: 1381 controlli superati (sezione 91: tre righe nell'ordine, parola e segno, niente WhatsApp, sotto la lista di oggi,
+   Apri scheda, Fatto con Annulla e dopo la riapertura, in attesa della mappa → Gruppo, chi non ha nessuno sotto, nessun
+   motivo → nessun riquadro, versione semplificata; anteprime a 360 px `e2e/91-da-seguire-light.png` e `-dark.png`).
 
 ## Condivisione, primo ordine in attesa, avvisi allo sponsor, qualifica (13 novembre 2026, migrazioni 064 e 065, app v120)
 

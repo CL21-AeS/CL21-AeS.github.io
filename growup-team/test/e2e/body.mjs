@@ -6100,6 +6100,108 @@ for(const tema of ["light", "dark"]){
   DB.nascosti = DB.nascosti.filter(x => x.partner_id !== U);
 }
 
+// 91. «Da seguire oggi», punto 2: il riquadro in Io → Il mio giorno, sotto la lista di oggi. Tre righe (due da aiutare e
+//     un complimento) con nome, motivo, «Apri scheda» e «Fatto»; colori ambra/verde sempre con parola e segno; niente
+//     WhatsApp (il numero non è visibile). «Apri scheda» apre la scheda, o il Gruppo per chi è in attesa della mappa.
+//     «Fatto» toglie la riga (Annulla la rimette) e resta anche ricaricando. Si vede anche nella versione semplificata,
+//     con una persona sotto; chi non ha nessuno sotto non lo vede, e senza nomi il riquadro non c'è. Anteprime a 360 px.
+{
+  const id = n => "91000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0");
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const ora = new Date().toISOString(), V = id(1);
+  const app = (n, nome, sponsor, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:sponsor, stato:"attivo", codice_invito:"DT" + n + "XX",
+    codice_amway:"7991" + String(n).padStart(3, "0"), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:quando(-200), ultimo_aggiornamento:ora }, extra));
+  const perche = n => { DB.obiettivi = (DB.obiettivi || []).concat([{ partner_id:id(n), cifra_mese:300, entro:"2027-06-01", perche:"Per la famiglia" }]); };
+  const nuovo = (sponsor, iscritto, entrato) => ({ invitato_da:sponsor, data_iscrizione:giorno(-iscritto), privacy_accettata_il:quando(-entrato), creato_il:quando(-entrato), conPercorso:true });
+  app(1, "Vera Upline", "R", { chiave:"71".repeat(16), data_iscrizione:giorno(-400) }); perche(1);
+  app(2, "Alba Avvio", V, nuovo(V, 5, 4));                                         // da aiutare: obiettivo non scritto
+  app(3, "Dino Dormiente", V, { ultimo_aggiornamento:quando(-10) });             // da aiutare: non aggiorna
+  app(4, "Lina Lanciata", V, { chiave:"72".repeat(16), invitato_da:V, data_iscrizione:giorno(-20), privacy_accettata_il:quando(-19),
+    partenza_completata_il:quando(-2) }); perche(4);                               // complimento: partenza completata
+  const box = () => page.locator(".card.da-seguire");
+  const righe = () => page.locator(".card.da-seguire .da-seguire-l > li");
+
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "71".repeat(16)));
+  await page.locator(".testata h1").waitFor();
+  await box().waitFor();
+  check(await righe().count() === 3, "da seguire: tre righe");
+  check(JSON.stringify(await page.locator(".da-seguire-l .ds-nome").allInnerTexts()) === JSON.stringify(["Alba Avvio", "Dino Dormiente", "Lina Lanciata"]),
+    "da seguire: nell'ordine dei criteri, il complimento in fondo");
+  check(JSON.stringify(await page.locator(".da-seguire-l .ds-tag").allInnerTexts()) === JSON.stringify(["! Da sentire", "! Da sentire", "✓ Complimento"]),
+    "da seguire: ambra con «! Da sentire», verde con «✓ Complimento» (parola e segno oltre al colore)");
+  check(await righe().nth(0).locator(".ds-motivo").innerText() === "Obiettivo non ancora scritto · nell'app da 4 giorni"
+    && await righe().nth(1).locator(".ds-motivo").innerText() === "Non aggiorna da 10 giorni"
+    && /^Ha completato la partenza · /.test(await righe().nth(2).locator(".ds-motivo").innerText()), "da seguire: il motivo in piccolo sotto il nome");
+  check(await righe().nth(2).evaluate(li => li.classList.contains("ds-complimento")) && await righe().nth(0).evaluate(li => li.classList.contains("ds-aiuto")),
+    "da seguire: le classi del colore");
+  check(await page.locator(".card.da-seguire button[data-act=ds-apri]").count() === 3 && await page.locator(".card.da-seguire button[data-act=ds-fatto]").count() === 3,
+    "da seguire: «Apri scheda» e «Fatto» su ogni riga");
+  check(!(await page.locator(".card.da-seguire a[href*='wa.me']").count()), "da seguire: niente WhatsApp (il numero non è visibile all'upline)");
+  check(await page.evaluate(() => { const b = document.querySelector(".card.da-seguire"), o = document.querySelector(".card.oggi-lista, .card.oggi-per-te");
+    return !o || !!(o.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING); }), "da seguire: sotto la lista di oggi");
+  check(!(await box().innerText()).includes("famiglia"), "da seguire: mai il testo del perché");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "da seguire, 360 px: niente scroll orizzontale");
+  // «Apri scheda»: la stessa scheda del tocco sulle notifiche
+  await righe().nth(1).locator("button[data-act=ds-apri]").click();
+  await page.locator(".testata h1", { hasText:"Scheda partner" }).waitFor();
+  check((await page.locator("#app").innerText()).includes("Dino Dormiente"), "Apri scheda: si apre la scheda della persona");
+  await page.click("button[data-act=vista-io]"); await box().waitFor();
+  // «Fatto»: la riga sparisce, Annulla la rimette; resta anche ricaricando
+  await righe().nth(1).locator("button[data-act=ds-fatto]").click();
+  check(await righe().count() === 2 && !(await box().innerText()).includes("Dino Dormiente"), "Fatto: la riga sparisce");
+  check((await page.locator("#toast").innerText()).includes("Torna tra 7 giorni"), "Fatto: il messaggio dice per quanto");
+  await page.click("#toast button[data-act=annulla]");
+  check(await righe().count() === 3, "Fatto: Annulla la rimette");
+  await righe().nth(1).locator("button[data-act=ds-fatto]").click();
+  await sync(page); const memoria91 = await ctx.storageState(); await ctx.close();
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, storageState:memoria91 }));
+  await box().waitFor();
+  check(await righe().count() === 2 && !(await box().innerText()).includes("Dino Dormiente"), "Fatto: ricaricando la persona resta fuori (su questo telefono)");
+  await ctx.close();
+  // le anteprime a 360 px, tre righe, chiaro e scuro
+  for(const tema of ["light", "dark"]){
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, colorScheme:tema, deviceScaleFactor:2 }, "#chiave=" + "71".repeat(16)));
+    await box().waitFor();
+    check(await righe().count() === 3, `da seguire (${tema}): tre righe nell'anteprima`);
+    await box().scrollIntoViewIfNeeded();
+    await box().screenshot({ path: S + `/e2e/91-da-seguire-${tema}.png` });
+    await ctx.close();
+  }
+  // chi è in attesa della mappa: «Apri scheda» porta al Gruppo su «I tuoi nuovi in partenza»
+  app(5, "Quinto Attesa", V, Object.assign(nuovo(V, 4, 3), { confermato_il:null }));
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "71".repeat(16)));
+  await box().waitFor();
+  await page.locator(".da-seguire-l > li", { hasText:"Quinto Attesa" }).locator("button[data-act=ds-apri]").click();
+  await page.locator(".testata h1", { hasText:"Il mio gruppo" }).waitFor();
+  check(await page.locator(".card.nuovi-partenza").isVisible(), "Apri scheda, in attesa della mappa: il Gruppo su «I tuoi nuovi in partenza»");
+  await ctx.close();
+  // chi non ha nessuno sotto non vede il riquadro
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "72".repeat(16)));
+  await page.locator(".testata h1").waitFor();
+  check(!(await box().count()), "da seguire: chi non ha nessuno sotto non vede il riquadro");
+  await ctx.close();
+  // nessun nome: nessun riquadro (le persone ci sono, ma oggi nessuna ha un motivo)
+  for(const n of [2, 3, 5]) Object.assign(DB.partners.find(p => p.id === id(n)), { invitato_da:null, ultimo_aggiornamento:ora });
+  Object.assign(DB.partners.find(p => p.id === id(4)), { partenza_completata_il:quando(-30) });
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "71".repeat(16)));
+  await page.locator(".testata h1").waitFor();
+  check(!(await box().count()), "da seguire: nessuno con un motivo, nessun riquadro (niente riquadro vuoto)");
+  await ctx.close();
+  // anche nella versione semplificata, con una persona sotto
+  app(6, "Nadia Nuova", V, Object.assign(nuovo(V, 5, 4), { chiave:"73".repeat(16), incontro_sponsor:giorno(2) })); perche(6);
+  app(7, "Paolo Partito", id(6), nuovo(id(6), 4, 3));
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "73".repeat(16)));
+  await page.locator(".testata h1").waitFor();
+  check(!(await page.getByRole("button", { name:"Verifica", exact:true }).count()), "versione semplificata: la Verifica non c'è");
+  await box().waitFor({ timeout:5000 }).catch(() => {});
+  check(await box().count() === 1 && (await box().innerText()).includes("Paolo Partito"), "da seguire: si vede anche nella versione semplificata, con una persona sotto");
+  await ctx.close();
+  check(!errori.length, "da seguire, riquadro: nessun errore nella pagina");
+  const tutti = Array.from({ length:7 }, (_, i) => id(i + 1));
+  DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
+  DB.obiettivi = DB.obiettivi.filter(o => !tutti.includes(o.partner_id));
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

@@ -1560,6 +1560,7 @@ function vHome(){
   ${vPerIniziare()}
   ${percorsoAttivo() ? vPercorso() : vCruscotto()}
   ${st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : vOggiLista()}
+  ${vDaSeguire()}
   ${vSerie()}
   ${linkDaSalvare() || percorsoAttivo() ? "" : vPrimiPassi()}
   ${vMioMese()}
@@ -3185,6 +3186,27 @@ function daSeguireOggi(giorno){
   return out.map(({ n, ...r }) => r);
 }
 
+/* Il riquadro in Io → Il mio giorno, sotto la lista di oggi: solo per chi ha almeno una persona sotto (haPartnerSotto, anche
+   nella versione semplificata); senza nomi non c'è. Ambra «! Da sentire» per chi ha bisogno, verde «✓ Complimento»: sempre
+   la parola e il segno oltre al colore. «Apri scheda» come il tocco sulle notifiche; WhatsApp no (il numero di un partner
+   non è mai visibile all'upline). */
+function vDaSeguire(){
+  if(!haPartnerSotto()) return "";
+  let l;
+  try{ l = daSeguireOggi(); }catch(e){ l = []; }
+  if(!l.length) return "";
+  return `<div class="card da-seguire">
+    <div class="spread"><span class="eyebrow">Da seguire oggi</span><span class="small">${l.length === 1 ? "1 persona" : `${num(l.length)} persone`}</span></div>
+    <ul class="da-seguire-l">${l.map(r => `<li class="ds-${r.tipo}" data-id="${esc(r.id)}">
+      <div class="ds-testa"><b class="ds-nome">${esc(r.nome)}</b>
+        <span class="pill ${r.tipo === "complimento" ? "v" : "g"} ds-tag">${r.tipo === "complimento" ? "✓ Complimento" : "! Da sentire"}</span></div>
+      <span class="small ds-motivo">${esc(r.motivo)}</span>
+      ${r.anche ? `<span class="small ds-anche"><span class="ds-segno" aria-hidden="true">✓</span> Complimento: ${esc(r.anche)}</span>` : ""}
+      <div class="ds-azioni"><button class="btn small" data-act="ds-apri" data-id="${esc(r.id)}" aria-label="Apri la scheda di ${esc(r.nome)}">Apri scheda</button>
+        <button class="btn small" data-act="ds-fatto" data-id="${esc(r.id)}" aria-label="Fatto: ${esc(r.nome)}">Fatto</button></div></li>`).join("")}</ul>
+  </div>`;
+}
+
 /* chi è senza app non ha etichetta: i suoi numeri dipendono da quando lo sponsor li inserisce */
 /* ---- Preferiti: le persone da seguire da vicino, con i loro numeri rispetto ai loro obiettivi ---- */
 function vPreferiti(){
@@ -4212,6 +4234,22 @@ const AZIONI = {
   },
   "vista-io"(){ st.vista = "io"; st.target = null; render(); window.scrollTo(0, 0); },
   "vista-gruppo"(){ st.vista = "gruppo"; st.target = null; st.schedaId = null; st.schedaPila = []; render(); window.scrollTo(0, 0); },
+  /* «Da seguire oggi»: la scheda come dal tocco su una notifica; chi non ha ancora la scheda (in attesa della mappa): il Gruppo
+     su «I tuoi nuovi in partenza» */
+  "ds-apri"(el){
+    const id = el.dataset.id;
+    if(id && id !== st.profilo.id && st.struttura.some(p => p.id === id)) return AZIONI["apri-scheda"]({ dataset:{ id } });
+    st.vista = "gruppo"; st.target = null; st.schedaId = null; st.schedaPila = []; st.vaiNuoviPartenza = true; render(); window.scrollTo(0, 0);
+  },
+  /* «Fatto»: sparisce per 7 giorni (salvo un motivo nuovo), solo su questo telefono; Annulla lo rimette */
+  "ds-fatto"(el){
+    const r = daSeguireOggi().find(x => x.id === el.dataset.id);
+    if(!r) return;
+    const prima = memoriaDaSeguire().fatti[r.id] || null;
+    segnaFattoDaSeguire(r); render();
+    toast(`${r.nome}: fatto. Torna tra 7 giorni, o prima se c'è una novità.`, () => {
+      const m = memoriaDaSeguire(); if(prima) m.fatti[r.id] = prima; else delete m.fatti[r.id]; salvaMemoriaDaSeguire(m); render(); });
+  },
   "scheda-indietro"(){
     const id = st.schedaPila.pop();
     if(!id){ AZIONI["vista-gruppo"](); return; }
