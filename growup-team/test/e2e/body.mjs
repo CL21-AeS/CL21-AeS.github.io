@@ -5983,6 +5983,123 @@ for(const tema of ["light", "dark"]){
   check(!errori.length, "qualifica: nessun errore nella pagina");
 }
 
+// 90. «Da seguire oggi» (13 novembre 2026), punto 1: il calcolo (daSeguireOggi). Un upline con: nuovi invitati da lui fermi
+//     (obiettivo, incontro, primo ordine a meno di 7 giorni dalla fine dei 30), uno con l'ordine in attesa della mappa, uno
+//     ancora lontano dalla scadenza, uno oltre i 30 giorni; partner fermi («Non aggiorna»); la profondità (sotto uno sponsor
+//     attivo no, sotto uno fermo da più di 14 giorni o senza app sì, chi ho invitato io sempre); il traguardo negli ultimi
+//     10 giorni del mese; i complimenti (percentuale più alta, primo ordine nella mappa, partenza completata); nessun limite
+//     di persone, nell'ordine dei criteri; «Fatto» per 7 giorni salvo un motivo nuovo; la memoria del telefono che non va.
+{
+  const id = n => "90000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0");
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const ora = new Date().toISOString(), U = id(1);
+  const mesePrima = (() => { const [y, m] = meseOra().split("-").map(Number), t = y * 12 + m - 2; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, "0")}`; })();
+  const app = (n, nome, sponsor, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:sponsor, stato:"attivo", codice_invito:"DS" + n + "XX",
+    codice_amway:"7990" + String(n).padStart(3, "0"), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:quando(-200), ultimo_aggiornamento:ora }, extra));
+  const gestito = (n, nome, sponsor, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:sponsor, stato:"gestito", gestore_id:U, codice_invito:"DS" + n + "XX",
+    codice_amway:"7990" + String(n).padStart(3, "0"), partenza_confermata_il:ora, creato_il:quando(-200) }, extra));
+  const nuovo = (iscritto, entrato) => ({ invitato_da:U, data_iscrizione:giorno(-iscritto), privacy_accettata_il:quando(-entrato), creato_il:quando(-entrato), ultimo_aggiornamento:ora, conPercorso:true });
+  const perche = n => { DB.obiettivi = (DB.obiettivi || []).concat([{ partner_id:id(n), cifra_mese:300, entro:"2027-06-01", perche:"Per la famiglia" }]); };
+  app(1, "Ugo Upline", "R", { chiave:"c9".repeat(16), data_iscrizione:giorno(-400) }); perche(1);
+  app(2, "Anna Avvio", U, nuovo(5, 4));                                                            // 1: obiettivo e incontro
+  app(3, "Bruno Binario", U, Object.assign(nuovo(25, 24), { incontro_sponsor:giorno(-20) })); perche(3);   // 1: primo ordine, restano 5
+  app(4, "Carla Conferma", U, Object.assign(nuovo(25, 24), { incontro_sponsor:giorno(-20) })); perche(4);  // ordine in attesa: niente
+  DB.ordiniMiei = (DB.ordiniMiei || []).concat([{ id:"o90", proprietario:id(4), stato:"confermato", data:giorno(-2), persona_id:null }]);
+  app(17, "Nino Nuovo", U, Object.assign(nuovo(15, 14), { incontro_sponsor:giorno(-10) })); perche(17);    // restano 15: niente
+  app(18, "Olga Oltre", U, Object.assign(nuovo(35, 28), { incontro_sponsor:giorno(-20) })); perche(18);    // oltre i 30: niente
+  app(5, "Dario Dormiente", U, { ultimo_aggiornamento:quando(-10) });                             // 2, ma attivo (10 ≤ 14)
+  app(6, "Elio Esterno", id(5), { ultimo_aggiornamento:quando(-30) });                            // sotto uno sponsor attivo: no
+  app(7, "Franco Fermo", U, { ultimo_aggiornamento:quando(-20) });                                // 2, non attivo
+  app(8, "Gino Giù", id(7), { ultimo_aggiornamento:quando(-9) });                                 // sotto uno fermo: 2 + complimento
+  mappa(id(8), 60, 250, { percentuale:3 });
+  gestito(9, "Ezio Senza App", U);                                                                 // senza app e senza motivo
+  gestito(10, "Ivo Vicino", id(9)); mappa(id(10), 100, 1150, { percentuale:6 });                   // sotto chi non usa l'app: 3
+  gestito(11, "Jole Salita", U); mappa(id(11), 100, 1300, { percentuale:9 }); mappa(id(11), 100, 700, { percentuale:6, mese:mesePrima });  // 4
+  gestito(12, "Katia Primo", U, { data_iscrizione:giorno(-3) }); mappa(id(12), 60, 60);            // 4: primo ordine nella mappa
+  app(13, "Lia Lanciata", U, { invitato_da:U, data_iscrizione:giorno(-20), privacy_accettata_il:quando(-19), partenza_completata_il:quando(-2) });  // 4
+  app(14, "Pia Invitata", id(5), nuovo(6, 5));                                                     // invitata da me, sotto uno attivo: 1
+  app(15, "Quinto Attesa", U, Object.assign(nuovo(4, 3), { confermato_il:null }));                 // in attesa della mappa: 1, senza scheda
+  app(16, "Nora Nascosta", U, { ultimo_aggiornamento:quando(-12) });                               // nascosta: no
+  DB.nascosti = (DB.nascosti || []).concat([{ partner_id:U, nascosto_id:id(16) }]);
+
+  ({ ctx, page } = await apri({}, "#chiave=" + "c9".repeat(16)));
+  await page.locator(".testata h1").waitFor();
+  const calcola = g => page.evaluate(g => GROWUP_TEST.daSeguireOggi(g), g || null);
+  const nomi = l => l.map(r => r.nome);
+  const riga = (l, nome) => l.find(r => r.nome === nome);
+  const [aa, mm, dd] = await page.evaluate(() => GROWUP_TEST.oggi().split("-").map(Number));
+  const ultimoGiorno = new Date(Date.UTC(aa, mm, 0)).getUTCDate(), fineMese = ultimoGiorno - dd < 10;
+  const ultimo = `${meseOra()}-${String(ultimoGiorno).padStart(2, "0")}`;
+  let l = await calcola();
+  const attesi = ["Anna Avvio", "Bruno Binario", "Pia Invitata", "Quinto Attesa", "Dario Dormiente", "Franco Fermo", "Gino Giù"]
+    .concat(fineMese ? ["Ivo Vicino"] : [], ["Jole Salita", "Katia Primo", "Lia Lanciata"]);
+  check(JSON.stringify(nomi(l)) === JSON.stringify(attesi), `da seguire: tutte le persone con un motivo, nell'ordine dei criteri (${nomi(l).join(", ")})`);
+  check(l.length > 3, "da seguire: nessun limite di persone");
+  check(l.every((r, i) => !i || l[i - 1].criterio <= r.criterio), "da seguire: prima il criterio 1, poi 2, 3 e 4");
+  // criterio 1
+  check(riga(l, "Anna Avvio").k === "obiettivo" && riga(l, "Anna Avvio").motivo === "Obiettivo non ancora scritto · nell'app da 4 giorni"
+    && riga(l, "Anna Avvio").chiavi.includes("incontro") && riga(l, "Anna Avvio").tipo === "aiuto", "criterio 1: obiettivo non scritto da 3 giorni (e incontro non fissato)");
+  check(riga(l, "Bruno Binario").k === "ordine" && riga(l, "Bruno Binario").motivo === "Primo ordine non ancora fatto · restano 5 giorni dei 30",
+    "criterio 1: meno di 7 giorni alla fine dei 30, senza ordine");
+  check(!riga(l, "Carla Conferma"), "criterio 1: ordine confermato in attesa della mappa: niente");
+  check(!riga(l, "Nino Nuovo") && !riga(l, "Olga Oltre"), "criterio 1: ancora 15 giorni, oppure oltre i 30 giorni: niente");
+  check(riga(l, "Quinto Attesa").scheda === false && riga(l, "Anna Avvio").scheda === true, "criterio 1: chi è in attesa della mappa non ha la scheda");
+  // criterio 2 e profondità
+  check(riga(l, "Dario Dormiente").motivo === "Non aggiorna da 10 giorni" && riga(l, "Franco Fermo").motivo === "Non aggiorna da 20 giorni",
+    "criterio 2: «Non aggiorna» da più di 7 giorni");
+  check(!riga(l, "Elio Esterno"), "profondità: sotto uno sponsor attivo (fermo da 10 giorni) non compare");
+  check(riga(l, "Gino Giù").criterio === 2, "profondità: sotto uno sponsor fermo da più di 14 giorni compare");
+  check(riga(l, "Pia Invitata").criterio === 1, "profondità: chi ho invitato io compare anche sotto uno sponsor attivo");
+  check(!riga(l, "Ezio Senza App") && !riga(l, "Nora Nascosta"), "senza motivo, o nascosta: non compare");
+  // criterio 3: negli ultimi 10 giorni del mese, con la data della mappa
+  const fine = await calcola(ultimo), inizio = await calcola(meseOra() + "-01");
+  check(riga(fine, "Ivo Vicino") && riga(fine, "Ivo Vicino").criterio === 3 && /^Mancano 50 VP di gruppo per il 9% · mappa del /.test(riga(fine, "Ivo Vicino").motivo),
+    "criterio 3: a fine mese, mancano 50 VP per il 9%, con la data della mappa (sotto chi non usa l'app)");
+  check(!riga(inizio, "Ivo Vicino"), "criterio 3: il primo del mese niente");
+  check(!riga(fine, "Jole Salita") || riga(fine, "Jole Salita").criterio === 4, "criterio 3: lontano dalla percentuale successiva: niente");
+  // criterio 4
+  check(riga(l, "Jole Salita").tipo === "complimento" && /^Al 9% questo mese · a \S+ 6% · mappa del /.test(riga(l, "Jole Salita").motivo),
+    "criterio 4: percentuale più alta del mese prima");
+  check(/^Primo ordine nella mappa · 60 VP · mappa del /.test(riga(l, "Katia Primo").motivo), "criterio 4: primo ordine nella mappa");
+  check(/^Ha completato la partenza · /.test(riga(l, "Lia Lanciata").motivo), "criterio 4: partenza completata negli ultimi 7 giorni");
+  check(riga(l, "Gino Giù").anche === "Al 3% questo mese · all'ingresso 0% · " + riga(l, "Gino Giù").anche.split(" · ").pop(),
+    "criterio 4: senza la mappa del mese prima, la percentuale dichiarata all'ingresso; il complimento resta accanto («anche»)");
+  // privacy: mai il perché, mai nomi della Lista
+  check(!JSON.stringify(l).includes("famiglia"), "da seguire: il testo del perché non c'è mai");
+  // la profondità: lo sponsor fermo da più di 14 giorni non è più attivo
+  check(await page.evaluate(() => { const { st, daSeguireOggi } = GROWUP_TEST; const d = st.struttura.find(p => p.nome === "Dario Dormiente"), prima = d.ultimo_aggiornamento;
+    d.ultimo_aggiornamento = new Date(Date.now() - 15 * 864e5).toISOString(); const r = daSeguireOggi().some(x => x.nome === "Elio Esterno");
+    d.ultimo_aggiornamento = prima; return r; }), "profondità: sponsor fermo da 15 giorni, chi sta sotto compare");
+  // «Fatto»: fuori per 7 giorni
+  await page.evaluate(() => GROWUP_TEST.segnaFattoDaSeguire(GROWUP_TEST.daSeguireOggi().find(r => r.nome === "Dario Dormiente")));
+  check(!riga(await calcola(), "Dario Dormiente"), "Fatto: la persona non compare più oggi");
+  check(!riga(await calcola(giorno(6)), "Dario Dormiente"), "Fatto: non compare dopo 6 giorni");
+  check(riga(await calcola(giorno(7)), "Dario Dormiente"), "Fatto: dopo 7 giorni torna");
+  // «Fatto» con un motivo nuovo: torna subito, con il motivo nuovo
+  await page.evaluate(() => GROWUP_TEST.segnaFattoDaSeguire(GROWUP_TEST.daSeguireOggi().find(r => r.nome === "Gino Giù")));
+  check(!riga(await calcola(), "Gino Giù"), "Fatto: tutti i suoi motivi di oggi (anche il complimento) sono segnati");
+  const gino = await page.evaluate(() => { const { st, daSeguireOggi } = GROWUP_TEST; const r = st.riep.find(x => x.partner_id === st.struttura.find(p => p.nome === "Gino Giù").id);
+    r.percentuale = 6; r.vp_gruppo = 700; return daSeguireOggi().find(x => x.nome === "Gino Giù"); });
+  check(gino && gino.k === "percentuale-6" && gino.tipo === "complimento", "Fatto: un fatto nuovo (la percentuale sale ancora) e torna subito");
+  // il complimento della mappa: 7 giorni da quando l'app lo vede la prima volta
+  check(await page.evaluate(() => { const { st, daSeguireOggi, piuGiorni, oggi } = GROWUP_TEST; const k = "growup-team.da-seguire." + st.profilo.id, m = JSON.parse(localStorage.getItem(k));
+    const c = Object.keys(m.visti).find(c => c.endsWith("|percentuale-9")); m.visti[c] = piuGiorni(oggi(), -8); localStorage.setItem(k, JSON.stringify(m));
+    return !daSeguireOggi().some(x => x.nome === "Jole Salita"); }), "complimento: visto per la prima volta 8 giorni fa, non compare più");
+  // la memoria del telefono non risponde: il calcolo va avanti
+  check(await page.evaluate(() => { const g = Storage.prototype.getItem, s = Storage.prototype.setItem;
+    Storage.prototype.getItem = () => { throw new Error("bloccato"); }; Storage.prototype.setItem = () => { throw new Error("bloccato"); };
+    try{ return GROWUP_TEST.daSeguireOggi().length > 3; }finally{ Storage.prototype.getItem = g; Storage.prototype.setItem = s; } }),
+    "memoria del telefono bloccata: il calcolo va avanti senza errori");
+  await ctx.close();
+  check(!errori.length, "da seguire, calcolo: nessun errore nella pagina");
+  const tutti = Array.from({ length:18 }, (_, i) => id(i + 1));
+  DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
+  DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
+  DB.obiettivi = DB.obiettivi.filter(o => !tutti.includes(o.partner_id));
+  DB.ordiniMiei = DB.ordiniMiei.filter(o => !tutti.includes(o.proprietario));
+  DB.nascosti = DB.nascosti.filter(x => x.partner_id !== U);
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
