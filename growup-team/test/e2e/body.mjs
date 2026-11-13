@@ -4293,8 +4293,9 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   /* Ricomincia: tutto da capo, l'invito di Luca torna aperto */
   await pg.click("[data-prova=scegli]"); await pg.locator(".prova-scelta").waitFor();
   await pg.click("[data-prova=ricomincia]"); await pg.locator(".prova-scelta").waitFor();
-  check(await pg.evaluate(() => JSON.parse(localStorage.getItem("prova.dati")).partners.find(p => p.id === "L").stato) === "gestito"
-    && Object.keys(await tutte()).filter(k => k.startsWith("prova.")).join() === "prova.dati", "prova: «Ricomincia» rimette i dati inventati come all'inizio");
+  check(await pg.evaluate(() => { const d = JSON.parse(localStorage.getItem("prova.dati"));
+      return !d.partners.some(p => p.codice_amway === d._prova.codiceLuca) && !d.invitiP.find(i => i.id === "inv-luca").usato_il; })
+    && Object.keys(await tutte()).filter(k => k.startsWith("prova.")).join() === "prova.dati", "prova: «Ricomincia» rimette i dati inventati come all'inizio (l'invito di Luca torna aperto)");
   check(!err.length, "prova: nessun errore nella pagina (" + err.slice(0, 2).join(" | ") + ")");
   await c.close();
 }
@@ -6367,6 +6368,128 @@ for(const tema of ["light", "dark"]){
   DB.activities = DB.activities.filter(a => !tutti.includes(a.partner_id)); DB.numeri = (DB.numeri || []).filter(x => !tutti.includes(x.partner_id));
   DB.obiettivi = (DB.obiettivi || []).filter(o => !tutti.includes(o.partner_id));
   DB.traguardiAperti = false;
+}
+
+// 94. La prova, Luca (il nuovo): entra con l'invito di Giulia («in attesa della mappa», non è ancora in una mappa importata),
+//     trova 29 nomi nella Lista e l'incontro con lo sponsor da fissare; versione semplificata e «La prossima cosa»; fissa
+//     l'incontro e scrive il trentesimo nome (festa della fase 2); bozza confermata → in attesa della mappa; «Arriva la
+//     mappa con il primo ordine» nella barra (solo per Luca) → festa della fase 3; primo piano e primo cliente → festa
+//     finale con «Ora hai tutta l'app» e poi la domanda sulla condivisione. Niente database.
+{
+  const c = await browser.newContext({ viewport:{ width:360, height:780 }, locale:"it-IT", timezoneId:"Europe/Rome", reducedMotion:"reduce", deviceScaleFactor:2 });
+  const pg = await c.newPage();
+  const fuori = [], err = [];
+  pg.on("request", r => { if(!r.url().startsWith("http://127.0.0.1:8765/")) fuori.push(r.url()); });
+  pg.on("pageerror", e => err.push(String(e))); pg.on("console", m => { if(m.type() === "error") err.push(m.text()); });
+  pg.on("dialog", d => d.accept());
+  const tr = pg.locator(".festa.traguardo");
+  const trTesto = async () => (await tr.innerText()).replace(/\s+/g, " ").trim();
+  /* l'anteprima a 360 px in chiaro e in scuro: la finestra alta quanto la pagina (le barre fisse non coprono niente) */
+  const anteprima = async nome => { await pg.waitForFunction(() => !document.querySelector(".toast"), null, { timeout:8000 }).catch(() => {});
+    const alta = await pg.evaluate(() => document.documentElement.scrollHeight);
+    if(!(await tr.count())) await pg.setViewportSize({ width:360, height:Math.min(alta, 4000) });
+    for(const tema of ["light", "dark"]){ await pg.emulateMedia({ colorScheme:tema }); await pg.waitForTimeout(150);
+      check(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `prova Luca, ${nome} (${tema}) a 360 px: niente scroll orizzontale`);
+      await pg.screenshot({ path: S + `/e2e/94-${nome}-${tema}.png` }); }
+    await pg.emulateMedia({ colorScheme:"light" }); await pg.setViewportSize({ width:360, height:780 }); };
+  await pg.goto(BASE + "prova/"); await pg.locator(".prova-scelta").waitFor();
+  await pg.click("[data-prova=come][data-k=luca]");
+  await pg.getByText("ti diamo il benvenuto in Growup").waitFor();
+  check((await pg.locator(".chi-invita").innerText()).replace(/\s+/g, " ").includes("Ti ha invitato Giulia Martini"), "prova Luca: l'invito di Giulia");
+  check(await pg.locator("form[data-form=ingresso] .field", { hasText:"La tua qualifica attuale" }).count() === 1, "prova Luca: all'ingresso «La tua qualifica attuale»");
+  check(!(await pg.locator(".prova-barra [data-prova=arriva]").count()), "prova Luca: prima di entrare niente «Arriva la mappa»");
+  await pg.selectOption("select[name=qualifica]", { label:"Inizio (nessuna qualifica)" });
+  await pg.fill("input[name=data]", new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10));
+  await pg.check("input[name=privacy]");
+  await pg.click("form button.primary");
+  await perche(pg);
+  const pc = pg.locator(".card.percorso-partenza");
+  await pc.waitFor();
+  check((await pc.locator(".percorso-l li", { hasText:"30 nomi" }).innerText()).includes("29 / 30"), "prova Luca: dopo l'ingresso 29 nomi nella Lista");
+  check((await pc.locator(".percorso-l li", { hasText:"Primo incontro" }).innerText()).includes("data da fissare"), "prova Luca: l'incontro con lo sponsor non è fissato");
+  check(!(await pg.locator("button[data-act=sez-io][data-sez=guida]").count()) && !(await pg.locator(".domanda-condividi").count()), "prova Luca: la versione semplificata (niente Verifica)");
+  check((await pg.locator(".oggi-lista .prossima-titolo").innerText()).trim() === "Fissa l'incontro con il tuo sponsor", "prova Luca: «La prossima cosa» lo guida");
+  await pg.locator(".prova-barra [data-prova=arriva]").waitFor();
+  check(true, "prova Luca: nella barra «Arriva la mappa con il primo ordine» (solo per Luca)");
+  await anteprima("io-semplice");
+  /* la Lista: 29 nomi inventati, vari, con «Come lo conosci?», nessuno «senza nome» */
+  const d0 = await pg.evaluate(() => { const d = window.__DB, l = d.partners.find(p => p.codice_amway === d._prova.codiceLuca);
+    return { l, persone:d.persone.filter(x => x.proprietario === l.id) }; });
+  check(d0.l.confermato_il == null && d0.l.invitato_da === "G" && d0.persone.length === 29 && new Set(d0.persone.map(x => x.nome)).size === 29
+    && d0.persone.every(x => x.nome && x.fonte && x.origine) && new Set(d0.persone.map(x => x.fonte)).size === 3,
+    "prova Luca: in attesa della mappa, invitato da Giulia; 29 nomi diversi, tutti con «Come lo conosci?»");
+  await pg.click("button[data-act=vista-persone]");
+  check(!(await pg.locator("#app").innerText()).toLowerCase().includes("senza nome"), "prova Luca: nella Lista niente «senza nome»");
+  await pg.click("button[data-act=vista-io]");
+  /* fase 2: l'incontro, poi il trentesimo nome → la festa */
+  await pg.click(".oggi-lista button[data-act=incontro-fissa]");
+  await pg.locator(".sheet h2", { hasText:"Il primo incontro con il tuo sponsor" }).waitFor();
+  await pg.locator(`.sheet input[name=quando][value="${new Date(Date.now() + 864e5).toISOString().slice(0, 10)}"]`).evaluate(e => e.click());
+  await pg.click(".sheet button.primary");
+  await pg.getByText("Primo incontro con lo sponsor: domani").waitFor();
+  check(!(await tr.count()) && (await pg.locator(".oggi-lista .prossima-titolo").innerText()).trim() === "Scrivi i prossimi nomi nella Lista", "prova Luca: incontro fissato, ora il trentesimo nome");
+  await pg.click(".oggi-lista .prossima-azioni button.primary");
+  await pg.click("button[data-act=persona-nuova]");
+  check(await pg.locator(".sheet button[data-act=rubrica], .sheet [data-act=incolla-numero]").count() >= 1, "prova Luca: nel modulo del nome Rubrica o Incolla");
+  await pg.fill(".sheet input[name=nome]", "Gianna Trenta");
+  await pg.click(".sheet button:has-text('Salva')");
+  await tr.waitFor();
+  check((await trTesto()).includes("Fase 2 completata! 30 nomi nella Lista e l'incontro con il tuo sponsor fissato. Ora il primo ordine."), "prova Luca: la festa della fase 2");
+  await anteprima("festa-fase2");
+  await tr.locator("button[data-act=traguardo-chiudi]").click();
+  /* fase 3: la bozza confermata → in attesa della mappa */
+  await pg.click("button[data-act=vista-io]");
+  check((await pg.locator(".oggi-lista .prossima-titolo").innerText()).trim() === "Il tuo primo ordine", "prova Luca: «La prossima cosa»: il primo ordine");
+  await pg.click(".oggi-lista .prossima-azioni button.primary");
+  await pg.click(".sheet button[data-act=apri-bozze]");
+  await pg.click(".sheet #le-mie-bozze button[data-act=bozza-nuova]");
+  const bozza = pg.locator(".sheet #bozza-ordine"); await bozza.waitFor();
+  for(const [i, cerca] of ["multivit", "proteine", "siero"].entries()){
+    await pg.fill("#cerca-mio", cerca);
+    await bozza.locator("button[data-act=mio-aggiungi]").first().click();
+    await bozza.getByText(i ? `${i + 1} prodotti` : "1 prodotto").waitFor(); }
+  await pg.click("#bozza-ordine button[data-act=mio-conferma]");
+  await pg.click(".sheet button.primary");
+  await pg.getByText("Ordine confermato").first().waitFor();
+  await pg.click(".sheet #miei-ordini button[data-act=ordini]");
+  await pg.locator(".sheet [data-act=chiudi]").last().click();
+  await pg.locator(".percorso-partenza .ordine-attesa").waitFor();
+  check((await pg.locator(".percorso-partenza .ordine-attesa").innerText()).replace(/\s+/g, " ").trim() === "! Ordine confermato · in attesa della mappa"
+    && (await pg.locator(".percorso-partenza .fase-titolo").innerText()).trim() === "I due binari", "prova Luca: bozza confermata → «in attesa della mappa», si va ai due binari");
+  /* arriva la mappa con il primo ordine → la festa della fase 3 */
+  await pg.click(".prova-barra [data-prova=arriva]");
+  await tr.waitFor();
+  check((await trTesto()).includes("Fase 3 completata! Il tuo primo ordine è nella mappa. Ora i due binari: il primo piano e il primo cliente."), "prova Luca: arriva la mappa → la festa della fase 3");
+  await tr.locator("button[data-act=traguardo-chiudi]").click();
+  const d1 = await pg.evaluate(() => { const d = window.__DB, l = d.partners.find(p => p.codice_amway === d._prova.codiceLuca);
+    return { conf:l.confermato_il, vp:d.numeri.filter(n => n.partner_id === l.id).map(n => n.vpp) }; });
+  check(!!d1.conf && d1.vp.length === 1 && Math.abs(d1.vp[0] - 55.2) < 0.01, "prova Luca: nella mappa, con i VP della bozza confermata (" + d1.vp.join() + ")");
+  check(!(await pg.locator(".prova-barra [data-prova=arriva]").count()) && !(await pg.locator(".percorso-partenza .ordine-attesa").count()), "prova Luca: niente più «Arriva la mappa» né «in attesa»");
+  /* fase 4: il primo piano e il primo cliente → la festa finale, poi la domanda sulla condivisione */
+  await pg.click("button[data-act=piano-rapido]");
+  await pg.fill("#cerca-piano", "marco");
+  await pg.locator("#risultati-piano button[data-act=piano-con]", { hasText:"Marco Sartori" }).click();
+  await pg.click(".sheet button:has-text('Salva')");
+  await pg.getByText("Piano segnato").waitFor();
+  await pg.click("button[data-act=vista-persone]"); await pg.click("button[data-sez=clienti]");
+  await pg.click("button[data-act=cliente-nuovo]");
+  await pg.fill(".sheet input[name=nome]", "Rosa Prima");
+  await pg.click(".sheet button.primary");
+  await tr.waitFor(); await tr.locator("button[data-act=traguardo-chiudi]").click();
+  await pg.click("button[data-act=vista-io]");
+  const festa = pg.locator(".festa:not(.traguardo)"); await festa.waitFor();
+  check((await festa.innerText()).includes("Ora hai tutta l'app."), "prova Luca: la festa finale con «Ora hai tutta l'app»");
+  check(!(await pg.locator(".domanda-condividi").count()), "prova Luca: durante la festa niente domanda sulla condivisione");
+  await festa.locator("button[data-act=festa-fine]").click();
+  await pg.locator(".domanda-condividi").waitFor();
+  check(true, "prova Luca: dopo la festa la domanda sulla condivisione");
+  check(!fuori.length, "prova Luca: nessuna richiesta fuori dal sito, niente database (" + fuori.slice(0, 3).join(", ") + ")");
+  check(!err.length, "prova Luca: nessun errore nella pagina (" + err.slice(0, 2).join(" | ") + ")");
+  /* tornando su Luca: le feste già viste non tornano */
+  await pg.click("[data-prova=scegli]"); await pg.locator(".prova-scelta").waitFor();
+  await pg.click("[data-prova=come][data-k=luca]"); await pg.getByText("Ciao Luca").waitFor(); await pg.waitForTimeout(500);
+  check(!(await pg.locator(".festa").count()), "prova Luca: rientrando, le feste già viste non tornano");
+  await c.close();
 }
 
 await browser.close();

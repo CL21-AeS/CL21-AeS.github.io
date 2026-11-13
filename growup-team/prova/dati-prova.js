@@ -3,8 +3,11 @@
    sempre «fresca» (il mese in corso, la settimana, l'agenda di oggi). Le persone della prova:
    - Stefano e Alessia: upline e admin, importano la mappa;
    - Giulia Martini: in attività da due anni, con Lista, clienti, gruppo, Verifica; è la sponsor di Sara e di Luca;
-   - Luca Bassi: appena iscritto (è già nella mappa), entra con l'invito di Giulia;
+   - Luca Bassi: iscritto ad Amway da pochi giorni, non ancora in una mappa importata; entra con l'invito di Giulia
+     (resta «in attesa della mappa») e trova già 29 nomi nella Lista (li mette avvio-prova.js all'ingresso);
    - Sara Conti: entrata 12 giorni fa con l'invito di Giulia, a metà del percorso di partenza. */
+/* la versione dei dati: se cambia, chi aveva una prova più vecchia sul telefono ricomincia da capo */
+window.GROWUP_PROVA_VERSIONE = 3;
 window.GROWUP_PROVA_DATI = function(){
   "use strict";
   /* ---- tempo: tutto è relativo a oggi ---- */
@@ -27,6 +30,8 @@ window.GROWUP_PROVA_DATI = function(){
 
   /* ---- le chiavi della prova (pubbliche: servono solo a scegliere chi essere nella prova) ---- */
   const CHIAVE = { R:"5a".repeat(16), G:"6b".repeat(16), S:"7d".repeat(16) }, INVITO_LUCA = "7c".repeat(16);
+  /* il codice Amway di Luca: non è in nessuna mappa importata (si è iscritto da pochi giorni) */
+  const CODICE_LUCA = "7199010";
 
   /* ---- tappe e impostazioni: le stesse dell'app vera (non sono dati personali) ---- */
   const T = (ordine, chiave, nome, x) => Object.assign({ ordine, chiave, nome, percentuale:null, vp_personali:0, vp_gruppo:null, linee:null, vp_linea:null,
@@ -117,7 +122,6 @@ window.GROWUP_PROVA_DATI = function(){
         ["mp", "Mirko Pace", "lp", 17, 90],
         ["sn", "Silvia Neri", "lp", 6, 150],
       ["S", "Sara Conti", "G", 0, 60, true],
-      ["L", "Luca Bassi", "G", 0, 0],
     ["pr", "Paolo Ricci", "R", 30, 320, true],
       ["al", "Anna Lodi", "pr", 21, 520],
       ["cl", "Carlo Lodi", "pr", 15, 410],
@@ -125,11 +129,11 @@ window.GROWUP_PROVA_DATI = function(){
     ["fb", "Franca Bellini", "R", 26, 280],
       ["dm", "Dario Moro", "fb", 11, 450],
       ["gv", "Gloria Vitale", "fb", 5, 320]];
-  /* le date di iscrizione «del mese»: Rita Sala (dalla mappa) all'inizio del mese, Sara 12 giorni fa, Luca 4 giorni fa */
-  const iscritto = { S:gg(12), L:gg(4), rs:gg(Math.min(giornoDelMese - 1, 9)) };
+  /* le date di iscrizione «del mese»: Rita Sala (dalla mappa) all'inizio del mese, Sara 12 giorni fa */
+  const iscritto = { S:gg(12), rs:gg(Math.min(giornoDelMese - 1, 9)) };
   let codice = 7100000;
   const partners = albero.map(([k, nome, sp, mesi, vpTipo, app]) => {
-    const p = { id:k === "R" || k === "G" || k === "S" || k === "L" ? k : "p-" + k, nome, sponsor_id:sp ? (["R", "G", "S", "L"].includes(sp) ? sp : "p-" + sp) : null,
+    const p = { id:k === "R" || k === "G" || k === "S" ? k : "p-" + k, nome, sponsor_id:sp ? (["R", "G", "S"].includes(sp) ? sp : "p-" + sp) : null,
       codice_amway:String(++codice), codice_invito:("P" + k.toUpperCase() + "RV00").slice(0, 6), data_iscrizione:iscritto[k] || mesiFa(mesi),
       creato_il:ts(Math.max(30, mesi * 30)), stato:app ? "attivo" : "gestito", gestore_id:app ? null : "R",
       mappa_mese:mese(0) + "-01", posizione_al:ts(2), partenza_confermata_il:ts(Math.max(1, mesi * 30)), _vp:vpTipo, _k:k };
@@ -147,8 +151,6 @@ window.GROWUP_PROVA_DATI = function(){
   /* Sara: entrata 12 giorni fa con il link di Giulia, a metà del percorso di partenza */
   Object.assign(P("S"), { chiave:CHIAVE.S, invitato_da:"G", invitato_il:ts(12), privacy_accettata_il:ts(12), confermato_il:ts(10), partenza_completata_il:null,
     partenza_confermata_il:ts(12), incontro_sponsor:gg(10), punto_upline:null, ultimo_aggiornamento:ts(1) });
-  /* Luca: è nella mappa da pochi giorni (senza app); entrerà con l'invito di Giulia */
-  Object.assign(P("L"), { partenza_confermata_il:null });
 
   /* ---- i numeri delle mappe: 12 mesi (11 chiusi + quello in corso) ---- */
   const figli = id => partners.filter(p => p.sponsor_id === id);
@@ -162,7 +164,7 @@ window.GROWUP_PROVA_DATI = function(){
       if(p.data_iscrizione > fine){ continue; }
       const primo = p.data_iscrizione.slice(0, 7) === m;
       let v = p._vp * (1.15 + caso() * 0.6);
-      if(primo) v = p._k === "L" ? 0 : Math.max(55, v * 0.8);
+      if(primo) v = Math.max(55, v * 0.8);
       if(p._k === "mb") v = 0;                               // fermo da mesi
       if(caso() < 0.08 && !["R", "G"].includes(p._k)) v = 0;   // un mese senza ordini, ogni tanto
             vpp.set(p.id, Math.round(v * quota * 100) / 100);
@@ -184,7 +186,7 @@ window.GROWUP_PROVA_DATI = function(){
       }
     }
   }
-  const codiceDi = { L:P("L").codice_amway, S:P("S").codice_amway };
+  const codiceDi = { S:P("S").codice_amway };
   for(const p of partners){ delete p._vp; delete p._k; }
 
   /* ---- la Lista e i clienti di Giulia (e qualche nome di Sara) ---- */
@@ -338,14 +340,33 @@ window.GROWUP_PROVA_DATI = function(){
 
   /* gli inviti personali in Growup: quello di Luca (aperto) e quello di Sara (usato) */
   const invitiP = [
-    { id:"inv-luca", codice:INVITO_LUCA, creato_da:G, nome:"Luca Bassi", codice_amway:codiceDi.L, creato_il:ts(1), scade_il:new Date(adesso + 6 * giorno).toISOString(),
+    { id:"inv-luca", codice:INVITO_LUCA, creato_da:G, nome:"Luca Bassi", codice_amway:CODICE_LUCA, creato_il:ts(1), scade_il:new Date(adesso + 6 * giorno).toISOString(),
       annullato_il:null, usato_il:null, usato_da:null },
     { id:"inv-sara", codice:"8e".repeat(16), creato_da:G, nome:"Sara Conti", codice_amway:codiceDi.S, creato_il:ts(13), scade_il:ts(6),
       annullato_il:null, usato_il:ts(12), usato_da:"S" }];
 
+  /* i 29 nomi che Luca trova nella Lista appena entrato (li scrive avvio-prova.js all'ingresso, con la data di quel momento):
+     [nome, come lo conosci (fonte), dove (origine), telefono] */
+  const nomiLuca = [
+    ["Marco Sartori", "conoscenza", "amico d'infanzia", "333 100 0001"], ["Elena Bassi", "conoscenza", "cugina", "333 100 0002"],
+    ["Davide Ricci", "conoscenza", "calcetto del giovedì", "333 100 0003"], ["Chiara Lupi", "conoscenza", "ex collega", "333 100 0004"],
+    ["Federico Gallo", "conoscenza", "vicino di casa", null], ["Silvia Mancini", "dal_vivo", "corso di yoga", "333 100 0006"],
+    ["Giorgio Neri", "conoscenza", "zio", "333 100 0007"], ["Martina Costa", "social", "gruppo di cucina su Facebook", null],
+    ["Andrea Fontana", "conoscenza", "compagno di università", "333 100 0009"], ["Valentina Rossi", "dal_vivo", "palestra", "333 100 0010"],
+    ["Stefano Greco", "conoscenza", "collega di lavoro", "333 100 0011"], ["Paola Marchi", "conoscenza", "mamma di un compagno di scuola", "333 100 0012"],
+    ["Lorenzo Villa", "social", "Instagram", null], ["Giada Ferri", "dal_vivo", "festa di un amico", "333 100 0014"],
+    ["Matteo Conti", "conoscenza", "amico del calcetto", "333 100 0015"], ["Sofia Moretti", "conoscenza", "cugina", "333 100 0016"],
+    ["Riccardo Bianchi", "dal_vivo", "barbiere", "333 100 0017"], ["Alessandra Pini", "conoscenza", "ex compagna di classe", "333 100 0018"],
+    ["Nicolò Ferrari", "conoscenza", "collega di lavoro", "333 100 0019"], ["Irene Marino", "social", "gruppo del quartiere su WhatsApp", "333 100 0020"],
+    ["Tommaso Galli", "conoscenza", "amico di famiglia", "333 100 0021"], ["Beatrice Leone", "dal_vivo", "corso di inglese", null],
+    ["Simone De Luca", "conoscenza", "cognato", "333 100 0023"], ["Camilla Testa", "conoscenza", "vicina di casa", "333 100 0024"],
+    ["Pietro Barbieri", "dal_vivo", "papà al parco giochi", "333 100 0025"], ["Laura Sala", "social", "LinkedIn", null],
+    ["Fabio Rinaldi", "conoscenza", "allenatore di calcetto", "333 100 0027"], ["Monica Fabbri", "conoscenza", "collega della moglie", "333 100 0028"],
+    ["Gabriele Monti", "dal_vivo", "fiera del paese", "333 100 0029"]];
+
   return {
-    /* versione 2 (13 novembre 2026): la pagina di scelta con Luca e Giulia; Giulia qui è nell'app da tempo (dueMesi) */
-    _prova:{ versione:2, creata_il:new Date().toISOString(), chiavi:CHIAVE, invitoLuca:INVITO_LUCA, codiceLuca:codiceDi.L, invitoGiulia:null, dueMesi:true },
+    /* Giulia qui è nell'app da tempo (dueMesi) */
+    _prova:{ versione:window.GROWUP_PROVA_VERSIONE, creata_il:new Date().toISOString(), chiavi:CHIAVE, invitoLuca:INVITO_LUCA, codiceLuca:CODICE_LUCA, nomiLuca, invitoGiulia:null, dueMesi:true },
     partners, stages, settings, listino, numeri, storico, persone, passi, activities, ordini, righe, cerchie, pc, goals, mgoals, obiettivi,
     numeriCl21, guidaObiettivi, guidaFatti, seguimi, seguimiGiorni:[], inviti, invitiP, preferiti:[{ partner_id:"R", preferito_id:"G" }, { partner_id:"G", preferito_id:"p-pg" }],
     accessi:[], aggiunti:[], anon:0, joins:[], nascosti:[], esclusi:[], ordiniMiei:[], righeMie:[], partenzaTolti:[], telefoni:[], previste:[],
