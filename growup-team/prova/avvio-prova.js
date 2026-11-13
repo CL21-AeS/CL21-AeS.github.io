@@ -17,7 +17,7 @@
   let db = null;
   try{ db = JSON.parse(leggi(K_DATI)); }catch(e){ db = null; }
   /* dati di una versione di prova più vecchia: si ricomincia da capo (anche la sessione) */
-  if(!db || !db._prova || db._prova.versione !== 2){ db = window.GROWUP_PROVA_DATI(); for(const x of chiaviProva()) if(x !== K_DATI) scrivi(x, null); }
+  if(!db || !db._prova || db._prova.versione !== window.GROWUP_PROVA_VERSIONE){ db = window.GROWUP_PROVA_DATI(); for(const x of chiaviProva()) if(x !== K_DATI) scrivi(x, null); }
   window.__DB = db;
   let dimentica = false;   // «Ricomincia»: i dati di adesso non si salvano più (neanche uscendo dalla pagina)
   const salvaDati = () => { if(!dimentica) scrivi(K_DATI, JSON.stringify(window.__DB)); };
@@ -83,6 +83,26 @@
     try{ sessionStorage.clear(); }catch(e){}
     location.hash = ""; location.reload();
   }
+  /* Luca: arriva la mappa con il suo primo ordine. Come un import della mappa di Giulia: Luca è al suo posto nella
+     struttura (non più in attesa) e la mappa del mese mostra i VP del suo primo ordine (quelli della bozza confermata,
+     altrimenti un primo ordine di 62 VP). */
+  function arrivaMappa(){
+    const d = window.__DB, l = luca();
+    if(!l) return;
+    const m = meseIso(), ora = new Date().toISOString();
+    const vp = Math.round((d.ordiniMiei || []).filter(o => o.proprietario === l.id && o.stato === "confermato" && !o.persona_id)
+      .reduce((t, o) => t + (Number(o.vp) || 0), 0) * 100) / 100 || 62;
+    Object.assign(l, { confermato_il:l.confermato_il || ora, mappa_mese:m + "-01", posizione_al:ora });
+    d.numeri = (d.numeri || []).filter(n => !(n.partner_id === l.id && n.mese === m))
+      .concat([{ visto_da:"G", partner_id:l.id, mese:m, vpp:vp, vpg:vp, percentuale:0, linee:[], nascoste:false, dati_al:ora }]);
+    /* i VP di gruppo di chi gli sta sopra, nella stessa mappa */
+    for(let s = d.partners.find(p => p.id === l.sponsor_id); s; s = d.partners.find(p => p.id === s.sponsor_id)){
+      const n = (d.numeri || []).find(x => x.partner_id === s.id && x.mese === m); if(n) n.vpg = Math.round((Number(n.vpg) + vp) * 100) / 100; }
+    salvaDati();
+    location.reload();
+  }
+  const ordineInMappa = () => { const d = window.__DB, l = luca(); if(!l) return false; const dal = String(l.data_iscrizione || "2000-01-01").slice(0, 7);
+    return (d.numeri || []).some(n => n.partner_id === l.id && n.mese >= dal && Number(n.vpp) > 0); };
   /* ---- i file «del sito Amway» di prova, per far vedere gli import (tutto inventato) ---- */
   const MESI_L = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
   const oggiL = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12); };
@@ -173,13 +193,16 @@
 .prova-scelta .avviso{background:#fde4d3;color:#5c2a0c;border-radius:14px;padding:10px 12px;font-size:13px;line-height:1.45;margin:0}`;
     document.head.appendChild(st);
   }
-  /* la barra in cima: «Cambia persona» */
+  /* la barra in cima: «Cambia persona» e, solo per Luca, «Arriva la mappa con il primo ordine» (dopo l'ingresso, finché
+     la mappa non mostra il primo ordine) */
   function barra(){
-    const extra = "";
-    const b = document.createElement("div");
-    b.className = "prova-barra";
-    b.innerHTML = `<span>Versione di prova · dati inventati</span><span class="prova-azioni">${extra}<button type="button" data-prova="scegli">Cambia persona</button></span>`;
-    document.body.insertBefore(b, document.body.firstChild);
+    const chi = leggi(K_CHI);
+    const extra = chi === "luca" && luca() && !ordineInMappa() ? `<button type="button" data-prova="arriva">Arriva la mappa con il primo ordine</button>`
+ : "";
+    const html = `<span>Versione di prova · dati inventati</span><span class="prova-azioni">${extra}<button type="button" data-prova="scegli">Cambia persona</button></span>`;
+    let b = document.querySelector(".prova-barra");
+    if(!b){ b = document.createElement("div"); b.className = "prova-barra"; document.body.insertBefore(b, document.body.firstChild); }
+    if(b.innerHTML !== html) b.innerHTML = html;
   }
   function scelta(){
     document.body.innerHTML = `<main class="prova-scelta">
@@ -207,7 +230,25 @@
     else if(a === "ricomincia") ricomincia();
     else if(a === "mappa") mappaProva();
     else if(a === "clienti") clientiProva();
+    else if(a === "arriva") arrivaMappa();
   }, true);
+
+  /* Luca, appena entrato con l'invito di Giulia, trova già 29 nomi nella sua Lista (inventati, con «Come lo conosci?»):
+     manca il trentesimo, per far vedere la festa della fase 2 */
+  function nomiDiLuca(){
+    const api = window.GROWUP_API, entra = api.join;
+    api.join = async a => {
+      const r = await entra(a), d = window.__DB, id = r && r.profilo && r.profilo.id;
+      if(id && String(a.p_codice || "").toLowerCase() === d._prova.invitoLuca && !(d.persone || []).some(x => x.proprietario === id)){
+        const t = Date.now();
+        d.persone = (d.persone || []).concat(d._prova.nomiLuca.map(([nome, fonte, origine, contatto], i) => ({ id:"pl-" + (i + 1), proprietario:id, nome,
+          contatto, origine, fonte, social:null, fase:"lista", esito:null, creato_il:new Date(t - (29 - i) * 60000).toISOString(), prossima_data:null,
+          prossima_ora:null, prossima_nota:null, prossima_per:null, prossima_come:null, note:null })));
+        salvaDati();
+      }
+      return r;
+    };
+  }
 
   const carica = src => new Promise((ok, ko) => { const s = document.createElement("script"); s.src = src; s.async = false; s.onload = ok; s.onerror = ko; document.body.appendChild(s); });
   (async () => {
@@ -216,6 +257,9 @@
     const conLink = /^#(chiave|invito|r)=/.test(location.hash);
     if(!conLink && !leggi(K_SESSIONE)){ scelta(); return; }
     barra();
-    for(const s of ["prova/api-prova.js", "listino.js", "app.js"]) await carica(s);
+    setInterval(barra, 1000);   // Luca entra e conferma la bozza senza ricaricare la pagina: il pulsante compare da solo
+    await carica("prova/api-prova.js");
+    nomiDiLuca();
+    for(const s of ["listino.js", "app.js"]) await carica(s);
   })().catch(e => { document.body.innerHTML = `<p style="padding:20px">La prova non si è aperta: ${esc(e && e.message || e)}. Ricarica la pagina.</p>`; });
 })();
