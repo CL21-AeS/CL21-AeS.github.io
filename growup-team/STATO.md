@@ -3,6 +3,68 @@
 Ultimo aggiornamento: 13 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Feste di fase e la versione di prova per Cum Laude 21 (13 novembre 2026, sera, app v122, database non toccato)
+
+Cinque PR in fila, da unire in ordine (una per punto); la versione del service worker sale una volta sola, nell'ultima.
+Per la presentazione a Cum Laude 21. Scelte di Stefano.
+1. **La festa a fine fase** (app vera, `festaFaseDaFare` e il tipo «fase» di `htmlTraguardo` in `app.js`): quando il nuovo
+   chiude la **fase 2** (incontro con lo sponsor fissato e 30 nomi, qualunque dei due arrivi per ultimo) e la **fase 3** (il
+   primo ordine nella mappa) compare un traguardo a tutto schermo come gli altri: «Fase 2 completata! 30 nomi nella Lista e
+   l'incontro con il tuo sponsor fissato. Ora il primo ordine.» / «Fase 3 completata! Il tuo primo ordine è nella mappa. Ora
+   i due binari: il primo piano e il primo cliente.». Coriandoli una volta sola, niente con «riduci animazioni»; anche
+   nella versione semplificata; una volta sola per fase, ricordata **su questo telefono** (`growup-team.festa.<id>.fase.2/3`).
+   Si controlla a ogni disegno, quindi anche all'apertura (la mappa del primo ordine arriva da un import). La fase 4 ha la
+   sua festa di sempre: se è dovuta quella, niente festa di fase. Casi rari, scelti da Claude: se il primo ordine è già
+   nella mappa (o in attesa) quando si chiude la fase 2, la festa è una sola, quella della fase 2, con «Ora i due binari…»;
+   la fase 3 non fa festa se il primo ordine viene dalla qualifica dichiarata all'ingresso (non c'è una mappa).
+   Da sapere: su un telefono nuovo una festa di fase già vista può tornare una volta. Test: sezione 93 (anteprime
+   `e2e/93-festa-fase2-light.png` e `-dark.png`); nei test `riapri()` ricarica la pagina con i dati di adesso.
+2. **Prova, la pagina di scelta**: solo **«Sono appena entrato» → Luca Bassi** e **«Sono in attività da tempo» → Giulia
+   Martini**, con i testi di Stefano; restano «Cambia persona» e «Ricomincia da capo». Tolti dalla scelta Sara e «Stefano e
+   Alessia» (restano nella struttura: Stefano e Alessia sono gli upline, Sara compare con «Due mesi dopo»). I file sono due:
+   **la mappa della rete di Giulia** e **i clienti di Giulia**. Tolti la mappa di Stefano e Alessia e il **file degli
+   ordini**: l'import dei clienti funziona da solo (l'ultimo ordine di ognuno va nello storico). Cambiando persona si azzerano
+   sessione, link e scelte senza persona; restano quelle legate a una persona (feste viste, domande, «Fatto»), così tornando
+   su Luca le feste già viste non tornano. Chi ha sul telefono i dati di una prova più vecchia ricomincia da capo
+   (`GROWUP_PROVA_VERSIONE`).
+3. **Prova, Luca** (il nuovo): entra con l'invito di Giulia e fa tutto il primo ingresso («La tua qualifica attuale»:
+   «Inizio», iscrizione di pochi giorni fa, obiettivo e perché). **Entra «in attesa della mappa»** (non è ancora in una mappa
+   importata: è iscritto da pochi giorni), così Giulia lo vede subito tra i suoi nuovi (vedi «Da sapere»). Trova **29 nomi
+   inventati** nella Lista, vari, con «Come lo conosci?» e da dove (li scrive `avvio-prova.js` all'ingresso), e l'incontro
+   con lo sponsor da fissare: si fissa l'incontro, si scrive il trentesimo nome e parte la festa della fase 2. Versione
+   semplificata e «La prossima cosa» come nell'app vera. Fase 3: bozza confermata → «in attesa della mappa»; nella barra
+   della prova, **solo per Luca**, **«Arriva la mappa con il primo ordine»**: Luca va al suo posto nella struttura e la
+   mappa del mese mostra i VP della bozza confermata (senza bozza, 62 VP); poi la festa della fase 3, i due binari, la festa
+   finale con «Ora hai tutta l'app» e, dopo, la domanda sulla condivisione. Test: sezione 94 (tutto il percorso; anteprime
+   `e2e/94-io-semplice-*.png` e `94-festa-fase2-*.png`).
+4. **Prova, Giulia** (in attività da due anni), in due tempi.
+   - **Primo tempo**: entra con l'invito di Stefano e Alessia (qualifica, per esempio 21%, iscrizione di circa due anni
+     fa, obiettivo e perché). È avviata: app completa, Seguimi acceso da solo, domanda sulla condivisione, «Per iniziare»
+     con «Importa la tua mappa». Lista e agenda vuote. **Il Gruppo** ha già le sue persone (dalla mappa del mese scorso di
+     Stefano e Alessia, senza i VP di questo mese: scelta di Stefano, perché nell'app «Importa la tua mappa» compare solo a
+     chi ha qualcuno sotto); importando la sua mappa (da «Per iniziare» o da Gruppo → Importa da Amway) arrivano i VP di
+     oggi e due iscritti nuovi (e Luca, se è entrato, va al suo posto); importando i clienti compaiono 6 clienti e 2 nomi
+     che non hanno mai comprato.
+   - **Secondo tempo**: nella barra, **solo per Giulia**, **«Due mesi dopo»** (anche senza aver fatto il primo tempo; dopo
+     l'uso non c'è più): Giulia dopo due mesi di uso (`GROWUP_PROVA_DUE_MESI` in `dati-prova.js`), con Il mio giorno, il
+     Seguimi e «Da fare oggi», la serie, l'agenda, la Lista con alcuni «Da riprendere», 9 clienti (arrivati con l'import dal
+     sito il secondo giorno, alcuni da riordinare), il Target, la Verifica con la tabella Stabilità, il Gruppo con la
+     struttura. **«Da seguire oggi»**: Sara Conti ferma (incontro con lo sponsor non fissato, con il complimento del primo
+     ordine), Paola Greco che non aggiorna da 9 giorni, Valeria e Ivo Testa con la percentuale salita. **Luca resta
+     com'è**: se Stefano l'ha fatto avanzare, Giulia lo vede tra «I tuoi nuovi in partenza» con la sua fase reale.
+   Test: sezioni 68 (primo tempo, anteprima `e2e/68-giulia-primo-ingresso-*.png`) e 95 («Due mesi dopo», anteprime
+   `e2e/95-giulia-due-mesi-*.png` e `95-da-seguire-*.png`).
+5. **Controllo generale** della prova: versione semplificata, «La prossima cosa», primo ordine in attesa della mappa, «Da
+   seguire oggi», «La tua qualifica attuale», domanda sulla condivisione, niente «senza nome», Incolla nel modulo del nome
+   (la Rubrica c'è solo sui telefoni che la lasciano usare), notifiche finte, nessun collegamento al database. Le date sono
+   relative a oggi: la sezione 96 apre la prova il 1° marzo, il 31 dicembre e il 15 febbraio. Pagina di scelta a 360 px in
+   chiaro e scuro: `e2e/68-prova-scelta-*.png`. Service worker **v122**, questo STATO.md.
+**Da sapere (difetto dell'app vera, da correggere a parte)**: se un nuovo è **già nella mappa** importata dallo sponsor ed
+entra con l'invito, `entra_con_invito` (052) non segna `invitato_da`: lo sponsor non lo vede in «I tuoi nuovi in partenza»
+né in «Da seguire oggi» (e non conta negli iscritti personali della Verifica). Va bene solo per chi entra prima di essere in
+una mappa (in attesa). Per questo nella prova Luca entra in attesa. Correzione proposta: una migrazione 066 che segna
+`invitato_da`/`invitato_il` dall'invito anche per chi è già nella mappa, e la stessa regola nell'API finta.
+
 ## «Da seguire oggi» per gli upline (13 novembre 2026, app v121, database non toccato)
 
 Tre PR in fila, da unire in ordine (una per punto); la versione del service worker sale una volta sola, nell'ultima.
@@ -479,6 +541,9 @@ scrive a mano non viene mai trasformato.
 Test: sezioni 69-74 (interfaccia) e 062 (database). Da provare dal telefono: Rubrica su Android, Incolla su iPhone.
 
 ## La versione di prova (4 novembre 2026, notte, app v103, database non toccato)
+
+Aggiornata il 13 novembre 2026 (sera, app v122): solo Luca e Giulia, due file; vedi «Feste di fase e la versione di prova»
+in cima. Quello che segue è com'era il 4 e 5 novembre.
 
 Per far vedere l'app senza dati veri (incontro del 7 novembre con un leader CL21): **`growup-team/prova/`**, link
 `https://cl21-aes.github.io/growup-team/prova/`. È l'app vera (index.html, app.js, listino.js) con al posto del database

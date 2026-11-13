@@ -6594,6 +6594,64 @@ for(const tema of ["light", "dark"]){
   await c.close();
 }
 
+// 96. La prova, controllo generale (13 novembre 2026): le date sono sempre relative a oggi, così la prova funziona in qualunque
+//     giorno (inizio, metà e fine mese, a cavallo dell'anno); le notifiche restano finte (nessun permesso, nessun server);
+//     nessun «senza nome»; nessun collegamento al database.
+{
+  const giorni = [new Date(2027, 2, 1, 9, 30), new Date(2026, 11, 31, 18, 0), new Date(2027, 1, 15, 12, 0)];
+  for(const quando of giorni){
+    const etichetta = quando.toISOString().slice(0, 10);
+    const c = await browser.newContext({ viewport:{ width:390, height:844 }, locale:"it-IT", timezoneId:"Europe/Rome", reducedMotion:"reduce" });
+    const pg = await c.newPage();
+    await pg.clock.install({ time:quando });
+    const fuori = [], err = [];
+    pg.on("request", r => { if(!r.url().startsWith("http://127.0.0.1:8765/")) fuori.push(r.url()); });
+    pg.on("pageerror", e => err.push(String(e))); pg.on("console", m => { if(m.type() === "error") err.push(m.text()); });
+    pg.on("dialog", d => d.accept());
+    await pg.addLocatorHandler(pg.locator(".festa.traguardo"), async t => { await t.locator("button[data-act=traguardo-chiudi]").click(); });
+    await pg.goto(BASE + "prova/"); await pg.locator(".prova-scelta").waitFor();
+    /* Luca: l'ingresso con i 29 nomi */
+    await pg.click("[data-prova=come][data-k=luca]");
+    await pg.getByText("ti diamo il benvenuto in Growup").waitFor();
+    const fa4 = new Date(quando.getTime() - 4 * 864e5);
+    await pg.fill("input[name=data]", `${fa4.getFullYear()}-${String(fa4.getMonth() + 1).padStart(2, "0")}-${String(fa4.getDate()).padStart(2, "0")}`);
+    await pg.check("input[name=privacy]");
+    await pg.click("form button.primary");
+    await perche(pg);
+    const pc = pg.locator(".card.percorso-partenza"); await pc.waitFor();
+    check((await pc.locator(".percorso-l li", { hasText:"30 nomi" }).innerText()).includes("29 / 30"), `prova (${etichetta}): Luca con 29 nomi`);
+    /* le notifiche sono finte: «Sì, attiva» non chiede niente al telefono e non va a nessun server */
+    if(await pg.locator("button[data-act=notifiche-si]").count()){
+      await pg.locator("button[data-act=notifiche-si]").first().click();
+      await pg.waitForTimeout(500);
+      check(await pg.evaluate(() => window.__DB.telefoni.length === 1 && window.__DB.telefoni[0].endpoint === "prova://questo-telefono"), `prova (${etichetta}): le notifiche restano finte`);
+    }
+    /* Giulia «Due mesi dopo» */
+    await pg.click("[data-prova=scegli]"); await pg.locator(".prova-scelta").waitFor();
+    await pg.click("[data-prova=come][data-k=giulia]");
+    await pg.getByText("ti diamo il benvenuto in Growup").waitFor();
+    await pg.click(".prova-barra [data-prova=due-mesi]");
+    await pg.getByText("Ciao Giulia").waitFor();
+    const ds = (await pg.locator(".card.da-seguire .da-seguire-l > li").allInnerTexts()).map(x => x.replace(/\s+/g, " "));
+    check(ds.length >= 3 && ds.some(r => r.includes("Sara Conti") && r.includes("Incontro con lo sponsor non ancora fissato")) && ds.some(r => r.includes("Non aggiorna"))
+      && ds.some(r => /Complimento/i.test(r)), `prova (${etichetta}): «Da seguire oggi» con un nuovo fermo, uno che non aggiorna e un complimento (${ds.join(" | ")})`);
+    const t = (await pg.locator("#app").innerText()).replace(/\s+/g, " ");
+    check(/Da fare oggi/i.test(t) && /settimane? di fila|La tua serie/i.test(t), `prova (${etichetta}): Il mio giorno con «Da fare oggi» e la serie`);
+    await pg.locator("button[data-act=vista-gruppo]").first().click();
+    check(await pg.locator(".nuovi-partenza", { hasText:"Luca Bassi" }).isVisible() && await pg.locator(".nuovi-partenza", { hasText:"Sara Conti" }).isVisible(),
+      `prova (${etichetta}): Luca e Sara tra i nuovi in partenza di Giulia`);
+    await pg.click("button[data-act=vista-persone]"); await pg.click("button[data-sez=lista]");
+    check(!/senza nome/i.test(await pg.locator("#app").innerText()), `prova (${etichetta}): nella Lista di Giulia niente «senza nome»`);
+    check(!fuori.length, `prova (${etichetta}): niente database (${fuori.slice(0, 3).join(", ")})`);
+    check(!err.length, `prova (${etichetta}): nessun errore nella pagina (${err.slice(0, 2).join(" | ")})`);
+    await c.close();
+  }
+  /* nessun collegamento al database: la pagina lo vieta (connect-src 'self') e non carica la libreria di Supabase */
+  const html = fs.readFileSync(S + "/../prova/index.html", "utf8"), avvio = fs.readFileSync(S + "/../prova/avvio-prova.js", "utf8");
+  check(/connect-src 'self'/.test(html) && !/supabase/i.test(html) && /s\.remove\(\)/.test(avvio) && !/config\.js|supabase/i.test(avvio.replace(/\/\*[\s\S]*?\*\//g, "")),
+    "prova: la pagina vieta i collegamenti fuori dal sito e non carica né Supabase né config.js");
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
