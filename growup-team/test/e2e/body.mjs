@@ -6242,6 +6242,116 @@ for(const tema of ["light", "dark"]){
   DB.obiettivi = DB.obiettivi.filter(o => !tutti.includes(o.partner_id));
 }
 
+// 93. La festa a fine fase (13 novembre 2026): quando il nuovo chiude la fase 2 (incontro fissato e 30 nomi, qualunque dei due
+//     arrivi per ultimo) e la fase 3 (il primo ordine nella mappa), un traguardo a tutto schermo come gli altri. Una volta
+//     sola per fase, ricordata sul telefono; coriandoli solo senza «riduci animazioni»; anche nella versione semplificata.
+{
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), ora = new Date().toISOString();
+  DB.traguardiAperti = true;   // qui i traguardi si guardano e si chiudono a mano
+  const nuovo = (id, k, nome, x) => { DB.partners = DB.partners.filter(p => p.id !== id).concat([Object.assign({ id, nome, sponsor_id:"R", invitato_da:"R",
+    stato:"attivo", chiave:k.repeat(16), codice_invito:id.toUpperCase().padEnd(6, "X").slice(0, 6), codice_amway:"79930" + DB.partners.length, data_iscrizione:giorno(-3),
+    privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true }, x || {})]); };
+  const nomi = (id, n) => { DB.persone = (DB.persone || []).filter(x => x.proprietario !== id)
+    .concat(Array.from({ length:n }, (_, i) => ({ id:id + "n" + i, proprietario:id, nome:"Nome " + id + " " + (i + 1), fase:"lista", esito:null, creato_il:ora, fonte:"conoscenza" }))); };
+  const tr = () => page.locator(".festa.traguardo");
+  const testo = async () => (await tr().innerText()).replace(/\s+/g, " ").trim().replace(/^Percorso di partenza · fase (\d) di 5/i, "Percorso di partenza · fase $1 di 5");
+  const chiudi = async () => { await tr().locator("button[data-act=traguardo-chiudi]").click(); await tr().waitFor({ state:"detached" }); };
+  const entra = async (k, nome, opz) => {
+    ({ ctx, page } = await apri(Object.assign({ viewport:{ width:360, height:780 } }, opz || {}), "#chiave=" + k.repeat(16)));
+    await page.getByText("Ciao " + nome).waitFor();
+  };
+  // A. Fede: «Inizio» (versione semplificata), 29 nomi, incontro da fissare. Prima l'incontro, poi il trentesimo nome.
+  nuovo("ff93", "3a", "Fede Fasi"); nomi("ff93", 29);
+  await entra("3a", "Fede");
+  check(await page.locator("button[data-act=sez-io][data-sez=guida]").count() === 0, "festa di fase: Fede è nella versione semplificata");
+  check(!(await tr().count()), "festa di fase: con 29 nomi e l'incontro da fissare niente festa");
+  await page.click(".oggi-lista button[data-act=incontro-fissa]");
+  await page.locator(".sheet h2", { hasText:"Il primo incontro con il tuo sponsor" }).waitFor();
+  await page.check(`.sheet input[name=quando][value="${giorno(1)}"]`, { force:true });
+  await page.click(".sheet button.primary");
+  await page.getByText("Primo incontro con lo sponsor: domani").waitFor();
+  check(!(await tr().count()), "festa di fase: incontro fissato ma 29 nomi, niente festa");
+  await page.click("button[data-act=vista-persone]");
+  await page.click("button[data-act=persona-nuova]");
+  await page.fill(".sheet input[name=nome]", "Trentesimo Nome");
+  await page.click(".sheet button:has-text('Salva')");
+  await tr().waitFor();
+  check(await testo() === "Percorso di partenza · fase 2 di 5 Fase 2 completata! 30 nomi nella Lista e l'incontro con il tuo sponsor fissato. Ora il primo ordine. Continua",
+    "festa di fase 2: il trentesimo nome con l'incontro già fissato (" + await testo() + ")");
+  check(await tr().locator("button").count() === 1 && !(await page.locator("canvas.coriandoli").count()), "festa di fase 2: un solo pulsante; con «riduci animazioni» niente coriandoli");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "festa di fase 2, 360 px: niente scroll orizzontale");
+  await chiudi();
+  await riapri(page); await page.getByText("Ciao Fede").waitFor(); await page.waitForTimeout(400);
+  check(!(await tr().count()), "festa di fase 2: una volta sola (riaprendo l'app sullo stesso telefono non torna)");
+  // fase 3: arriva la mappa con il primo ordine (anche dopo una bozza confermata in attesa della mappa)
+  await mappaIn(page, "ff93", 62);
+  await tr().waitFor();
+  check(await testo() === "Percorso di partenza · fase 3 di 5 Fase 3 completata! Il tuo primo ordine è nella mappa. Ora i due binari: il primo piano e il primo cliente. Continua",
+    "festa di fase 3: all'apertura, con il primo ordine nella mappa (" + await testo() + ")");
+  await chiudi();
+  await riapri(page); await page.getByText("Ciao Fede").waitFor(); await page.waitForTimeout(400);
+  check(!(await tr().count()), "festa di fase 3: una volta sola");
+  check(!errori.length, "festa di fase: nessun errore nella pagina");
+  await ctx.close();
+  // B. Gino: 30 nomi prima, l'incontro per ultimo; con i coriandoli (senza «riduci animazioni»). Anteprime a 360 px.
+  nuovo("gg93", "3b", "Gino Giro"); nomi("gg93", 30);
+  for(const tema of ["light", "dark"]){
+    await entra("3b", "Gino", { colorScheme:tema, deviceScaleFactor:2, reducedMotion:tema === "light" ? "no-preference" : "reduce" });
+    if(tema === "light"){
+      check(!(await tr().count()), "festa di fase: 30 nomi e incontro da fissare, niente festa");
+      await page.click(".oggi-lista button[data-act=incontro-fissa]");
+      await page.locator(".sheet h2", { hasText:"Il primo incontro con il tuo sponsor" }).waitFor();
+      await page.locator(`.sheet input[name=quando][value="${giorno(1)}"]`).evaluate(e => e.click());
+      await page.click(".sheet button.primary");
+      await tr().waitFor();
+      check(await page.locator("canvas.coriandoli").count() === 1, "festa di fase 2: l'incontro per ultimo; senza «riduci animazioni» i coriandoli");
+      await page.waitForTimeout(2800);
+      check(!(await page.locator("canvas.coriandoli").count()), "festa di fase 2: i coriandoli finiscono da soli");
+    } else {
+      /* un altro telefono: la festa non è ancora stata vista qui */
+      await tr().waitFor();
+    }
+    check((await testo()).includes("Fase 2 completata!"), `festa di fase 2 (${tema})`);
+    await page.screenshot({ path: S + `/e2e/93-festa-fase2-${tema}.png` });
+    await chiudi();
+    await sync(page); await ctx.close();
+  }
+  // C. Il primo ordine era già nella mappa quando si chiude la fase 2: una festa sola, con i due binari dopo
+  nuovo("hh93", "3c", "Ugo Unasola", { incontro_sponsor:giorno(1) }); nomi("hh93", 29); mappa("hh93", 70);
+  await entra("3c", "Ugo");
+  check(!(await tr().count()), "festa di fase: primo ordine nella mappa ma fase 2 aperta: niente festa della fase 3");
+  await page.click("button[data-act=vista-persone]");
+  await page.click("button[data-act=persona-nuova]");
+  await page.fill(".sheet input[name=nome]", "Ultimo Nome");
+  await page.click(".sheet button:has-text('Salva')");
+  await tr().waitFor();
+  check((await testo()).includes("Fase 2 completata!") && (await testo()).includes("Ora i due binari: il primo piano e il primo cliente."),
+    "festa di fase 2 con il primo ordine già nella mappa: «Ora i due binari»");
+  await chiudi();
+  await riapri(page); await page.getByText("Ciao Ugo").waitFor(); await page.waitForTimeout(400);
+  check(!(await tr().count()), "festa di fase: la fase 3 non fa una seconda festa");
+  await ctx.close();
+  // D. Fase 4 chiusa: c'è solo la festa della partenza (come prima), niente festa di fase
+  nuovo("ii93", "3d", "Ivo Insieme", { incontro_sponsor:giorno(-1) }); nomi("ii93", 30); mappa("ii93", 70);
+  DB.activities.push({ id:"ii93p", partner_id:"ii93", tipo:"piano", quantita:1, data:giorno(0), inserito_il:ora },
+    { id:"ii93c", partner_id:"ii93", tipo:"cliente", quantita:1, data:giorno(0), inserito_il:ora });
+  await entra("3d", "Ivo");
+  await page.locator(".festa:not(.traguardo)").waitFor(); await page.waitForTimeout(300);
+  check(!(await tr().count()), "fase 4 chiusa: solo la festa della partenza, nessuna festa di fase");
+  await ctx.close();
+  // E. Un avviato e chi ha dichiarato la qualifica: nessuna festa di fase
+  nuovo("jj93", "3e", "Lia Avviata", { data_iscrizione:giorno(-300) }); nomi("jj93", 30);
+  await entra("3e", "Lia"); await page.waitForTimeout(400);
+  check(!(await tr().count()), "avviato: nessuna festa di fase");
+  await ctx.close();
+  check(!errori.length, "festa di fase: nessun errore nella pagina");
+  const tutti = ["ff93", "gg93", "hh93", "ii93", "jj93"];
+  DB.partners = DB.partners.filter(p => !tutti.includes(p.id)); DB.persone = DB.persone.filter(x => !tutti.includes(x.proprietario));
+  DB.activities = DB.activities.filter(a => !tutti.includes(a.partner_id)); DB.numeri = (DB.numeri || []).filter(x => !tutti.includes(x.partner_id));
+  DB.obiettivi = (DB.obiettivi || []).filter(o => !tutti.includes(o.partner_id));
+  DB.traguardiAperti = false;
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

@@ -68,7 +68,9 @@ async function apri(ctxOpts, hash){
   if(!DB.conPercorso) for(const p of DB.partners) if(p.data_iscrizione && !p.conPercorso && !p.partenza_completata_il) p.partenza_completata_il = "2026-01-01T00:00:00Z";
   if(!DB.senzaObiettivo) for(const p of DB.partners) if(p.chiave && p.privacy_accettata_il && !p.senzaObiettivo && !(DB.obiettivi || []).some(o => o.partner_id === p.id))
     DB.obiettivi = (DB.obiettivi || []).concat([{ partner_id:p.id, cifra_mese:300, entro:(new Date().getFullYear() + 1) + "-06-01", perche:"Per la famiglia" }]);
-  await page.addInitScript(([db, m]) => { window.__DB = db; window.GROWUP_TEST = {}; eval(m); }, [DB, mock]);
+  /* riapri(): ricaricando la pagina si riparte dai dati di adesso (non da quelli dell'apertura) */
+  await page.addInitScript(([db, m]) => { let x = null; try{ x = sessionStorage.getItem("__test_db"); sessionStorage.removeItem("__test_db"); }catch(e){}
+    window.__DB = x ? JSON.parse(x) : db; window.GROWUP_TEST = {}; eval(m); }, [DB, mock]);
   await page.goto(BASE + (hash || ""));
   return { ctx, page };
 }
@@ -86,6 +88,8 @@ const mappaIn = async (pg, pid, vpp, vpg, extra) => { const r = rigaMappa(pid, v
 /* «mappa del 10 novembre» per una data e ora */
 const giornoMappaIt = d => new Intl.DateTimeFormat("it-IT", { timeZone:"Europe/Rome", day:"numeric", month:"long" }).format(new Date(d));
 const delGiornoIt = d => { const g = giornoMappaIt(d), n = parseInt(g, 10); return n === 1 ? "del 1°" + g.slice(1) : n === 8 || n === 11 ? "dell'" + g : "del " + g; };
+/* riapre l'app sullo stesso telefono (stessa memoria del telefono), con i dati di adesso */
+const riapri = async page => { await page.evaluate(() => sessionStorage.setItem("__test_db", JSON.stringify(window.__DBOUT || window.__DB))); await page.reload(); };
 const sync = async page => Object.assign(DB, await page.evaluate(() => JSON.parse(JSON.stringify(window.__DBOUT || window.__DB))));
 /* ottimizzazione 1: tappa e diario si aprono toccandoli; gli ordini stanno nel foglio «Ordini» */
 const apriRiga = async (pg, act) => { const b = pg.locator(`button[data-act=${act}]`).first();
