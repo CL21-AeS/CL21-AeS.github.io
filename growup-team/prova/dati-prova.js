@@ -344,7 +344,8 @@ window.GROWUP_PROVA_DATI = function(){
       annullato_il:null, usato_il:ts(12), usato_da:"S" }];
 
   return {
-    _prova:{ creata_il:new Date().toISOString(), chiavi:CHIAVE, invitoLuca:INVITO_LUCA },
+    /* versione 2 (13 novembre 2026): la pagina di scelta con Luca e Giulia; Giulia qui è nell'app da tempo (dueMesi) */
+    _prova:{ versione:2, creata_il:new Date().toISOString(), chiavi:CHIAVE, invitoLuca:INVITO_LUCA, codiceLuca:codiceDi.L, invitoGiulia:null, dueMesi:true },
     partners, stages, settings, listino, numeri, storico, persone, passi, activities, ordini, righe, cerchie, pc, goals, mgoals, obiettivi,
     numeriCl21, guidaObiettivi, guidaFatti, seguimi, seguimiGiorni:[], inviti, invitiP, preferiti:[{ partner_id:"R", preferito_id:"G" }, { partner_id:"G", preferito_id:"p-pg" }],
     accessi:[], aggiunti:[], anon:0, joins:[], nascosti:[], esclusi:[], ordiniMiei:[], righeMie:[], partenzaTolti:[], telefoni:[], previste:[],

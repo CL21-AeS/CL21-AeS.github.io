@@ -16,7 +16,8 @@
   /* ---- i dati inventati: quelli salvati su questo telefono, o nuovi ---- */
   let db = null;
   try{ db = JSON.parse(leggi(K_DATI)); }catch(e){ db = null; }
-  if(!db || !db._prova) db = window.GROWUP_PROVA_DATI();
+  /* dati di una versione di prova più vecchia: si ricomincia da capo (anche la sessione) */
+  if(!db || !db._prova || db._prova.versione !== 2){ db = window.GROWUP_PROVA_DATI(); for(const x of chiaviProva()) if(x !== K_DATI) scrivi(x, null); }
   window.__DB = db;
   let dimentica = false;   // «Ricomincia»: i dati di adesso non si salvano più (neanche uscendo dalla pagina)
   const salvaDati = () => { if(!dimentica) scrivi(K_DATI, JSON.stringify(window.__DB)); };
@@ -39,32 +40,38 @@
     }
   };
 
-  /* ---- chi essere nella prova ---- */
+  /* ---- chi essere nella prova: Luca (il nuovo) e Giulia (in attività da tempo) ---- */
   const PERSONE = [
     { k:"luca", titolo:"Sono appena entrato", chi:"Luca Bassi",
-      testo:"Riceve l'invito di Giulia: l'ingresso, da dove parte, l'obiettivo con il perché, il percorso di partenza fase per fase, fino alla festa." },
-    { k:"giulia", titolo:"Sono in attività da due anni", chi:"Giulia Martini",
-      testo:"La sua giornata, la serie, l'agenda, la Lista con chi è da riprendere, i clienti, il Target, la Verifica con la tabella Stabilità. È la sponsor di Sara e di Luca: in Gruppo li segue nella partenza." },
-    { k:"sara", titolo:"Sono entrata da 12 giorni", chi:"Sara Conti",
-      testo:"A metà del percorso di partenza: cosa le manca, i primi nomi della Lista, i primi contatti." },
-    { k:"stefano", titolo:"Siamo la sua upline (e admin)", chi:"Stefano e Alessia",
-      testo:"Vedono il gruppo con i numeri, mai i nomi delle Liste né il perché di nessuno. Importano la mappa Amway (qui sotto quella di prova)." }];
+      testo:"Il primo ingresso di un nuovo partner e il percorso di partenza, fase per fase, fino alla festa." },
+    { k:"giulia", titolo:"Sono in attività da tempo", chi:"Giulia Martini",
+      testo:"Il primo ingresso di chi è già in attività, l'import della mappa e dei clienti, poi l'app dopo due mesi." }];
+  const K_CHI = "prova.chi";
+  /* cambiando persona si esce come da un telefono che passa di mano: via la sessione, il link personale e le altre scelte
+     senza nome di persona. Restano le scelte legate a una persona (feste viste, domanda sulla condivisione, «Fatto»…):
+     tornando su Luca o su Giulia, quello che ha già visto non torna. Il link salvato si ricorda per persona. */
+  const GLOBALI = ["invito", "chiave", "chiave-salvata", "installa-no", "ultima-copia", "risposta-target", "whatsapp"].map(k => "prova.growup-team." + k);
+  function esci(){
+    const chi = leggi(K_CHI);
+    if(chi) scrivi("prova.salvata." + chi, leggi("prova.growup-team.chiave-salvata"));
+    for(const x of [K_SESSIONE, K_CHI].concat(GLOBALI)) scrivi(x, null);
+    try{ sessionStorage.clear(); }catch(e){}
+  }
+  const giulia = () => window.__DB.partners.find(p => p.id === "G");
+  const luca = () => window.__DB.partners.find(p => p.codice_amway === window.__DB._prova.codiceLuca && p.stato !== "gestito");
   function vaiCome(k){
-    const d = window.__DB, ch = d._prova.chiavi;
-    /* si entra come da un telefono nuovo: via la sessione e le scelte della prova, i dati restano */
-    for(const x of chiaviProva()) if(x !== K_DATI) scrivi(x, null);
+    const d = window.__DB;
+    esci();
     let hash;
-    if(k === "luca"){
-      const l = d.partners.find(p => p.id === "L");
-      hash = l && l.stato !== "gestito" && l.chiave ? "#chiave=" + l.chiave : "#invito=" + d._prova.invitoLuca;
-    } else {
-      hash = "#chiave=" + ({ giulia:ch.G, sara:ch.S, stefano:ch.R })[k];
-      /* chi è nell'app da tempo ha già salvato il suo link e risposto alla domanda delle notifiche */
-      const pid = ({ giulia:"G", sara:"S", stefano:"R" })[k];
-      scrivi("prova.growup-team.chiave-salvata", "1");
-      if(k !== "sara") scrivi("prova.growup-team.notifiche-chiesto." + pid, "1");
-      if(k !== "sara") scrivi("prova.growup-team.primi-passi-no." + pid, "1");
+    if(k === "luca"){ const l = luca(); hash = l && l.chiave ? "#chiave=" + l.chiave : "#invito=" + d._prova.invitoLuca; }
+    else {
+      const g = giulia();
+      hash = g && g.stato !== "gestito" && g.chiave ? "#chiave=" + g.chiave : "#invito=" + d._prova.invitoGiulia;
+      /* dopo due mesi Giulia ha già salvato il suo link e risposto alla domanda delle notifiche */
+      if(d._prova.dueMesi){ scrivi("prova.salvata." + k, "1"); scrivi("prova.growup-team.notifiche-chiesto.G", "1"); scrivi("prova.growup-team.primi-passi-no.G", "1"); }
     }
+    if(leggi("prova.salvata." + k) === "1") scrivi("prova.growup-team.chiave-salvata", "1");
+    scrivi(K_CHI, k);
     salvaDati();
     location.hash = hash;
     location.reload();
@@ -73,9 +80,9 @@
     if(!confirm("Ricominciare la prova da capo?\n\nTutto quello che hai fatto nella prova si cancella e i dati inventati tornano come all'inizio.")) return;
     dimentica = true;
     for(const x of chiaviProva()) scrivi(x, null);
+    try{ sessionStorage.clear(); }catch(e){}
     location.hash = ""; location.reload();
   }
-
   /* ---- i file «del sito Amway» di prova, per far vedere gli import (tutto inventato) ---- */
   const MESI_L = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
   const oggiL = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12); };
@@ -84,6 +91,7 @@
   const it = n => (Math.round(Number(n || 0) * 100) / 100).toLocaleString("it-IT", { minimumFractionDigits:2, maximumFractionDigits:2 });
   const q = v => `"${String(v).replace(/"/g, '""')}"`;
   const meseFile = () => { const m = oggiL(); return `${m.getFullYear()}${String(m.getMonth() + 1).padStart(2, "0")}`; };
+  const meseIso = () => meseFile().slice(0, 4) + "-" + meseFile().slice(4);
   const amway = n => { const t = n.split(" "); return t.length > 1 && !/ e /.test(n) ? `${t.slice(1).join(" ")}, ${t[0]}`.toUpperCase() : n.toUpperCase(); };
   function scarica(nome, righe){
     const blob = new Blob(["﻿" + righe.join("\n") + "\n"], { type:"text/csv" });
@@ -93,16 +101,17 @@
   }
   const testaFile = titolo => [[q("Amway"), q("CONFIDENZIALE - " + titolo + " DI PROVA, DATI INVENTATI")].join(","), [q("Mese di competenza"), q(meseFile())].join(",")];
 
-  /* la mappa (Linea di Sponsorizzazione) di Giulia o di Stefano e Alessia: il loro gruppo, i VP di oggi e due iscritti nuovi */
-  function mappaProva(chi){
-    const d = window.__DB, mm = meseFile(), mese = mm.slice(0, 4) + "-" + mm.slice(4);
+  /* la mappa (Linea di Sponsorizzazione) di Giulia: il suo gruppo con i VP di oggi e due iscritti nuovi. I VP: quelli della
+     mappa del mese se c'è già (dopo un import, o il primo ordine di Luca), altrimenti quelli del mese preparati nei dati */
+  function mappaProva(){
+    const d = window.__DB, mm = meseFile(), mese = meseIso(), piano = d._prova.meseGiulia || {};
     const ultimo = id => (d.numeri || []).filter(x => x.partner_id === id && x.mese === mese).sort((a, b) => String(a.dati_al) < String(b.dati_al) ? -1 : 1).pop();
     const sotto = id => d.partners.filter(p => p.sponsor_id === id && !p.fuori_report_dal);
     const righe = [];
-    const giro = (p, liv, sp) => { const n = ultimo(p.id) || {};
-      righe.push({ liv, sp, cod:p.codice_amway, nome:amway(p.nome), ingresso:p.data_iscrizione, vpp:(Number(n.vpp) || 0) * 1.08, vpg:0 });
+    const giro = (p, liv, sp) => { const n = ultimo(p.id), v = n ? Number(n.vpp) || 0 : Number(piano[p.codice_amway]) || 0;
+      righe.push({ liv, sp, cod:p.codice_amway, nome:amway(p.nome), ingresso:p.data_iscrizione, vpp:v, vpg:0 });
       for(const f of sotto(p.id)) if(f.codice_amway) giro(f, liv + 1, p.codice_amway); };
-    const radice = d.partners.find(p => p.id === chi), sopra = d.partners.find(p => p.id === radice.sponsor_id);
+    const radice = d.partners.find(p => p.id === "G"), sopra = d.partners.find(p => p.id === radice.sponsor_id);
     giro(radice, 1, sopra ? sopra.codice_amway : "7000000");
     /* due iscritti nuovi in questi giorni: nella mappa ci sono, nell'app non ancora */
     const liv = c => (righe.find(x => x.cod === c) || {}).liv || 1;
@@ -116,12 +125,13 @@
     const pct = v => [[10000, 21], [7000, 18], [4000, 15], [2400, 12], [1200, 9], [600, 6], [200, 3]].find(([s]) => v >= s)?.[1] || 0;
     const testa = ["Qualifica Amway Partner", "Codice Amway Partner Sponsor", "Codice Amway Partner", "Paese", "Nome", "Data di ingresso", "Telefono",
       "Email", "Indirizzo", "Data di rinnovo", "VPG", "VPP", "Percentuale di bonus", "VVG", "VP Cliente", " Clienti", "Punti al livello successivo"];
-    scarica(`mappa-di-prova-${chi === "G" ? "giulia" : "stefano-e-alessia"}-${mm}.csv`, testaFile("MAPPA").concat([testa.map(q).join(",")])
+    scarica(`mappa-di-prova-giulia-${mm}.csv`, testaFile("MAPPA").concat([testa.map(q).join(",")])
       .concat(righe.map(x => [String(x.liv), "'" + x.sp, "'" + x.cod, "'Italia", "'" + x.nome, "'" + lunga(x.ingresso), "", "", "", "",
         "'" + it(x.vpg), "'" + it(x.vpp), "'" + pct(x.vpg) + "%", "0", "'0,00", "'0", "0"].map(q).join(","))));
   }
 
-  /* i clienti di Giulia dal sito Amway (export «Clienti»): alcuni ci sono già, tre sono nuovi, due non hanno mai comprato */
+  /* i clienti di Giulia dal sito Amway (export «Clienti»): sei hanno comprato, due non hanno mai comprato. Basta questo file:
+     l'import dei clienti non ha bisogno dell'export «Ordini» (l'ultimo ordine di ognuno va nello storico) */
   const CLIENTI_FILE = [
     ["MORETTI, ANNA", "7300000101", 300, "+39 333 000 0031", 2],
     ["FERRARO, CARLA", "7300000103", 150, "+39 333 000 0033", 1],
@@ -138,17 +148,6 @@
         tel ? "Principale: " + tel : "", "", "", ultimo == null ? "0" : "1", "0,00", ultimo == null ? "--" : lunga(ggL(ultimo))]
         .map((v, i) => i === 5 && !v ? "" : q("'" + v)).join(","))));
   }
-  /* gli ordini dei clienti di Giulia dal sito Amway (export «Ordini») */
-  function ordiniProva(){
-    const testa = ["Nome", "Codice Cliente", "Data ordine", "Numero ordine", "VP", "VV", "Tipo ordine", "Dettagli VeCV"];
-    const ordini = [["MORETTI, ANNA", "7300000101", 2, "180000011", "28,60", "64,30"], ["FERRARO, CARLA", "7300000103", 1, "180000012", "31,70", "71,20"],
-      ["LONGO, BEATRICE", "7300000102", 16, "180000013", "25,40", "57,10"], ["RUSSO, ELENA", "7300000201", 6, "180000014", "17,20", "38,60"],
-      ["GALLI, TEO", "7300000202", 3, "180000015", "15,50", "34,90"], ["BERTONI, SONIA", "7300000203", 12, "180000016", "22,50", "50,70"],
-      ["BERTONI, SONIA", "7300000203", 45, "180000017", "13,20", "29,70"]];
-    scarica(`${meseFile()}_Ordine_prova.csv`, testaFile("ORDINI").concat([testa.map(q).join(",")])
-      .concat(ordini.map(([nome, cod, giorni, numero, vp, vv]) => [nome, cod, lunga(ggL(giorni)), numero, vp, vv, "Ordine"].map(v => q("'" + v)).join(",") + ",")));
-  }
-
   /* ---- la pagina: quella vera (index.html), senza i suoi script; poi la scelta o l'app ---- */
   async function prepara(){
     const testo = await (await fetch("index.html", { cache:"no-store" })).text();
@@ -161,6 +160,8 @@
     st.textContent = `
 .prova-barra{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;padding-top:calc(6px + env(safe-area-inset-top, 0px));
   background:#fde4d3;color:#5c2a0c;font:700 12px/1.3 var(--f-testo, sans-serif);position:relative;z-index:27}
+.prova-barra{flex-wrap:wrap}
+.prova-azioni{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
 .prova-barra button{border:1px solid rgba(92,42,12,.35);background:#fff;color:#5c2a0c;border-radius:99px;padding:4px 10px;font:700 12px var(--f-testo, sans-serif);cursor:pointer;white-space:nowrap}
 .prova-scelta{max-width:560px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top, 0px)) 16px 40px;display:flex;flex-direction:column;gap:12px}
 .prova-scelta h1{margin:0;font:700 32px/1.1 var(--f-titoli, serif)}
@@ -172,10 +173,12 @@
 .prova-scelta .avviso{background:#fde4d3;color:#5c2a0c;border-radius:14px;padding:10px 12px;font-size:13px;line-height:1.45;margin:0}`;
     document.head.appendChild(st);
   }
+  /* la barra in cima: «Cambia persona» */
   function barra(){
+    const extra = "";
     const b = document.createElement("div");
     b.className = "prova-barra";
-    b.innerHTML = `<span>Versione di prova · dati inventati</span><button type="button" data-prova="scegli">Cambia persona</button>`;
+    b.innerHTML = `<span>Versione di prova · dati inventati</span><span class="prova-azioni">${extra}<button type="button" data-prova="scegli">Cambia persona</button></span>`;
     document.body.insertBefore(b, document.body.firstChild);
   }
   function scelta(){
@@ -186,15 +189,11 @@
       <p class="small" style="margin:4px 0 0">Chi vuoi essere?</p>
       ${PERSONE.map(p => `<button type="button" class="chi" data-prova="come" data-k="${p.k}"><i>${esc(p.chi)}</i><b>${esc(p.titolo)}</b><span>${esc(p.testo)}</span></button>`).join("")}
       <span class="eyebrow" style="margin-top:10px">I file del sito Amway, per gli import (inventati)</span>
-      <p class="small" style="margin:0">Scaricali qui, poi entra come la persona indicata e importali dall'app: si sceglie il file scaricato.</p>
-      <button type="button" class="chi" data-prova="mappa" data-chi="G"><i>Giulia · Gruppo → Importa da Amway</i><b>La mappa della rete di Giulia</b>
-        <span>Il suo gruppo con i VP di oggi e due iscritti nuovi: la struttura si aggiorna da sola.</span></button>
-      <button type="button" class="chi" data-prova="mappa" data-chi="R"><i>Stefano e Alessia · Gruppo → Importa da Amway</i><b>La mappa della rete di Stefano e Alessia</b>
-        <span>Tutto il gruppo, con le stesse due persone nuove.</span></button>
+      <p class="small" style="margin:0">Scaricali qui, poi entra come Giulia e importali dall'app: si sceglie il file scaricato.</p>
+      <button type="button" class="chi" data-prova="mappa"><i>Giulia · «Per iniziare» o Gruppo → Importa da Amway</i><b>La mappa della rete di Giulia</b>
+        <span>Il suo gruppo con i VP di oggi e due iscritti nuovi: il Gruppo si riempie da solo.</span></button>
       <button type="button" class="chi" data-prova="clienti"><i>Giulia · Persone → Clienti → Importa</i><b>I clienti di Giulia</b>
-        <span>L'elenco «Clienti» del sito: tre clienti nuovi e due che non hanno mai comprato; chi c'è già si riconosce dal nome.</span></button>
-      <button type="button" class="chi" data-prova="ordini"><i>Giulia · Persone → Clienti → Importa</i><b>Gli ordini dei clienti di Giulia</b>
-        <span>L'elenco «Ordini» del sito: gli ultimi ordini finiscono nello storico di ogni cliente. Si può importare insieme ai clienti.</span></button>
+        <span>L'elenco «Clienti» del sito: sei clienti con il loro ultimo ordine e due che non hanno mai comprato.</span></button>
       <button type="button" class="btn small ghost" data-prova="ricomincia" style="align-self:flex-start;margin-top:6px">Ricomincia da capo</button>
     </main>`;
   }
@@ -203,12 +202,11 @@
     if(!t) return;
     e.preventDefault(); e.stopPropagation();
     const a = t.dataset.prova;
-    if(a === "scegli"){ for(const x of chiaviProva()) if(x !== K_DATI) scrivi(x, null); salvaDati(); location.hash = ""; location.reload(); }
+    if(a === "scegli"){ esci(); salvaDati(); location.hash = ""; location.reload(); }
     else if(a === "come") vaiCome(t.dataset.k);
     else if(a === "ricomincia") ricomincia();
-    else if(a === "mappa") mappaProva(t.dataset.chi === "G" ? "G" : "R");
+    else if(a === "mappa") mappaProva();
     else if(a === "clienti") clientiProva();
-    else if(a === "ordini") ordiniProva();
   }, true);
 
   const carica = src => new Promise((ok, ko) => { const s = document.createElement("script"); s.src = src; s.async = false; s.onload = ok; s.onerror = ko; document.body.appendChild(s); });
