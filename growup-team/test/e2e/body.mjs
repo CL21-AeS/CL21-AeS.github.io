@@ -6202,6 +6202,46 @@ for(const tema of ["light", "dark"]){
   DB.obiettivi = DB.obiettivi.filter(o => !tutti.includes(o.partner_id));
 }
 
+// 92. «Da seguire oggi», punto 3: il «?» spiega in parole semplici chi compare e perché (le soglie dalle impostazioni),
+//     si apre e si chiude sul riquadro; il testo non fa credere che contatti o piani facciano ottenere la percentuale.
+//     Anteprime a 360 px, chiaro e scuro, con tre righe e la spiegazione aperta.
+{
+  const id = n => "92000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0");
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const ora = new Date().toISOString(), W = id(1);
+  const app = (n, nome, sponsor, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:sponsor, stato:"attivo", codice_invito:"DU" + n + "XX",
+    codice_amway:"7992" + String(n).padStart(3, "0"), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:quando(-200), ultimo_aggiornamento:ora }, extra));
+  DB.obiettivi = (DB.obiettivi || []).concat([{ partner_id:W, cifra_mese:300, entro:"2027-06-01", perche:"Per la famiglia" }]);
+  app(1, "Walter Upline", "R", { chiave:"74".repeat(16), data_iscrizione:giorno(-400) });
+  app(2, "Alba Avvio", W, { invitato_da:W, data_iscrizione:giorno(-5), privacy_accettata_il:quando(-4), creato_il:quando(-4), conPercorso:true });
+  app(3, "Dino Dormiente", W, { ultimo_aggiornamento:quando(-10) });
+  app(4, "Lina Lanciata", W, { invitato_da:W, data_iscrizione:giorno(-20), privacy_accettata_il:quando(-19), partenza_completata_il:quando(-2) });
+  const box = () => page.locator(".card.da-seguire");
+  for(const tema of ["light", "dark"]){
+    // finestra alta: il riquadro intero sta tra le barre fisse in alto e in basso
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:2200 }, colorScheme:tema, deviceScaleFactor:2 }, "#chiave=" + "74".repeat(16)));
+    await box().waitFor();
+    const q = box().locator("button.aiuto-btn[data-k=da-seguire]");
+    check(await q.count() === 1 && !(await box().locator(".aiuto-testo").count()), `da seguire (${tema}): il «?» c'è, la spiegazione è chiusa`);
+    await q.click();
+    const t = await box().locator(".aiuto-testo").innerText();
+    check(t.includes("la tua prima linea e chi hai invitato tu") && t.includes("più di 14 giorni") && t.includes("non aggiorna da più di 7 giorni")
+      && t.includes("ultimi 10 giorni del mese") && t.includes("percentuale più alta del mese prima") && t.split("\n").length >= 6 && t.includes("partenza completata")
+      && t.includes("mai i nomi della sua Lista o dei suoi Clienti") && t.includes("«Fatto» toglie la persona per 7 giorni"), `da seguire (${tema}): la spiegazione dice chi compare e perché`);
+    check(!/per (ottenere|raggiungere|arrivare)|se (lo )?(chiami|contatti|senti)|contatt\w+ (e|o) piani/i.test(t), `da seguire (${tema}): nessuna promessa che contatti o piani portino la percentuale`);
+    check(await box().locator(".da-seguire-l > li").count() === 3, `da seguire (${tema}): tre righe con la spiegazione aperta`);
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `da seguire (${tema}), 360 px: niente scroll orizzontale`);
+    await box().screenshot({ path: S + `/e2e/92-da-seguire-aiuto-${tema}.png` });
+    await q.click();
+    check(!(await box().locator(".aiuto-testo").count()), `da seguire (${tema}): il «?» la richiude`);
+    await ctx.close();
+  }
+  check(!errori.length, "da seguire, «?»: nessun errore nella pagina");
+  const tutti = Array.from({ length:4 }, (_, i) => id(i + 1));
+  DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
+  DB.obiettivi = DB.obiettivi.filter(o => !tutti.includes(o.partner_id));
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
