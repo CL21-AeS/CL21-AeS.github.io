@@ -17,6 +17,9 @@
   giorno» solo per chi ha scelto «Seguimi giorno per giorno» nel **Profilo** (dove c'è anche la scelta di condividere
   con l'upline). L'«Analisi della persona» è una pagina a parte, aperta solo a richiesta (dalla Verifica e dalla scheda
   partner): solo dati, senza calcoli né consigli.
+  Eccezione voluta da Stefano (13 novembre 2026): **«Da seguire oggi»** in «Il mio giorno», solo per chi ha qualcuno sotto
+  (`haPartnerSotto`): le persone che segue e che oggi hanno un motivo, compreso **un complimento da fare**. Mostra solo il
+  fatto (chi e perché), mai come fare; il testo non deve far credere che contatti o piani facciano ottenere la percentuale.
 - **Versione semplificata per chi inizia**: nei primi 30 giorni del percorso di partenza una parte dell'app si nasconde
   (Verifica, Storico, promemoria dell'import, percorso completo dell'Obiettivo, Gruppo senza partner sotto). La regola sta
   in una sola funzione, `versioneSemplice()` in `app.js`: ogni cosa nuova da nascondere a chi inizia passa da lì. Si

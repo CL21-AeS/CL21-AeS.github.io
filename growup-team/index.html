@@ -845,6 +845,16 @@ form:has(input[name=modo][value=filtri]:checked) .imp-filtri{display:block}
 .settimana-riga .btn.link{min-height:0;padding:0 2px}
 .proposta-obiettivi{margin:6px 0 0}
 .card.oggi-lista{border:2px solid var(--azione);border-radius:20px}
+/* «Da seguire oggi» (per gli upline): ambra per chi ha bisogno, verde per il complimento, sempre con la parola e il segno */
+.da-seguire-l{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.da-seguire-l>li{border:1px solid var(--line);border-left:4px solid var(--giallo);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:3px}
+.da-seguire-l>li.ds-complimento{border-left-color:var(--verde)}
+.da-seguire-l .ds-testa{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.da-seguire-l .ds-nome{min-width:0;overflow-wrap:anywhere}
+.da-seguire-l .ds-tag{flex:none;white-space:nowrap;font-weight:800}
+.da-seguire-l .ds-segno{color:var(--verde);font-weight:800}
+.da-seguire-l .ds-azioni{display:flex;gap:8px;margin-top:6px}
+.da-seguire-l .ds-azioni .btn{flex:1}
 .eyebrow.pesca{color:var(--eb)}
 .prossima-titolo{all:unset;display:block;cursor:pointer;font-family:var(--f-titoli);font-size:30px;font-weight:700;line-height:1.05;margin:8px 0 4px;color:var(--ink)}
 .prossima-titolo:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
