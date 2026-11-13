@@ -4238,53 +4238,92 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
     await p2.screenshot({ path: S + `/e2e/68-prova-scelta-${tema}.png`, fullPage:true });
     await c2.close();
   }
-  /* Giulia, in attività da due anni */
-  await pg.click("[data-prova=come][data-k=giulia]");
-  await pg.getByText("Ciao Giulia").waitFor();
-  check(await pg.locator(".prova-barra", { hasText:"Versione di prova · dati inventati" }).isVisible(), "prova: la barra «Versione di prova» in cima");
-  check((await pg.locator("#app").innerText()).includes("Bronze Builder 18%") && await pg.locator(".primi-passi").count() === 0,
-    "prova: Giulia è alla tappa Bronze Builder 18%, senza i Primi passi");
-  await pg.click("button[data-act=vista-persone]"); await pg.click("button[data-sez=lista]");
-  check(await pg.locator(".persone li.fermo").count() >= 3, "prova: nella Lista di Giulia qualche contatto fermo, in ambra");
-  await pg.click("button[data-sez=clienti]");
-  check(await pg.locator(".persone button[data-act=apri-cliente]").count() === 9, "prova: i 9 clienti di Giulia");
-  await pg.locator("button[data-act=vista-gruppo]").first().click();
-  check(await pg.locator(".nuovi-partenza", { hasText:"Sara Conti" }).isVisible(), "prova: in Gruppo Giulia segue Sara nella partenza");
-  /* Luca entra con l'invito di Giulia */
-  await pg.click("[data-prova=scegli]"); await pg.locator(".prova-scelta").waitFor();
+  /* Luca entra con l'invito di Giulia (il percorso intero è nella sezione 94) */
   await pg.click("[data-prova=come][data-k=luca]");
   await pg.getByText("ti diamo il benvenuto in Growup").waitFor();
+  check(await pg.locator(".prova-barra", { hasText:"Versione di prova · dati inventati" }).isVisible(), "prova: la barra «Versione di prova» in cima");
   check((await pg.locator(".chi-invita").innerText()).replace(/\s+/g, " ").includes("Ti ha invitato Giulia Martini"), "prova: Luca riceve l'invito di Giulia");
+  check(!(await pg.locator(".prova-barra [data-prova=due-mesi]").count()), "prova: «Due mesi dopo» non c'è per Luca");
   await pg.fill("input[name=data]", new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10));
   await pg.check("input[name=privacy]");
   await pg.click("form button.primary");
   await perche(pg);
   await pg.locator(".card.percorso-partenza").waitFor();
   check(true, "prova: Luca entra e inizia il percorso di partenza");
-  await pg.screenshot({ path: S + "/e2e/68-prova-luca.png", fullPage:true });
   /* rientrando come Luca si torna nel suo profilo (l'invito non si rifà) */
   await pg.click("[data-prova=scegli]"); await pg.locator(".prova-scelta").waitFor();
   await pg.click("[data-prova=come][data-k=luca]");
   await pg.getByText("Ciao Luca").waitFor(); check(true, "prova: rientrando come Luca si torna nel suo profilo");
-  /* i file del sito Amway di prova: la mappa di Giulia, i suoi clienti e i loro ordini, importati come Giulia */
+  /* i due file del sito Amway: la mappa di Giulia e i suoi clienti */
   await pg.click("[data-prova=scegli]"); await pg.locator(".prova-scelta").waitFor();
   const scaricaP = async (sel, nome) => { const [dl] = await Promise.all([pg.waitForEvent("download"), pg.click(sel)]);
     const f = S + "/e2e/" + nome; await dl.saveAs(f); return f; };
   const mappaG = await scaricaP("[data-prova=mappa]", "prova-mappa-giulia.csv");
   const cliG = await scaricaP("[data-prova=clienti]", "prova-clienti.csv");
-  await pg.click("[data-prova=come][data-k=giulia]"); await pg.getByText("Ciao Giulia").waitFor();
+  /* Giulia, in attività da due anni: il primo ingresso con l'invito di Stefano e Alessia */
+  await pg.click("[data-prova=come][data-k=giulia]");
+  await pg.getByText("ti diamo il benvenuto in Growup").waitFor();
+  check((await pg.locator(".chi-invita").innerText()).replace(/\s+/g, " ").includes("Stefano e Alessia"), "prova Giulia: l'invito di Stefano e Alessia");
+  check(await pg.locator(".prova-barra [data-prova=due-mesi]").isVisible() && !(await pg.locator(".prova-barra [data-prova=arriva]").count()),
+    "prova Giulia: nella barra «Due mesi dopo» (solo per Giulia), anche prima di entrare");
+  check(await pg.locator("form[data-form=ingresso] .field", { hasText:"La tua qualifica attuale" }).count() === 1, "prova Giulia: «La tua qualifica attuale»");
+  await pg.selectOption("select[name=qualifica]", { label:"21%" });
+  const dueAnni = new Date(); dueAnni.setFullYear(dueAnni.getFullYear() - 2); dueAnni.setDate(dueAnni.getDate() - 20);
+  await pg.fill("input[name=data]", dueAnni.toISOString().slice(0, 10));
+  await pg.check("input[name=privacy]");
+  await pg.click("form button.primary");
+  await perche(pg);
+  await pg.locator(".card.per-iniziare").waitFor();
+  const pi = (await pg.locator(".card.per-iniziare").innerText()).replace(/\s+/g, " ");
+  check(pi.includes("Importa la tua mappa") && /Per iniziare · 1 di 2/i.test(pi), "prova Giulia: «Per iniziare» con «Importa la tua mappa» (" + pi.slice(0, 60) + ")");
+  check(await pg.locator(".domanda-condividi").isVisible() && !(await pg.locator(".card.percorso-partenza").count()), "prova Giulia: avviata, la domanda sulla condivisione, niente percorso");
+  check(await pg.locator("button[data-act=sez-io][data-sez=guida]").isVisible(), "prova Giulia: l'app completa (la Verifica c'è)");
+  const dg = await pg.evaluate(() => { const d = window.__DB; return { seg:d.seguimi.find(x => x.partner_id === "G"), persone:d.persone.filter(x => x.proprietario === "G").length,
+    q:d.partners.find(p => p.id === "G").percentuale_iniziale }; });
+  check(dg.seg && dg.seg.attivo && !dg.seg.condividi && dg.persone === 0 && dg.q === 21, "prova Giulia: Seguimi acceso da solo, Lista vuota, qualifica 21%");
+  /* l'anteprima a 360 px: Io con «Per iniziare», in chiaro e in scuro */
+  await pg.waitForFunction(() => !document.querySelector(".toast"), null, { timeout:8000 }).catch(() => {});
+  await pg.setViewportSize({ width:360, height:Math.min(4000, await pg.evaluate(() => document.documentElement.scrollHeight)) });
+  for(const tema of ["light", "dark"]){ await pg.emulateMedia({ colorScheme:tema }); await pg.waitForTimeout(150);
+    check(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `prova Giulia (${tema}), primo ingresso a 360 px: niente scroll orizzontale`);
+    await pg.screenshot({ path: S + `/e2e/68-giulia-primo-ingresso-${tema}.png` }); }
+  await pg.emulateMedia({ colorScheme:"light" }); await pg.setViewportSize({ width:390, height:844 });
+  /* la Lista vuota, come per chiunque entri */
+  await pg.click("button[data-act=vista-persone]"); await pg.click("button[data-sez=lista]");
+  check(await pg.getByText("La tua lista è vuota").isVisible(), "prova Giulia: la Lista è vuota");
+  /* il Gruppo: le persone dalla mappa del mese scorso di Stefano e Alessia, senza i VP di questo mese; Luca tra i nuovi */
   await pg.locator("button[data-act=vista-gruppo]").first().click();
-  await pg.locator("input.file-amway").first().setInputFiles(mappaG);
+  const gr = async () => (await pg.locator("#app").innerText()).replace(/\s+/g, " ");
+  check((await gr()).includes("Marco Ferri") && !(await gr()).includes("Lia Conte") && await pg.locator(".nuovi-partenza", { hasText:"Luca Bassi" }).isVisible(),
+    "prova Giulia: il Gruppo ha già le sue persone (senza i due nuovi) e Luca tra i nuovi in partenza");
+  check(await pg.evaluate(() => { const d = window.__DB, m = new Date().toISOString().slice(0, 7);
+      return !d.numeri.some(n => n.mese === m && ["G", "p-mf", "p-pg"].includes(n.partner_id)); }), "prova Giulia: prima dell'import, nessun VP di questo mese per il suo gruppo");
+  /* l'import della mappa da «Per iniziare» */
+  await pg.click("button[data-act=vista-io]");
+  await pg.locator(".card.per-iniziare input.file-amway").setInputFiles(mappaG);
   await pg.locator(".sheet h2", { hasText:"importata" }).waitFor();
-  check((await pg.locator(".sheet").innerText()).includes("Nuove nella tua struttura · 2"), "prova: la mappa di Giulia si importa, con due iscritti nuovi");
+  check((await pg.locator(".sheet").innerText()).includes("Nuove nella tua struttura · 2"), "prova Giulia: la mappa si importa da «Per iniziare», con due iscritti nuovi");
   await pg.locator(".sheet [data-act=chiudi]").first().click();
+  check(!(await pg.locator(".card.per-iniziare").count()), "prova Giulia: dopo l'import «Per iniziare» sparisce");
+  await pg.locator("button[data-act=vista-gruppo]").first().click();
+  check((await gr()).includes("Lia Conte") && (await gr()).includes("Elio Fanti"), "prova Giulia: il Gruppo si riempie, con i due iscritti nuovi");
+  check(await pg.evaluate(() => { const d = window.__DB, l = d.partners.find(p => p.codice_amway === d._prova.codiceLuca); return !!l.confermato_il; }),
+    "prova Giulia: con la sua mappa anche Luca è al suo posto (non più in attesa)");
+  /* l'import dei clienti */
   await pg.click("button[data-act=vista-persone]"); await pg.click("button[data-sez=clienti]");
   await pg.locator("input.file-amway").first().setInputFiles([cliG]);
   await pg.locator(".sheet form[data-form=importa-ordini]").waitFor();
-  check((await pg.locator(".sheet").innerText()).includes("8 clienti nei file"), "prova: i clienti di Giulia si leggono (senza il file degli ordini)");
+  check((await pg.locator(".sheet").innerText()).includes("8 clienti nei file"), "prova Giulia: i clienti si leggono (senza il file degli ordini)");
   await pg.click(".sheet button:has-text('Importa')");
-  await pg.getByText("3 nuovi clienti, 2 in Lista (mai comprato)").waitFor();
-  check(true, "prova: import dei clienti: 3 nuovi clienti, 2 mai comprato");
+  await pg.getByText("6 nuovi clienti, 2 in Lista (mai comprato)").waitFor();
+  check(await pg.locator(".persone button[data-act=apri-cliente]").count() === 6, "prova Giulia: dopo l'import compaiono i 6 clienti");
+  /* «Due mesi dopo»: Luca resta com'è, Giulia lo vede tra i nuovi con la sua fase */
+  await pg.click(".prova-barra [data-prova=due-mesi]");
+  await pg.getByText("Ciao Giulia").waitFor();
+  check(!(await pg.locator(".prova-barra [data-prova=due-mesi]").count()), "prova Giulia: dopo «Due mesi dopo» il pulsante non c'è più");
+  await pg.locator("button[data-act=vista-gruppo]").first().click();
+  const lucaRiga = pg.locator(".nuovi-partenza .partenze-l li", { hasText:"Luca Bassi" });
+  check((await lucaRiga.innerText()).includes("Fase 2 di 5"), "prova Giulia, due mesi dopo: Luca tra i nuovi in partenza, con la sua fase (fase 2)");
   /* l'app vera non si tocca: le sue chiavi restano uguali, le altre sono tutte «prova.» */
   const dopo = await tutte();
   check(Object.entries(prima).every(([k, v]) => dopo[k] === v) && Object.keys(dopo).every(k => k in prima || k.startsWith("prova.")),
@@ -6489,6 +6528,69 @@ for(const tema of ["light", "dark"]){
   await pg.click("[data-prova=scegli]"); await pg.locator(".prova-scelta").waitFor();
   await pg.click("[data-prova=come][data-k=luca]"); await pg.getByText("Ciao Luca").waitFor(); await pg.waitForTimeout(500);
   check(!(await pg.locator(".festa").count()), "prova Luca: rientrando, le feste già viste non tornano");
+  await c.close();
+}
+
+// 95. La prova, Giulia «Due mesi dopo» (anche senza aver fatto il primo ingresso): Il mio giorno con il Seguimi e «Da fare oggi»
+//     (i motivi sotto i nomi), la serie, «Da seguire oggi» con un nuovo fermo, uno che non aggiorna e un complimento; la Lista
+//     con «Da riprendere», i clienti, il Target, la Verifica con la tabella Stabilità, il Gruppo con la struttura.
+{
+  const c = await browser.newContext({ viewport:{ width:390, height:844 }, locale:"it-IT", timezoneId:"Europe/Rome", reducedMotion:"reduce", deviceScaleFactor:2 });
+  const pg = await c.newPage();
+  const fuori = [], err = [];
+  pg.on("request", r => { if(!r.url().startsWith("http://127.0.0.1:8765/")) fuori.push(r.url()); });
+  pg.on("pageerror", e => err.push(String(e))); pg.on("console", m => { if(m.type() === "error") err.push(m.text()); });
+  pg.on("dialog", d => d.accept());
+  await pg.addLocatorHandler(pg.locator(".festa.traguardo"), async t => { await t.locator("button[data-act=traguardo-chiudi]").click(); });
+  await pg.goto(BASE + "prova/"); await pg.locator(".prova-scelta").waitFor();
+  await pg.click("[data-prova=come][data-k=giulia]");
+  await pg.getByText("ti diamo il benvenuto in Growup").waitFor();
+  await pg.click(".prova-barra [data-prova=due-mesi]");
+  await pg.getByText("Ciao Giulia").waitFor();
+  const app = async () => (await pg.locator("#app").innerText()).replace(/\s+/g, " ");
+  check(!(await pg.locator(".primi-passi, .per-iniziare, .domanda-condividi, .card.percorso-partenza").count()), "prova Giulia, due mesi dopo: niente Primi passi, «Per iniziare» o domanda");
+  /* Il mio giorno: «Da fare oggi» con i motivi sotto i nomi, la serie */
+  const t0 = await app();
+  check(/Da fare oggi/i.test(t0) && /\d settimane di fila/i.test(t0), "prova Giulia, due mesi dopo: «Da fare oggi» del Seguimi e la serie di settimane");
+  const motiviSotto = await pg.evaluate(() => { const c = [...document.querySelectorAll("#app .card")].find(x => /Da fare oggi/i.test(x.innerText));
+    return c ? [...c.querySelectorAll("li")].filter(li => li.querySelector(".small")).length : 0; });
+  check(motiviSotto >= 3, "prova Giulia, due mesi dopo: in «Da fare oggi» i motivi sotto i nomi (" + motiviSotto + " righe)");
+  const seg = await pg.evaluate(() => window.__DB.seguimi.find(x => x.partner_id === "G"));
+  check(seg && seg.attivo && seg.condividi, "prova Giulia, due mesi dopo: Seguimi acceso e condiviso");
+  /* «Da seguire oggi»: almeno tre motivi diversi */
+  const ds = pg.locator(".card.da-seguire"); await ds.waitFor();
+  const righe = (await ds.locator(".da-seguire-l > li").allInnerTexts()).map(x => x.replace(/\s+/g, " "));
+  check(righe.length >= 3 && righe.some(r => r.includes("Sara Conti") && r.includes("Incontro con lo sponsor non ancora fissato"))
+    && righe.some(r => r.includes("Paola Greco") && r.includes("Non aggiorna da 9 giorni"))
+    && righe.some(r => r.includes("Valeria Testa") && /Complimento/i.test(r) && r.includes("Al 6% questo mese")),
+    "prova Giulia, due mesi dopo: «Da seguire oggi» con un nuovo fermo, uno che non aggiorna e un complimento (" + righe.join(" | ") + ")");
+  await pg.waitForFunction(() => !document.querySelector(".toast"), null, { timeout:8000 }).catch(() => {});
+  await pg.setViewportSize({ width:360, height:Math.min(5000, await pg.evaluate(() => document.documentElement.scrollHeight)) });
+  for(const tema of ["light", "dark"]){ await pg.emulateMedia({ colorScheme:tema }); await pg.waitForTimeout(150);
+    check(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `prova Giulia, due mesi dopo (${tema}), 360 px: niente scroll orizzontale`);
+    await pg.screenshot({ path: S + `/e2e/95-giulia-due-mesi-${tema}.png` });
+    await ds.screenshot({ path: S + `/e2e/95-da-seguire-${tema}.png` }); }
+  await pg.emulateMedia({ colorScheme:"light" }); await pg.setViewportSize({ width:390, height:844 });
+  /* la Verifica con la tabella Stabilità */
+  await pg.click("button[data-act=sez-io][data-sez=guida]");
+  check(/Stabilità della tua rete/i.test(await app()), "prova Giulia, due mesi dopo: la Verifica con la tabella Stabilità");
+  /* la Lista con «Da riprendere», i clienti (qualcuno da riordinare), il Target */
+  await pg.click("button[data-act=vista-persone]"); await pg.click("button[data-sez=lista]");
+  check(await pg.locator(".persone li.fermo").count() >= 2 && /Da riprendere/i.test(await app()), "prova Giulia, due mesi dopo: la Lista con alcuni «Da riprendere»");
+  await pg.click("button[data-sez=clienti]");
+  check(await pg.locator(".persone button[data-act=apri-cliente]").count() === 9, "prova Giulia, due mesi dopo: i 9 clienti");
+  check(/riordin|finisc/i.test(await app()), "prova Giulia, due mesi dopo: qualche cliente da riordinare");
+  await pg.click("button[data-sez=target]");
+  check((await app()).includes("Carla Nuova"), "prova Giulia, due mesi dopo: il Target");
+  /* il Gruppo con la struttura: i nuovi in partenza (Sara); Luca qui non è entrato */
+  await pg.locator("button[data-act=vista-gruppo]").first().click();
+  const g = await app();
+  check(g.includes("Marco Ferri") && g.includes("Lia Conte") && await pg.locator(".nuovi-partenza", { hasText:"Sara Conti" }).isVisible()
+    && !(await pg.locator(".nuovi-partenza", { hasText:"Luca Bassi" }).count()), "prova Giulia, due mesi dopo: il Gruppo con la struttura; Sara tra i nuovi (Luca non è entrato)");
+  const agenda = await pg.evaluate(() => window.__DB.persone.filter(p => p.proprietario === "G" && p.prossima_data).length);
+  check(agenda >= 3, "prova Giulia, due mesi dopo: l'agenda ha i suoi appuntamenti");
+  check(!fuori.length, "prova Giulia, due mesi dopo: niente database (" + fuori.slice(0, 3).join(", ") + ")");
+  check(!err.length, "prova Giulia, due mesi dopo: nessun errore nella pagina (" + err.slice(0, 2).join(" | ") + ")");
   await c.close();
 }
 
