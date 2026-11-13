@@ -8008,6 +8008,9 @@ function valoriTraguardi(){
 }
 function controllaTraguardi(){
   if(st.fase !== "home" || !st.profilo || !st.goal || !st.goalMese){ traguardiPrima = null; return; }
+  /* la festa a fine fase 2 e fase 3 del percorso: anche all'apertura (la mappa del primo ordine arriva da un import) */
+  const ff = festaFaseDaFare();
+  if(ff){ for(const k of ff.segna) salvaLocale(k, "1"); mostraTraguardo({ tipo:"fase", n:ff.n, poi:ff.poi }); }
   const v = valoriTraguardi(), a = traguardiPrima;
   traguardiPrima = v;
   if(!a || a.settimana !== v.settimana && a.mese !== v.mese) return;
@@ -8020,6 +8023,7 @@ function controllaTraguardi(){
   /* consegna 9: i traguardi grandi a tutto schermo (con i coriandoli), i piccoli restano l'annuncio */
   const grande = (chiave, t) => { const k = `growup-team.festa.${st.profilo.id}.${chiave}`; if(leggiLocale(k)) return; salvaLocale(k, "1"); mostraTraguardo(t); };
   const nuovoDi = esito => st.persone.filter(x => x.esito === esito).sort((x, y) => String(x.creato_il) < String(y.creato_il) ? 1 : -1)[0];
+  if(ff) return;
   if(passato(a.vp, v.vp, v.obVp) && a.mese === v.mese) grande(`vp.${v.mese}`, { tipo:"vp", v });
   else if(v.tappa > a.tappa && v.nomeTappa) grande(`tappa.${v.tappa}`, { tipo:"tappa", v });
   else if(a.clienti === 0 && v.clienti > 0) grande("primo-cliente", { tipo:"cliente", p:nuovoDi("cliente") });
@@ -8034,6 +8038,25 @@ function controllaTraguardi(){
     una(`piani.${v.settimana}`, "piccola", "Obiettivo piani raggiunto!", `${plur(v.piani, "piano", "piani")} questa settimana`);
 }
 
+/* La festa a fine fase (13 novembre 2026, scelta di Stefano): quando il nuovo chiude la fase 2 (incontro con lo sponsor
+   fissato e 30 nomi nella Lista, qualunque dei due arrivi per ultimo) e la fase 3 (il primo ordine nella mappa), un
+   traguardo a tutto schermo come gli altri. Una volta sola per fase, ricordata su questo telefono. Vale anche nella
+   versione semplificata. La fase 4 ha già la sua festa (vFesta): se è dovuta quella, niente festa di fase.
+   - Fase 2: «Ora …» dice la fase che viene dopo davvero: di solito il primo ordine; se il primo ordine c'è già (o è in
+     attesa della mappa), i due binari. Se il primo ordine era già nella mappa, la festa della fase 3 non si ripete.
+   - Fase 3: solo quando il primo ordine lo mostra la mappa (non con la qualifica dichiarata all'ingresso) e la fase 2 è
+     chiusa: se la mappa arriva prima dei 30 nomi, la festa è una sola, quella della fase 2. */
+const chiaveFestaFase = n => `growup-team.festa.${st.profilo.id}.fase.${n}`;
+const POI_ORDINE = "Ora il primo ordine.", POI_BINARI = "Ora i due binari: il primo piano e il primo cliente.";
+function festaFaseDaFare(){
+  if(!percorsoAttivo() || festaDaFare()) return null;
+  const x = fasiPercorso(), f = x.fasi;
+  if(!f[0].fatto || !f[1].fatto) return null;
+  const k2 = chiaveFestaFase(2), k3 = chiaveFestaFase(3), ordineMappa = f[2].fatto && !!x.ord.mappa;
+  if(leggiLocale(k2) !== "1") return { n:2, poi:f[x.qui].k === "ordine" ? POI_ORDINE : POI_BINARI, segna:ordineMappa ? [k2, k3] : [k2] };
+  if(ordineMappa && leggiLocale(k3) !== "1") return { n:3, poi:POI_BINARI, segna:[k3] };
+  return null;
+}
 const SERIE_TAPPE = [4, 8, 12, 26, 52];
 /* Un traguardo grande a tutto schermo (consegna 9): sopra la pagina, una volta sola, con un solo pulsante «Continua» */
 function htmlTraguardo(t){
@@ -8047,6 +8070,10 @@ function htmlTraguardo(t){
       <p class="small">${esc(testoMappa(m).replace(/^./, c => c.toUpperCase()))}</p>` : ""}
       ${attuale ? `<div class="riquadro"><span class="eyebrow">La prossima tappa</span><span><b>${esc(attuale.nome)}</b>${requisitiTesto(attuale) ? ` · ${esc(requisitiTesto(attuale))}` : ""}</span></div>` : ""}`;
   }
+  if(t.tipo === "fase") return `<span class="eyebrow">Percorso di partenza · fase ${t.n} di 5</span>
+      <h1 id="traguardo-titolo">Fase ${t.n}<br>completata!</h1>
+      <p>${t.n === 2 ? `${NOMI_PARTENZA} nomi nella Lista e l'incontro con il tuo sponsor fissato.` : "Il tuo primo ordine è nella mappa."}</p>
+      <p><b>${esc(t.poi)}</b></p>`;
   if(t.tipo === "vp") return `<span class="eyebrow">Obiettivo del mese</span>
       <h1 id="traguardo-titolo">Obiettivo VP<br>raggiunto!</h1>
       <div class="numeri-traguardo"><div><span>VP personali a ${esc(nomeMese(m).split(" ")[0])}</span><b>${num(t.v.vp)}</b></div><div><span>Il tuo obiettivo</span><b>${num(t.v.obVp)}</b></div></div>
