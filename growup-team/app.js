@@ -3038,6 +3038,153 @@ function etichettaDi(p){
   }
   return Object.assign({ k, perche, giorni, n }, ETICHETTE_GRUPPO[k]);
 }
+/* ---- Da seguire oggi (13 novembre 2026, per gli upline): le persone che seguo e che oggi hanno un motivo ----
+   Chi seguo: la mia prima linea e chi ho invitato io; più in profondità chi ha sopra uno sponsor non attivo (non usa l'app
+   o non aggiorna da più di «giorni_presa_in_carico» giorni, 14): risalendo gli sponsor, il primo upline attivo sono io.
+   Solo dati già caricati all'apertura (struttura, mappe del mese e del mese prima, partenze, ordini in attesa): mai i nomi
+   della Lista o dei Clienti, mai il testo del perché (solo se c'è). Nessun limite di persone, nell'ordine dei criteri:
+   1 nuovo in partenza invitato da me che si è fermato (obiettivo o incontro da 3 giorni, primo ordine a meno di 7 giorni
+     dalla fine dei 30, senza ordine né nella mappa né confermato in attesa della mappa);
+   2 «Non aggiorna» (la regola dell'etichetta rossa del Gruppo, soglia dalle impostazioni);
+   3 negli ultimi 10 giorni del mese, meno del 10% dei VP di gruppo che servono per la percentuale successiva (con la mappa
+     del mese; dal 21% in su niente);
+   4 un complimento: partenza completata, primo ordine nella mappa, percentuale più alta del mese prima (senza la mappa del
+     mese prima: di quella dichiarata all'ingresso), negli ultimi 7 giorni.
+   Una riga per persona, con il motivo più importante; un complimento della stessa persona resta accanto («anche»).
+   Su questo telefono (try/catch, mai nel database) si ricordano «Fatto» (la persona non torna per 7 giorni, salvo un motivo
+   che allora non c'era) e il giorno in cui l'app ha visto un complimento la prima volta (la mappa non dice quando). ---- */
+const DA_SEGUIRE = { giorniFermo:3, giorniOrdine:7, giorniFineMese:10, quotaTraguardo:0.1, giorniFatto:7, giorniComplimento:7, giorniMemoria:62 };
+const chiaveDaSeguire = () => "growup-team.da-seguire." + st.profilo.id;
+function memoriaDaSeguire(){
+  try{ const m = JSON.parse(leggiLocale(chiaveDaSeguire()) || "null");
+    if(m && typeof m === "object") return { fatti:m.fatti && typeof m.fatti === "object" ? m.fatti : {}, visti:m.visti && typeof m.visti === "object" ? m.visti : {} }; }
+  catch(e){}
+  return { fatti:{}, visti:{} };
+}
+function salvaMemoriaDaSeguire(m){ try{ salvaLocale(chiaveDaSeguire(), JSON.stringify(m)); }catch(e){} }
+/* «Fatto»: si segnano tutti i motivi che la persona ha oggi; torna prima dei 7 giorni solo con un motivo nuovo */
+function segnaFattoDaSeguire(riga, giorno){
+  const m = memoriaDaSeguire();
+  m.fatti[riga.id] = { il:giorno || oggi(), chiavi:(riga.chiavi || [riga.k]).slice() };
+  salvaMemoriaDaSeguire(m);
+}
+function giorniPresaInCarico(){ return Number(cfg("giorni_presa_in_carico")) || 14; }
+/* uno sponsor è attivo se usa l'app e ha aggiornato negli ultimi 14 giorni */
+function sponsorAttivo(p, giorno){
+  if(!p || p.stato === "gestito") return false;
+  const rif = String(p.ultimo_aggiornamento || p.creato_il || "").slice(0, 10);
+  return !!rif && giorniTra(rif, giorno) <= giorniPresaInCarico();
+}
+/* il primo upline attivo di una persona della struttura, risalendo gli sponsor (io conto sempre); null se non c'è */
+function primoUplineAttivo(p, giorno){
+  const io = st.profilo.id, visti = new Set();
+  for(let s = st.struttura.find(x => x.id === p.sponsor_id); s && !visti.has(s.id); s = st.struttura.find(x => x.id === s.sponsor_id)){
+    if(s.id === io || sponsorAttivo(s, giorno)) return s.id;
+    visti.add(s.id);
+  }
+  return null;
+}
+/* la percentuale dichiarata all'ingresso («La tua qualifica attuale»: la percentuale del mese scorso); null per chi non
+   usa l'app (non ha dichiarato niente) */
+function percentualeDichiarata(p){
+  if(!p || p.stato === "gestito") return null;
+  if(p.percentuale_iniziale != null && p.percentuale_iniziale !== "") return Number(p.percentuale_iniziale) || 0;
+  const t = st.stages.find(s => s.chiave === p.qualifica_iniziale);
+  if(!t) return 0;   // «Inizio»
+  return Number(t.percentuale) || (t.ordine >= ordineDi("argento") && ordineDi("argento") ? 21 : 0);
+}
+function daSeguireOggi(giorno){
+  giorno = giorno || oggi();
+  const io = st.profilo.id, mem = memoriaDaSeguire(), mese = meseDi(giorno), mPrec = spostaMese(mese, -1);
+  let cambiata = false;
+  const persone = new Map();
+  const aggiungi = (p, scheda) => { if(!persone.has(p.id)) persone.set(p.id, { id:p.id, nome:p.nome, scheda, motivi:[] }); };
+  const motivo = (id, criterio, k, testo) => persone.get(id).motivi.push({ criterio, k, motivo:testo, n:persone.get(id).motivi.length });
+  for(const p of st.struttura) if(p.id !== io && !st.nascosti.has(p.id) && primoUplineAttivo(p, giorno) === io) aggiungi(p, true);
+  const partenze = (st.partenze || []).filter(x => x.invitato_da_me !== false && x.id !== io && !st.nascosti.has(x.id));
+  for(const x of partenze) aggiungi(x, st.struttura.some(p => p.id === x.id));
+  const nellApp = g => g <= 0 ? "nell'app da oggi" : `nell'app da ${plur(g, "giorno", "giorni")}`;
+
+  /* 1. il nuovo in partenza che si è fermato */
+  for(const x of partenze){
+    const isc = String(x.data_iscrizione || "").slice(0, 10), ing = String(x.ingresso || "").slice(0, 10);
+    if(!isc || !ing || x.partenza_completata_il || giorniTra(isc, ing) > GIORNI_NUOVO) continue;
+    const g = giorniTra(ing, giorno), restano = GIORNI_NUOVO - giorniTra(isc, giorno);
+    const ordine = Number(x.vp_dal_ingresso) > 0 || !!(st.ordiniAttesa && st.ordiniAttesa.has(x.id));
+    if(!x.ha_perche && g >= DA_SEGUIRE.giorniFermo) motivo(x.id, 1, "obiettivo", `Obiettivo non ancora scritto · ${nellApp(g)}`);
+    if(!x.incontro_sponsor && g >= DA_SEGUIRE.giorniFermo) motivo(x.id, 1, "incontro", `Incontro con lo sponsor non ancora fissato · ${nellApp(g)}`);
+    if(!ordine && restano >= 0 && restano < DA_SEGUIRE.giorniOrdine) motivo(x.id, 1, "ordine", restano === 0
+      ? "Primo ordine non ancora fatto · oggi è l'ultimo dei 30 giorni" : `Primo ordine non ancora fatto · ${restano === 1 ? "resta 1 giorno" : `restano ${restano} giorni`} dei 30`);
+  }
+  /* 2. «Non aggiorna»: chi usa l'app, fermo da più dei giorni dell'etichetta rossa */
+  const soglia = soglieEtichette().giorni_da_chiamare;
+  for(const p of st.struttura) if(persone.has(p.id) && p.stato !== "gestito"){
+    const rif = String(p.ultimo_aggiornamento || p.creato_il || "").slice(0, 10), g = rif ? giorniTra(rif, giorno) : null;
+    if(g != null && g > soglia) motivo(p.id, 2, "fermo", `Non aggiorna da ${plur(g, "giorno", "giorni")}`);
+  }
+  /* i numeri della mappa (riepilogo del mese in corso e del mese prima): solo se il giorno è nel mese caricato */
+  const caricato = mese === meseDi(oggi());
+  const conMappa = r => !!r && r.vp_personali != null;
+  const pctDi = r => r.percentuale == null ? Number(percentualeDa(Number(r.vp_gruppo) || 0)) || 0 : Number(r.percentuale) || 0;
+  /* 3. vicino alla percentuale successiva, negli ultimi 10 giorni del mese */
+  const ultimo = piuGiorni(spostaMese(mese, 1) + "-01", -1);
+  if(caricato && giorniTra(giorno, ultimo) < DA_SEGUIRE.giorniFineMese){
+    const livelli = (st.livelli || []).map(l => ({ pct:Number(l.percentuale), vp:Number(l.vp_gruppo) })).sort((a, b) => a.pct - b.pct);
+    for(const x of persone.values()){
+      const r = rigaDi(st.riep, x.id);
+      if(!conMappa(r)) continue;
+      const vpg = Number(r.vp_gruppo) || 0, dopo = livelli.find(l => l.pct > pctDi(r));
+      const manca = dopo ? dopo.vp - vpg : 0;
+      if(dopo && manca > 0 && manca < dopo.vp * DA_SEGUIRE.quotaTraguardo)
+        motivo(x.id, 3, "traguardo-" + dopo.pct, `Mancano ${num(manca)} VP di gruppo per il ${dopo.pct}% · ${testoMappaDi(x.id, mese)}`);
+    }
+  }
+  /* 4. i complimenti: il giorno in cui l'app li vede la prima volta (la mappa non dice da quando), per 7 giorni */
+  const visto = (id, k) => { const c = id + "|" + k; if(!mem.visti[c]){ mem.visti[c] = giorno; cambiata = true; } return mem.visti[c]; };
+  const recente = d => { const g = giorniTra(String(d).slice(0, 10), giorno); return g >= 0 && g < DA_SEGUIRE.giorniComplimento; };
+  for(const x of partenze) if(x.partenza_completata_il){
+    const d = fmtGiorno.format(new Date(x.partenza_completata_il));
+    if(recente(d)) motivo(x.id, 4, "partenza", `Ha completato la partenza · ${dataIt(d)}`);
+  }
+  if(caricato) for(const x of persone.values()){
+    const ora = rigaDi(st.riep, x.id), prima = rigaDi(st.riepPrec, x.id), vp = r => conMappa(r) ? Number(r.vp_personali) || 0 : 0;
+    const dp = partenze.find(y => y.id === x.id);
+    const isc = meseDi((dp && dp.data_iscrizione) || (st.ingressi && st.ingressi.get(x.id)) || "");
+    /* il primo ordine: iscritto nel mese in corso o in quello prima, i primi VP in una di queste due mappe */
+    if(/^\d{4}-\d{2}$/.test(isc) && isc >= mPrec && isc <= mese){
+      const mOrdine = isc === mPrec && vp(prima) > 0 ? mPrec : vp(ora) > 0 ? mese : null;
+      if(mOrdine && recente(visto(x.id, "primo-ordine")))
+        motivo(x.id, 4, "primo-ordine", `Primo ordine nella mappa · ${num(vp(mOrdine === mese ? ora : prima))} VP · ${testoMappaDi(x.id, mOrdine)}`);
+    }
+    /* la percentuale più alta del mese prima (senza la sua mappa: di quella dichiarata all'ingresso) */
+    if(conMappa(ora) && pctDi(ora) > 0){
+      const p = st.struttura.find(y => y.id === x.id), cur = pctDi(ora);
+      const rif = conMappa(prima) ? pctDi(prima) : percentualeDichiarata(p);
+      if(rif != null && cur > rif && recente(visto(x.id, "percentuale-" + cur)))
+        motivo(x.id, 4, "percentuale-" + cur, `Al ${cur}% questo mese · ${conMappa(prima) ? `a ${MESI[Number(mPrec.slice(5, 7)) - 1]} ${rif}%` : `all'ingresso ${rif}%`} · ${testoMappaDi(x.id, mese)}`);
+    }
+  }
+
+  /* «Fatto»: fuori per 7 giorni, salvo un motivo che quel giorno non c'era */
+  const out = [];
+  for(const x of persone.values()){
+    if(!x.motivi.length) continue;
+    const f = mem.fatti[x.id], gf = f && f.il ? giorniTra(f.il, giorno) : null;
+    const fresco = gf != null && gf >= 0 && gf < DA_SEGUIRE.giorniFatto;
+    const restano = (fresco ? x.motivi.filter(m => !(f.chiavi || []).includes(m.k)) : x.motivi).sort((a, b) => a.criterio - b.criterio || a.n - b.n);
+    if(!restano.length) continue;
+    const m = restano[0], anche = m.criterio < 4 ? restano.find(y => y.criterio === 4) : null;
+    out.push({ id:x.id, nome:x.nome, scheda:x.scheda, criterio:m.criterio, k:m.k, tipo:m.criterio === 4 ? "complimento" : "aiuto",
+      motivo:m.motivo, anche:anche ? anche.motivo : null, chiavi:x.motivi.map(y => y.k), n:m.n });
+  }
+  out.sort((a, b) => a.criterio - b.criterio || a.n - b.n || a.nome.localeCompare(b.nome, "it"));
+  /* la memoria non cresce: via i complimenti visti da più di 2 mesi e i «Fatto» scaduti */
+  for(const [c, d] of Object.entries(mem.visti)) if(giorniTra(String(d).slice(0, 10), giorno) > DA_SEGUIRE.giorniMemoria){ delete mem.visti[c]; cambiata = true; }
+  for(const [id, f] of Object.entries(mem.fatti)) if(!f || !f.il || giorniTra(f.il, giorno) >= DA_SEGUIRE.giorniFatto){ delete mem.fatti[id]; cambiata = true; }
+  if(cambiata) salvaMemoriaDaSeguire(mem);
+  return out.map(({ n, ...r }) => r);
+}
+
 /* chi è senza app non ha etichetta: i suoi numeri dipendono da quando lo sponsor li inserisce */
 /* ---- Preferiti: le persone da seguire da vicino, con i loro numeri rispetto ai loro obiettivi ---- */
 function vPreferiti(){
@@ -8157,6 +8304,10 @@ window.addEventListener("hashchange", () => {
 if("serviceWorker" in navigator && location.protocol === "https:"){
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
+
+/* solo nei test (window.GROWUP_TEST, come GROWUP_API): il calcolo di «Da seguire oggi» e lo stato, per controllarlo criterio
+   per criterio. Nell'app vera window.GROWUP_TEST non c'è e non si espone niente. */
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { st, oggi, piuGiorni, daSeguireOggi, segnaFattoDaSeguire });
 
 avvio();
 })();

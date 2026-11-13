@@ -1,7 +1,44 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 12 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 13 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
+
+## «Da seguire oggi» per gli upline (13 novembre 2026, database non toccato)
+
+Tre PR in fila, da unire in ordine (una per punto); la versione del service worker sale una volta sola, nell'ultima.
+Richiesta e scelte di Stefano. Un riquadro in Io → Il mio giorno, sotto la lista di oggi, con le persone che seguo e che
+oggi hanno un motivo. **Solo dati già caricati all'apertura** (struttura, mappe del mese e del mese prima, partenze,
+ordini in attesa, date delle mappe): nessuna richiesta nuova, nessuna tabella. Mai i nomi della Lista o dei Clienti dei
+partner, mai il testo del perché (solo se c'è).
+1. **Il calcolo** (`daSeguireOggi(giorno)` in `app.js`, una funzione sola).
+   - **Chi seguo**: la mia prima linea e chi ho invitato io (`partenze()`, anche in attesa della mappa); più in profondità
+     chi ha sopra uno sponsor **non attivo**: non usa l'app oppure non aggiorna da più di `giorni_presa_in_carico` giorni
+     (14, impostazione che c'era già e non era usata; la «presa in carico» della Fase 3 non era mai stata costruita). Regola:
+     risalendo gli sponsor, il primo upline attivo sono io (`primoUplineAttivo`). Le persone nascoste («Nascondi dalla mia
+     struttura») non compaiono.
+   - **Criteri, in ordine**: 1. il nuovo in partenza invitato da me che si è fermato: obiettivo non scritto da 3 giorni dal
+     primo ingresso; incontro con lo sponsor non fissato da 3 giorni; primo ordine non fatto (né nella mappa né confermato in
+     attesa della mappa) con **da 6 a 0 giorni** alla fine dei 30 (chi li ha già superati no, scelta di Stefano). 2. «Non
+     aggiorna»: chi usa l'app, fermo da più dei giorni dell'etichetta rossa (`soglie_etichette.giorni_da_chiamare`, 7).
+     3. Negli ultimi 10 giorni del mese, con la mappa del mese: mancano meno del 10% dei VP di gruppo della soglia della
+     percentuale successiva (`percent_levels`), con la data della mappa («Mancano 50 VP di gruppo per il 9% · mappa del …»;
+     dal 21% in su niente; anche chi non usa l'app). 4. I complimenti, negli ultimi 7 giorni: partenza completata (data
+     esatta); primo ordine nella mappa (iscritto nel mese in corso o in quello prima, primi VP in una di queste due mappe);
+     percentuale del mese più alta di quella del mese prima, oppure, senza la mappa del mese prima, di quella dichiarata
+     all'ingresso («La tua qualifica attuale» = percentuale del mese scorso; «Inizio» = 0%).
+   - **Il giorno del complimento**: la mappa non dice da quando mostra un fatto (ogni import riscrive le date). L'app si
+     ricorda **su questo telefono** il giorno in cui vede un complimento la prima volta, e lo mostra per 7 giorni (scelta
+     di Stefano). Una percentuale che sale ancora nello stesso mese è un fatto nuovo. Da sapere: su un telefono nuovo, o se
+     l'app non si apre per giorni, i 7 giorni partono da quando la si apre.
+   - **Nessun limite di persone** (scelta di Stefano): tutte quelle con un motivo, nell'ordine dei criteri. Una riga per
+     persona con il motivo più importante; se ha anche un complimento, resta accanto (`anche`), così i complimenti ci sono
+     sempre.
+   - **«Fatto»** (`segnaFattoDaSeguire`): si ricorda su questo telefono (`growup-team.da-seguire.<id>`, con try/catch: solo id
+     interni, motivi e date, mai nomi) con tutti i motivi che la persona ha quel giorno; non torna per 7 giorni, salvo un
+     motivo che allora non c'era. La memoria si ripulisce da sola (Fatto scaduti, complimenti visti da più di 2 mesi).
+   - Per i test, `window.GROWUP_TEST` (lo mette solo il test, come `GROWUP_API`) espone il calcolo; nell'app vera non c'è.
+   Test dell'interfaccia: sezione 90 (ogni criterio, la profondità, nessun limite e l'ordine, Fatto e fatto nuovo, il
+   complimento dopo 7 giorni, la memoria del telefono bloccata).
 
 ## Condivisione, primo ordine in attesa, avvisi allo sponsor, qualifica (13 novembre 2026, migrazioni 064 e 065, app v120)
 
