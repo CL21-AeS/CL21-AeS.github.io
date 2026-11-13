@@ -103,6 +103,12 @@
   }
   const ordineInMappa = () => { const d = window.__DB, l = luca(); if(!l) return false; const dal = String(l.data_iscrizione || "2000-01-01").slice(0, 7);
     return (d.numeri || []).some(n => n.partner_id === l.id && n.mese >= dal && Number(n.vpp) > 0); };
+  function dueMesiDopo(){
+    if(!confirm("Caricare Giulia dopo due mesi di uso?\n\nQuello che hai fatto come Giulia si sostituisce con i suoi due mesi. Luca resta com'è.")) return;
+    window.GROWUP_PROVA_DUE_MESI(window.__DB);
+    vaiCome("giulia");
+  }
+
   /* ---- i file «del sito Amway» di prova, per far vedere gli import (tutto inventato) ---- */
   const MESI_L = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
   const oggiL = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12); };
@@ -193,12 +199,13 @@
 .prova-scelta .avviso{background:#fde4d3;color:#5c2a0c;border-radius:14px;padding:10px 12px;font-size:13px;line-height:1.45;margin:0}`;
     document.head.appendChild(st);
   }
-  /* la barra in cima: «Cambia persona» e, solo per Luca, «Arriva la mappa con il primo ordine» (dopo l'ingresso, finché
-     la mappa non mostra il primo ordine) */
+  /* la barra in cima: «Cambia persona» e, solo per chi serve, un pulsante della prova:
+     Luca → «Arriva la mappa con il primo ordine» (dopo l'ingresso, finché la mappa non mostra il primo ordine);
+     Giulia → «Due mesi dopo» (sempre, anche prima del primo ingresso; non più dopo averlo usato) */
   function barra(){
-    const chi = leggi(K_CHI);
+    const d = window.__DB, chi = leggi(K_CHI);
     const extra = chi === "luca" && luca() && !ordineInMappa() ? `<button type="button" data-prova="arriva">Arriva la mappa con il primo ordine</button>`
- : "";
+      : chi === "giulia" && !d._prova.dueMesi ? `<button type="button" data-prova="due-mesi">Due mesi dopo</button>` : "";
     const html = `<span>Versione di prova · dati inventati</span><span class="prova-azioni">${extra}<button type="button" data-prova="scegli">Cambia persona</button></span>`;
     let b = document.querySelector(".prova-barra");
     if(!b){ b = document.createElement("div"); b.className = "prova-barra"; document.body.insertBefore(b, document.body.firstChild); }
@@ -231,6 +238,7 @@
     else if(a === "mappa") mappaProva();
     else if(a === "clienti") clientiProva();
     else if(a === "arriva") arrivaMappa();
+    else if(a === "due-mesi") dueMesiDopo();
   }, true);
 
   /* Luca, appena entrato con l'invito di Giulia, trova già 29 nomi nella sua Lista (inventati, con «Come lo conosci?»):
