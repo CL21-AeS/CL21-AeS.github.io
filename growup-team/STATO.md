@@ -6,7 +6,7 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 ## La strategia in Io, punto 2: la card in cima a Io (18 novembre 2026, database non toccato)
 
 - **Dove**: la prima card di Io → Il mio giorno (`vStrategia`); sopra restano solo le domande che compaiono una volta sola
-  (condivisione e notifiche), come oggi: dopo la risposta spariscono (scelta di Claude, da confermare con Stefano). Si vede a chi ha finito il percorso di partenza (e agli avviati,
+  (condivisione e notifiche), come oggi: dopo la risposta spariscono (confermato da Stefano il 18 novembre). Si vede a chi ha finito il percorso di partenza (e agli avviati,
   gli admin, chi è in attività da anni). Durante il percorso non c'è (tutto come prima); nella **festa della partenza** c'è
   il riquadro **«Ecco la tua strategia»** (`vStrategiaFesta`, titolo e prime tre caselle), poi la card.
 - **Card**: «La tua strategia» e quante caselle; il **titolo** (`titoloStrategia`): «Fai il tuo Path to Bronze» se la
