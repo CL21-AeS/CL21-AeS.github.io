@@ -7078,13 +7078,13 @@ for(const tema of ["light", "dark"]){
     `suggerimenti: invitato da te, nuovi iscritti, ha fatturato (${sugg.join(", ")})`);
   await prompt.locator("button[data-act=strategia-invitato-si]").click();
   await page.locator(".sheet form[data-form=strategia]").waitFor();
-  check(await page.locator(".sheet select[name=casella]").nth(2).inputValue() === "aiuta:" + id(25), "«Sì, in una casella»: Luca va nella casella da trovare");
+  check(await page.locator(".sheet select[name=casella]").nth(0).inputValue() === "aiuta:" + id(25), "«Sì, in una casella»: Luca va nella casella da trovare (la nuova linea frontale)");
   check(await page.locator(".sheet optgroup[label=Suggerite] option").count() >= 3, "Cambia: il gruppo «Suggerite» in cima alle persone");
   await page.click(".sheet form[data-form=strategia] button.primary");
   await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
   await sync(page);
   const righe = DB.caselle.filter(x => x.partner_id === id(20)).sort((a, b) => a.posizione - b.posizione);
-  check(righe.length === 3 && righe[2].tipo === "aiuta" && righe[2].persona_id === id(25) && righe[0].persona_id === id(21),
+  check(righe.length === 3 && righe[0].tipo === "aiuta" && righe[0].persona_id === id(25) && righe[1].persona_id === id(21) && righe[2].tipo === "profondita",
     "067: le caselle sono nel database (tabella strategia_caselle)");
   check(!(await page.evaluate(() => Object.keys(localStorage).filter(k => k.includes("growup-team.strategia.")).length)), "067: con il database niente caselle sul telefono");
   check(!(await page.locator(".sheet .invitato-aiuta").count()), "invitati: Luca è in una casella, la domanda non c'è più");
@@ -7097,7 +7097,8 @@ for(const tema of ["light", "dark"]){
   await ctx.close();
   ({ ctx, page } = await apriCome(20));   // un altro telefono (memoria vuota)
   await page.locator("#app .card.strategia").waitFor();
-  check(await page.locator("#app .card.strategia .casella.c-aiuta").count() === 3, "067: su un altro telefono le caselle scelte ci sono");
+  check(await page.locator("#app .card.strategia .casella.c-aiuta").count() === 2 && await page.locator("#app .card.strategia .casella.c-profondita").count() === 1,
+    "067: su un altro telefono le caselle scelte ci sono");
   check(!(await page.locator("#app .card.strategia .invitato-aiuta").count()), "invitati: nessuna domanda per chi è già in una casella");
   await ctx.close();
   check((DB.notificheEventi || []).length === eventiPrima, "067: la persona scelta non riceve avvisi");
