@@ -48,8 +48,9 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 | 3 | [#236](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/236) | Le caselle nel database, i suggerimenti, gli invitati che arrivano nella mappa | `067_strategia_caselle.sql` (tabella `strategia_caselle`) | `supabase/067_strategia_caselle_togli.sql` |
 | 4 | [#237](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/237) | «Oggi per la tua strategia» al posto della lista di oggi: i binari Persone e Fatturato | nessuna | — |
 | 5 | [#238](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/238) | La festa del Path to Bronze e, dopo, le sue linee nuove come suggerimento; service worker v123 | nessuna | — |
+| 6 | (questa) | «Cambia» per linea: prima la linea, poi chi aiuti solo tra le persone di quella linea | nessuna | — |
 
-Per tornare a tutto com'era: «Revert» delle PR dalla 5 alla 1 (o chiedere a Claude di riportare la cartella al tag),
+Per tornare a tutto com'era: «Revert» delle PR dalla 6 alla 1 (o chiedere a Claude di riportare la cartella al tag),
 poi, se si vuole, lo script della 067.
 
 La 067 è applicata al database vero dal 18 novembre 2026: per toglierla serve lo script qui sopra.

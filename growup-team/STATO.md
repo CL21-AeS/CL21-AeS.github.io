@@ -3,6 +3,20 @@
 Ultimo aggiornamento: 18 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## La strategia in Io: «Cambia» per linea (19 novembre 2026, richiesta di Stefano, database non toccato)
+
+App v124. Le PR #233-#238 sono unite. In «Cambia» le persone da aiutare non sono più tutte insieme: ogni casella ha **due scelte**,
+prima la **Linea** (Da scegliere, Nuova linea frontale · da trovare, «Linea N · nome» per ogni mia linea frontale), poi
+**Chi aiuti nella linea**, solo tra le persone di quella linea (`personeDellaLinea`): per prima chi la apre, poi gli altri
+dal più vicino al più profondo, con il motivo dei suggerimenti («nuovi iscritti», «ha fatturato», «invitato da te»), e in
+fondo «Nuovo in profondità · da trovare». Scelta una linea, la casella parte dal metodo Cum Laude 21 (`casellaPerLinea`):
+chi la apre se costruisce, altrimenti «Nuovo in profondità». Il gruppo «Suggerite» mescolato non c'è più.
+Corretto anche un difetto del punto 2: ridisegnando il foglio (con «+», «−», un modo o una linea cambiata) l'app rimetteva
+i valori dei campi per nome, e con più caselle dello stesso nome un valore poteva finire nella casella sbagliata. Ora ogni
+casella ha i suoi nomi (`linea-N`, `chi-N`) e prima di ridisegnare le scelte diventano il punto di partenza.
+Test: sezioni 98 (le due scelte, solo le persone della linea, cambiare linea, «+» che non sposta le altre caselle), 99 e
+101 adattate.
+
 ## La strategia in Io, punto 5: la festa del Path to Bronze (18 novembre 2026, app v123, database non toccato)
 
 - **Quando**: il partner (solo se la qualifica dichiarata è sotto Bronze Foundation, `sottoFoundation()`) o una persona in

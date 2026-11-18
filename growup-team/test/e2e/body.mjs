@@ -6919,9 +6919,27 @@ for(const tema of ["light", "dark"]){
   // «Cambia»: la terza casella diventa «Nuovo in profondità» per la linea 2; si ricorda riaprendo
   await card.locator("button[data-act=strategia-cambia]").click();
   await page.locator(".sheet form[data-form=strategia]").waitFor();
-  check(await page.locator(".sheet select[name=casella]").count() === 3, "Cambia: tre caselle da scegliere");
+  const caselleF = page.locator(".sheet fieldset.casella-scelta");
+  check(await caselleF.count() === 3, "Cambia: tre caselle da scegliere");
   check(!(await page.locator(".sheet .quante-caselle").count()), "Cambia sotto Argento: il numero di caselle non si sceglie");
-  await page.locator(".sheet select[name=casella]").nth(2).selectOption("prof:" + id(22));
+  // prima la linea, poi chi aiuti: solo le persone di quella linea (Stefano, 19 novembre)
+  check(JSON.stringify(await caselleF.nth(0).locator("select.sel-linea option").allInnerTexts())
+      === JSON.stringify(["Da scegliere", "Nuova linea frontale · da trovare", "Linea 1 · Lia Linea", "Linea 2 · Leo Linea", "Linea 3 · Max Poco"])
+    && !(await caselleF.nth(0).locator("select.sel-chi").count()), "Cambia: prima si sceglie la linea (la nuova linea frontale non chiede chi)");
+  const chiLia = (await caselleF.nth(1).locator("select.sel-chi option").allInnerTexts()).map(t => t.split(" · ")[0]);
+  check(await caselleF.nth(1).locator("select.sel-linea").inputValue() === id(21)
+    && JSON.stringify(chiLia) === JSON.stringify(["Lia Linea", "Nina Nuova", "Olga Vecchia", "Nuovo in profondità"]),
+    "Cambia: in «Chi aiuti» solo le persone della linea di Lia (chi la apre per primo), più «Nuovo in profondità» (" + chiLia.join(", ") + ")");
+  await caselleF.nth(0).locator("select.sel-linea").selectOption(id(22));
+  await page.waitForTimeout(150);
+  const chiLeo = (await caselleF.nth(0).locator("select.sel-chi option").allInnerTexts()).map(t => t.split(" · ")[0]);
+  check(JSON.stringify(chiLeo) === JSON.stringify(["Leo Linea", "Nuovo in profondità"]) && await caselleF.nth(0).locator("select.sel-chi").inputValue() === "prof",
+    "Cambia: cambiando linea, «Chi aiuti» ha solo le persone della nuova linea; Leo non costruisce → parte da «Nuovo in profondità»");
+  await caselleF.nth(0).locator("select.sel-linea").selectOption("nuova");
+  await page.waitForTimeout(150);
+  await caselleF.nth(2).locator("select.sel-linea").selectOption(id(22));
+  await page.waitForTimeout(150);
+  await caselleF.nth(2).locator("select.sel-chi").selectOption("prof");
   await page.screenshot({ path:S + "/e2e/98-strategia-cambia-light.png" });
   await page.click(".sheet form[data-form=strategia] button.primary");
   await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
@@ -6964,7 +6982,8 @@ for(const tema of ["light", "dark"]){
   await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
   check(await page.locator(".sheet .strategia-titolo").textContent() === "Aiuta le tue persone a fare il Path to Bronze", "titolo: «Aiuta le tue persone a fare il Path to Bronze»");
   await page.click(".sheet button[data-act=strategia-cambia]");
-  await page.locator(".sheet select[name=casella]").nth(2).selectOption("nuova");
+  await page.locator(".sheet fieldset.casella-scelta").nth(2).locator("select.sel-linea").selectOption("nuova");
+  await page.waitForTimeout(150);
   await page.click(".sheet form[data-form=strategia] button.primary");
   await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
   check(await page.locator(".sheet .strategia-titolo").textContent() === "La tua strategia · ibrida", "titolo: «La tua strategia · ibrida»");
@@ -6980,8 +6999,16 @@ for(const tema of ["light", "dark"]){
   check(!(await page.locator("#app .card.strategia .tappe4").count()), "strategia Argento: niente barra delle tappe");
   await page.click("#app .card.strategia button[data-act=strategia-cambia]");
   check(await page.locator(".sheet .quante-caselle").count() === 1, "Cambia da Argento: si sceglie quante caselle");
+  // una casella cambiata a mano resta dov'è anche premendo «+» (le altre non cambiano)
+  const linee98 = () => page.locator(".sheet fieldset.casella-scelta select.sel-linea").evaluateAll(l => l.map(x => x.value));
+  const prima98 = await linee98();
+  await page.locator(".sheet fieldset.casella-scelta").nth(2).locator("select.sel-linea").selectOption("");
+  await page.waitForTimeout(150);
   await page.click(".sheet button[data-act=strategia-piu]"); await page.click(".sheet button[data-act=strategia-piu]");
-  check(await page.locator(".sheet select[name=casella]").count() === 5, "Cambia da Argento: 5 caselle");
+  const dopo98 = await linee98();
+  check(dopo98.length === 5 && dopo98[0] === prima98[0] && dopo98[1] === prima98[1] && dopo98[2] === "",
+    "Cambia: premendo «+» le caselle già scelte restano come sono (" + prima98.join(",") + " → " + dopo98.join(",") + ")");
+  check(await page.locator(".sheet fieldset.casella-scelta").count() === 5, "Cambia da Argento: 5 caselle");
   await page.click(".sheet form[data-form=strategia] button.primary");
   await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
   check(await page.locator(".sheet .casella").count() === 5, "schermata intera: tutte e 5 le caselle");
@@ -7080,8 +7107,10 @@ for(const tema of ["light", "dark"]){
     `suggerimenti: invitato da te, nuovi iscritti, ha fatturato (${sugg.join(", ")})`);
   await prompt.locator("button[data-act=strategia-invitato-si]").click();
   await page.locator(".sheet form[data-form=strategia]").waitFor();
-  check(await page.locator(".sheet select[name=casella]").nth(0).inputValue() === "aiuta:" + id(25), "«Sì, in una casella»: Luca va nella casella da trovare (la nuova linea frontale)");
-  check(await page.locator(".sheet optgroup[label=Suggerite] option").count() >= 3, "Cambia: il gruppo «Suggerite» in cima alle persone");
+  check(await page.locator(".sheet fieldset.casella-scelta").nth(0).locator("select.sel-linea").inputValue() === id(25)
+    && await page.locator(".sheet fieldset.casella-scelta").nth(0).locator("select.sel-chi").inputValue() === id(25), "«Sì, in una casella»: Luca va nella casella da trovare (la nuova linea frontale)");
+  check((await page.locator(".sheet fieldset.casella-scelta").nth(1).locator("select.sel-chi option").allInnerTexts())[0] === "Lia Linea · nuovi iscritti",
+    "Cambia: chi apre la linea per primo, con il motivo del suggerimento (Lia: nuovi iscritti)");
   await page.click(".sheet form[data-form=strategia] button.primary");
   await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
   await sync(page);
@@ -7110,8 +7139,11 @@ for(const tema of ["light", "dark"]){
   ({ ctx, page } = await apriCome(20));
   await page.locator("#app .card.strategia").waitFor();
   await page.click("#app .card.strategia button[data-act=strategia-cambia]");
-  await page.locator(".sheet select[name=casella]").nth(2).selectOption("nuova");
-  await page.locator(".sheet select[name=casella]").nth(1).selectOption("prof:" + id(22));
+  await page.locator(".sheet fieldset.casella-scelta").nth(2).locator("select.sel-linea").selectOption("nuova");
+  await page.waitForTimeout(150);
+  await page.locator(".sheet fieldset.casella-scelta").nth(1).locator("select.sel-linea").selectOption(id(22));
+  await page.waitForTimeout(150);
+  await page.locator(".sheet fieldset.casella-scelta").nth(1).locator("select.sel-chi").selectOption("prof");
   await page.click(".sheet form[data-form=strategia] button.primary");
   await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
   check(await page.evaluate(() => Object.keys(localStorage).some(k => k.includes("growup-team.strategia."))), "senza la tabella: le caselle restano sul telefono");
@@ -7295,7 +7327,8 @@ for(const tema of ["light", "dark"]){
     "dopo la festa: le sue linee nuove diventano i suggerimenti");
   await dopo.locator("button[data-act=ptb-scegli]").click();
   await page.locator(".sheet form[data-form=strategia]").waitFor();
-  const scelte = await page.locator(".sheet select[name=casella]").evaluateAll(l => l.map(x => x.value));
+  const scelte = await page.locator(".sheet fieldset.casella-scelta").evaluateAll(l => l.map(f => { const li = f.querySelector("select.sel-linea").value, chi = f.querySelector("select.sel-chi");
+    return !li ? "" : li === "nuova" ? "nuova" : chi && chi.value !== "prof" ? "aiuta:" + chi.value : "prof:" + li; }));
   check(JSON.stringify(scelte) === JSON.stringify(["aiuta:" + id(23), "aiuta:" + id(22), "aiuta:" + id(24)]),
     "«Scegli chi aiutare»: le sue linee al posto della sua casella e nella casella da trovare (" + scelte.join(", ") + ")");
   await page.click(".sheet [data-act=strategia-annulla]");
