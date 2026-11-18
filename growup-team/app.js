@@ -8385,6 +8385,187 @@ if("serviceWorker" in navigator && location.protocol === "https:"){
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 
+/* ==== La tua strategia (novembre 2026, punto 1): il calcolo, in una sola funzione (strategia) ====
+   Solo dati della mappa importata (VP personali e di gruppo, linee frontali, data di ingresso) e degli inviti. I requisiti
+   vengono dalla tabella delle tappe (stage_requirements), mai scritti qui. Il modo di lavorare lo propone la MAPPA:
+   - situazione dalle linee frontali attive (almeno soglia_linea_attiva VP di gruppo) nell'ultimo mese chiuso (il mese
+     scorso): A nessuna, B una o due, C tre o più. Chi si è iscritto da quel mese in poi e non è nella sua mappa parte da A, con la mappa di adesso.
+   - la qualifica dichiarata serve solo a: capire se è nuovo, il punto di partenza delle tappe, il titolo, le caselle da
+     Argento in su (da 3 a CASELLE_MAX, scelte dal partner; restano anche se per qualche mese scende sotto il 21%).
+   Una linea conta quando fattura, mai solo perché c'è una persona iscritta. Niente premi, cifre in euro o proiezioni. */
+const CASELLE_MIN = 3, CASELLE_MAX = 20;   // tetto tecnico, controllato anche nel database (067)
+const TAPPE_STRATEGIA = [["path_to_bronze", "Path to Bronze"], ["foundation", "Bronze Foundation"], ["builder", "Bronze Builder"], ["argento", "Argento"]];
+function tappaStrategia(chiave){ return st.stages.find(s => s.chiave === chiave) || null; }
+/* le tappe della strategia, dal Path to Bronze ad Argento compresi, in ordine */
+function tappeStrategia(){
+  const da = ordineDi("path_to_bronze"), a = ordineDi("argento");
+  return da && a ? st.stages.filter(s => s.ordine >= da && s.ordine <= a).sort((x, y) => x.ordine - y.ordine) : [];
+}
+/* da Argento in su: la qualifica dichiarata (anche una percentuale del 21%) o un mese da Argento nelle mappe */
+function strategiaDaArgento(p){
+  p = p || st.profilo;
+  return ordineDi(p.qualifica_iniziale) >= ordineDi("argento") && ordineDi("argento") > 0
+    || Number(p.percentuale_iniziale) >= 21 || (st.mesiReport || []).some(daArgento);
+}
+/* la qualifica dichiarata è sotto Bronze Foundation (per il titolo «Fai il tuo Path to Bronze») */
+function sottoFoundation(p){
+  p = p || st.profilo;
+  const f = st.stages.filter(s => String(s.chiave).startsWith("foundation")).sort((a, b) => a.ordine - b.ordine)[0];
+  if(!f) return true;
+  return ordineDi(p.qualifica_iniziale) < f.ordine && !(Number(p.percentuale_iniziale) >= (Number(f.percentuale) || Infinity));
+}
+/* i numeri di una persona in un mese (mese in corso o mese scorso, quelli caricati): null senza la sua mappa */
+function numeriPersona(pid, m){
+  if(pid === st.profilo.id){ const n = numeriMese(m); return n.mappa ? { personali:n.personali, gruppo:n.gruppo, linee:n.linee, datiAl:n.mappa.dati_al || null } : null; }
+  const righe = m === meseDi(oggi()) ? st.riep : m === mesePrecedente() ? st.riepPrec : [];
+  const r = rigaDi(righe, pid);
+  if(!r || r.vp_personali == null) return null;
+  const linee = r.da_report ? lineeReport(r)
+    : righe.filter(x => x.sponsor_id === pid).map(x => ({ id:x.partner_id, nome:nomeDi(x.partner_id), vp:Number(x.vp_gruppo) || 0 })).sort((a, b) => b.vp - a.vp);
+  return { personali:Number(r.vp_personali) || 0, gruppo:Number(r.vp_gruppo) || 0, linee, datiAl:(st.dateMappe && st.dateMappe.get(pid + "|" + m)) || null };
+}
+/* la mappa più recente di una persona: quella di questo mese, altrimenti quella del mese scorso */
+function mappaRecente(pid){
+  for(const m of [meseDi(oggi()), mesePrecedente()]){ const n = numeriPersona(pid, m); if(n) return Object.assign({ mese:m }, n); }
+  return null;
+}
+function dataIngressoDi(id){
+  const p = st.struttura.find(x => x.id === id);
+  const d = (st.ingressi && st.ingressi.get(id)) || (p && p.data_iscrizione) || (id === st.profilo.id ? st.profilo.data_iscrizione : null);
+  return d ? String(d).slice(0, 10) : null;
+}
+/* «Linee nuove» del Path to Bronze: iscritte dalla data della tabella delle tappe (linee_nuove_dal); se è vuota (scelta di
+   Stefano, 18 novembre 2026) contano tutte le linee frontali. Senza la data di ingresso non si sa: non è nuova. */
+function lineaNuova(l, dal){
+  if(!dal) return true;
+  const d = l.id ? dataIngressoDi(l.id) : null;
+  return !!d && d >= String(dal).slice(0, 10);
+}
+/* Il Path to Bronze di una persona (io o chiunque della mia downline), dalla sua mappa più recente:
+   { personali, vpPersonali, linee:[{ id, nome, vp, ok }] (solo le nuove), fatte, richieste, vpLinea, valore, completo, mese, datiAl }
+   valore = i VP che il suo Path to Bronze porta almeno nella linea (VP personali + linee × VP di linea della tabella). */
+function pathToBronze(pid){
+  const t = tappaStrategia("path_to_bronze");
+  if(!t) return null;
+  const richieste = Number(t.linee) || 0, vpLinea = Number(t.vp_linea) || soglia(), vpPersonali = Number(t.vp_personali) || 0;
+  const valore = vpPersonali + richieste * vpLinea, n = mappaRecente(pid);
+  if(!n) return { personali:null, vpPersonali, linee:[], fatte:0, richieste, vpLinea, valore, completo:false, mese:null, datiAl:null };
+  const linee = n.linee.filter(l => lineaNuova(l, t.linee_nuove_dal)).map(l => ({ id:l.id, nome:l.nome, vp:l.vp, ok:l.vp >= vpLinea }));
+  const fatte = linee.filter(l => l.ok).length;
+  return { personali:n.personali, vpPersonali, linee, fatte, richieste, vpLinea, valore,
+           completo:n.personali >= vpPersonali && fatte >= richieste, mese:n.mese, datiAl:n.datiAl };
+}
+/* la mia linea frontale in cui sta una persona della mia downline (null se non è sotto di me) */
+function lineaDiPersona(pid){
+  const io = st.profilo.id;
+  let p = st.struttura.find(x => x.id === pid), giri = 0;
+  while(p && p.sponsor_id !== io && giri++ < 100) p = st.struttura.find(x => x.id === p.sponsor_id);
+  return p && p.sponsor_id === io ? p.id : null;
+}
+/* le mie linee frontali numerate: il numero è la posizione per VP nell'ultimo mese chiuso (fermo per tutto il mese),
+   poi chi in quel mese non c'era, per nome */
+function lineeNumerate(chiuso, recente){
+  const viste = new Map();
+  for(const l of (chiuso ? chiuso.linee : []).concat(recente ? recente.linee : [])) if(!viste.has(l.id || l.nome)) viste.set(l.id || l.nome, l);
+  for(const p of figli(st.profilo.id)) if(!viste.has(p.id)) viste.set(p.id, { id:p.id, nome:p.nome, vp:0 });
+  const vpChiuso = l => { const x = chiuso && chiuso.linee.find(y => (y.id || y.nome) === (l.id || l.nome)); return x ? x.vp : -1; };
+  return [...viste.values()].sort((a, b) => vpChiuso(b) - vpChiuso(a) || String(a.nome).localeCompare(String(b.nome), "it"))
+    .map((l, i) => ({ id:l.id, nome:l.nome, n:i + 1 }));
+}
+/* Le caselle proposte dalla mappa, per n caselle:
+   A → «Nuova linea frontale»; B → prima «Nuova linea frontale» per quelle che mancano, poi per ogni linea attiva «Persona
+   che aiuti» (chi la apre, se costruisce) o «Nuovo in profondità»; C → nessuna proposta (sceglie il partner, con proposteModo). */
+function proposteStrategia(s, n){
+  if(s.situazione === "A") return Array.from({ length:n }, () => ({ tipo:"nuova_linea" }));
+  /* B, con il metodo Cum Laude 21 (scelta di Stefano, 18 novembre 2026): prima le nuove linee frontali che mancano; poi,
+     per ogni linea attiva, «Persona che aiuti» se chi la apre costruisce, altrimenti «Nuovo in profondità» in quella linea */
+  if(s.situazione === "B"){
+    const linee = s.linee.filter(l => l.attiva).map(l => l.id && st.struttura.some(p => p.id === l.id) && costruisce(l.id)
+      ? { tipo:"aiuta", persona_id:l.id, linea_id:l.id } : { tipo:"profondita", linea_id:l.id || null });
+    const nuove = Math.max(0, n - linee.length);
+    return Array.from({ length:nuove }, () => ({ tipo:"nuova_linea" })).concat(linee).slice(0, n);
+  }
+  return [];
+}
+/* Il metodo Cum Laude 21 (Stefano, 18 novembre 2026): si sponsorizzano prima i tre frontali; poi si valuta se lavorare
+   con le persone sponsorizzate o se mettere altre persone in profondità nella loro linea, finché non si trova la persona
+   che vuole costruire. Dalla mappa (Stefano, 18 novembre 2026): chi apre una linea «costruisce» se ha nuovi iscritti nel
+   suo gruppo negli ultimi 2 mesi (data di ingresso della mappa) oppure una sua linea nuova con i VP del Path to Bronze,
+   E ha fatturato personale (VP personali nella mappa di questo mese o del mese scorso). */
+function costruisce(pid){
+  const ptb = pathToBronze(pid), dal = spostaMese(meseDi(oggi()), -2) + "-01";
+  const fattura = [meseDi(oggi()), mesePrecedente()].some(m => { const n = numeriPersona(pid, m); return !!n && n.personali > 0; });
+  return fattura && (!!(ptb && ptb.fatte > 0) || alberoSotto(pid, 0).some(y => (dataIngressoDi(y.p.id) || "") >= dal));
+}
+/* Situazione C, «Come vuoi lavorare?»: le caselle di ogni modo. «Personalizza» parte da caselle vuote. */
+function proposteModo(s, modo, n){
+  n = n || s.caselle;
+  const conPersona = s.linee.filter(l => l.id && st.struttura.some(p => p.id === l.id));
+  if(modo === "nuove_linee") return Array.from({ length:n }, () => ({ tipo:"nuova_linea" }));
+  if(modo === "aiuta"){
+    /* prima chi costruisce; poi le linee sotto la soglia della tappa, dalla più vicina; poi le altre */
+    const l = conPersona.filter(x => costruisce(x.id)).concat(conPersona.filter(x => !costruisce(x.id) && !x.ok), conPersona.filter(x => !costruisce(x.id) && x.ok));
+    return l.slice(0, n).map(x => ({ tipo:"aiuta", persona_id:x.id, linea_id:x.id }));
+  }
+  /* in profondità: prima le linee in cui chi le apre non costruisce */
+  if(modo === "profondita") return conPersona.filter(x => !costruisce(x.id)).concat(conPersona.filter(x => costruisce(x.id)))
+    .slice(0, n).map(x => ({ tipo:"profondita", linea_id:x.id }));
+  return Array.from({ length:n }, () => ({ tipo:null }));
+}
+/* il modo che si adatta ai numeri (solo un segno, mai preselezionato), con il metodo Cum Laude 21: i tre frontali ci sono
+   (situazione C); tra le tre linee con più VP, se almeno due persone che le aprono costruiscono → «Aiuta le persone che
+   hai», altrimenti → «Sponsorizza in profondità» (fino a trovare chi vuole costruire) */
+function modoAdatto(s){
+  const tre = s.linee.filter(l => l.id && st.struttura.some(p => p.id === l.id)).slice(0, 3);
+  return tre.length && tre.filter(l => costruisce(l.id)).length * 2 > tre.length ? "aiuta" : "profondita";
+}
+/* La strategia di chi usa l'app (io). n: quante caselle (da Argento in su il partner ne sceglie da 3 a 20).
+   { pronta, motivo?, situazione, attive, chiuso:{ mese, datiAl }, recente:{ mese, datiAl, gruppo }, tappa, tappe4, linee,
+     argento, caselle, caselleMax, proposte, modoAdatto, ptb } */
+function strategia(n){
+  const p = st.profilo, chiusoM = mesePrecedente();
+  const argento = strategiaDaArgento(p), caselleMax = argento ? CASELLE_MAX : CASELLE_MIN;
+  const caselle = Math.max(CASELLE_MIN, Math.min(caselleMax, Number(n) || CASELLE_MIN));
+  const base = { argento, caselle, caselleMax, nuovo:percorsoAttivo() };
+  let chiuso = numeriPersona(p.id, chiusoM);
+  const recenteN = mappaRecente(p.id);
+  const isc = dataIngressoDi(p.id);
+  /* iscritto nel mese chiuso o dopo, e non ancora nella sua mappa: non aveva linee (situazione A), vale la mappa di adesso */
+  const dopoChiuso = !chiuso && isc && meseDi(isc) >= chiusoM && recenteN;
+  if(!chiuso && !dopoChiuso) return Object.assign(base, { pronta:false, motivo:"mappa" });
+  const soglia1 = soglia();
+  const attive = chiuso ? chiuso.linee.filter(l => l.vp >= soglia1).length : 0;
+  const situazione = attive === 0 ? "A" : attive < 3 ? "B" : "C";
+  /* la prossima tappa: la prima dal Path to Bronze ad Argento non ancora fatta (punto di partenza: la qualifica dichiarata) */
+  const T = tappeStrategia(), partenza = ordineDi(p.qualifica_iniziale);
+  const fatta = t => t.ordine <= partenza || tappaFatta(t);
+  const tappa = argento ? null : T.find(t => !fatta(t)) || null;
+  const tappe4 = argento ? null : TAPPE_STRATEGIA.map(([k, nome]) => {
+    const membri = T.filter(t => t.chiave === k || String(t.chiave).startsWith(k + "_"));
+    const tutte = membri.length && membri.every(fatta), corso = !tutte && tappa && membri.some(t => t.chiave === tappa.chiave);
+    return { chiave:k, nome, stato:tutte ? "fatta" : corso ? "corso" : "da_fare", tappa:corso ? tappa : null };
+  });
+  const vpLinea = tappa ? Number(tappa.vp_linea) || soglia1 : soglia1;
+  const numerate = lineeNumerate(chiuso, recenteN);
+  const nDi = l => { const x = numerate.find(y => (y.id || y.nome) === (l.id || l.nome)); return x ? x.n : null; };
+  const vpChiuso = l => { const x = chiuso && chiuso.linee.find(y => (y.id || y.nome) === (l.id || l.nome)); return x ? x.vp : 0; };
+  /* le linee con i VP della mappa più recente rispetto alla soglia della tappa (attiva: nel mese chiuso) */
+  const linee = (recenteN ? recenteN.linee : []).map(l => ({ id:l.id, nome:l.nome, vp:l.vp, n:nDi(l), soglia:vpLinea,
+    ok:l.vp >= vpLinea, manca:Math.max(0, vpLinea - l.vp), attiva:vpChiuso(l) >= soglia1 }));
+  /* le linee attive nel mese chiuso che questo mese non sono ancora nella mappa restano (con 0 VP) */
+  if(chiuso) for(const l of chiuso.linee) if(l.vp >= soglia1 && !linee.some(x => (x.id || x.nome) === (l.id || l.nome)))
+    linee.push({ id:l.id, nome:l.nome, vp:0, n:nDi(l), soglia:vpLinea, ok:false, manca:vpLinea, attiva:true });
+  linee.sort((a, b) => b.vp - a.vp || (a.n || 99) - (b.n || 99));
+  const s = Object.assign(base, { pronta:true, situazione, attive, tappa, tappe4, linee, numerate,
+    chiuso:{ mese:chiuso ? chiusoM : null, datiAl:chiuso ? chiuso.datiAl : null },
+    recente:recenteN ? { mese:recenteN.mese, datiAl:recenteN.datiAl, gruppo:recenteN.gruppo, personali:recenteN.personali } : null,
+    ptb:pathToBronze(p.id) });
+  s.proposte = proposteStrategia(s, caselle);
+  s.modoAdatto = situazione === "C" ? modoAdatto(s) : null;
+  return s;
+}
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { strategia, pathToBronze, proposteModo, lineaDiPersona });
+
 /* solo nei test (window.GROWUP_TEST, come GROWUP_API): il calcolo di «Da seguire oggi» e lo stato, per controllarlo criterio
    per criterio. Nell'app vera window.GROWUP_TEST non c'è e non si espone niente. */
 if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { st, oggi, piuGiorni, daSeguireOggi, segnaFattoDaSeguire });

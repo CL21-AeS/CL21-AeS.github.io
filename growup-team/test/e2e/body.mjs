@@ -6652,6 +6652,172 @@ for(const tema of ["light", "dark"]){
     "prova: la pagina vieta i collegamenti fuori dal sito e non carica né Supabase né config.js");
 }
 
+// 97. La tua strategia (novembre 2026), punto 1: il calcolo (strategia e pathToBronze). Linee frontali attive (almeno
+//     100 VP di gruppo) nell'ultimo mese chiuso: A nessuna, B una o due, C tre o più. Prossima tappa dalla qualifica
+//     dichiarata e dalla mappa; VP di ogni linea rispetto alla soglia della tappa; il Path to Bronze di una persona della
+//     downline (VP personali su 100, linee nuove da 100 VP, «linee nuove» dalla data della tabella delle tappe: vuota =
+//     tutte); le caselle proposte. Casi: nuovo dopo la partenza (e prima: nuovo), A, B, C, Argento o oltre con più di 3
+//     caselle, Argento sceso sotto il 21%, mappa assente. Requisiti dalla tabella delle tappe (si cambiano e il calcolo segue).
+{
+  const id = n => "97000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0");
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const ora = new Date().toISOString();
+  const spMese = (m, k) => { const [y, mm] = m.split("-").map(Number), t = y * 12 + mm - 1 + k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, "0")}`; };
+  const mesePrima = spMese(meseOra(), -1), treMesiFa = spMese(meseOra(), -3);
+  const cod = n => "7970" + String(n).padStart(3, "0");
+  const io = (n, nome, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:"R", stato:"attivo", codice_invito:"ST" + n + "XX", codice_amway:cod(n),
+    chiave:String(n).padStart(2, "0").repeat(16), privacy_accettata_il:quando(-300), confermato_il:ora, partenza_confermata_il:ora, creato_il:quando(-300),
+    ultimo_aggiornamento:ora, data_iscrizione:giorno(-700) }, extra));
+  const sotto = (n, nome, sponsor, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:id(sponsor), stato:"gestito", gestore_id:id(sponsor),
+    codice_invito:"ST" + n + "XX", codice_amway:cod(n), partenza_confermata_il:ora, creato_il:quando(-300), data_iscrizione:giorno(-500) }, extra));
+  const linee = l => l.map(([n, vpg]) => ({ codice:cod(n), vpg }));
+  const tutti = [];
+  const apriCome = async n => { const r = await apri({}, "#chiave=" + String(n).padStart(2, "0").repeat(16)); await r.page.locator(".testata h1").waitFor(); return r; };
+  const calcola = (pg, n) => pg.evaluate(n => { const s = GROWUP_TEST.strategia(n); return JSON.parse(JSON.stringify(s)); }, n || null);
+
+  // A: Alba, avviata, nessuna linea attiva il mese scorso (una linea con 50 VP non conta: non fattura abbastanza)
+  io(10, "Alba Avvio"); sotto(11, "Aldo Sotto", 10);
+  mappa(id(10), 120, 170, { mese:mesePrima, linee:linee([[11, 50]]) }); mappa(id(10), 60, 60, { linee:linee([[11, 0]]) });
+  // B: Bea, due linee attive (Lia 300, Leo 150) e una che non fattura abbastanza (Max 40); Lia ha due linee sue
+  io(20, "Bea Binario"); sotto(21, "Lia Linea", 20); sotto(22, "Leo Linea", 20); sotto(23, "Max Poco", 20);
+  sotto(24, "Nina Nuova", 21, { data_iscrizione:giorno(-30) }); sotto(25, "Olga Vecchia", 21, { data_iscrizione:giorno(-400) });
+  sotto(26, "Pino Profondo", 24);
+  mappa(id(20), 110, 600, { mese:mesePrima, linee:linee([[21, 300], [22, 150], [23, 40]]) });
+  mappa(id(20), 100, 500, { linee:linee([[21, 260], [22, 90], [23, 40]]) });
+  mappa(id(21), 80, 260, { linee:linee([[24, 120], [25, 60]]) });
+  mappa(id(24), 100, 120, { linee:linee([[26, 20]]) });
+  // C: Cora, Bronze Foundation 9% dichiarata, tre linee attive (sotto i 200 VP della Foundation 12%: due)
+  io(30, "Cora Tre", { qualifica_iniziale:"foundation_9" }); sotto(31, "Ugo Uno", 30); sotto(32, "Ivo Due", 30); sotto(33, "Ada Tre", 30);
+  mappa(id(30), 150, 900, { mese:mesePrima, linee:linee([[31, 250], [32, 180], [33, 120]]) });
+  mappa(id(30), 150, 700, { linee:linee([[31, 220], [32, 150], [33, 110]]) });
+  // Argento dichiarato
+  io(40, "Dora Argento", { qualifica_iniziale:"argento" }); sotto(41, "Ezio Linea", 40);
+  mappa(id(40), 200, 3000, { mese:mesePrima, linee:linee([[41, 3000]]) });
+  // Argento dalla mappa (tre mesi fa al 21%) e sceso sotto il 21% (il mese scorso al 18%), dichiarata solo una percentuale
+  io(50, "Elsa Scesa", { percentuale_iniziale:18 }); sotto(51, "Fabio Linea", 50);
+  mappa(id(50), 200, 12000, { mese:treMesiFa, percentuale:21, linee:linee([[51, 12000]]) });
+  mappa(id(50), 200, 7500, { mese:mesePrima, percentuale:18, linee:linee([[51, 7300]]) });
+  // mappa assente
+  io(60, "Furio Senza");
+  // nuovo: iscritto 20 giorni fa, entrato il giorno dopo, con il primo ordine nella mappa di questo mese
+  io(70, "Gino Nuovo", { data_iscrizione:giorno(-20), privacy_accettata_il:quando(-19), creato_il:quando(-19), conPercorso:true });
+  mappa(id(70), 60, 60);
+  DB.obiettivi = (DB.obiettivi || []).concat([{ partner_id:id(70), cifra_mese:300, entro:"2027-06-01", perche:"Per la famiglia" }]);
+  for(let n = 10; n <= 80; n++) tutti.push(id(n));
+
+  // --- A
+  ({ ctx, page } = await apriCome(10));
+  let s = await calcola(page);
+  check(s.pronta && s.situazione === "A" && s.attive === 0, `strategia A: nessuna linea attiva il mese scorso (${s.situazione}, ${s.attive})`);
+  check(s.proposte.length === 3 && s.proposte.every(c => c.tipo === "nuova_linea"), "strategia A: 3 caselle «Nuova linea frontale»");
+  check(s.tappa && s.tappa.chiave === "path_to_bronze", "strategia A: la prossima tappa è il Path to Bronze");
+  check(JSON.stringify(s.tappe4.map(t => t.stato)) === JSON.stringify(["corso", "da_fare", "da_fare", "da_fare"])
+    && s.tappe4.map(t => t.nome).join("|") === "Path to Bronze|Bronze Foundation|Bronze Builder|Argento", "strategia A: le 4 tappe, la prima in corso");
+  check(s.chiuso.mese === mesePrima && s.recente.mese === meseOra() && !!s.recente.datiAl, "strategia: mese chiuso = il mese scorso; i VP dalla mappa più recente, con la sua data");
+  check(s.linee.length === 1 && s.linee[0].nome === "Aldo Sotto" && s.linee[0].vp === 0 && s.linee[0].soglia === 100 && !s.linee[0].attiva,
+    "strategia A: la linea con i VP della mappa di questo mese e la soglia del Path to Bronze (100)");
+  check(s.caselle === 3 && s.caselleMax === 3 && !s.argento, "strategia A: 3 caselle, non di più");
+  check((await calcola(page, 7)).caselle === 3, "strategia: sotto Argento le caselle restano 3 anche chiedendone di più");
+  check(s.modoAdatto === null, "strategia A: nessun «Come vuoi lavorare?»");
+  // i requisiti vengono dalla tabella delle tappe: cambiandola, il calcolo segue
+  check(await page.evaluate(() => { const t = GROWUP_TEST.st.stages.find(x => x.chiave === "path_to_bronze"), prima = t.vp_linea; t.vp_linea = 250;
+    const r = GROWUP_TEST.strategia().linee[0].soglia; t.vp_linea = prima; return r === 250; }), "strategia: la soglia della linea viene dalla tabella delle tappe");
+  await ctx.close();
+
+  // --- B
+  ({ ctx, page } = await apriCome(20));
+  s = await calcola(page);
+  check(s.situazione === "B" && s.attive === 2, `strategia B: due linee attive (${s.situazione}, ${s.attive})`);
+  check(JSON.stringify(s.proposte) === JSON.stringify([{ tipo:"nuova_linea" }, { tipo:"aiuta", persona_id:id(21), linea_id:id(21) }, { tipo:"profondita", linea_id:id(22) }]),
+    "strategia B (metodo CL21): prima la nuova linea frontale che manca; Lia costruisce (fattura e ha una linea nuova da 100 VP) → «Persona che aiuti»; Leo non ha la mappa (non fattura) → «Nuovo in profondità» nella sua linea");
+  check(JSON.stringify(s.linee.map(l => [l.nome, l.vp, l.n, l.ok, l.attiva])) === JSON.stringify([["Lia Linea", 260, 1, true, true], ["Leo Linea", 90, 2, false, true], ["Max Poco", 40, 3, false, false]]),
+    "strategia B: le linee con i VP di adesso, numerate per VP del mese chiuso, rispetto alla soglia della tappa");
+  check(s.linee[1].manca === 10, "strategia B: quanto manca alla soglia della linea");
+  let ptb = await page.evaluate(id => GROWUP_TEST.pathToBronze(id), id(21));
+  check(ptb.personali === 80 && ptb.vpPersonali === 100 && ptb.fatte === 1 && ptb.richieste === 3 && ptb.linee.length === 2 && ptb.valore === 400 && !ptb.completo,
+    `Path to Bronze di Lia: 80 VP personali su 100, 1 linea da 100 VP su 3, vale 400 VP (${JSON.stringify(ptb)})`);
+  check(ptb.mese === meseOra() && !!ptb.datiAl, "Path to Bronze: dalla mappa più recente, con la sua data");
+  ptb = await page.evaluate(([idL, dal]) => { const t = GROWUP_TEST.st.stages.find(x => x.chiave === "path_to_bronze"); t.linee_nuove_dal = dal;
+    const r = GROWUP_TEST.pathToBronze(idL); t.linee_nuove_dal = null; return r; }, [id(21), giorno(-100)]);
+  check(ptb.linee.length === 1 && ptb.linee[0].nome === "Nina Nuova" && ptb.fatte === 1,
+    "Path to Bronze: con la data nella tabella contano solo le linee iscritte da quel giorno (data di ingresso della mappa)");
+  ptb = await page.evaluate(id => GROWUP_TEST.pathToBronze(id), id(24));
+  check(ptb.personali === 100 && ptb.fatte === 0 && ptb.linee.length === 1, "Path to Bronze di una persona in profondità (Nina): 100 VP, nessuna linea da 100");
+  check(await page.evaluate(id => GROWUP_TEST.lineaDiPersona(id), id(26)) === id(21) && await page.evaluate(id => GROWUP_TEST.lineaDiPersona(id), "R") === null,
+    "la linea di una persona della downline (Pino è nella linea di Lia); chi non è sotto: nessuna");
+  ptb = await page.evaluate(id => GROWUP_TEST.pathToBronze(id), id(23));
+  check(ptb.personali === null && ptb.fatte === 0 && !ptb.completo, "Path to Bronze senza la sua mappa: nessun numero, mai uno zero");
+  await ctx.close();
+
+  // --- C
+  ({ ctx, page } = await apriCome(30));
+  s = await calcola(page);
+  check(s.situazione === "C" && s.attive === 3 && s.proposte.length === 0, "strategia C: tre linee attive, nessuna proposta (sceglie il partner)");
+  check(s.tappa && s.tappa.chiave === "foundation_12" && s.tappe4[0].stato === "fatta" && s.tappe4[1].stato === "corso",
+    "strategia C: punto di partenza dalla qualifica dichiarata (Foundation 9%): prossima tappa Foundation 12%");
+  check(s.linee.every(l => l.soglia === 200) && s.linee.filter(l => l.ok).length === 1, "strategia C: VP delle linee rispetto ai 200 VP della tappa");
+  check(s.modoAdatto === "profondita", "strategia C (metodo CL21): nessun frontale costruisce → «Adatta ai tuoi numeri» su «Sponsorizza in profondità»");
+  // due frontali su tre costruiscono (nuovi iscritti nel loro gruppo negli ultimi 2 mesi) → «Aiuta le persone che hai»
+  const conCostruttori = await page.evaluate(([u, i, g]) => { const { st, strategia, proposteModo } = GROWUP_TEST;
+    const prima = st.struttura.slice();
+    st.struttura.push({ id:"97x1", nome:"Nuovo Di Ugo", sponsor_id:u, stato:"gestito" }, { id:"97x2", nome:"Nuovo Di Ivo", sponsor_id:i, stato:"gestito" });
+    st.ingressi.set("97x1", g); st.ingressi.set("97x2", g);
+    const riepPrima = st.riep.map(r => Object.assign({}, r));
+    const senzaFatt = strategia().modoAdatto;   // nuovi iscritti, ma senza fatturato personale
+    for(const r of st.riep) if(r.partner_id === u || r.partner_id === i) Object.assign(r, { vp_personali:50, vp_gruppo:50, da_report:true, linee_report:[] });
+    const s = strategia(), r = { modo:s.modoAdatto, aiuta:proposteModo(s, "aiuta").map(c => c.persona_id), prof:proposteModo(s, "profondita").map(c => c.linea_id), senzaFatt };
+    st.struttura.length = 0; st.struttura.push(...prima); st.riep.length = 0; st.riep.push(...riepPrima); return r; }, [id(31), id(32), giorno(-20)]);
+  check(conCostruttori.modo === "aiuta", "strategia C (metodo CL21): due frontali su tre costruiscono (nuovi iscritti e fatturato personale) → «Aiuta le persone che hai»");
+  check(conCostruttori.senzaFatt === "profondita", "strategia C (metodo CL21): nuovi iscritti senza fatturato personale non bastano → «in profondità»");
+  check(conCostruttori.aiuta.join() === [id(31), id(32), id(33)].join() && conCostruttori.prof[0] === id(33),
+    "strategia C: «Aiuta» parte da chi costruisce, «in profondità» dalla linea di chi non costruisce");
+  const modi = await page.evaluate(() => { const s = GROWUP_TEST.strategia(); return Object.fromEntries(["nuove_linee", "aiuta", "profondita", "personalizza"].map(m => [m, GROWUP_TEST.proposteModo(s, m)])); });
+  check(modi.nuove_linee.length === 3 && modi.nuove_linee.every(c => c.tipo === "nuova_linea"), "strategia C: «Apri 3 nuove linee frontali»");
+  check(modi.aiuta.map(c => c.persona_id).join() === [id(32), id(33), id(31)].join(), "strategia C: «Aiuta le persone che hai», prima le linee sotto la soglia");
+  check(modi.profondita.length === 3 && modi.profondita.every(c => c.tipo === "profondita" && c.linea_id), "strategia C: «Sponsorizza in profondità», una casella per linea");
+  check(modi.personalizza.length === 3 && modi.personalizza.every(c => c.tipo === null), "strategia C: «Personalizza», caselle vuote");
+  await ctx.close();
+
+  // --- Argento dichiarato: da 3 a 20 caselle, niente barra delle tappe
+  ({ ctx, page } = await apriCome(40));
+  s = await calcola(page, 5);
+  check(s.argento && s.caselleMax === 20 && s.caselle === 5 && s.tappa === null && s.tappe4 === null, "strategia Argento: 5 caselle scelte, nessuna tappa né barra");
+  check(s.situazione === "B" && s.proposte.length === 5 && s.proposte.slice(0, 4).every(c => c.tipo === "nuova_linea") && s.proposte[4].tipo === "profondita",
+    "strategia Argento: il modo lo propone la mappa (B), su tutte le caselle: prima le nuove linee");
+  check((await calcola(page, 50)).caselle === 20 && (await calcola(page, 1)).caselle === 3, "strategia Argento: tetto tecnico 20, minimo 3");
+  await ctx.close();
+
+  // --- Argento dalla mappa, sceso sotto il 21%: le caselle restano
+  ({ ctx, page } = await apriCome(50));
+  s = await calcola(page, 4);
+  check(s.argento && s.caselle === 4 && s.tappe4 === null, "strategia: Argento in una mappa passata e sceso al 18%: tiene le sue caselle, niente barra");
+  check(s.situazione === "B" && s.linee[0].soglia === 100, "strategia Argento sceso: la mappa propone il modo; soglia della linea attiva (100)");
+  await ctx.close();
+
+  // --- mappa assente
+  ({ ctx, page } = await apriCome(60));
+  s = await calcola(page);
+  check(s.pronta === false && s.motivo === "mappa" && !s.proposte, "strategia senza mappa: non è pronta («compare quando arriva la mappa»)");
+  await ctx.close();
+
+  // --- nuovo: prima della partenza completata è «nuovo», dopo la strategia c'è (situazione A con la mappa di adesso)
+  ({ ctx, page } = await apriCome(70));
+  s = await calcola(page);
+  check(s.nuovo === true, "strategia: il nuovo con il percorso di partenza non finito è segnato come nuovo");
+  check(s.pronta && s.situazione === "A" && s.recente.mese === meseOra(), "strategia del nuovo: situazione A con la mappa di questo mese");
+  await ctx.close();
+  DB.partners.find(p => p.id === id(70)).partenza_completata_il = quando(-1);
+  ({ ctx, page } = await apriCome(70));
+  s = await calcola(page);
+  check(!s.nuovo && s.pronta && s.situazione === "A" && s.proposte.length === 3 && s.tappa.chiave === "path_to_bronze",
+    "strategia: nuovo dopo la partenza, 3 caselle «Nuova linea frontale» verso il Path to Bronze");
+  await ctx.close();
+  check(!errori.length, "strategia, calcolo: nessun errore nella pagina");
+  DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
+  DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
+  DB.obiettivi = DB.obiettivi.filter(o => !tutti.includes(o.partner_id));
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
