@@ -10,7 +10,8 @@ prima la **Linea** (Da scegliere, Nuova linea frontale · da trovare, «Linea N 
 **Chi aiuti nella linea**, solo tra le persone di quella linea (`personeDellaLinea`): per prima chi la apre, poi gli altri
 dal più vicino al più profondo, con il motivo dei suggerimenti («nuovi iscritti», «ha fatturato», «invitato da te»), e in
 fondo «Nuovo in profondità · da trovare». Scelta una linea, la casella parte dal metodo Cum Laude 21 (`casellaPerLinea`):
-chi la apre se costruisce, altrimenti «Nuovo in profondità». Il gruppo «Suggerite» mescolato non c'è più.
+chi la apre se costruisce, altrimenti «Nuovo in profondità». Il gruppo «Suggerite» mescolato non c'è più. **Scelta di Stefano (19 novembre): per ora in «Chi aiuti» ci sono tutte le
+persone della linea**, anche nelle linee grandi (niente «Mostra tutti»: se servirà, si aggiunge).
 Corretto anche un difetto del punto 2: ridisegnando il foglio (con «+», «−», un modo o una linea cambiata) l'app rimetteva
 i valori dei campi per nome, e con più caselle dello stesso nome un valore poteva finire nella casella sbagliata. Ora ogni
 casella ha i suoi nomi (`linea-N`, `chi-N`) e prima di ridisegnare le scelte diventano il punto di partenza.
