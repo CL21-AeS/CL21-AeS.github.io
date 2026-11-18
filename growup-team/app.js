@@ -8018,6 +8018,9 @@ function controllaTraguardi(){
   /* la festa a fine fase 2 e fase 3 del percorso: anche all'apertura (la mappa del primo ordine arriva da un import) */
   const ff = festaFaseDaFare();
   if(ff){ for(const k of ff.segna) salvaLocale(k, "1"); mostraTraguardo({ tipo:"fase", n:ff.n, poi:ff.poi }); }
+  /* la festa del Path to Bronze (strategia, punto 5): anche all'apertura (arriva con la mappa), una volta sola per persona */
+  const fp = ff ? null : festaPtbDaFare();
+  if(fp){ salvaLocale(chiaveFestaPtb(fp.id), "1"); mostraTraguardo(Object.assign({ tipo:"ptb" }, fp)); }
   const v = valoriTraguardi(), a = traguardiPrima;
   traguardiPrima = v;
   if(!a || a.settimana !== v.settimana && a.mese !== v.mese) return;
@@ -8064,9 +8067,78 @@ function festaFaseDaFare(){
   if(ordineMappa && leggiLocale(k3) !== "1") return { n:3, poi:POI_BINARI, segna:[k3] };
   return null;
 }
+/* ==== La tua strategia, punto 5: la festa del Path to Bronze ====
+   Quando il partner (se la sua qualifica dichiarata è sotto Bronze Foundation) o una persona che aiuta (in una sua
+   casella) ha il Path to Bronze completo nella mappa: un traguardo a tutto schermo, «Giada ha fatto il suo Path to Bronze:
+   ora aiuta le sue 3». Una volta sola per persona, ricordata su questo telefono (growup-team.festa.<id>.ptb.<persona>);
+   coriandoli solo senza «riduci animazioni» (come tutti i traguardi). Nessuna notifica allo sponsor.
+   Da lì le sue linee nuove diventano i suggerimenti: in cima alla strategia «Scegli chi aiutare» le mette nelle caselle. */
+const chiaveFestaPtb = pid => `growup-team.festa.${st.profilo.id}.ptb.${pid}`;
+const chiavePtbNo = pid => `growup-team.strategia-ptb-no.${st.profilo.id}.${pid}`;
+/* chi ha il Path to Bronze completo e conta: io (sotto Bronze Foundation) e le persone nelle mie caselle */
+function ptbCompleti(){
+  if(!st.profilo || percorsoAttivo()) return [];
+  let x;
+  try{ x = strategiaAttuale(); }catch(e){ return []; }
+  const out = [];
+  const io = st.profilo.id, mio = sottoFoundation() ? pathToBronze(io) : null;
+  if(mio && mio.completo) out.push({ id:io, nome:st.profilo.nome, io:true, ptb:mio });
+  for(const c of x.caselle || []) if(c.tipo === "aiuta" && !out.some(y => y.id === c.persona_id)){
+    const p = st.struttura.find(y => y.id === c.persona_id), ptb = p && pathToBronze(p.id);
+    if(ptb && ptb.completo) out.push({ id:p.id, nome:p.nome, io:false, ptb });
+  }
+  return out;
+}
+function festaPtbDaFare(){ return ptbCompleti().find(y => leggiLocale(chiaveFestaPtb(y.id)) !== "1") || null; }
+function htmlTraguardoPtb(t){
+  const linee = t.ptb.linee.filter(l => l.ok), quante = t.ptb.richieste;
+  return `<span class="eyebrow">La tua strategia · Path to Bronze</span>
+    <h1 id="traguardo-titolo">${t.io ? "Hai fatto il tuo Path&nbsp;to&nbsp;Bronze!" : `${esc(nomeSaluto(t.nome))} ha fatto il suo Path&nbsp;to&nbsp;Bronze!`}</h1>
+    <p><b>${t.io ? `Ora aiuta le tue ${num(quante)}.` : `Ora aiuta le sue ${num(quante)}.`}</b></p>
+    <ul class="festa-l">
+      <li><span class="segno" aria-hidden="true">✓</span><span><b>${num(t.ptb.personali)} VP personali</b><br><span class="small">su ${num(t.ptb.vpPersonali)}</span></span></li>
+      ${linee.map(l => `<li><span class="segno" aria-hidden="true">✓</span><span><b>${esc(l.nome)}</b><br><span class="small">${num(l.vp)} VP · linea nuova</span></span></li>`).join("")}
+    </ul>
+    <p class="small">VP: ${esc(testoMappaStrategia(t.ptb.mese, t.ptb.datiAl))}</p>`;
+}
+/* dopo la festa: le sue linee nuove (chi è nell'app) che non sono ancora in una casella */
+function lineeDopoPtb(caselle){
+  const gia = new Set((caselle || []).filter(c => c.tipo === "aiuta").map(c => c.persona_id)), out = [];
+  for(const y of ptbCompleti()){
+    if(leggiLocale(chiaveFestaPtb(y.id)) !== "1" || leggiLocale(chiavePtbNo(y.id)) === "1") continue;
+    const l = y.ptb.linee.filter(z => z.id && z.id !== st.profilo.id && !gia.has(z.id) && st.struttura.some(p => p.id === z.id));
+    if(l.length) out.push({ chi:y, linee:l });
+  }
+  return out;
+}
+function vDopoPtb(caselle){
+  const d = lineeDopoPtb(caselle)[0];
+  if(!d) return "";
+  const chi = d.chi.io ? "Hai fatto il tuo Path to Bronze" : `${esc(nomeSaluto(d.chi.nome))} ha fatto il suo Path to Bronze`;
+  return `<div class="dopo-ptb"><p class="small" style="margin:0"><span class="segno-ok" aria-hidden="true">✓</span> ${chi}: ${d.chi.io ? "le tue" : "le sue"} linee nuove
+    sono ${d.linee.map(l => `<b>${esc(l.nome)}</b>`).join(", ")}.</p>
+    <div class="row"><button class="btn small" data-act="ptb-scegli" data-id="${esc(d.chi.id)}">Scegli chi aiutare</button>
+      <button class="btn small" data-act="ptb-no" data-id="${esc(d.chi.id)}">Non ora</button></div></div>`;
+}
+Object.assign(AZIONI, {
+  /* «Cambia» con le sue linee nuove: al posto della sua casella (se è una persona che aiuto) e nelle caselle libere o da trovare */
+  "ptb-scegli"(el){
+    const x = strategiaAttuale(), d = lineeDopoPtb(x.caselle).find(y => y.chi.id === el.dataset.id);
+    if(!d) return;
+    const c = x.caselle.slice(), l = d.linee.slice();
+    const posti = c.map((y, i) => y.tipo === "aiuta" && y.persona_id === d.chi.id ? i : -1).filter(i => i >= 0)
+      .concat(c.map((y, i) => !y.tipo ? i : -1).filter(i => i >= 0), c.map((y, i) => y.tipo === "nuova_linea" || y.tipo === "profondita" ? i : -1).filter(i => i >= 0));
+    for(const i of posti){ const z = l.shift(); if(!z) break; c[i] = { tipo:"aiuta", persona_id:z.id, linea_id:lineaDiPersona(z.id) }; }
+    st.strategiaBozza = { n:c.length, caselle:c }; st.strategiaModifica = true; st.sheet = "strategia"; render();
+  },
+  "ptb-no"(el){ salvaLocale(chiavePtbNo(el.dataset.id), "1"); render(); }
+});
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { festaPtbDaFare, ptbCompleti });
+
 const SERIE_TAPPE = [4, 8, 12, 26, 52];
 /* Un traguardo grande a tutto schermo (consegna 9): sopra la pagina, una volta sola, con un solo pulsante «Continua» */
 function htmlTraguardo(t){
+  if(t.tipo === "ptb") return htmlTraguardoPtb(t);
   const nome = esc(nomeSaluto(st.profilo.nome)), m = meseDi(oggi());
   if(t.tipo === "tappa"){
     const S = st.stages, { indice, attuale } = percorso(), tot = (S.findIndex(x => x.chiave === "platino") + 1) || S.length, n = numeriMese(m);
@@ -8849,6 +8921,7 @@ function vStrategia(){
   </div>`;
   return `<div class="card strategia" data-act="strategia-apri" role="button" tabindex="0" aria-label="Apri la tua strategia">
     <div class="spread"><span class="eyebrow">La tua strategia</span><span class="small">${num(caselle.length)} caselle</span></div>
+    ${vDopoPtb(caselle)}
     <h2 class="strategia-titolo">${esc(titoloStrategia(caselle))}</h2>
     ${vTappe4(s)}
     ${vCaselle(caselle, s, 3)}
@@ -8877,6 +8950,7 @@ function vSheetStrategia(sh){
   if(st.strategiaModifica) return vStrategiaModifica(x);
   return `<div class="strategia-intera">
     <div class="spread strategia-cima"><span class="eyebrow">La tua strategia</span><button class="x" data-act="chiudi" aria-label="Chiudi">×</button></div>
+    ${x.daScegliere ? "" : vDopoPtb(x.caselle)}
     <h2 class="strategia-titolo">${esc(x.daScegliere ? "Come vuoi lavorare?" : titoloStrategia(x.caselle))}</h2>
     ${vTappe4(s)}
     ${x.daScegliere ? vModi(s, "strategia-modo") : vCaselle(x.caselle, s) + vInvitatoDaAiutare(x.caselle)}

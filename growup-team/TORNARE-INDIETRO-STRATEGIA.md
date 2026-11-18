@@ -46,9 +46,11 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 | 1 | [#234](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/234) | Il calcolo della strategia, senza schermate nuove | nessuna | — |
 | 2 | [#235](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/235) | La card «La tua strategia» in cima a Io e la schermata intera; le caselle si ricordano sul telefono | nessuna | — |
 | 3 | [#236](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/236) | Le caselle nel database, i suggerimenti, gli invitati che arrivano nella mappa | `067_strategia_caselle.sql` (tabella `strategia_caselle`) | `supabase/067_strategia_caselle_togli.sql` |
-| 4 | (questa) | «Oggi per la tua strategia» al posto della lista di oggi: i binari Persone e Fatturato | nessuna | — |
+| 4 | [#237](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/237) | «Oggi per la tua strategia» al posto della lista di oggi: i binari Persone e Fatturato | nessuna | — |
+| 5 | (questa) | La festa del Path to Bronze e, dopo, le sue linee nuove come suggerimento; service worker v123 | nessuna | — |
 
-La riga del punto 5 si aggiunge quando la PR è pronta.
+Per tornare a tutto com'era: «Revert» delle PR dalla 5 alla 1 (o chiedere a Claude di riportare la cartella al tag),
+poi, se si vuole, lo script della 067.
 
 Da sapere sulla 067: se si annulla la PR 3 ma la tabella resta nel database, l'app torna a ricordare le caselle sul
 telefono (come nel punto 2) e le caselle salvate nella tabella non si vedono più; se si toglie la tabella e la PR 3 resta,

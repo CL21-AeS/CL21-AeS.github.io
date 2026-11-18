@@ -3,6 +3,27 @@
 Ultimo aggiornamento: 18 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## La strategia in Io, punto 5: la festa del Path to Bronze (18 novembre 2026, app v123, database non toccato)
+
+- **Quando**: il partner (solo se la qualifica dichiarata è sotto Bronze Foundation, `sottoFoundation()`) o una persona in
+  una sua casella «Persona che aiuti» ha il **Path to Bronze completo** nella mappa (`pathToBronze().completo`). Si controlla
+  a ogni disegno, quindi anche all'apertura (la mappa arriva da un import), come le feste di fase; mai durante il percorso
+  di partenza; se è dovuta una festa di fase, prima quella.
+- **La festa** (`htmlTraguardoPtb`, tipo «ptb» dei traguardi a tutto schermo): «Giada ha fatto il suo Path to Bronze!» e
+  **«Ora aiuta le sue 3.»** (per sé: «Hai fatto il tuo Path to Bronze! Ora aiuta le tue 3.»), con i VP personali, le sue
+  linee nuove da almeno 100 VP e la data della mappa; «Continua». **Una volta sola per persona**, ricordata su questo
+  telefono (`growup-team.festa.<id>.ptb.<persona>`); coriandoli solo senza «riduci animazioni». **Nessuna notifica** allo
+  sponsor né ad altri.
+- **Dopo**: le sue linee nuove diventano i suggerimenti. In cima alla card e alla schermata intera (`vDopoPtb`): «✓ Giada ha
+  fatto il suo Path to Bronze: le sue linee nuove sono Nina, Olga, Pino.» con **«Scegli chi aiutare»** (apre «Cambia» con
+  le sue linee al posto della sua casella e nelle caselle libere o da trovare: si salva solo con «Salva») e «Non ora» (su
+  questo telefono).
+- Da sapere: su un telefono nuovo la festa di una persona già festeggiata può tornare una volta (come le feste di fase).
+- Service worker **v123** (sale una volta sola, in quest'ultima PR della serie).
+Test dell'interfaccia: sezione 101 (festa di una persona aiutata e la propria, una volta sola, coriandoli e «riduci
+animazioni», nessuna notifica, «Scegli chi aiutare» e «Non ora», niente festa propria da Bronze Foundation; anteprime
+`e2e/101-festa-ptb-light.png` e `-dark.png`).
+
 ## La strategia in Io, punto 4: «Oggi per la tua strategia» (18 novembre 2026, database non toccato)
 
 Al posto della lista di oggi, **a partenza completata** (`binariAttivi()`; nel percorso di partenza e nella versione

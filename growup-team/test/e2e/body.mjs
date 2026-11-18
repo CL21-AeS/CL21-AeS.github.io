@@ -7219,6 +7219,96 @@ for(const tema of ["light", "dark"]){
   DB.persone = DB.persone.filter(p => !["s100a", "s100b"].includes(p.id));
   DB.obiettivi = DB.obiettivi.filter(o => !tutti.includes(o.partner_id));
 }
+// 101. La tua strategia, punto 5: la festa del Path to Bronze. Una persona che aiuto (in una mia casella) ha il Path to
+//      Bronze completo nella mappa: «Giada ha fatto il suo Path to Bronze! Ora aiuta le sue 3.» a tutto schermo, una
+//      volta sola; coriandoli solo senza «riduci animazioni»; nessun avviso a nessuno. Dopo, in cima alla strategia, le sue
+//      linee nuove («Scegli chi aiutare» le mette nelle caselle; «Non ora»). Anche per il partner sotto Bronze Foundation:
+//      «Hai fatto il tuo Path to Bronze! Ora aiuta le tue 3.». Durante il percorso di partenza niente festa.
+{
+  const id = n => "a1000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0");
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const ora = new Date().toISOString();
+  const spMese = (m, k) => { const [y, mm] = m.split("-").map(Number), t = y * 12 + mm - 1 + k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, "0")}`; };
+  const mesePrima = spMese(meseOra(), -1);
+  const cod = n => "7910" + String(n).padStart(3, "0");
+  const io = (n, nome, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:"R", stato:"attivo", codice_invito:"SP" + n + "XX", codice_amway:cod(n),
+    chiave:String(n).padStart(2, "0").repeat(16), privacy_accettata_il:quando(-300), confermato_il:ora, partenza_confermata_il:ora, creato_il:quando(-300),
+    ultimo_aggiornamento:ora, data_iscrizione:giorno(-700) }, extra));
+  const sotto = (n, nome, sponsor, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:id(sponsor), stato:"gestito", gestore_id:id(sponsor),
+    codice_invito:"SP" + n + "XX", codice_amway:cod(n), partenza_confermata_il:ora, creato_il:quando(-300), data_iscrizione:giorno(-90) }, extra));
+  const linee = l => l.map(([n, vpg]) => ({ codice:cod(n), vpg }));
+  const tutti = []; for(let n = 10; n <= 80; n++) tutti.push(id(n));
+  // Bea aiuta Giada (casella 1); Giada ha 120 VP personali e tre linee nuove da almeno 100 VP: Path to Bronze fatto
+  io(20, "Bea Binario", { qualifica_iniziale:"foundation_9" }); sotto(21, "Giada Gialli", 20); sotto(22, "Leo Linea", 20);
+  sotto(23, "Nina Uno", 21); sotto(24, "Olga Due", 21); sotto(25, "Pino Tre", 21);
+  mappa(id(20), 110, 900, { mese:mesePrima, linee:linee([[21, 600], [22, 150]]) });
+  mappa(id(20), 110, 900, { linee:linee([[21, 600], [22, 150]]) });
+  mappa(id(21), 120, 600, { linee:linee([[23, 160], [24, 140], [25, 110]]) });
+  DB.caselle = (DB.caselle || []).concat([{ partner_id:id(20), posizione:1, tipo:"aiuta", persona_id:id(21), linea_id:null, creato_il:quando(-20) },
+    { partner_id:id(20), posizione:2, tipo:"aiuta", persona_id:id(22), linea_id:null, creato_il:quando(-20) },
+    { partner_id:id(20), posizione:3, tipo:"nuova_linea", persona_id:null, linea_id:null, creato_il:quando(-20) }]);
+  // Pia: nessuna qualifica dichiarata, il suo Path to Bronze è completo
+  io(30, "Pia Partner"); sotto(31, "Ugo Uno", 30); sotto(32, "Ivo Due", 30); sotto(33, "Ada Tre", 30);
+  mappa(id(30), 100, 500, { mese:mesePrima, linee:linee([[31, 50]]) });
+  mappa(id(30), 100, 500, { linee:linee([[31, 130], [32, 120], [33, 100]]) });
+  const eventiPrima = (DB.notificheEventi || []).length;
+  const apriCome = async (n, opz) => { const r = await apri(Object.assign({ viewport:{ width:360, height:780 } }, opz || {}), "#chiave=" + String(n).padStart(2, "0").repeat(16));
+    await r.page.locator(".testata h1").waitFor(); return r; };
+  DB.traguardiAperti = true;
+
+  // --- Bea: la festa di Giada (con «riduci animazioni»: niente coriandoli)
+  ({ ctx, page } = await apriCome(20));
+  const t = page.locator(".festa.traguardo");
+  await t.waitFor();
+  check((await t.locator("h1").innerText()).replace(/\s+/g, " ") === "Giada ha fatto il suo Path to Bronze!" && (await t.innerText()).includes("Ora aiuta le sue 3."),
+    "festa Path to Bronze: «Giada ha fatto il suo Path to Bronze! Ora aiuta le sue 3.»");
+  check(await t.locator(".festa-l li").count() === 4 && (await t.innerText()).includes("Nina Uno") && /VP: mappa /.test(await t.innerText()),
+    "festa Path to Bronze: i VP personali e le sue tre linee nuove, con la data della mappa");
+  check(!(await page.locator("canvas.coriandoli").count()), "festa Path to Bronze: con «riduci animazioni» niente coriandoli");
+  check(!/€|euro/i.test(await t.innerText()), "festa Path to Bronze: nessuna cifra in euro");
+  await page.screenshot({ path:S + "/e2e/101-festa-ptb-light.png" });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await page.screenshot({ path:S + "/e2e/101-festa-ptb-dark.png" });
+  await page.emulateMedia({ colorScheme:"light" });
+  await t.locator("button[data-act=traguardo-chiudi]").click();
+  // dopo: le sue linee nuove in cima alla strategia
+  const dopo = page.locator("#app .card.strategia .dopo-ptb");
+  await dopo.waitFor();
+  check((await dopo.innerText()).replace(/\s+/g, " ").includes("Giada ha fatto il suo Path to Bronze: le sue linee nuove sono Nina Uno, Olga Due, Pino Tre."),
+    "dopo la festa: le sue linee nuove diventano i suggerimenti");
+  await dopo.locator("button[data-act=ptb-scegli]").click();
+  await page.locator(".sheet form[data-form=strategia]").waitFor();
+  const scelte = await page.locator(".sheet select[name=casella]").evaluateAll(l => l.map(x => x.value));
+  check(JSON.stringify(scelte) === JSON.stringify(["aiuta:" + id(23), "aiuta:" + id(22), "aiuta:" + id(24)]),
+    "«Scegli chi aiutare»: le sue linee al posto della sua casella e nella casella da trovare (" + scelte.join(", ") + ")");
+  await page.click(".sheet [data-act=strategia-annulla]");
+  await page.click(".sheet [data-act=chiudi]");
+  await page.locator("#app .card.strategia .dopo-ptb button[data-act=ptb-no]").click();
+  check(!(await page.locator("#app .dopo-ptb").count()), "«Non ora»: le sue linee non si propongono più");
+  // una volta sola
+  await riapri(page); await page.locator(".testata h1").waitFor(); await page.waitForTimeout(500);
+  check(!(await page.locator(".festa.traguardo").count()), "festa Path to Bronze: una volta sola");
+  await ctx.close();
+  check((DB.notificheEventi || []).length === eventiPrima, "festa Path to Bronze: nessuna notifica (nemmeno allo sponsor)");
+
+  // --- Pia: il suo Path to Bronze, senza «riduci animazioni»: i coriandoli
+  ({ ctx, page } = await apriCome(30, { reducedMotion:"no-preference" }));
+  await page.locator(".festa.traguardo").waitFor();
+  check((await page.locator(".festa.traguardo h1").innerText()).replace(/\s+/g, " ") === "Hai fatto il tuo Path to Bronze!"
+    && (await page.locator(".festa.traguardo").innerText()).includes("Ora aiuta le tue 3."), "festa del proprio Path to Bronze: «Hai fatto il tuo Path to Bronze! Ora aiuta le tue 3.»");
+  check(await page.locator("canvas.coriandoli").count() >= 1, "festa Path to Bronze: senza «riduci animazioni» i coriandoli");
+  await page.locator(".festa.traguardo button[data-act=traguardo-chiudi]").click();
+  await ctx.close();
+  // chi ha dichiarato Bronze Foundation non festeggia il proprio Path to Bronze
+  check(await (async () => { ({ ctx, page } = await apriCome(20)); await page.waitForTimeout(400);
+    const r = await page.evaluate(() => GROWUP_TEST.ptbCompleti().map(x => x.io)); await ctx.close(); return !r.includes(true); })(),
+    "festa del proprio Path to Bronze solo sotto Bronze Foundation");
+  DB.traguardiAperti = false;
+  check(!errori.length, "festa Path to Bronze: nessun errore nella pagina");
+  DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
+  DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
+  DB.caselle = (DB.caselle || []).filter(x => !tutti.includes(x.partner_id));
+}
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
