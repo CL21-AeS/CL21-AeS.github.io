@@ -1555,6 +1555,7 @@ function vHome(){
   ${vInvita()}` : st.sezIo === "guida" ? vGuida() : `
   ${vDomandaCondividi()}
   ${vDomandaNotifiche()}
+  ${vStrategia()}
   ${festaDaFare() ? vFesta() : ""}
   ${linkDaSalvare() && !percorsoAttivo() ? vPrimiPassi() : ""}
   ${vPerIniziare()}
@@ -2371,6 +2372,7 @@ function vFesta(){
     <p>In ${giorni === 1 ? "1 giorno" : `${num(giorni)} giorni`} hai fatto i tre passi che contano.</p>
     ${versioneSemplice() ? `<p class="festa-tutta-app"><b>Ora hai tutta l'app.</b></p>` : ""}
     <ul class="festa-l">${voci.map(([t, d]) => `<li><span class="segno" aria-hidden="true">✓</span><span><b>${t}</b>${d ? `<br><span class="small">${esc(d)}</span>` : ""}</span></li>`).join("")}</ul>
+    ${vStrategiaFesta()}
     <p class="small">Da oggi la pagina Io è il tuo cruscotto e il Seguimi ti accompagna giorno per giorno, con le azioni di ogni giorno.
       Se non lo vuoi, lo togli dal Profilo.</p>
     <button class="btn primary wide" data-act="festa-fine">Vai al cruscotto</button>
@@ -3988,7 +3990,7 @@ function toastImport(e){
 /* ---- 10. Fogli in basso ---- */
 function vSheet(){
   const s = st.sheet;
-  const sp = vSheetAgenda(s) || vSheetIncontro(s) || vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s) || vSheetListino(s) || vSheetMiei(s) || vSheetGuida(s);
+  const sp = vSheetAgenda(s) || vSheetIncontro(s) || vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s) || vSheetListino(s) || vSheetMiei(s) || vSheetGuida(s) || vSheetStrategia(s);
   if(sp) return sp;
   if(s === "codici-tolti") return `<h2>Codici Amway tolti</h2>
     <p class="small">Le persone tolte dalla struttura prima della conferma: con questi codici non si entra finché non li sblocchi.</p>
@@ -8394,7 +8396,8 @@ if("serviceWorker" in navigator && location.protocol === "https:"){
      Argento in su (da 3 a CASELLE_MAX, scelte dal partner; restano anche se per qualche mese scende sotto il 21%).
    Una linea conta quando fattura, mai solo perché c'è una persona iscritta. Niente premi, cifre in euro o proiezioni. */
 const CASELLE_MIN = 3, CASELLE_MAX = 20;   // tetto tecnico, controllato anche nel database (067)
-const TAPPE_STRATEGIA = [["path_to_bronze", "Path to Bronze"], ["foundation", "Bronze Foundation"], ["builder", "Bronze Builder"], ["argento", "Argento"]];
+const TAPPE_STRATEGIA = [["path_to_bronze", "Path to Bronze", "Path to Bronze"], ["foundation", "Bronze Foundation", "Foundation"],
+  ["builder", "Bronze Builder", "Builder"], ["argento", "Argento", "Argento"]];
 function tappaStrategia(chiave){ return st.stages.find(s => s.chiave === chiave) || null; }
 /* le tappe della strategia, dal Path to Bronze ad Argento compresi, in ordine */
 function tappeStrategia(){
@@ -8526,10 +8529,10 @@ function strategia(n){
   const T = tappeStrategia(), partenza = ordineDi(p.qualifica_iniziale);
   const fatta = t => t.ordine <= partenza || tappaFatta(t);
   const tappa = argento ? null : T.find(t => !fatta(t)) || null;
-  const tappe4 = argento ? null : TAPPE_STRATEGIA.map(([k, nome]) => {
+  const tappe4 = argento ? null : TAPPE_STRATEGIA.map(([k, nome, breve]) => {
     const membri = T.filter(t => t.chiave === k || String(t.chiave).startsWith(k + "_"));
     const tutte = membri.length && membri.every(fatta), corso = !tutte && tappa && membri.some(t => t.chiave === tappa.chiave);
-    return { chiave:k, nome, stato:tutte ? "fatta" : corso ? "corso" : "da_fare", tappa:corso ? tappa : null };
+    return { chiave:k, nome, breve, stato:tutte ? "fatta" : corso ? "corso" : "da_fare", tappa:corso ? tappa : null };
   });
   const vpLinea = tappa ? Number(tappa.vp_linea) || soglia1 : soglia1;
   const numerate = lineeNumerate(chiuso, recenteN);
@@ -8551,6 +8554,233 @@ function strategia(n){
   return s;
 }
 if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { strategia, pathToBronze, proposteModo, lineaDiPersona });
+
+/* ==== La tua strategia, punto 2: la card in cima a Io e la schermata intera ====
+   Le caselle scelte con «Cambia» si ricordano su questo telefono (growup-team.strategia.<id>, con try/catch); senza una
+   scelta valgono quelle proposte dalla mappa. Il nuovo vede la card solo a partenza completata (e nella festa della
+   partenza, «Ecco la tua strategia»); prima tutto resta com'è. Colori: pesca solo per l'azione principale, verde = fatto
+   (sempre con ✓), ambra = attenzione (sempre con !). */
+const chiaveStrategia = () => "growup-team.strategia." + st.profilo.id;
+function sceltaStrategia(){
+  try{ const x = JSON.parse(leggiLocale(chiaveStrategia()) || "null"); return x && Array.isArray(x.caselle) ? x : null; }catch(e){ return null; }
+}
+async function salvaSceltaStrategia(x){ salvaLocale(chiaveStrategia(), x ? JSON.stringify(x) : null); }
+const TIPI_CASELLA = { aiuta:"Persona che aiuti", profondita:"Nuovo in profondità", nuova_linea:"Nuova linea frontale" };
+/* una casella salvata vale solo se la persona è ancora nella mia downline e la linea è ancora una mia linea frontale */
+function casellaValida(c){
+  if(!c || !TIPI_CASELLA[c.tipo]) return { tipo:null };
+  if(c.tipo === "aiuta") return c.persona_id && c.persona_id !== st.profilo.id && lineaDiPersona(c.persona_id)
+    ? { tipo:"aiuta", persona_id:c.persona_id, linea_id:lineaDiPersona(c.persona_id) } : { tipo:null };
+  if(c.tipo === "profondita") return c.linea_id && figli(st.profilo.id).some(p => p.id === c.linea_id) ? { tipo:"profondita", linea_id:c.linea_id } : { tipo:null };
+  return { tipo:"nuova_linea" };
+}
+/* la strategia con le caselle di adesso: { s, caselle, scelta, daScegliere } */
+function strategiaAttuale(){
+  const scelta = sceltaStrategia(), s = strategia(scelta && scelta.n);
+  if(!s.pronta) return { s, caselle:[], scelta, daScegliere:false };
+  const daScegliere = s.situazione === "C" && !scelta;
+  const caselle = (scelta ? scelta.caselle.map(casellaValida) : s.proposte).slice(0, s.caselle);
+  while(caselle.length < s.caselle) caselle.push(scelta || s.situazione === "C" ? { tipo:null } : proposteStrategia(s, s.caselle)[caselle.length] || { tipo:null });
+  return { s, caselle, scelta, daScegliere };
+}
+/* il titolo: «Fai il tuo Path to Bronze» solo per chi ha dichiarato meno di Bronze Foundation; poi secondo le caselle */
+function titoloStrategia(caselle){
+  if(sottoFoundation()) return "Fai il tuo Path to Bronze";
+  const t = caselle.map(c => c.tipo).filter(Boolean);
+  if(!t.length) return "La tua strategia";
+  if(t.every(x => x === "nuova_linea")) return "Apri nuove linee frontali";
+  if(t.every(x => x !== "nuova_linea")) return "Aiuta le tue persone a fare il Path to Bronze";
+  return "La tua strategia · ibrida";
+}
+function testoMappaStrategia(m, datiAl){ return m ? testoMappa(m, datiAl ? { dati_al:datiAl } : null) : ""; }
+function numeroLinea(s, id){ const l = (s.numerate || []).find(x => x.id === id); return l ? l.n : null; }
+function nomeLinea(s, id){ const l = (s.numerate || []).find(x => x.id === id); return l ? l.nome : ""; }
+/* i tre pallini delle sue linee nuove: pieno con ✓ = linea nuova da almeno 100 VP */
+function pallini(ptb){
+  const ok = Math.min(ptb.fatte, ptb.richieste);
+  return `<span class="pallini" role="img" aria-label="Linee nuove da ${num(ptb.vpLinea)} VP: ${ok} su ${ptb.richieste}">${
+    Array.from({ length:ptb.richieste }, (_, i) => `<i class="${i < ok ? "si" : ""}" aria-hidden="true">${i < ok ? "✓" : ""}</i>`).join("")}</span>`;
+}
+function vCasella(c, s, i, primaVuota){
+  const lista = (motivo, prima) => `<button class="btn small${prima ? " primary" : ""}" data-act="strategia-lista" data-motivo="${esc(motivo)}">Lista ›</button>`;
+  if(c.tipo === "aiuta"){
+    const p = st.struttura.find(x => x.id === c.persona_id) || {}, n = numeroLinea(s, c.linea_id), ptb = pathToBronze(c.persona_id);
+    const mappa = ptb && ptb.mese ? testoMappaStrategia(ptb.mese, ptb.datiAl) : testoMappa(meseDi(oggi()), null);
+    return `<li class="casella c-aiuta" data-i="${i}">
+      <span class="casella-tipo">${TIPI_CASELLA.aiuta}${n ? ` · linea ${n}` : ""}</span>
+      <b class="casella-nome">${esc(p.nome || "")}</b>
+      ${ptb && ptb.completo ? `<span class="pill v">✓ Path to Bronze fatto</span>`
+        : `<span class="ptb-riga"><span class="ptb-vp"><b class="num">${ptb && ptb.personali != null ? num(ptb.personali) : "—"}</b><small> / ${num(ptb ? ptb.vpPersonali : 0)} VP personali</small>${ptb && ptb.personali != null && ptb.personali >= ptb.vpPersonali ? ` <span class="segno-ok" aria-label="fatto">✓</span>` : ""}</span>${ptb ? pallini(ptb) : ""}</span>`}
+      ${ptb ? `<span class="small">Il suo Path to Bronze vale almeno ${num(ptb.valore)} VP nella tua linea${n ? ` ${n}` : ""}</span>` : ""}
+      <span class="small casella-mappa">${ptb && ptb.personali == null ? `<span class="segno-att" aria-hidden="true">!</span> ` : ""}VP: ${esc(mappa)}</span>
+    </li>`;
+  }
+  if(c.tipo === "profondita"){
+    const n = numeroLinea(s, c.linea_id), nome = nomeLinea(s, c.linea_id);
+    return `<li class="casella vuota c-profondita" data-i="${i}"><span class="grow"><span class="casella-tipo">${TIPI_CASELLA.profondita}</span>
+      <b class="casella-nome">da trovare</b><span class="small">per la linea ${n || ""}${nome ? ` (${esc(nome)})` : ""}</span></span>
+      ${lista(n ? `per la linea ${n}` : "in profondità", primaVuota)}</li>`;
+  }
+  if(c.tipo === "nuova_linea") return `<li class="casella vuota c-nuova" data-i="${i}"><span class="grow"><span class="casella-tipo">${TIPI_CASELLA.nuova_linea}</span>
+      <b class="casella-nome">da trovare</b></span>${lista("per una nuova linea", primaVuota)}</li>`;
+  return `<li class="casella vuota c-scegli" data-i="${i}"><span class="grow"><span class="casella-tipo">Casella libera</span>
+      <b class="casella-nome">da scegliere</b></span><button class="btn small" data-act="strategia-cambia">Scegli</button></li>`;
+}
+function vCaselle(caselle, s, quante){
+  const vuote = caselle.map((c, i) => c.tipo === "nuova_linea" || c.tipo === "profondita" ? i : -1).filter(i => i >= 0);
+  const l = caselle.slice(0, quante == null ? caselle.length : quante);
+  return `<ul class="caselle">${l.map((c, i) => vCasella(c, s, i, i === vuote[0])).join("")}</ul>
+    ${caselle.length > l.length ? `<p class="small altre-caselle">altre ${caselle.length - l.length}</p>` : ""}`;
+}
+/* la barra delle 4 tappe (fino ad Argento); ogni stato anche senza colore: ✓ fatta, ● in corso */
+function vTappe4(s){
+  if(!s.tappe4) return "";
+  const qui = s.tappe4.findIndex(t => t.stato === "corso");
+  return `<div class="tappe4" role="list" aria-label="Le tappe fino ad Argento">${s.tappe4.map(t =>
+    `<span role="listitem" class="t4 ${t.stato}" aria-label="${esc(t.nome)}: ${t.stato === "fatta" ? "fatta" : t.stato === "corso" ? "in corso" : "da fare"}"><i aria-hidden="true"></i>
+      <span aria-hidden="true">${t.stato === "fatta" ? "✓ " : t.stato === "corso" ? "● " : ""}${esc(t.breve)}</span></span>`).join("")}</div>
+    ${s.tappa ? `<p class="small tappe4-ora">Ora: <b>${esc(s.tappa.nome)}</b>${qui >= 0 ? ` · tappa ${qui + 1} di 4` : ""}</p>` : ""}`;
+}
+/* le linee con i VP rispetto alla prossima tappa: quante (null = tutte), oltre: «altre N» */
+function vLineeStrategia(s, quante){
+  if(!s.linee.length) return "";
+  const l = quante == null ? s.linee : s.linee.slice(0, quante);
+  const verso = s.tappa ? `verso ${esc(s.tappa.nome)}` : "linee attive";
+  return `<div class="linee-strategia">
+    <p class="small linee-testa"><b>Le tue linee</b> · ${verso}</p>
+    <ul>${l.map(x => `<li class="${x.ok ? "ok" : ""}"><span class="linea-nome">${x.n ? `Linea ${x.n} · ` : ""}${esc(x.nome)}</span>
+      <span class="linea-vp"><b class="num">${num(x.vp)}</b> / ${num(x.soglia)} VP${x.ok ? ` <span class="segno-ok" aria-label="fatto">✓</span>` : ""}</span></li>`).join("")}</ul>
+    ${s.linee.length > l.length ? `<p class="small">altre ${s.linee.length - l.length}</p>` : ""}
+    <p class="small linee-mappa">VP: ${esc(testoMappaStrategia(s.recente && s.recente.mese, s.recente && s.recente.datiAl))}</p>
+  </div>`;
+}
+/* Situazione C: «Come vuoi lavorare?», quattro scelte con lo stesso peso; «Adatta ai tuoi numeri» su una, mai preselezionata */
+const MODI_STRATEGIA = [["nuove_linee", n => `Apri ${n} nuove linee frontali`], ["aiuta", () => "Aiuta le persone che hai"],
+  ["profondita", () => "Sponsorizza in profondità"], ["personalizza", () => "Personalizza"]];
+function vModi(s, act){
+  return `<div class="modi" role="group" aria-label="Come vuoi lavorare?">${MODI_STRATEGIA.map(([k, t]) =>
+    `<button class="btn modo" data-act="${act}" data-modo="${k}"><span class="grow">${esc(t(s.caselle))}${k === "personalizza" ? `<span class="small"> · ogni casella a mano</span>` : ""}${
+      s.modoAdatto === k ? `<br><span class="small adatta">Adatta ai tuoi numeri</span>` : ""}</span></button>`).join("")}</div>`;
+}
+/* in Io solo a partenza completata (nella festa della partenza la strategia sta nella festa) */
+function vStrategia(){
+  if(!st.profilo || percorsoAttivo() || st.vista !== "io") return "";
+  let x;
+  try{ x = strategiaAttuale(); }catch(e){ return ""; }
+  const { s, caselle } = x;
+  if(!s.pronta) return `<div class="card strategia senza-mappa"><span class="eyebrow">La tua strategia</span>
+    <p class="strategia-vuota">La tua strategia compare quando arriva la mappa.</p>
+    <p class="small" style="margin:0">${esc(testoMappa(mesePrecedente(), null))}</p></div>`;
+  if(x.daScegliere) return `<div class="card strategia scegli">
+    <span class="eyebrow">La tua strategia</span>
+    <h2 class="strategia-titolo">Come vuoi lavorare?</h2>
+    <p class="small" style="margin:0">${num(s.attive)} linee frontali attive · ${esc(testoMappaStrategia(s.chiuso.mese, s.chiuso.datiAl))}</p>
+    ${vModi(s, "strategia-modo")}
+  </div>`;
+  return `<div class="card strategia" data-act="strategia-apri" role="button" tabindex="0" aria-label="Apri la tua strategia">
+    <div class="spread"><span class="eyebrow">La tua strategia</span><span class="small">${num(caselle.length)} caselle</span></div>
+    <h2 class="strategia-titolo">${esc(titoloStrategia(caselle))}</h2>
+    ${vTappe4(s)}
+    ${vCaselle(caselle, s, 3)}
+    ${vLineeStrategia(s, 3)}
+    <div class="strategia-piede"><button class="btn small" data-act="strategia-cambia">Cambia</button>
+      <button class="btn small" data-act="strategia-apri">Vedi tutto ›</button></div>
+  </div>`;
+}
+/* nella festa della partenza: «Ecco la tua strategia» */
+function vStrategiaFesta(){
+  let x;
+  try{ x = strategiaAttuale(); }catch(e){ return ""; }
+  if(!x.s.pronta) return "";
+  return `<div class="strategia-festa"><span class="eyebrow">Ecco la tua strategia</span>
+    <h2 class="strategia-titolo">${esc(titoloStrategia(x.caselle))}</h2>
+    <ul class="festa-caselle">${x.caselle.slice(0, 3).map(c => `<li><span class="casella-tipo">${esc(TIPI_CASELLA[c.tipo] || "Casella libera")}</span>
+      <b>${c.tipo === "aiuta" ? esc((st.struttura.find(p => p.id === c.persona_id) || {}).nome || "") : "da trovare"}</b></li>`).join("")}</ul></div>`;
+}
+/* la schermata intera (un foglio a tutta altezza: Indietro lo chiude) */
+function vSheetStrategia(sh){
+  if(sh !== "strategia") return "";
+  const x = strategiaAttuale(), { s } = x;
+  if(!s.pronta) return `<div class="strategia-intera"><h2>La tua strategia</h2><p>La tua strategia compare quando arriva la mappa.</p>
+    <button class="btn ghost wide" data-act="chiudi">Chiudi</button></div>`;
+  if(st.strategiaModifica) return vStrategiaModifica(x);
+  return `<div class="strategia-intera">
+    <div class="spread strategia-cima"><span class="eyebrow">La tua strategia</span><button class="x" data-act="chiudi" aria-label="Chiudi">×</button></div>
+    <h2 class="strategia-titolo">${esc(x.daScegliere ? "Come vuoi lavorare?" : titoloStrategia(x.caselle))}</h2>
+    ${vTappe4(s)}
+    ${x.daScegliere ? vModi(s, "strategia-modo") : vCaselle(x.caselle, s)}
+    ${vLineeStrategia(s)}
+    <div class="row strategia-piede"><button class="btn grow" data-act="strategia-cambia">Cambia</button></div>
+  </div>`;
+}
+/* «Cambia»: ogni casella si sceglie da un elenco; da Argento in su anche quante caselle (da 3 a 20) */
+function valoreCasella(c){ return !c || !c.tipo ? "" : c.tipo === "aiuta" ? "aiuta:" + c.persona_id : c.tipo === "profondita" ? "prof:" + c.linea_id : "nuova"; }
+function casellaDaValore(v){
+  if(v === "nuova") return { tipo:"nuova_linea" };
+  if(String(v).startsWith("prof:")) return casellaValida({ tipo:"profondita", linea_id:v.slice(5) });
+  if(String(v).startsWith("aiuta:")) return casellaValida({ tipo:"aiuta", persona_id:v.slice(6) });
+  return { tipo:null };
+}
+function vStrategiaModifica(x){
+  const { s } = x, b = st.strategiaBozza || { n:x.caselle.length, caselle:x.caselle };
+  const io = st.profilo.id, linee = (s.numerate || []).filter(l => l.id && figli(io).some(p => p.id === l.id));
+  const persone = alberoSotto(io, 0).map(y => y.p).map(p => ({ p, n:numeroLinea(s, lineaDiPersona(p.id)) }))
+    .sort((a, c) => (a.n || 99) - (c.n || 99) || a.p.nome.localeCompare(c.p.nome, "it"));
+  const opzioni = v => `<option value=""${v === "" ? " selected" : ""}>Da scegliere</option>
+    <option value="nuova"${v === "nuova" ? " selected" : ""}>Nuova linea frontale · da trovare</option>
+    ${linee.length ? `<optgroup label="Nuovo in profondità">${linee.map(l => `<option value="prof:${esc(l.id)}"${v === "prof:" + l.id ? " selected" : ""}>Nuovo · linea ${l.n} (${esc(l.nome)})</option>`).join("")}</optgroup>` : ""}
+    ${persone.length ? `<optgroup label="Persona che aiuti">${persone.map(({ p, n }) => `<option value="aiuta:${esc(p.id)}"${v === "aiuta:" + p.id ? " selected" : ""}>Aiuti · ${esc(p.nome)}${n ? ` · linea ${n}` : ""}</option>`).join("")}</optgroup>` : ""}`;
+  const caselle = b.caselle.slice(0, b.n);
+  while(caselle.length < b.n) caselle.push({ tipo:null });
+  return `<div class="strategia-intera">
+    <h2>Cambia le tue caselle</h2>
+    <p class="small">Scegli tu, oppure parti da un modo e poi ritocca.</p>
+    ${vModi(s, "strategia-bozza-modo")}
+    <form data-form="strategia" novalidate>
+      ${s.argento ? `<div class="spread quante-caselle"><span>Quante caselle</span><span class="row" style="gap:6px;align-items:center">
+        <button type="button" class="btn small" data-act="strategia-meno" aria-label="Una casella in meno"${b.n <= CASELLE_MIN ? " disabled" : ""}>−</button>
+        <b class="num" aria-live="polite">${num(b.n)}</b>
+        <button type="button" class="btn small" data-act="strategia-piu" aria-label="Una casella in più"${b.n >= s.caselleMax ? " disabled" : ""}>+</button></span></div>` : ""}
+      ${caselle.map((c, i) => `<label class="field"><span>Casella ${i + 1}</span><select name="casella">${opzioni(valoreCasella(c))}</select></label>`).join("")}
+      ${x.scelta ? `<button type="button" class="btn link small" data-act="strategia-proposta">Torna alla proposta della mappa</button>` : ""}
+      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="strategia-annulla">Annulla</button>
+        <button class="btn primary grow">Salva</button></div>
+    </form>
+  </div>`;
+}
+function leggiBozzaStrategia(){
+  const f = document.querySelector("form[data-form=strategia]");
+  if(f && st.strategiaBozza) st.strategiaBozza.caselle = [...f.querySelectorAll("select[name=casella]")].map(el => casellaDaValore(el.value));
+}
+Object.assign(AZIONI, {
+  "strategia-apri"(){ st.strategiaModifica = false; st.strategiaBozza = null; st.sheet = "strategia"; render(); },
+  "strategia-cambia"(){ const x = strategiaAttuale();
+    st.strategiaBozza = { n:x.caselle.length || x.s.caselle, caselle:x.caselle.slice() }; st.strategiaModifica = true; st.sheet = "strategia"; render(); },
+  "strategia-annulla"(){ st.strategiaModifica = false; st.strategiaBozza = null; render(); },
+  async "strategia-modo"(el){ const x = strategiaAttuale(), m = el.dataset.modo;
+    if(m === "personalizza"){ st.strategiaBozza = { n:x.s.caselle, caselle:proposteModo(x.s, m) }; st.strategiaModifica = true; st.sheet = "strategia"; render(); return; }
+    await salvaSceltaStrategia({ n:x.s.caselle, modo:m, caselle:proposteModo(x.s, m) }); render(); toast("Strategia scelta: la cambi quando vuoi con «Cambia»"); },
+  "strategia-bozza-modo"(el){ const x = strategiaAttuale(), b = st.strategiaBozza; leggiBozzaStrategia();
+    b.caselle = proposteModo(x.s, el.dataset.modo, b.n); b.modo = el.dataset.modo; render(); },
+  "strategia-meno"(){ leggiBozzaStrategia(); const b = st.strategiaBozza; b.n = Math.max(CASELLE_MIN, b.n - 1); render(); },
+  "strategia-piu"(){ leggiBozzaStrategia(); const b = st.strategiaBozza, s = strategiaAttuale().s; b.n = Math.min(s.caselleMax, b.n + 1); render(); },
+  async "strategia-proposta"(){ await salvaSceltaStrategia(null); st.strategiaModifica = false; st.strategiaBozza = null; render(); toast("Di nuovo le caselle proposte dalla mappa"); },
+  "strategia-lista"(el){ st.motivoLista = el.dataset.motivo || null; if(st.sheet) chiudiSheet();
+    st.vista = "persone"; st.sezPersone = "lista"; st.personaId = null; st.invitoId = null; render(); window.scrollTo(0, 0); }
+});
+Object.assign(MODULI, {
+  async strategia(f){
+    const b = st.strategiaBozza || { n:CASELLE_MIN };
+    const caselle = [...f.querySelectorAll("select[name=casella]")].map(el => casellaDaValore(el.value));
+    await salvaSceltaStrategia({ n:b.n, modo:b.modo || null, caselle });
+    st.strategiaModifica = false; st.strategiaBozza = null; render(); toast("Caselle salvate");
+  }
+});
+/* la card si apre anche dalla tastiera (Invio o spazio), come un pulsante */
+document.addEventListener("keydown", e => {
+  if((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".card.strategia[data-act=strategia-apri]")){ e.preventDefault(); e.target.click(); }
+});
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { strategiaAttuale, titoloStrategia });
 
 /* solo nei test (window.GROWUP_TEST, come GROWUP_API): il calcolo di «Da seguire oggi» e lo stato, per controllarlo criterio
    per criterio. Nell'app vera window.GROWUP_TEST non c'è e non si espone niente. */
