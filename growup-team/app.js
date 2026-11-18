@@ -8481,24 +8481,29 @@ function lineeNumerate(chiuso, recente){
     .map((l, i) => ({ id:l.id, nome:l.nome, n:i + 1 }));
 }
 /* Le caselle proposte dalla mappa, per n caselle:
-   A → «Nuova linea frontale»; B → una «Persona che aiuti» per ogni linea attiva (la persona che la apre) e «Nuova linea
-   frontale» per quelle che mancano; C → nessuna proposta (sceglie il partner, con proposteModo). */
+   A → «Nuova linea frontale»; B → prima «Nuova linea frontale» per quelle che mancano, poi per ogni linea attiva «Persona
+   che aiuti» (chi la apre, se costruisce) o «Nuovo in profondità»; C → nessuna proposta (sceglie il partner, con proposteModo). */
 function proposteStrategia(s, n){
   if(s.situazione === "A") return Array.from({ length:n }, () => ({ tipo:"nuova_linea" }));
+  /* B, con il metodo Cum Laude 21 (scelta di Stefano, 18 novembre 2026): prima le nuove linee frontali che mancano; poi,
+     per ogni linea attiva, «Persona che aiuti» se chi la apre costruisce, altrimenti «Nuovo in profondità» in quella linea */
   if(s.situazione === "B"){
-    const aiuta = s.linee.filter(l => l.attiva).map(l => l.id && st.struttura.some(p => p.id === l.id)
+    const linee = s.linee.filter(l => l.attiva).map(l => l.id && st.struttura.some(p => p.id === l.id) && costruisce(l.id)
       ? { tipo:"aiuta", persona_id:l.id, linea_id:l.id } : { tipo:"profondita", linea_id:l.id || null });
-    return aiuta.slice(0, n).concat(Array.from({ length:Math.max(0, n - aiuta.length) }, () => ({ tipo:"nuova_linea" })));
+    const nuove = Math.max(0, n - linee.length);
+    return Array.from({ length:nuove }, () => ({ tipo:"nuova_linea" })).concat(linee).slice(0, n);
   }
   return [];
 }
 /* Il metodo Cum Laude 21 (Stefano, 18 novembre 2026): si sponsorizzano prima i tre frontali; poi si valuta se lavorare
    con le persone sponsorizzate o se mettere altre persone in profondità nella loro linea, finché non si trova la persona
-   che vuole costruire. Dalla mappa, chi apre una linea «costruisce» se ha già almeno una sua linea nuova con i VP del
-   Path to Bronze, oppure nuovi iscritti nel suo gruppo negli ultimi 2 mesi (data di ingresso della mappa). */
+   che vuole costruire. Dalla mappa (Stefano, 18 novembre 2026): chi apre una linea «costruisce» se ha nuovi iscritti nel
+   suo gruppo negli ultimi 2 mesi (data di ingresso della mappa) oppure una sua linea nuova con i VP del Path to Bronze,
+   E ha fatturato personale (VP personali nella mappa di questo mese o del mese scorso). */
 function costruisce(pid){
   const ptb = pathToBronze(pid), dal = spostaMese(meseDi(oggi()), -2) + "-01";
-  return !!(ptb && ptb.fatte > 0) || alberoSotto(pid, 0).some(y => (dataIngressoDi(y.p.id) || "") >= dal);
+  const fattura = [meseDi(oggi()), mesePrecedente()].some(m => { const n = numeriPersona(pid, m); return !!n && n.personali > 0; });
+  return fattura && (!!(ptb && ptb.fatte > 0) || alberoSotto(pid, 0).some(y => (dataIngressoDi(y.p.id) || "") >= dal));
 }
 /* Situazione C, «Come vuoi lavorare?»: le caselle di ogni modo. «Personalizza» parte da caselle vuote. */
 function proposteModo(s, modo, n){
