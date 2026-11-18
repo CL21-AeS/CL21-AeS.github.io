@@ -6730,8 +6730,8 @@ for(const tema of ["light", "dark"]){
   ({ ctx, page } = await apriCome(20));
   s = await calcola(page);
   check(s.situazione === "B" && s.attive === 2, `strategia B: due linee attive (${s.situazione}, ${s.attive})`);
-  check(JSON.stringify(s.proposte) === JSON.stringify([{ tipo:"aiuta", persona_id:id(21), linea_id:id(21) }, { tipo:"aiuta", persona_id:id(22), linea_id:id(22) }, { tipo:"nuova_linea" }]),
-    "strategia B: una «Persona che aiuti» per ogni linea attiva e una «Nuova linea frontale» per quella che manca");
+  check(JSON.stringify(s.proposte) === JSON.stringify([{ tipo:"nuova_linea" }, { tipo:"aiuta", persona_id:id(21), linea_id:id(21) }, { tipo:"profondita", linea_id:id(22) }]),
+    "strategia B (metodo CL21): prima la nuova linea frontale che manca; Lia costruisce (fattura e ha una linea nuova da 100 VP) → «Persona che aiuti»; Leo non ha la mappa (non fattura) → «Nuovo in profondità» nella sua linea");
   check(JSON.stringify(s.linee.map(l => [l.nome, l.vp, l.n, l.ok, l.attiva])) === JSON.stringify([["Lia Linea", 260, 1, true, true], ["Leo Linea", 90, 2, false, true], ["Max Poco", 40, 3, false, false]]),
     "strategia B: le linee con i VP di adesso, numerate per VP del mese chiuso, rispetto alla soglia della tappa");
   check(s.linee[1].manca === 10, "strategia B: quanto manca alla soglia della linea");
@@ -6764,9 +6764,13 @@ for(const tema of ["light", "dark"]){
     const prima = st.struttura.slice();
     st.struttura.push({ id:"97x1", nome:"Nuovo Di Ugo", sponsor_id:u, stato:"gestito" }, { id:"97x2", nome:"Nuovo Di Ivo", sponsor_id:i, stato:"gestito" });
     st.ingressi.set("97x1", g); st.ingressi.set("97x2", g);
-    const s = strategia(), r = { modo:s.modoAdatto, aiuta:proposteModo(s, "aiuta").map(c => c.persona_id), prof:proposteModo(s, "profondita").map(c => c.linea_id) };
-    st.struttura.length = 0; st.struttura.push(...prima); return r; }, [id(31), id(32), giorno(-20)]);
-  check(conCostruttori.modo === "aiuta", "strategia C (metodo CL21): due frontali su tre costruiscono → «Aiuta le persone che hai»");
+    const riepPrima = st.riep.map(r => Object.assign({}, r));
+    const senzaFatt = strategia().modoAdatto;   // nuovi iscritti, ma senza fatturato personale
+    for(const r of st.riep) if(r.partner_id === u || r.partner_id === i) Object.assign(r, { vp_personali:50, vp_gruppo:50, da_report:true, linee_report:[] });
+    const s = strategia(), r = { modo:s.modoAdatto, aiuta:proposteModo(s, "aiuta").map(c => c.persona_id), prof:proposteModo(s, "profondita").map(c => c.linea_id), senzaFatt };
+    st.struttura.length = 0; st.struttura.push(...prima); st.riep.length = 0; st.riep.push(...riepPrima); return r; }, [id(31), id(32), giorno(-20)]);
+  check(conCostruttori.modo === "aiuta", "strategia C (metodo CL21): due frontali su tre costruiscono (nuovi iscritti e fatturato personale) → «Aiuta le persone che hai»");
+  check(conCostruttori.senzaFatt === "profondita", "strategia C (metodo CL21): nuovi iscritti senza fatturato personale non bastano → «in profondità»");
   check(conCostruttori.aiuta.join() === [id(31), id(32), id(33)].join() && conCostruttori.prof[0] === id(33),
     "strategia C: «Aiuta» parte da chi costruisce, «in profondità» dalla linea di chi non costruisce");
   const modi = await page.evaluate(() => { const s = GROWUP_TEST.strategia(); return Object.fromEntries(["nuove_linee", "aiuta", "profondita", "personalizza"].map(m => [m, GROWUP_TEST.proposteModo(s, m)])); });
@@ -6780,8 +6784,8 @@ for(const tema of ["light", "dark"]){
   ({ ctx, page } = await apriCome(40));
   s = await calcola(page, 5);
   check(s.argento && s.caselleMax === 20 && s.caselle === 5 && s.tappa === null && s.tappe4 === null, "strategia Argento: 5 caselle scelte, nessuna tappa né barra");
-  check(s.situazione === "B" && s.proposte.length === 5 && s.proposte[0].tipo === "aiuta" && s.proposte.slice(1).every(c => c.tipo === "nuova_linea"),
-    "strategia Argento: il modo lo propone la mappa (B), su tutte le caselle");
+  check(s.situazione === "B" && s.proposte.length === 5 && s.proposte.slice(0, 4).every(c => c.tipo === "nuova_linea") && s.proposte[4].tipo === "profondita",
+    "strategia Argento: il modo lo propone la mappa (B), su tutte le caselle: prima le nuove linee");
   check((await calcola(page, 50)).caselle === 20 && (await calcola(page, 1)).caselle === 3, "strategia Argento: tetto tecnico 20, minimo 3");
   await ctx.close();
 
@@ -7076,13 +7080,13 @@ for(const tema of ["light", "dark"]){
     `suggerimenti: invitato da te, nuovi iscritti, ha fatturato (${sugg.join(", ")})`);
   await prompt.locator("button[data-act=strategia-invitato-si]").click();
   await page.locator(".sheet form[data-form=strategia]").waitFor();
-  check(await page.locator(".sheet select[name=casella]").nth(2).inputValue() === "aiuta:" + id(25), "«Sì, in una casella»: Luca va nella casella da trovare");
+  check(await page.locator(".sheet select[name=casella]").nth(0).inputValue() === "aiuta:" + id(25), "«Sì, in una casella»: Luca va nella casella da trovare (la nuova linea frontale)");
   check(await page.locator(".sheet optgroup[label=Suggerite] option").count() >= 3, "Cambia: il gruppo «Suggerite» in cima alle persone");
   await page.click(".sheet form[data-form=strategia] button.primary");
   await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
   await sync(page);
   const righe = DB.caselle.filter(x => x.partner_id === id(20)).sort((a, b) => a.posizione - b.posizione);
-  check(righe.length === 3 && righe[2].tipo === "aiuta" && righe[2].persona_id === id(25) && righe[0].persona_id === id(21),
+  check(righe.length === 3 && righe[0].tipo === "aiuta" && righe[0].persona_id === id(25) && righe[1].persona_id === id(21) && righe[2].tipo === "profondita",
     "067: le caselle sono nel database (tabella strategia_caselle)");
   check(!(await page.evaluate(() => Object.keys(localStorage).filter(k => k.includes("growup-team.strategia.")).length)), "067: con il database niente caselle sul telefono");
   check(!(await page.locator(".sheet .invitato-aiuta").count()), "invitati: Luca è in una casella, la domanda non c'è più");
@@ -7095,7 +7099,8 @@ for(const tema of ["light", "dark"]){
   await ctx.close();
   ({ ctx, page } = await apriCome(20));   // un altro telefono (memoria vuota)
   await page.locator("#app .card.strategia").waitFor();
-  check(await page.locator("#app .card.strategia .casella.c-aiuta").count() === 3, "067: su un altro telefono le caselle scelte ci sono");
+  check(await page.locator("#app .card.strategia .casella.c-aiuta").count() === 2 && await page.locator("#app .card.strategia .casella.c-profondita").count() === 1,
+    "067: su un altro telefono le caselle scelte ci sono");
   check(!(await page.locator("#app .card.strategia .invitato-aiuta").count()), "invitati: nessuna domanda per chi è già in una casella");
   await ctx.close();
   check((DB.notificheEventi || []).length === eventiPrima, "067: la persona scelta non riceve avvisi");
@@ -7166,7 +7171,8 @@ for(const tema of ["light", "dark"]){
     creato_il:quando(-200), confermato_il:ora, partenza_confermata_il:ora, ultimo_aggiornamento:quando(-12), data_iscrizione:giorno(-210) });
   mappa(id(20), 110, 600, { mese:mesePrima, linee:linee([[21, 300], [22, 150], [23, 40]]) });
   mappa(id(20), 100, 500, { linee:linee([[21, 260], [22, 95], [23, 40], [24, 0]]) });
-  mappa(id(21), 80, 260); mappa(id(22), 100, 95);
+  sotto(26, "Nina Nuova", 21);
+  mappa(id(21), 80, 260, { linee:linee([[26, 120]]) }); mappa(id(22), 100, 95);   // Lia costruisce (fattura e ha una linea nuova da 100 VP), Leo no
   DB.persone = (DB.persone || []).concat([
     { id:"s100a", proprietario:id(20), nome:"Anna Agenda", fase:"contattato", esito:null, prossima_data:oggiIt, prossima_per:"fissare", creato_il:quando(-20) },
     { id:"s100b", proprietario:id(20), nome:"Carlo Cliente", fase:"lista", esito:"cliente", prossima_data:oggiIt, prossima_per:"riordino", creato_il:quando(-40) }]);
@@ -7187,7 +7193,8 @@ for(const tema of ["light", "dark"]){
   const tPers = (await pers.textContent()).replace(/\s+/g, " ");
   check(tPers.includes("Un nome per una nuova linea") && await pers.locator("button[data-act=strategia-lista][data-motivo='per una nuova linea']").count() === 1,
     "Persone: la casella vuota con «Lista ›» e il motivo");
-  check(tPers.includes("Senti Lia Linea") && tPers.includes("80 / 100 VP personali") && tPers.includes("Senti Leo Linea"), "Persone: «Senti…» per le persone che aiuti, con il loro Path to Bronze");
+  check(tPers.includes("Senti Lia Linea") && tPers.includes("80 / 100 VP personali") && tPers.includes("1 su 3 linee nuove") && tPers.includes("Un nome in profondità per la linea 2"),
+    "Persone: «Senti…» per chi aiuti (con il suo Path to Bronze); in profondità nella linea di chi non costruisce");
   check(tPers.includes("Dino Fermo") && tPers.includes("! Da sentire") && await pers.locator(".ds-blocco button.aiuto-btn[data-k=da-seguire]").count() === 1,
     "Persone: i motivi di «Da seguire oggi», con il loro «?»");
   check((await fatt.textContent()).includes("Carlo Cliente") && !tPers.includes("Carlo Cliente"), "Fatturato: i propri clienti");

@@ -89,7 +89,7 @@ nell'API, suggerimenti, «Hai invitato…», invitata che prende la casella; ant
 ## La strategia in Io, punto 2: la card in cima a Io (18 novembre 2026, database non toccato)
 
 - **Dove**: la prima card di Io → Il mio giorno (`vStrategia`); sopra restano solo le domande che compaiono una volta sola
-  (condivisione e notifiche), come oggi: dopo la risposta spariscono (scelta di Claude, da confermare con Stefano). Si vede a chi ha finito il percorso di partenza (e agli avviati,
+  (condivisione e notifiche), come oggi: dopo la risposta spariscono (confermato da Stefano il 18 novembre). Si vede a chi ha finito il percorso di partenza (e agli avviati,
   gli admin, chi è in attività da anni). Durante il percorso non c'è (tutto come prima); nella **festa della partenza** c'è
   il riquadro **«Ecco la tua strategia»** (`vStrategiaFesta`, titolo e prime tre caselle), poi la card.
 - **Card**: «La tua strategia» e quante caselle; il **titolo** (`titoloStrategia`): «Fai il tuo Path to Bronze» se la
@@ -142,13 +142,15 @@ ingresso) e dagli inviti; requisiti dalla tabella delle tappe (`stage_requiremen
   linee × vp_linea` = 400). **Linee nuove**: dalla data `linee_nuove_dal` della tabella; è vuota (004) e **resta vuota**
   (scelta di Stefano, 18 novembre): contano tutte le linee frontali, come nell'Obiettivo. Se un admin scrive la data nella
   tabella, contano solo le linee con la data di ingresso della mappa da quel giorno.
-- **Caselle proposte**: A → «Nuova linea frontale»; B → una «Persona che aiuti» per ogni linea attiva (chi la apre; se non
-  è nell'app, «Nuovo in profondità» per quella linea) e «Nuova linea frontale» per quelle che mancano; C → nessuna, sceglie
+- **Caselle proposte**: A → «Nuova linea frontale»; B (metodo Cum Laude 21, scelta di Stefano del 18 novembre) → **prima**
+  «Nuova linea frontale» per quelle che mancano, poi per ogni linea attiva «Persona che aiuti» se chi la apre costruisce,
+  altrimenti «Nuovo in profondità» in quella linea (anche se chi la apre non è nell'app); C → nessuna, sceglie
   il partner (`proposteModo`: nuove linee, aiuta, in profondità, personalizza). **«Adatta ai tuoi numeri»** (`modoAdatto`)
   segue il **metodo Cum Laude 21** (Stefano, 18 novembre 2026): si sponsorizzano prima i tre frontali, poi si valuta se
   lavorare con le persone sponsorizzate o mettere altre persone in profondità nella loro linea, finché non si trova chi
-  vuole costruire. Dalla mappa, chi apre una linea **costruisce** (`costruisce`) se ha almeno una sua linea nuova con i
-  VP del Path to Bronze oppure nuovi iscritti nel suo gruppo negli ultimi 2 mesi. Tra le tre linee con più VP: almeno due
+  vuole costruire. Dalla mappa, chi apre una linea **costruisce** (`costruisce`, regola di Stefano) se ha **nuovi iscritti**
+  nel suo gruppo negli ultimi 2 mesi **oppure una linea nuova** con i VP del Path to Bronze, **e fatturato personale** (VP
+  personali nella mappa di questo mese o del mese scorso). Tra le tre linee con più VP: almeno due
   che costruiscono → «Aiuta le persone che hai»; altrimenti → «Sponsorizza in profondità». «Aiuta» parte da chi
   costruisce; «in profondità» parte dalle linee di chi non costruisce. (Le nuove linee non sono mai il segno in C: i tre
   frontali ci sono già.)
