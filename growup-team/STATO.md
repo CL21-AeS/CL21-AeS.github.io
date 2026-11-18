@@ -3,6 +3,38 @@
 Ultimo aggiornamento: 18 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## La strategia in Io, punto 3: le caselle nel database (18 novembre 2026, migrazione 067 DA APPLICARE, chiedere a Stefano)
+
+- **067** (`supabase/067_strategia_caselle.sql`, solo cose nuove; per toglierla `067_strategia_caselle_togli.sql`): tabella
+  `strategia_caselle` (partner, posizione 1-20, tipo `aiuta` | `profondita` | `nuova_linea` | `libera`, persona, linea,
+  `creato_il` che riparte solo se la casella cambia). **RLS**: le vede e le modifica solo il partner (non la persona
+  scelta, non lo sponsor, non gli admin); `partner_id` lo mette il database. Al massimo **3 caselle sotto Argento, 20 da
+  Argento in su** (`strategia_caselle_max()`: qualifica dichiarata da Argento, 21% dichiarato o un mese al 21% in una
+  mappa), «Persona che aiuti» solo nella propria downline (`vedo`, mai sé stessi), «Nuovo in profondità» solo per una
+  propria linea frontale. La persona scelta non riceve avvisi. Controlli 067 in `tests_rls.sql`; 067 anche in
+  `installa_tutto.sql`. Provato su un Postgres locale: si installa, si toglie con lo script e si rimette.
+  **Non è ancora applicata al database vero**: prima chiedere a Stefano.
+- **App**: «Cambia» salva nella tabella (`api.caselle`, `salvaCaselle` con upsert, `togliCaselleDa`); le caselle si
+  ritrovano su ogni telefono. **Se la tabella non risponde** (per esempio la 067 non ancora applicata, o tolta) l'app
+  usa il telefono come nel punto 2; quando la tabella c'è, la scelta fatta sul telefono passa nel database una volta.
+- **Suggerimenti per «Persona che aiuti»** (`suggerimentiAiuta`, gruppo «Suggerite» in cima all'elenco di «Cambia»): chi
+  ha fatturato (mappe di questo mese e del mese scorso), chi ha iscritti nuovi negli ultimi 2 mesi (data di ingresso
+  della mappa) e chi ho invitato io (`invitato_da`, da `partenze()`). **«Hai invitato Luca: vuoi aiutare Luca a fare il
+  Path to Bronze?»** nella card e nella schermata intera (forma neutra: l'app non sa se è un uomo o una donna), una persona
+  alla volta (la più recente, già nella mappa): «Sì, in una casella» apre «Cambia» con la persona nella prima casella
+  libera (o da trovare); «Non ora» la toglie su questo telefono.
+- **Da trovare → Persona che aiuti** (`caselleDaInviti`, all'apertura): una persona invitata da me dopo la casella, che
+  compare nella mappa (nella mia struttura), prende la casella: «Nuova linea frontale» se è in prima linea, «Nuovo in
+  profondità» per la linea N se è più in basso in quella linea. Se le caselle erano solo proposte dalla mappa contano
+  gli invitati dal mese scorso, e da lì le caselle diventano una scelta salvata (scelta di Claude).
+- PRIVACY.md: la riga delle caselle nel registro dei trattamenti. **Da sapere**: «Scarica una copia» dei dati
+  (`copia_dati`) non comprende le caselle: per aggiungerle bisognerebbe cambiare una funzione esistente (non in questa
+  serie, per poter tornare indietro).
+- **Revisione di sicurezza** (/security-review sul ramo): nessuna vulnerabilità trovata; controllati RLS, permessi per
+  colonna, upsert, `strategia_caselle_max`, `esc()` su nomi e id.
+Test: `sh test/db.sh` (controlli 067); interfaccia sezione 99 (database e altro telefono, senza tabella e poi con, limiti
+nell'API, suggerimenti, «Hai invitato…», invitata che prende la casella; anteprima `e2e/99-strategia-invitata-light.png`).
+
 ## La strategia in Io, punto 2: la card in cima a Io (18 novembre 2026, database non toccato)
 
 - **Dove**: la prima card di Io → Il mio giorno (`vStrategia`); sopra restano solo le domande che compaiono una volta sola
