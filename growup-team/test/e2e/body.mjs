@@ -6758,7 +6758,17 @@ for(const tema of ["light", "dark"]){
   check(s.tappa && s.tappa.chiave === "foundation_12" && s.tappe4[0].stato === "fatta" && s.tappe4[1].stato === "corso",
     "strategia C: punto di partenza dalla qualifica dichiarata (Foundation 9%): prossima tappa Foundation 12%");
   check(s.linee.every(l => l.soglia === 200) && s.linee.filter(l => l.ok).length === 1, "strategia C: VP delle linee rispetto ai 200 VP della tappa");
-  check(s.modoAdatto === "aiuta", "strategia C: «Adatta ai tuoi numeri» su «Aiuta le persone che hai» (linee sotto la soglia)");
+  check(s.modoAdatto === "profondita", "strategia C (metodo CL21): nessun frontale costruisce → «Adatta ai tuoi numeri» su «Sponsorizza in profondità»");
+  // due frontali su tre costruiscono (nuovi iscritti nel loro gruppo negli ultimi 2 mesi) → «Aiuta le persone che hai»
+  const conCostruttori = await page.evaluate(([u, i, g]) => { const { st, strategia, proposteModo } = GROWUP_TEST;
+    const prima = st.struttura.slice();
+    st.struttura.push({ id:"97x1", nome:"Nuovo Di Ugo", sponsor_id:u, stato:"gestito" }, { id:"97x2", nome:"Nuovo Di Ivo", sponsor_id:i, stato:"gestito" });
+    st.ingressi.set("97x1", g); st.ingressi.set("97x2", g);
+    const s = strategia(), r = { modo:s.modoAdatto, aiuta:proposteModo(s, "aiuta").map(c => c.persona_id), prof:proposteModo(s, "profondita").map(c => c.linea_id) };
+    st.struttura.length = 0; st.struttura.push(...prima); return r; }, [id(31), id(32), giorno(-20)]);
+  check(conCostruttori.modo === "aiuta", "strategia C (metodo CL21): due frontali su tre costruiscono → «Aiuta le persone che hai»");
+  check(conCostruttori.aiuta.join() === [id(31), id(32), id(33)].join() && conCostruttori.prof[0] === id(33),
+    "strategia C: «Aiuta» parte da chi costruisce, «in profondità» dalla linea di chi non costruisce");
   const modi = await page.evaluate(() => { const s = GROWUP_TEST.strategia(); return Object.fromEntries(["nuove_linee", "aiuta", "profondita", "personalizza"].map(m => [m, GROWUP_TEST.proposteModo(s, m)])); });
   check(modi.nuove_linee.length === 3 && modi.nuove_linee.every(c => c.tipo === "nuova_linea"), "strategia C: «Apri 3 nuove linee frontali»");
   check(modi.aiuta.map(c => c.persona_id).join() === [id(32), id(33), id(31)].join(), "strategia C: «Aiuta le persone che hai», prima le linee sotto la soglia");

@@ -144,9 +144,14 @@ ingresso) e dagli inviti; requisiti dalla tabella delle tappe (`stage_requiremen
   tabella, contano solo le linee con la data di ingresso della mappa da quel giorno.
 - **Caselle proposte**: A → «Nuova linea frontale»; B → una «Persona che aiuti» per ogni linea attiva (chi la apre; se non
   è nell'app, «Nuovo in profondità» per quella linea) e «Nuova linea frontale» per quelle che mancano; C → nessuna, sceglie
-  il partner (`proposteModo`: nuove linee, aiuta, in profondità, personalizza). **«Adatta ai tuoi numeri»** (`modoAdatto`,
-  scelta di Claude): linee sotto la soglia della prossima tappa → aiuta; linee a posto ma VP di gruppo sotto la tappa → in
-  profondità; altrimenti nuove linee.
+  il partner (`proposteModo`: nuove linee, aiuta, in profondità, personalizza). **«Adatta ai tuoi numeri»** (`modoAdatto`)
+  segue il **metodo Cum Laude 21** (Stefano, 18 novembre 2026): si sponsorizzano prima i tre frontali, poi si valuta se
+  lavorare con le persone sponsorizzate o mettere altre persone in profondità nella loro linea, finché non si trova chi
+  vuole costruire. Dalla mappa, chi apre una linea **costruisce** (`costruisce`) se ha almeno una sua linea nuova con i
+  VP del Path to Bronze oppure nuovi iscritti nel suo gruppo negli ultimi 2 mesi. Tra le tre linee con più VP: almeno due
+  che costruiscono → «Aiuta le persone che hai»; altrimenti → «Sponsorizza in profondità». «Aiuta» parte da chi
+  costruisce; «in profondità» parte dalle linee di chi non costruisce. (Le nuove linee non sono mai il segno in C: i tre
+  frontali ci sono già.)
 - **Caselle**: 3 per tutti; **da Argento in su** (qualifica dichiarata, anche solo 21%, oppure un mese da Argento nelle
   mappe, anche se poi scende sotto il 21%) da 3 a 20 (`CASELLE_MAX`, tetto tecnico).
 Test dell'interfaccia: sezione 97 (A, B, C, Argento con 5 caselle, Argento sceso al 18%, mappa assente, nuovo prima e dopo

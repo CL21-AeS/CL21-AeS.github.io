@@ -8715,26 +8715,35 @@ function proposteStrategia(s, n){
   }
   return [];
 }
+/* Il metodo Cum Laude 21 (Stefano, 18 novembre 2026): si sponsorizzano prima i tre frontali; poi si valuta se lavorare
+   con le persone sponsorizzate o se mettere altre persone in profondità nella loro linea, finché non si trova la persona
+   che vuole costruire. Dalla mappa, chi apre una linea «costruisce» se ha già almeno una sua linea nuova con i VP del
+   Path to Bronze, oppure nuovi iscritti nel suo gruppo negli ultimi 2 mesi (data di ingresso della mappa). */
+function costruisce(pid){
+  const ptb = pathToBronze(pid), dal = spostaMese(meseDi(oggi()), -2) + "-01";
+  return !!(ptb && ptb.fatte > 0) || alberoSotto(pid, 0).some(y => (dataIngressoDi(y.p.id) || "") >= dal);
+}
 /* Situazione C, «Come vuoi lavorare?»: le caselle di ogni modo. «Personalizza» parte da caselle vuote. */
 function proposteModo(s, modo, n){
   n = n || s.caselle;
   const conPersona = s.linee.filter(l => l.id && st.struttura.some(p => p.id === l.id));
   if(modo === "nuove_linee") return Array.from({ length:n }, () => ({ tipo:"nuova_linea" }));
   if(modo === "aiuta"){
-    /* prima le linee sotto la soglia della tappa, dalla più vicina; poi le altre */
-    const l = conPersona.filter(x => !x.ok).concat(conPersona.filter(x => x.ok));
+    /* prima chi costruisce; poi le linee sotto la soglia della tappa, dalla più vicina; poi le altre */
+    const l = conPersona.filter(x => costruisce(x.id)).concat(conPersona.filter(x => !costruisce(x.id) && !x.ok), conPersona.filter(x => !costruisce(x.id) && x.ok));
     return l.slice(0, n).map(x => ({ tipo:"aiuta", persona_id:x.id, linea_id:x.id }));
   }
-  if(modo === "profondita") return s.linee.filter(x => x.id).slice(0, n).map(x => ({ tipo:"profondita", linea_id:x.id }));
+  /* in profondità: prima le linee in cui chi le apre non costruisce */
+  if(modo === "profondita") return conPersona.filter(x => !costruisce(x.id)).concat(conPersona.filter(x => costruisce(x.id)))
+    .slice(0, n).map(x => ({ tipo:"profondita", linea_id:x.id }));
   return Array.from({ length:n }, () => ({ tipo:null }));
 }
-/* il modo che si adatta ai numeri (solo un segno, mai preselezionato): linee sotto la soglia della prossima tappa →
-   aiuta; linee a posto ma VP di gruppo sotto la tappa → in profondità; tutto a posto (o da Argento in su) → nuove linee */
+/* il modo che si adatta ai numeri (solo un segno, mai preselezionato), con il metodo Cum Laude 21: i tre frontali ci sono
+   (situazione C); tra le tre linee con più VP, se almeno due persone che le aprono costruiscono → «Aiuta le persone che
+   hai», altrimenti → «Sponsorizza in profondità» (fino a trovare chi vuole costruire) */
 function modoAdatto(s){
-  const t = s.tappa;
-  if(t && t.linee && s.linee.filter(l => l.ok).length < Number(t.linee)) return "aiuta";
-  if(t && t.vp_gruppo && s.recente && s.recente.gruppo < Number(t.vp_gruppo)) return "profondita";
-  return "nuove_linee";
+  const tre = s.linee.filter(l => l.id && st.struttura.some(p => p.id === l.id)).slice(0, 3);
+  return tre.length && tre.filter(l => costruisce(l.id)).length * 2 > tre.length ? "aiuta" : "profondita";
 }
 /* La strategia di chi usa l'app (io). n: quante caselle (da Argento in su il partner ne sceglie da 3 a 20).
    { pronta, motivo?, situazione, attive, chiuso:{ mese, datiAl }, recente:{ mese, datiAl, gruppo }, tappa, tappe4, linee,
