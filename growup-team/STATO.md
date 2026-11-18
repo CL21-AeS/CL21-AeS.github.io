@@ -33,7 +33,7 @@ strategia»** (`vBinari`, calcolo in `binariOggi(giorno)`) con due binari (scelt
 Test dell'interfaccia: sezione 100 (i due binari e il loro contenuto, «Lista ›» con il motivo, «Fatto», le linee vicine a
 fine mese e non a inizio mese, il nuovo nel percorso com'era; anteprime `e2e/100-binari-light.png` e `-dark.png`).
 
-## La strategia in Io, punto 3: le caselle nel database (18 novembre 2026, migrazione 067 DA APPLICARE, chiedere a Stefano)
+## La strategia in Io, punto 3: le caselle nel database (18 novembre 2026, migrazione 067 applicata al database vero)
 
 - **067** (`supabase/067_strategia_caselle.sql`, solo cose nuove; per toglierla `067_strategia_caselle_togli.sql`): tabella
   `strategia_caselle` (partner, posizione 1-20, tipo `aiuta` | `profondita` | `nuova_linea` | `libera`, persona, linea,
@@ -43,7 +43,10 @@ fine mese e non a inizio mese, il nuovo nel percorso com'era; anteprime `e2e/100
   mappa), «Persona che aiuti» solo nella propria downline (`vedo`, mai sé stessi), «Nuovo in profondità» solo per una
   propria linea frontale. La persona scelta non riceve avvisi. Controlli 067 in `tests_rls.sql`; 067 anche in
   `installa_tutto.sql`. Provato su un Postgres locale: si installa, si toglie con lo script e si rimette.
-  **Non è ancora applicata al database vero**: prima chiedere a Stefano.
+  **Applicata al database vero il 18 novembre 2026** (ok di Stefano), con il connettore, senza le due righe `drop … if
+  exists` (sulla tabella appena creata non servono, e il connettore chiedeva una conferma che scadeva). Controllato dopo:
+  RLS attiva, una policy, il trigger, anon senza accesso, `partner_id` non scrivibile; tra gli avvisi di Supabase solo
+  «funzione security definer chiamabile da authenticated» per `strategia_caselle_max` (voluto, come le altre).
 - **App**: «Cambia» salva nella tabella (`api.caselle`, `salvaCaselle` con upsert, `togliCaselleDa`); le caselle si
   ritrovano su ogni telefono. **Se la tabella non risponde** (per esempio la 067 non ancora applicata, o tolta) l'app
   usa il telefono come nel punto 2; quando la tabella c'è, la scelta fatta sul telefono passa nel database una volta.
