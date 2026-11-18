@@ -8973,24 +8973,51 @@ function vSheetStrategia(sh){
   </div>`;
 }
 /* «Cambia»: ogni casella si sceglie da un elenco; da Argento in su anche quante caselle (da 3 a 20) */
-function valoreCasella(c){ return !c || !c.tipo ? "" : c.tipo === "aiuta" ? "aiuta:" + c.persona_id : c.tipo === "profondita" ? "prof:" + c.linea_id : "nuova"; }
-function casellaDaValore(v){
-  if(v === "nuova") return { tipo:"nuova_linea" };
-  if(String(v).startsWith("prof:")) return casellaValida({ tipo:"profondita", linea_id:v.slice(5) });
-  if(String(v).startsWith("aiuta:")) return casellaValida({ tipo:"aiuta", persona_id:v.slice(6) });
-  return { tipo:null };
+/* «Cambia», una casella alla volta in due scelte (Stefano, 19 novembre 2026): prima la LINEA (nuova linea frontale o una mia
+   linea), poi CHI AIUTI, solo tra le persone di quella linea (chi la apre, poi gli altri dal più vicino al più profondo,
+   con il motivo dei suggerimenti), oppure «Nuovo in profondità · da trovare» in quella linea. */
+function lineaCasella(c){
+  if(!c || !c.tipo) return "";
+  if(c.tipo === "nuova_linea") return "nuova";
+  return (c.tipo === "profondita" ? c.linea_id : lineaDiPersona(c.persona_id)) || "";
+}
+function casellaDaScelta(linea, chi){
+  if(!linea) return { tipo:null };
+  if(linea === "nuova") return { tipo:"nuova_linea" };
+  if(!chi || chi === "prof") return casellaValida({ tipo:"profondita", linea_id:linea });
+  const c = casellaValida({ tipo:"aiuta", persona_id:chi });
+  return c.tipo === "aiuta" && c.linea_id === linea ? c : casellaValida({ tipo:"profondita", linea_id:linea });
+}
+/* scelta una linea, la casella parte dal metodo CL21: chi la apre se costruisce, altrimenti un nuovo in profondità */
+function casellaPerLinea(linea){
+  if(!linea || linea === "nuova") return casellaDaScelta(linea);
+  return costruisce(linea) ? casellaDaScelta(linea, linea) : casellaDaScelta(linea, "prof");
+}
+/* le persone di una linea: chi la apre (sempre per primo), poi gli altri dal più vicino al più profondo; i suggeriti con il motivo */
+function personeDellaLinea(lineaId){
+  const apre = st.struttura.find(p => p.id === lineaId);
+  if(!apre) return [];
+  let motivi = new Map();
+  try{ motivi = new Map(suggerimentiAiuta([]).map(x => [x.p.id, x.perche])); }catch(e){}
+  const sotto = alberoSotto(lineaId, 1).filter(y => !st.nascosti.has(y.p.id))
+    .sort((a, b) => a.livello - b.livello || a.p.nome.localeCompare(b.p.nome, "it"));
+  return [{ p:apre, livello:0, apre:true }].concat(sotto).map(y => Object.assign({ perche:motivi.get(y.p.id) || "" }, y));
+}
+function caselleDalForm(f){
+  return [...f.querySelectorAll("fieldset.casella-scelta")].map(fs => {
+    const l = fs.querySelector("select.sel-linea"), c = fs.querySelector("select.sel-chi");
+    return casellaDaScelta(l ? l.value : "", c && c.dataset.linea === (l && l.value) ? c.value : "prof");
+  });
 }
 function vStrategiaModifica(x){
   const { s } = x, b = st.strategiaBozza || { n:x.caselle.length, caselle:x.caselle };
   const io = st.profilo.id, linee = (s.numerate || []).filter(l => l.id && figli(io).some(p => p.id === l.id));
-  const persone = alberoSotto(io, 0).map(y => y.p).map(p => ({ p, n:numeroLinea(s, lineaDiPersona(p.id)) }))
-    .sort((a, c) => (a.n || 99) - (c.n || 99) || a.p.nome.localeCompare(c.p.nome, "it"));
-  const sugg = suggerimentiAiuta([]), suggId = new Set(sugg.map(x => x.p.id));
-  const opzioni = v => `<option value=""${v === "" ? " selected" : ""}>Da scegliere</option>
-    <option value="nuova"${v === "nuova" ? " selected" : ""}>Nuova linea frontale · da trovare</option>
-    ${linee.length ? `<optgroup label="Nuovo in profondità">${linee.map(l => `<option value="prof:${esc(l.id)}"${v === "prof:" + l.id ? " selected" : ""}>Nuovo · linea ${l.n} (${esc(l.nome)})</option>`).join("")}</optgroup>` : ""}
-    ${sugg.length ? `<optgroup label="Suggerite">${sugg.map(({ p, perche }) => `<option value="aiuta:${esc(p.id)}"${v === "aiuta:" + p.id ? " selected" : ""}>Aiuti · ${esc(p.nome)} · ${perche}</option>`).join("")}</optgroup>` : ""}
-    ${persone.length ? `<optgroup label="Persona che aiuti">${persone.filter(({ p }) => !suggId.has(p.id)).map(({ p, n }) => `<option value="aiuta:${esc(p.id)}"${v === "aiuta:" + p.id ? " selected" : ""}>Aiuti · ${esc(p.nome)}${n ? ` · linea ${n}` : ""}</option>`).join("")}</optgroup>` : ""}`;
+  const sel = (a, b) => a === b ? " selected" : "";
+  const sceltaLinea = v => `<option value=""${sel(v, "")}>Da scegliere</option>
+    <option value="nuova"${sel(v, "nuova")}>Nuova linea frontale · da trovare</option>
+    ${linee.map(l => `<option value="${esc(l.id)}"${sel(v, l.id)}>Linea ${l.n} · ${esc(l.nome)}</option>`).join("")}`;
+  const sceltaChi = (linea, v) => `${personeDellaLinea(linea).map(y => `<option value="${esc(y.p.id)}"${sel(v, y.p.id)}>${esc(y.p.nome)}${y.perche ? ` · ${esc(y.perche)}` : ""}</option>`).join("")}
+    <option value="prof"${sel(v, "prof")}>Nuovo in profondità · da trovare</option>`;
   const caselle = b.caselle.slice(0, b.n);
   while(caselle.length < b.n) caselle.push({ tipo:null });
   return `<div class="strategia-intera">
@@ -9002,17 +9029,35 @@ function vStrategiaModifica(x){
         <button type="button" class="btn small" data-act="strategia-meno" aria-label="Una casella in meno"${b.n <= CASELLE_MIN ? " disabled" : ""}>−</button>
         <b class="num" aria-live="polite">${num(b.n)}</b>
         <button type="button" class="btn small" data-act="strategia-piu" aria-label="Una casella in più"${b.n >= s.caselleMax ? " disabled" : ""}>+</button></span></div>` : ""}
-      ${caselle.map((c, i) => `<label class="field"><span>Casella ${i + 1}</span><select name="casella">${opzioni(valoreCasella(c))}</select></label>`).join("")}
+      ${caselle.map((c, i) => { const linea = lineaCasella(c), chi = c.tipo === "aiuta" ? c.persona_id : "prof";
+        return `<fieldset class="casella-scelta" data-i="${i}"><legend>Casella ${i + 1}</legend>
+        <label class="field"><span>Linea</span><select class="sel-linea" name="linea-${i}">${sceltaLinea(linea)}</select></label>
+        ${linea && linea !== "nuova" ? `<label class="field"><span>Chi aiuti nella linea</span><select class="sel-chi" name="chi-${i}" data-linea="${esc(linea)}">${sceltaChi(linea, chi)}</select></label>` : ""}
+        </fieldset>`; }).join("")}
       ${x.scelta ? `<button type="button" class="btn link small" data-act="strategia-proposta">Torna alla proposta della mappa</button>` : ""}
       <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="strategia-annulla">Annulla</button>
         <button class="btn primary grow">Salva</button></div>
     </form>
   </div>`;
 }
+/* legge le scelte nella bozza e le prende come punto di partenza: il foglio ridisegnato non rimette valori vecchi */
 function leggiBozzaStrategia(){
   const f = document.querySelector("form[data-form=strategia]");
-  if(f && st.strategiaBozza) st.strategiaBozza.caselle = [...f.querySelectorAll("select[name=casella]")].map(el => casellaDaValore(el.value));
+  if(!f || !st.strategiaBozza) return;
+  st.strategiaBozza.caselle = caselleDalForm(f);
+  f.querySelectorAll("select").forEach(sel => [...sel.options].forEach(o => { o.defaultSelected = o.selected; }));
 }
+/* cambiata la linea di una casella: «Chi aiuti» si rifà con le persone di quella linea */
+document.addEventListener("change", e => {
+  const el = e.target;
+  if(!el.matches || !el.matches("form[data-form=strategia] select.sel-linea") || !st.strategiaBozza) return;
+  const i = Number(el.closest("fieldset").dataset.i);
+  leggiBozzaStrategia();
+  st.strategiaBozza.caselle[i] = casellaPerLinea(el.value);
+  render();
+  const nuovo = document.querySelector(`form[data-form=strategia] fieldset[data-i="${i}"] select.${el.value && el.value !== "nuova" ? "sel-chi" : "sel-linea"}`);
+  if(nuovo) nuovo.focus({ preventScroll:true });
+});
 Object.assign(AZIONI, {
   "strategia-apri"(){ st.strategiaModifica = false; st.strategiaBozza = null; st.sheet = "strategia"; render(); },
   "strategia-cambia"(){ const x = strategiaAttuale();
@@ -9032,7 +9077,7 @@ Object.assign(AZIONI, {
 Object.assign(MODULI, {
   async strategia(f){
     const b = st.strategiaBozza || { n:CASELLE_MIN };
-    const caselle = [...f.querySelectorAll("select[name=casella]")].map(el => casellaDaValore(el.value));
+    const caselle = caselleDalForm(f);
     if(!(await salvaSceltaStrategia({ n:b.n, modo:b.modo || null, caselle }))) return;
     st.strategiaModifica = false; st.strategiaBozza = null; render(); toast("Caselle salvate");
   }
@@ -9041,7 +9086,7 @@ Object.assign(MODULI, {
 document.addEventListener("keydown", e => {
   if((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".card.strategia[data-act=strategia-apri]")){ e.preventDefault(); e.target.click(); }
 });
-if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { strategiaAttuale, titoloStrategia });
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { strategiaAttuale, titoloStrategia, personeDellaLinea });
 
 /* ==== La tua strategia, punto 3: le caselle nel database (067), i suggerimenti, gli invitati che arrivano ====
    Le righe della tabella: { posizione, tipo: aiuta | profondita | nuova_linea | libera, persona_id, linea_id, creato_il }.
