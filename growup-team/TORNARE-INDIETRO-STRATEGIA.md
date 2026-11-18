@@ -42,6 +42,7 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 
 | Punto | PR | Cosa fa | Migrazione nel database | Script per toglierla |
 |---|---|---|---|---|
-| 0 | (questa) | Il tag `prima-della-strategia` e questo file | nessuna | — |
+| 0 | [#233](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/233) | Il tag `prima-della-strategia` e questo file | nessuna | — |
+| 1 | (questa) | Il calcolo della strategia, senza schermate nuove | nessuna | — |
 
-Le righe dei punti 1-5 si aggiungono quando le PR sono pronte.
+Le righe dei punti 2-5 si aggiungono quando le PR sono pronte.

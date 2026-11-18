@@ -3,6 +3,36 @@
 Ultimo aggiornamento: 18 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## La strategia in Io, punto 1: il calcolo (18 novembre 2026, app non cambiata a vista, database non toccato)
+
+Una sola funzione, `strategia(n)` in `app.js` (blocco «La tua strategia» in fondo al file), più `pathToBronze(pid)`. Nessuna
+schermata nuova: la usano i punti 2-5. Dati solo dalla mappa importata (VP personali e di gruppo, linee frontali, data di
+ingresso) e dagli inviti; requisiti dalla tabella delle tappe (`stage_requirements`), mai scritti nel codice.
+- **Situazione** dalle linee frontali attive (almeno `soglia_linea_attiva`, 100 VP di gruppo) nell'**ultimo mese chiuso =
+  il mese scorso** (scelta di Claude: è quello già caricato all'apertura, `st.riepPrec`): **A** nessuna, **B** una o due,
+  **C** tre o più. Chi si è iscritto da quel mese in poi e non è nella sua mappa parte da **A** con la mappa di adesso (il
+  nuovo dopo la partenza). Senza nessuna mappa: `pronta:false, motivo:"mappa"`.
+- **Prossima tappa**: la prima dal Path to Bronze ad Argento non fatta; punto di partenza la qualifica dichiarata, poi
+  `tappaFatta` (mappe). **Barra delle 4 tappe** (`tappe4`): Path to Bronze, Bronze Foundation (9% e 12%), Bronze Builder
+  (15% e 18%), Argento; un gruppo è fatto quando sono fatte tutte le sue righe. Da Argento in su niente tappa né barra.
+- **Linee**: i VP della mappa più recente (questo mese, altrimenti il mese scorso) rispetto alla soglia della tappa
+  (`vp_linea`, per Argento la soglia della linea attiva), con quanto manca; `attiva` = attiva nel mese chiuso. Il **numero
+  della linea** è la posizione per VP nel mese chiuso (fermo per tutto il mese; scelta di Claude).
+- **Path to Bronze di una persona** (io o chiunque della downline), dalla sua mappa più recente: VP personali su
+  `vp_personali`, quante sue linee **nuove** hanno almeno `vp_linea`, e il valore minimo nella mia linea (`vp_personali +
+  linee × vp_linea` = 400). **Linee nuove**: dalla data `linee_nuove_dal` della tabella; è vuota (004) e **resta vuota**
+  (scelta di Stefano, 18 novembre): contano tutte le linee frontali, come nell'Obiettivo. Se un admin scrive la data nella
+  tabella, contano solo le linee con la data di ingresso della mappa da quel giorno.
+- **Caselle proposte**: A → «Nuova linea frontale»; B → una «Persona che aiuti» per ogni linea attiva (chi la apre; se non
+  è nell'app, «Nuovo in profondità» per quella linea) e «Nuova linea frontale» per quelle che mancano; C → nessuna, sceglie
+  il partner (`proposteModo`: nuove linee, aiuta, in profondità, personalizza). **«Adatta ai tuoi numeri»** (`modoAdatto`,
+  scelta di Claude): linee sotto la soglia della prossima tappa → aiuta; linee a posto ma VP di gruppo sotto la tappa → in
+  profondità; altrimenti nuove linee.
+- **Caselle**: 3 per tutti; **da Argento in su** (qualifica dichiarata, anche solo 21%, oppure un mese da Argento nelle
+  mappe, anche se poi scende sotto il 21%) da 3 a 20 (`CASELLE_MAX`, tetto tecnico).
+Test dell'interfaccia: sezione 97 (A, B, C, Argento con 5 caselle, Argento sceso al 18%, mappa assente, nuovo prima e dopo
+la partenza, Path to Bronze con e senza la data delle linee nuove, requisiti cambiati nella tabella).
+
 ## La strategia in Io, punto 0: si può tornare indietro (18 novembre 2026, app e database non toccati)
 
 Prima di «La tua strategia» in cima a Io (punti 1-5, una PR per punto) la versione di adesso ha un nome: il tag
