@@ -7171,7 +7171,8 @@ for(const tema of ["light", "dark"]){
     creato_il:quando(-200), confermato_il:ora, partenza_confermata_il:ora, ultimo_aggiornamento:quando(-12), data_iscrizione:giorno(-210) });
   mappa(id(20), 110, 600, { mese:mesePrima, linee:linee([[21, 300], [22, 150], [23, 40]]) });
   mappa(id(20), 100, 500, { linee:linee([[21, 260], [22, 95], [23, 40], [24, 0]]) });
-  mappa(id(21), 80, 260); mappa(id(22), 100, 95);
+  sotto(26, "Nina Nuova", 21);
+  mappa(id(21), 80, 260, { linee:linee([[26, 120]]) }); mappa(id(22), 100, 95);   // Lia costruisce (fattura e ha una linea nuova da 100 VP), Leo no
   DB.persone = (DB.persone || []).concat([
     { id:"s100a", proprietario:id(20), nome:"Anna Agenda", fase:"contattato", esito:null, prossima_data:oggiIt, prossima_per:"fissare", creato_il:quando(-20) },
     { id:"s100b", proprietario:id(20), nome:"Carlo Cliente", fase:"lista", esito:"cliente", prossima_data:oggiIt, prossima_per:"riordino", creato_il:quando(-40) }]);
@@ -7192,7 +7193,8 @@ for(const tema of ["light", "dark"]){
   const tPers = (await pers.textContent()).replace(/\s+/g, " ");
   check(tPers.includes("Un nome per una nuova linea") && await pers.locator("button[data-act=strategia-lista][data-motivo='per una nuova linea']").count() === 1,
     "Persone: la casella vuota con «Lista ›» e il motivo");
-  check(tPers.includes("Senti Lia Linea") && tPers.includes("80 / 100 VP personali") && tPers.includes("Senti Leo Linea"), "Persone: «Senti…» per le persone che aiuti, con il loro Path to Bronze");
+  check(tPers.includes("Senti Lia Linea") && tPers.includes("80 / 100 VP personali") && tPers.includes("1 su 3 linee nuove") && tPers.includes("Un nome in profondità per la linea 2"),
+    "Persone: «Senti…» per chi aiuti (con il suo Path to Bronze); in profondità nella linea di chi non costruisce");
   check(tPers.includes("Dino Fermo") && tPers.includes("! Da sentire") && await pers.locator(".ds-blocco button.aiuto-btn[data-k=da-seguire]").count() === 1,
     "Persone: i motivi di «Da seguire oggi», con il loro «?»");
   check((await fatt.textContent()).includes("Carlo Cliente") && !tPers.includes("Carlo Cliente"), "Fatturato: i propri clienti");
