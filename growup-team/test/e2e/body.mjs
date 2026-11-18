@@ -6941,8 +6941,8 @@ for(const tema of ["light", "dark"]){
     === JSON.stringify(["Apri 3 nuove linee frontali", "Aiuta le persone che hai", "Sponsorizza in profondità", "Personalizza · ogni casella a mano"]), "strategia C: le quattro scelte");
   const pesi = await modi.evaluateAll(l => l.map(b => { const s = getComputedStyle(b); return [s.backgroundColor, s.borderColor, s.fontWeight, Math.round(b.getBoundingClientRect().width)].join(); }));
   check(new Set(pesi).size === 1 && !(await c.locator("button.modo.primary, button.modo[aria-pressed=true]").count()), "strategia C: le quattro scelte hanno lo stesso peso, nessuna preselezionata");
-  check(await c.locator(".adatta").count() === 1 && /Aiuta le persone che hai/.test(await c.locator("button.modo:has(.adatta)").textContent()),
-    "strategia C: «Adatta ai tuoi numeri» su una sola scelta (Aiuta, linee sotto la soglia)");
+  check(await c.locator(".adatta").count() === 1 && /Sponsorizza in profondità/.test(await c.locator("button.modo:has(.adatta)").textContent()),
+    "strategia C: «Adatta ai tuoi numeri» su una sola scelta (metodo CL21: nessun frontale costruisce → in profondità)");
   check(!(await aCapo(page)).length, "strategia C a 360 px: niente a capo (" + (await aCapo(page)).join("; ") + ")");
   await page.screenshot({ path:S + "/e2e/98-strategia-c-light.png" });
   await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
