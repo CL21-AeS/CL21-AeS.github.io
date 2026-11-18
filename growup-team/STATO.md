@@ -3,6 +3,13 @@
 Ultimo aggiornamento: 18 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## La strategia in Io, punto 0: si può tornare indietro (18 novembre 2026, app e database non toccati)
+
+Prima di «La tua strategia» in cima a Io (punti 1-5, una PR per punto) la versione di adesso ha un nome: il tag
+**`prima-della-strategia`** sul `main` (commit `2c12e40`, app v122, database fino alla 066). Come tornarci, in parole
+semplici, sta in **`TORNARE-INDIETRO-STRATEGIA.md`**, che si aggiorna a ogni PR della strategia con il numero della PR e
+le migrazioni da togliere. Regole: nel database solo tabelle nuove, per ogni migrazione anche lo script per toglierla.
+
 ## Chi ha invitato, anche per chi era già nella mappa (18 novembre 2026, migrazione 066, app non toccata)
 
 Corregge il difetto scritto qui sotto («Da sapere», 13 novembre). `entra_con_invito` ora segna `invitato_da` (chi ha
