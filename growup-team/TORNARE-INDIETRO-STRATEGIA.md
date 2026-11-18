@@ -45,9 +45,10 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 | 0 | [#233](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/233) | Il tag `prima-della-strategia` e questo file | nessuna | — |
 | 1 | [#234](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/234) | Il calcolo della strategia, senza schermate nuove | nessuna | — |
 | 2 | [#235](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/235) | La card «La tua strategia» in cima a Io e la schermata intera; le caselle si ricordano sul telefono | nessuna | — |
-| 3 | (questa) | Le caselle nel database, i suggerimenti, gli invitati che arrivano nella mappa | `067_strategia_caselle.sql` (tabella `strategia_caselle`) | `supabase/067_strategia_caselle_togli.sql` |
+| 3 | [#236](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/236) | Le caselle nel database, i suggerimenti, gli invitati che arrivano nella mappa | `067_strategia_caselle.sql` (tabella `strategia_caselle`) | `supabase/067_strategia_caselle_togli.sql` |
+| 4 | (questa) | «Oggi per la tua strategia» al posto della lista di oggi: i binari Persone e Fatturato | nessuna | — |
 
-Le righe dei punti 4 e 5 si aggiungono quando le PR sono pronte.
+La riga del punto 5 si aggiunge quando la PR è pronta.
 
 La 067 è applicata al database vero dal 18 novembre 2026: per toglierla serve lo script qui sopra.
 

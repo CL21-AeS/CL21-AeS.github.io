@@ -1565,8 +1565,8 @@ function vHome(){
   ${linkDaSalvare() && !percorsoAttivo() ? vPrimiPassi() : ""}
   ${vPerIniziare()}
   ${percorsoAttivo() ? vPercorso() : vCruscotto()}
-  ${st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : vOggiLista()}
-  ${vDaSeguire()}
+  ${st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : binariAttivi() ? "" : vOggiLista()}
+  ${binariAttivi() ? vBinari() : vDaSeguire()}
   ${vSerie()}
   ${linkDaSalvare() || percorsoAttivo() ? "" : vPrimiPassi()}
   ${vMioMese()}
@@ -4871,7 +4871,7 @@ function vPersone(){
   const l = nellaLista.filter(filtro.ok).filter(p => !cerchia || inCerchia(p.id, cerchia.id))
     .filter(p => !q || senzaAccenti(p.nome + " " + (p.origine || "")).includes(q))
     .sort((a, b) => String(b.creato_il || "").localeCompare(String(a.creato_il || "")) || a.nome.localeCompare(b.nome, "it"));
-  return `<div class="card">
+  return `${vMotivoLista()}<div class="card">
     <div class="spread testa-sezione"><span class="con-aiuto"><span class="eyebrow">La mia lista</span>${aiutoBtn("lista")}</span>
       <span class="pulsanti"><button class="btn small" data-act="persone-tante">Importa</button>
       <button class="btn small primary" data-act="persona-nuova">+ Nome</button></span></div>
@@ -8378,6 +8378,157 @@ document.addEventListener("visibilitychange", async () => {
   if(st.fase === "home" && st.profilo){ try{ if(!(await api.collega()) && await accessoNegato()) return; }catch(e){} }
   aggiornaAttivita();
 });
+
+/* ==== La tua strategia, punto 4: «Oggi per la tua strategia», al posto della lista di oggi, in due binari ====
+   Solo a partenza completata (con il percorso di partenza, e nei primi 30 giorni semplificati, tutto resta com'è).
+   PERSONE (Lista): le caselle vuote portano alla Lista con il motivo («per una nuova linea», «per la linea 2»); per le
+   persone che aiuti «Senti…» con il loro Path to Bronze; gli appuntamenti della Lista; i motivi di «Da seguire oggi».
+   FATTURATO (clienti e VP): i propri clienti (appuntamenti e da sentire); negli ultimi 10 giorni del mese anche le linee
+   vicine alla soglia della tappa (meno del 10% che manca, come in «Da seguire oggi») e chi è vicino alla percentuale.
+   Con il Seguimi acceso «Da fare oggi» resta com'è e i binari vengono sotto, senza ripetere Lista e Clienti. */
+function binariAttivi(){ return !!st.profilo && !percorsoAttivo() && st.vista === "io"; }
+const chiaveOggiStrategia = () => "growup-team.strategia-oggi." + st.profilo.id;
+function fattiOggiStrategia(){
+  try{ const m = JSON.parse(leggiLocale(chiaveOggiStrategia()) || "null"); return m && m.giorno === oggi() ? new Set(m.fatti || []) : new Set(); }catch(e){ return new Set(); }
+}
+function binariOggi(giorno){
+  giorno = giorno || oggi();
+  const persone = [], fatturato = [], fatti = fattiOggiStrategia();
+  let x = null;
+  try{ x = strategiaAttuale(); }catch(e){}
+  let ds = [];
+  try{ ds = haPartnerSotto() ? daSeguireOggi() : []; }catch(e){}
+  const dsId = new Set(ds.map(r => r.id));
+  if(x && x.s.pronta){
+    const s = x.s;
+    if(x.daScegliere) persone.push({ k:"scegli" });
+    /* le caselle vuote: una riga per tipo (e per linea), con quante ne mancano */
+    const vuote = new Map();
+    for(const c of x.caselle){
+      if(c.tipo !== "nuova_linea" && c.tipo !== "profondita" && c.tipo) continue;
+      const n = c.tipo === "profondita" ? numeroLinea(s, c.linea_id) : null;
+      const k = c.tipo ? c.tipo + "|" + (c.linea_id || "") : "libera";
+      const v = vuote.get(k) || { k:"casella", tipo:c.tipo || "libera", quante:0, n, nome:c.tipo === "profondita" ? nomeLinea(s, c.linea_id) : "",
+        motivo:c.tipo === "nuova_linea" ? "per una nuova linea" : c.tipo === "profondita" ? `per la linea ${n || ""}`.trim() : "" };
+      v.quante++; vuote.set(k, v);
+    }
+    persone.push(...vuote.values());
+    /* le persone che aiuti: «Senti…» con il loro Path to Bronze (se hanno anche un motivo di «Da seguire oggi», vale quello) */
+    for(const c of x.caselle) if(c.tipo === "aiuta" && !dsId.has(c.persona_id) && !fatti.has(c.persona_id)){
+      const p = st.struttura.find(y => y.id === c.persona_id);
+      if(p) persone.push({ k:"aiuta", p, n:numeroLinea(s, c.linea_id), ptb:pathToBronze(p.id) });
+    }
+    /* negli ultimi 10 giorni del mese: le linee vicine alla soglia della tappa */
+    const ultimo = piuGiorni(spostaMese(meseDi(giorno), 1) + "-01", -1);
+    if(s.recente && s.recente.mese === meseDi(giorno) && giorniTra(giorno, ultimo) < DA_SEGUIRE.giorniFineMese)
+      for(const l of s.linee) if(!l.ok && l.manca > 0 && l.manca < l.soglia * DA_SEGUIRE.quotaTraguardo) fatturato.push({ k:"linea", l, s });
+  }
+  /* «Da seguire oggi»: i motivi entrano qui (chi è vicino alla percentuale va nel Fatturato) */
+  for(const r of ds) (r.criterio === 3 ? fatturato : persone).push({ k:"seguire", r });
+  /* gli appuntamenti della Lista e i clienti, come nella lista di oggi (con il Seguimi stanno già in «Da fare oggi») */
+  const v = vociOggi(), seguimi = !!(st.seguimi && st.seguimi.attivo && oggiSeguimi());
+  if(!seguimi){
+    for(const y of v.oggi) (y.k === "cliente" ? fatturato : persone).push(y.k === "cliente" ? { k:"cliente", y } : { k:"lista", p:y.p });
+  }
+  return { persone, fatturato, altri:seguimi ? 0 : v.presto.length + v.corso.length, presto:v.presto, corso:v.corso };
+}
+function testoPtbBreve(ptb){
+  if(!ptb) return "";
+  if(ptb.completo) return "✓ Path to Bronze fatto";
+  if(ptb.personali == null) return `Path to Bronze · ${testoMappa(meseDi(oggi()), null)}`;
+  return `${num(ptb.personali)} / ${num(ptb.vpPersonali)} VP personali${ptb.personali >= ptb.vpPersonali ? " ✓" : ""} · ${Math.min(ptb.fatte, ptb.richieste)} su ${ptb.richieste} linee nuove · ${testoMappaStrategia(ptb.mese, ptb.datiAl)}`;
+}
+function rigaBinario(x){
+  if(x.k === "lista") return rigaPersona(x.p, true, "Lista");
+  if(x.k === "cliente") return rigaCliente(x.y);
+  if(x.k === "scegli") return `<li class="bin-riga"><span class="grow"><b>Come vuoi lavorare?</b><br><span class="small">La tua strategia aspetta la tua scelta</span></span>
+    <button class="btn small" data-act="strategia-apri">Scegli</button></li>`;
+  if(x.k === "casella"){
+    if(x.tipo === "libera") return `<li class="bin-riga"><span class="grow"><b>${x.quante === 1 ? "Una casella da scegliere" : `${num(x.quante)} caselle da scegliere`}</b>
+      <br><span class="small">nella tua strategia</span></span><button class="btn small" data-act="strategia-cambia">Scegli</button></li>`;
+    const titolo = x.tipo === "nuova_linea" ? (x.quante === 1 ? "Un nome per una nuova linea" : `${num(x.quante)} nomi per nuove linee`)
+      : `Un nome in profondità${x.n ? ` per la linea ${x.n}` : ""}`;
+    return `<li class="bin-riga"><span class="grow"><b>${esc(titolo)}</b><br><span class="small">${x.tipo === "nuova_linea" ? "Nuova linea frontale · da trovare"
+      : `Nuovo in profondità · da trovare${x.nome ? ` (${esc(x.nome)})` : ""}`}</span></span>
+      <button class="btn small" data-act="strategia-lista" data-motivo="${esc(x.motivo)}">Lista ›</button></li>`;
+  }
+  if(x.k === "aiuta") return `<li class="bin-riga"><span class="grow"><b>Senti ${esc(x.p.nome)}</b><br><span class="small">Persona che aiuti${x.n ? ` · linea ${x.n}` : ""}</span><br><span class="small">${esc(testoPtbBreve(x.ptb))}</span></span>
+    <span class="bin-azioni"><button class="btn small" data-act="ds-apri" data-id="${esc(x.p.id)}" aria-label="Apri la scheda di ${esc(x.p.nome)}">Apri scheda</button>
+    <button class="btn small" data-act="strategia-oggi-fatto" data-id="${esc(x.p.id)}" aria-label="Fatto: ${esc(x.p.nome)}">Fatto</button></span></li>`;
+  if(x.k === "linea"){ const l = x.l, apri = l.id && st.struttura.some(p => p.id === l.id);
+    return `<li class="bin-riga"><span class="grow"><b>Linea ${l.n || ""} · ${esc(l.nome)}</b> <span class="pill g mini">! Vicina</span>
+      <br><span class="small">Mancano ${num(l.manca)} VP per ${num(l.soglia)} · ${esc(testoMappaStrategia(x.s.recente.mese, x.s.recente.datiAl))}</span></span>
+      ${apri ? `<button class="btn small" data-act="ds-apri" data-id="${esc(l.id)}" aria-label="Apri la scheda di ${esc(l.nome)}">Apri scheda</button>` : ""}</li>`; }
+  return "";
+}
+/* una riga di «Da seguire oggi», come nel riquadro di prima (stesse classi, stessi pulsanti) */
+function rigaDaSeguire(r){
+  return `<li class="ds-${r.tipo}" data-id="${esc(r.id)}">
+      <div class="ds-testa"><b class="ds-nome">${esc(r.nome)}</b>
+        <span class="pill ${r.tipo === "complimento" ? "v" : "g"} ds-tag">${r.tipo === "complimento" ? "✓ Complimento" : "! Da sentire"}</span></div>
+      <span class="small ds-motivo">${esc(r.motivo)}</span>
+      ${r.anche ? `<span class="small ds-anche"><span class="ds-segno" aria-hidden="true">✓</span> Complimento: ${esc(r.anche)}</span>` : ""}
+      <div class="ds-azioni"><button class="btn small" data-act="ds-apri" data-id="${esc(r.id)}" aria-label="Apri la scheda di ${esc(r.nome)}">Apri scheda</button>
+        <button class="btn small" data-act="ds-fatto" data-id="${esc(r.id)}" aria-label="Fatto: ${esc(r.nome)}">Fatto</button></div></li>`;
+}
+/* i motivi di «Da seguire oggi» dentro un binario: in Persone con il «?» di sempre */
+function vDsBlocco(l, conAiuto){
+  if(!l.length) return "";
+  return `<div class="ds-blocco">${conAiuto ? `<div class="spread"><span class="con-aiuto"><span class="small"><b>Da seguire oggi</b></span>${aiutoBtn("da-seguire")}</span>
+      <span class="small">${l.length === 1 ? "1 persona" : `${num(l.length)} persone`}</span></div>
+    ${aiutoTesto("da-seguire", testoAiutoDaSeguire())}` : ""}
+    <ul class="da-seguire-l">${l.map(x => rigaDaSeguire(x.r)).join("")}</ul></div>`;
+}
+/* La card: in cima «La prossima cosa» come nella lista di oggi (il primo di oggi, Lista o Cliente, con Fatto / Segna il
+   passo / Più tardi), poi i due binari con il resto; in fondo «Prossimi giorni e in corso». Stessa classe della lista di
+   oggi (oggi-lista): tutto quello che si faceva da lì si fa ancora. */
+function vBinari(){
+  if(!binariAttivi()) return "";
+  let b;
+  try{ b = binariOggi(); }catch(e){ return vOggiLista() + vDaSeguire(); }
+  const aperto = !!st.dopoAperto, voci = b.persone.concat(b.fatturato).filter(x => x.k === "lista" || x.k === "cliente");
+  const prima = voci[0] || null, totale = voci.length;
+  const daTogliere = x => x === prima;
+  const persone = b.persone.filter(x => !daTogliere(x)), fatturato = b.fatturato.filter(x => !daTogliere(x));
+  const pp = prima && (prima.k === "cliente" ? prima.y.p : prima.p), kc = prima && prima.k === "cliente";
+  const testa = prima ? `<div class="spread"><span class="eyebrow pesca">La prossima cosa</span>
+      <span class="row" style="gap:6px;align-items:center"><span class="small">1 di ${totale} oggi</span>
+      <button class="x" data-act="togli-da-io" data-id="${esc(pp.id)}" aria-label="Togli ${esc(pp.nome)} da Io">×</button></span></div>
+    <button class="prossima-titolo" data-act="${kc ? "apri-cliente" : "apri-persona"}" data-id="${esc(pp.id)}">${esc(pp.nome)}
+      <span class="pill mini tag tag-${kc ? "cliente" : "lista"}">${kc ? "Cliente" : "Lista"}</span></button>
+    <p class="small${inAgenda(pp) ? " agenda-testo" : ""}" style="margin:0">${kc ? esc(motivoVoce(prima.y)) : motivoVoce({ k:"lista", p:pp })}</p>
+    <div class="prossima-azioni">
+      ${inAgenda(pp) ? `<button class="btn primary" data-act="agenda-fatto" data-id="${esc(pp.id)}">Fatto</button>`
+        : `<button class="btn primary" data-act="prossima-fatto" data-k="${kc ? "cliente" : "lista"}" data-id="${esc(pp.id)}">${kc ? "Apri" : "Segna il passo"}</button>`}
+      <button class="btn" data-act="agenda" data-id="${esc(pp.id)}" data-dopo="1">Più tardi</button></div>` : "";
+  const binario = (titolo, sotto, tutte, vuoto, aiuto) => { const l = tutte.filter(x => x.k !== "seguire"), ds = tutte.filter(x => x.k === "seguire");
+    return `<section class="binario-oggi"><div class="spread"><h3>${titolo}</h3><span class="small">${sotto}</span></div>
+    ${l.length ? `<ul class="persone bin-l">${l.map(rigaBinario).join("")}</ul>` : ds.length ? "" : `<p class="small muted" style="margin:4px 0 0">${vuoto}</p>`}
+    ${vDsBlocco(ds, aiuto)}</section>`; };
+  return `<div class="card oggi-lista oggi-strategia">
+    <span class="eyebrow">Oggi per la tua strategia</span>
+    ${testa ? `<div class="prossima-cosa">${testa}</div>` : ""}
+    ${binario("Persone", "Lista", persone, prima ? "Nient'altro in programma oggi." : "Niente in programma oggi.", true)}
+    ${binario("Fatturato", "clienti e VP", fatturato, "Nessun cliente da sentire oggi.")}
+    ${b.altri ? `<button class="riga-apri" data-act="apri-dopo" aria-expanded="${aperto}"><span class="grow">Prossimi giorni e in corso · ${num(b.altri)}</span>
+      <span class="fr" aria-hidden="true">${aperto ? "▴" : "▾"}</span></button>
+    ${aperto ? [["Prossimi giorni", b.presto], ["In corso", b.corso]].filter(([, l]) => l.length).map(([t, l]) => `<p class="small da-fare-t">${t}</p>
+      <ul class="persone">${l.map(p => rigaPersona(p, true)).join("")}</ul>`).join("") : ""}` : ""}
+  </div>`;
+}
+/* nella Lista, il motivo per cui ci si arriva dalla strategia */
+function vMotivoLista(){
+  if(!st.motivoLista || st.sezPersone !== "lista" || st.personaId) return "";
+  return `<div class="card motivo-lista"><span class="grow"><span class="eyebrow">Per la tua strategia</span><br><b>Un nome ${esc(st.motivoLista)}</b></span>
+    <button class="x" data-act="motivo-lista-chiudi" aria-label="Chiudi">×</button></div>`;
+}
+Object.assign(AZIONI, {
+  "motivo-lista-chiudi"(){ st.motivoLista = null; render(); },
+  /* «Fatto» su una persona che aiuti: per oggi non c'è più (su questo telefono) */
+  "strategia-oggi-fatto"(el){ const f = fattiOggiStrategia(); f.add(el.dataset.id);
+    salvaLocale(chiaveOggiStrategia(), JSON.stringify({ giorno:oggi(), fatti:[...f] })); render(); toast("Fatto per oggi"); }
+});
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { binariOggi });
 
 /* Un link aperto mentre l'app è già aperta (es. il link personale toccato in WhatsApp). */
 window.addEventListener("hashchange", () => {

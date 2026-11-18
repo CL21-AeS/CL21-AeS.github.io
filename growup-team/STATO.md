@@ -3,6 +3,36 @@
 Ultimo aggiornamento: 18 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## La strategia in Io, punto 4: «Oggi per la tua strategia» (18 novembre 2026, database non toccato)
+
+Al posto della lista di oggi, **a partenza completata** (`binariAttivi()`; nel percorso di partenza e nella versione
+semplificata dei primi 30 giorni tutto resta com'è), sotto la card della strategia, la card **«Oggi per la tua
+strategia»** (`vBinari`, calcolo in `binariOggi(giorno)`) con due binari (scelte di Stefano del 18 novembre):
+- **Persone** (Lista): le caselle vuote, una riga per tipo e per linea («Un nome per una nuova linea», «2 nomi per nuove
+  linee», «Un nome in profondità per la linea 2», «Una casella da scegliere», in C «Come vuoi lavorare?»), con «Lista ›»
+  che apre la Lista e in cima il **motivo** («Per la tua strategia · Un nome per una nuova linea», con la ×:
+  `vMotivoLista`); **«Senti …»** per ogni persona che aiuti (linea, VP personali su 100 con ✓, «N su 3 linee nuove»,
+  data della mappa) con «Apri scheda» e «Fatto» (per oggi, su questo telefono: `growup-team.strategia-oggi.<id>`); gli
+  **appuntamenti della Lista** (come prima); i motivi di **«Da seguire oggi»** («! Da sentire», «✓ Complimento», con «Apri
+  scheda» e «Fatto» di sempre). Il riquadro «Da seguire oggi» a parte non c'è più (scelta di Stefano); chi aiuto e ha
+  anche un motivo di «Da seguire oggi» ha una riga sola, quella del motivo.
+- **Fatturato** (clienti e VP): i propri clienti (appuntamenti e da sentire, come prima); negli **ultimi 10 giorni del
+  mese** le linee vicine alla soglia della tappa («! Vicina», mancano meno del 10% dei VP, le stesse regole di «Da seguire
+  oggi»: `DA_SEGUIRE`) con la data della mappa; chi è vicino alla percentuale (criterio 3 di «Da seguire oggi»).
+- «Prossimi giorni e in corso» resta in fondo alla card; «Il mio mese», la serie e la Verifica restano sotto.
+- **Con il Seguimi** acceso «Da fare oggi» resta com'è (scelta di Stefano) e i binari vengono sotto, senza ripetere gli
+  appuntamenti di Lista e Clienti (sono già in «Da fare oggi»).
+- **«La prossima cosa»** resta in cima alla card, com'era (il primo appuntamento di oggi, Lista o Cliente, con Fatto /
+  Segna il passo / Più tardi): la card ha anche la classe della lista di oggi (`oggi-lista`), così tutto quello che si
+  faceva da lì si fa ancora; sotto, il resto diviso nei due binari. I motivi di «Da seguire oggi» hanno lo stesso aspetto
+  e gli stessi pulsanti di prima (`rigaDaSeguire`, `.ds-blocco`) e il loro «?»; il riquadro a parte resta solo per chi è
+  nel percorso di partenza e ha già qualcuno sotto (raro). Test di prima adattati: sezioni 91, 92, 95, 96 (cercano «Da
+  seguire oggi» in `.card.da-seguire, .ds-blocco`).
+- La versione di prova per Cum Laude 21 mostra anche la strategia e i binari (Giulia «Due mesi dopo» è in situazione C:
+  «Come vuoi lavorare?»).
+Test dell'interfaccia: sezione 100 (i due binari e il loro contenuto, «Lista ›» con il motivo, «Fatto», le linee vicine a
+fine mese e non a inizio mese, il nuovo nel percorso com'era; anteprime `e2e/100-binari-light.png` e `-dark.png`).
+
 ## La strategia in Io, punto 3: le caselle nel database (18 novembre 2026, migrazione 067 applicata al database vero)
 
 - **067** (`supabase/067_strategia_caselle.sql`, solo cose nuove; per toglierla `067_strategia_caselle_togli.sql`): tabella
