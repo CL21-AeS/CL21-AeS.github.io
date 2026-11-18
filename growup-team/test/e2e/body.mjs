@@ -6175,8 +6175,10 @@ for(const tema of ["light", "dark"]){
   app(3, "Dino Dormiente", V, { ultimo_aggiornamento:quando(-10) });             // da aiutare: non aggiorna
   app(4, "Lina Lanciata", V, { chiave:"72".repeat(16), invitato_da:V, data_iscrizione:giorno(-20), privacy_accettata_il:quando(-19),
     partenza_completata_il:quando(-2) }); perche(4);                               // complimento: partenza completata
-  const box = () => page.locator(".card.da-seguire");
-  const righe = () => page.locator(".card.da-seguire .da-seguire-l > li");
+  /* strategia, punto 4: a partenza completata i motivi stanno nel binario Persone di «Oggi per la tua strategia» (.ds-blocco);
+     il riquadro a parte resta per chi è nel percorso di partenza */
+  const box = () => page.locator(".card.da-seguire, .ds-blocco");
+  const righe = () => box().locator(".da-seguire-l > li");
 
   ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "71".repeat(16)));
   await page.locator(".testata h1").waitFor();
@@ -6191,11 +6193,11 @@ for(const tema of ["light", "dark"]){
     && /^Ha completato la partenza · /.test(await righe().nth(2).locator(".ds-motivo").innerText()), "da seguire: il motivo in piccolo sotto il nome");
   check(await righe().nth(2).evaluate(li => li.classList.contains("ds-complimento")) && await righe().nth(0).evaluate(li => li.classList.contains("ds-aiuto")),
     "da seguire: le classi del colore");
-  check(await page.locator(".card.da-seguire button[data-act=ds-apri]").count() === 3 && await page.locator(".card.da-seguire button[data-act=ds-fatto]").count() === 3,
+  check(await box().locator("button[data-act=ds-apri]").count() === 3 && await box().locator("button[data-act=ds-fatto]").count() === 3,
     "da seguire: «Apri scheda» e «Fatto» su ogni riga");
-  check(!(await page.locator(".card.da-seguire a[href*='wa.me']").count()), "da seguire: niente WhatsApp (il numero non è visibile all'upline)");
-  check(await page.evaluate(() => { const b = document.querySelector(".card.da-seguire"), o = document.querySelector(".card.oggi-lista, .card.oggi-per-te");
-    return !o || !!(o.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING); }), "da seguire: sotto la lista di oggi");
+  check(!(await box().locator("a[href*='wa.me']").count()), "da seguire: niente WhatsApp (il numero non è visibile all'upline)");
+  check(await page.evaluate(() => !!document.querySelector(".card.oggi-strategia .binario-oggi .ds-blocco") && !document.querySelector(".card.da-seguire")),
+    "da seguire: a partenza completata nel binario Persone di «Oggi per la tua strategia», nessun riquadro a parte");
   check(!(await box().innerText()).includes("famiglia"), "da seguire: mai il testo del perché");
   check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "da seguire, 360 px: niente scroll orizzontale");
   // «Apri scheda»: la stessa scheda del tocco sulle notifiche
@@ -6273,7 +6275,7 @@ for(const tema of ["light", "dark"]){
   app(2, "Alba Avvio", W, { invitato_da:W, data_iscrizione:giorno(-5), privacy_accettata_il:quando(-4), creato_il:quando(-4), conPercorso:true });
   app(3, "Dino Dormiente", W, { ultimo_aggiornamento:quando(-10) });
   app(4, "Lina Lanciata", W, { invitato_da:W, data_iscrizione:giorno(-20), privacy_accettata_il:quando(-19), partenza_completata_il:quando(-2) });
-  const box = () => page.locator(".card.da-seguire");
+  const box = () => page.locator(".card.da-seguire, .ds-blocco");   // strategia, punto 4: nel binario Persone
   for(const tema of ["light", "dark"]){
     // finestra alta: il riquadro intero sta tra le barre fisse in alto e in basso
     ({ ctx, page } = await apri({ viewport:{ width:360, height:2200 }, colorScheme:tema, deviceScaleFactor:2 }, "#chiave=" + "74".repeat(16)));
@@ -6558,7 +6560,7 @@ for(const tema of ["light", "dark"]){
   const seg = await pg.evaluate(() => window.__DB.seguimi.find(x => x.partner_id === "G"));
   check(seg && seg.attivo && seg.condividi, "prova Giulia, due mesi dopo: Seguimi acceso e condiviso");
   /* «Da seguire oggi»: almeno tre motivi diversi */
-  const ds = pg.locator(".card.da-seguire"); await ds.waitFor();
+  const ds = pg.locator(".card.da-seguire, .ds-blocco"); await ds.waitFor();   // strategia, punto 4: nel binario Persone
   const righe = (await ds.locator(".da-seguire-l > li").allInnerTexts()).map(x => x.replace(/\s+/g, " "));
   check(righe.length >= 3 && righe.some(r => r.includes("Sara Conti") && r.includes("Incontro con lo sponsor non ancora fissato"))
     && righe.some(r => r.includes("Paola Greco") && r.includes("Non aggiorna da 9 giorni"))
@@ -6632,7 +6634,7 @@ for(const tema of ["light", "dark"]){
     await pg.getByText("ti diamo il benvenuto in Growup").waitFor();
     await pg.click(".prova-barra [data-prova=due-mesi]");
     await pg.getByText("Ciao Giulia").waitFor();
-    const ds = (await pg.locator(".card.da-seguire .da-seguire-l > li").allInnerTexts()).map(x => x.replace(/\s+/g, " "));
+    const ds = (await pg.locator(".card.da-seguire .da-seguire-l > li, .ds-blocco .da-seguire-l > li").allInnerTexts()).map(x => x.replace(/\s+/g, " "));
     check(ds.length >= 3 && ds.some(r => r.includes("Sara Conti") && r.includes("Incontro con lo sponsor non ancora fissato")) && ds.some(r => r.includes("Non aggiorna"))
       && ds.some(r => /Complimento/i.test(r)), `prova (${etichetta}): «Da seguire oggi» con un nuovo fermo, uno che non aggiorna e un complimento (${ds.join(" | ")})`);
     const t = (await pg.locator("#app").innerText()).replace(/\s+/g, " ");
@@ -7127,6 +7129,95 @@ for(const tema of ["light", "dark"]){
   DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
   DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
   DB.caselle = (DB.caselle || []).filter(x => !tutti.includes(x.partner_id));
+}
+// 100. La tua strategia, punto 4: «Oggi per la tua strategia» al posto della lista di oggi, in due binari. Persone: le
+//      caselle vuote con «Lista ›» e il motivo (che la Lista mostra in cima), «Senti…» per le persone che aiuti con il loro
+//      Path to Bronze, gli appuntamenti della Lista, i motivi di «Da seguire oggi» (il riquadro a parte non c'è più).
+//      Fatturato: i clienti; negli ultimi 10 giorni del mese le linee vicine alla soglia. «Il mio mese» resta sotto.
+//      Il nuovo nel percorso vede tutto com'era. Anteprime a 360 px, chiaro e scuro.
+{
+  const id = n => "a0000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0");
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const ora = new Date().toISOString();
+  const spMese = (m, k) => { const [y, mm] = m.split("-").map(Number), t = y * 12 + mm - 1 + k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, "0")}`; };
+  const mesePrima = spMese(meseOra(), -1);
+  const oggiIt = new Intl.DateTimeFormat("en-CA", { timeZone:"Europe/Rome" }).format(new Date());
+  const cod = n => "7900" + String(n).padStart(3, "0");
+  const io = (n, nome, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:"R", stato:"attivo", codice_invito:"SO" + n + "XX", codice_amway:cod(n),
+    chiave:String(n).padStart(2, "0").repeat(16), privacy_accettata_il:quando(-300), confermato_il:ora, partenza_confermata_il:ora, creato_il:quando(-300),
+    ultimo_aggiornamento:ora, data_iscrizione:giorno(-700) }, extra));
+  const sotto = (n, nome, sponsor, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:id(sponsor), stato:"gestito", gestore_id:id(sponsor),
+    codice_invito:"SO" + n + "XX", codice_amway:cod(n), partenza_confermata_il:ora, creato_il:quando(-300), data_iscrizione:giorno(-500) }, extra));
+  const linee = l => l.map(([n, vpg]) => ({ codice:cod(n), vpg }));
+  const tutti = []; for(let n = 10; n <= 80; n++) tutti.push(id(n));
+  io(20, "Bea Binario"); sotto(21, "Lia Linea", 20); sotto(22, "Leo Linea", 20); sotto(23, "Max Poco", 20);
+  // Dino: usa l'app, nella prima linea di Bea, non aggiorna da 12 giorni («Da seguire oggi»)
+  DB.partners.push({ id:id(24), nome:"Dino Fermo", sponsor_id:id(20), stato:"attivo", codice_invito:"SO24XX", codice_amway:cod(24), privacy_accettata_il:quando(-200),
+    creato_il:quando(-200), confermato_il:ora, partenza_confermata_il:ora, ultimo_aggiornamento:quando(-12), data_iscrizione:giorno(-210) });
+  mappa(id(20), 110, 600, { mese:mesePrima, linee:linee([[21, 300], [22, 150], [23, 40]]) });
+  mappa(id(20), 100, 500, { linee:linee([[21, 260], [22, 95], [23, 40], [24, 0]]) });
+  mappa(id(21), 80, 260); mappa(id(22), 100, 95);
+  DB.persone = (DB.persone || []).concat([
+    { id:"s100a", proprietario:id(20), nome:"Anna Agenda", fase:"contattato", esito:null, prossima_data:oggiIt, prossima_per:"fissare", creato_il:quando(-20) },
+    { id:"s100b", proprietario:id(20), nome:"Carlo Cliente", fase:"lista", esito:"cliente", prossima_data:oggiIt, prossima_per:"riordino", creato_il:quando(-40) }]);
+  const apriCome = async (n, opz) => { const r = await apri(Object.assign({ viewport:{ width:360, height:780 } }, opz || {}), "#chiave=" + String(n).padStart(2, "0").repeat(16));
+    await r.page.locator(".testata h1").waitFor(); return r; };
+
+  ({ ctx, page } = await apriCome(20));
+  const b = page.locator("#app .card.oggi-strategia");
+  await b.waitFor();
+  check(!(await page.locator("#app .oggi-lista:not(.oggi-strategia)").count()) && !(await page.locator("#app .card.da-seguire").count()),
+    "binari: al posto della lista di oggi; il riquadro «Da seguire oggi» non c'è più");
+  check((await b.locator(".prossima-cosa .prossima-titolo").innerText()).startsWith("Anna Agenda") && await b.locator(".prossima-cosa button[data-act=agenda-fatto]").count() === 1,
+    "binari: in cima «La prossima cosa» di sempre (il primo appuntamento di oggi, con Fatto e Più tardi)");
+  check(await page.evaluate(() => { const c = [...document.querySelectorAll("#app > .card, #app .card")]; return c.indexOf(document.querySelector(".card.strategia")) < c.indexOf(document.querySelector(".card.oggi-strategia")); }),
+    "binari: sotto la card della strategia");
+  const [pers, fatt] = [b.locator(".binario-oggi").nth(0), b.locator(".binario-oggi").nth(1)];
+  check((await pers.locator("h3").textContent()) === "Persone" && (await fatt.locator("h3").textContent()) === "Fatturato", "binari: Persone e Fatturato");
+  const tPers = (await pers.textContent()).replace(/\s+/g, " ");
+  check(tPers.includes("Un nome per una nuova linea") && await pers.locator("button[data-act=strategia-lista][data-motivo='per una nuova linea']").count() === 1,
+    "Persone: la casella vuota con «Lista ›» e il motivo");
+  check(tPers.includes("Senti Lia Linea") && tPers.includes("80 / 100 VP personali") && tPers.includes("Senti Leo Linea"), "Persone: «Senti…» per le persone che aiuti, con il loro Path to Bronze");
+  check(tPers.includes("Dino Fermo") && tPers.includes("! Da sentire") && await pers.locator(".ds-blocco button.aiuto-btn[data-k=da-seguire]").count() === 1,
+    "Persone: i motivi di «Da seguire oggi», con il loro «?»");
+  check((await fatt.textContent()).includes("Carlo Cliente") && !tPers.includes("Carlo Cliente"), "Fatturato: i propri clienti");
+  check(await page.locator("#app button[data-act=apri-mese]").count() === 1, "«Il mio mese» resta sotto");
+  // le linee vicine alla soglia negli ultimi 10 giorni del mese (Leo: 95 su 100)
+  const [aa, mm] = meseOra().split("-").map(Number), ultimo = `${meseOra()}-${String(new Date(Date.UTC(aa, mm, 0)).getUTCDate()).padStart(2, "0")}`;
+  const linFine = await page.evaluate(g => GROWUP_TEST.binariOggi(g).fatturato.filter(x => x.k === "linea").map(x => x.l.nome), ultimo);
+  const linInizio = await page.evaluate(g => GROWUP_TEST.binariOggi(g).fatturato.filter(x => x.k === "linea").length, meseOra() + "-01");
+  check(JSON.stringify(linFine) === JSON.stringify(["Leo Linea"]) && linInizio === 0, "Fatturato: negli ultimi 10 giorni del mese le linee vicine alla soglia (solo Leo, a 5 VP)");
+  // niente a capo a 360 px nei pulsanti e nelle etichette
+  const aCapo = await page.evaluate(() => [...document.querySelectorAll(".oggi-strategia button, .oggi-strategia .pill, .oggi-strategia h3")].filter(e => !e.querySelector("br, .grow") && !e.matches(".prossima-titolo")).filter(e => {
+    const g = document.createRange(); g.selectNodeContents(e); return new Set([...g.getClientRects()].filter(r => r.width > 1).map(r => Math.round(r.top))).size > 1; }).map(e => e.textContent.trim()));
+  check(!aCapo.length && await page.evaluate(() => document.documentElement.scrollWidth <= 360), "binari a 360 px: niente a capo (" + aCapo.join("; ") + ")");
+  await page.screenshot({ path:S + "/e2e/100-binari-light.png", fullPage:true });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await page.screenshot({ path:S + "/e2e/100-binari-dark.png", fullPage:true });
+  await page.emulateMedia({ colorScheme:"light" });
+  // «Fatto» su una persona che aiuti: per oggi non c'è più
+  await pers.locator("button[data-act=strategia-oggi-fatto]").first().click();
+  check(!(await pers.textContent()).includes("Senti Lia Linea"), "«Fatto» su una persona che aiuti: per oggi sparisce");
+  // la Lista con il motivo
+  await pers.locator("button[data-act=strategia-lista]").first().click();
+  const m = page.locator("#app .card.motivo-lista");
+  check(await m.count() === 1 && (await m.textContent()).includes("Un nome per una nuova linea"), "Lista: in cima il motivo della strategia");
+  await m.locator("button[data-act=motivo-lista-chiudi]").click();
+  check(!(await page.locator("#app .card.motivo-lista").count()), "Lista: il motivo si chiude con la ×");
+  await ctx.close();
+
+  // il nuovo nel percorso: tutto com'era (la lista di oggi con «La prossima cosa», nessun binario)
+  io(30, "Gino Percorso", { data_iscrizione:giorno(-5), privacy_accettata_il:quando(-4), creato_il:quando(-4), conPercorso:true });
+  DB.obiettivi = (DB.obiettivi || []).concat([{ partner_id:id(30), cifra_mese:300, entro:"2027-06-01", perche:"Per la famiglia" }]);
+  ({ ctx, page } = await apriCome(30));
+  await page.waitForTimeout(300);
+  check(!(await page.locator("#app .card.oggi-strategia").count()) && await page.locator("#app .oggi-lista").count() === 1, "nuovo nel percorso: la lista di oggi com'era, nessun binario");
+  await ctx.close();
+  check(!errori.length, "binari: nessun errore nella pagina");
+  DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
+  DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
+  DB.persone = DB.persone.filter(p => !["s100a", "s100b"].includes(p.id));
+  DB.obiettivi = DB.obiettivi.filter(o => !tutti.includes(o.partner_id));
 }
 await browser.close();
 console.log(`controlli superati: ${ok}`);

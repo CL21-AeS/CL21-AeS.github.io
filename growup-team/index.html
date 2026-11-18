@@ -954,6 +954,24 @@ html,body{overflow-x:clip}
 .festa-caselle{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .festa-caselle li{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:10px;border:1px dashed rgba(255,255,255,.35)}
 .festa-caselle .casella-tipo{color:#e8dcc6}
+/* Oggi per la tua strategia (punto 4): i due binari, Persone e Fatturato */
+.oggi-strategia{display:flex;flex-direction:column;gap:10px}
+.oggi-strategia .prossima-cosa{display:flex;flex-direction:column;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.binario-oggi h3{font-family:var(--f-titoli);font-size:20px}
+.binario-oggi+.binario-oggi{border-top:1px solid var(--line);padding-top:10px}
+.bin-l{margin:4px 0 0}
+.bin-riga{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.bin-l>li:first-child{border-top:0}
+.bin-riga .grow{min-width:0}
+.bin-riga{flex-wrap:wrap}
+.bin-riga .grow{flex:1 1 0}
+.bin-riga .bin-azioni{display:flex;gap:8px;flex:1 0 100%}
+.bin-riga .bin-azioni .btn{flex:1}
+.ds-blocco{margin-top:8px}
+.oggi-strategia .prossima-azioni{grid-template-columns:1fr auto}
+.oggi-strategia .prossima-azioni .btn{white-space:nowrap}
+.bin-riga .segno-ok{color:var(--verde);font-weight:800}
+.card.motivo-lista{display:flex;align-items:center;gap:10px;border:2px dashed var(--scelta)}
 </style>
 <script src="config.js"></script>
 <script src="lib/supabase-2.117.2.js"
