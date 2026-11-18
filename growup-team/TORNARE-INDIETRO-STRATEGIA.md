@@ -44,6 +44,13 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 |---|---|---|---|---|
 | 0 | [#233](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/233) | Il tag `prima-della-strategia` e questo file | nessuna | — |
 | 1 | [#234](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/234) | Il calcolo della strategia, senza schermate nuove | nessuna | — |
-| 2 | (questa) | La card «La tua strategia» in cima a Io e la schermata intera; le caselle si ricordano sul telefono | nessuna | — |
+| 2 | [#235](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/235) | La card «La tua strategia» in cima a Io e la schermata intera; le caselle si ricordano sul telefono | nessuna | — |
+| 3 | (questa) | Le caselle nel database, i suggerimenti, gli invitati che arrivano nella mappa | `067_strategia_caselle.sql` (tabella `strategia_caselle`) | `supabase/067_strategia_caselle_togli.sql` |
 
-Le righe dei punti 3-5 si aggiungono quando le PR sono pronte.
+Le righe dei punti 4 e 5 si aggiungono quando le PR sono pronte.
+
+La 067 è applicata al database vero dal 18 novembre 2026: per toglierla serve lo script qui sopra.
+
+Da sapere sulla 067: se si annulla la PR 3 ma la tabella resta nel database, l'app torna a ricordare le caselle sul
+telefono (come nel punto 2) e le caselle salvate nella tabella non si vedono più; se si toglie la tabella e la PR 3 resta,
+l'app se ne accorge e usa il telefono.

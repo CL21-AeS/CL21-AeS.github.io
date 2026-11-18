@@ -177,6 +177,10 @@ function creaApi(){
     numeriPersone: pid => q(sb.rpc("numeri_persone", { p_partner:pid })),
     /* 060: i numeri della partenza (senza argomento: chi ho invitato io) e chi ho tolto con la × */
     partenze:     pid => q(sb.rpc("partenze", pid ? { p_partner:pid } : {})),
+    /* 067: le caselle della strategia, solo mie (RLS) */
+    caselle:      () => q(sb.from("strategia_caselle").select("posizione,tipo,persona_id,linea_id,creato_il").order("posizione")),
+    salvaCaselle: righe => q(sb.from("strategia_caselle").upsert(righe, { onConflict:"partner_id,posizione" })),
+    togliCaselleDa: n => q(sb.from("strategia_caselle").delete().gt("posizione", n)),
     /* 064: solo sì/no (gli id) per i nuovi con il primo ordine confermato che la mappa non mostra ancora */
     ordiniInAttesa: pid => q(sb.rpc("ordini_in_attesa", pid ? { p_partner:pid } : {})),
     partenzaTolti: () => q(sb.from("partenza_tolti").select("nuovo_id,fase")),
@@ -843,6 +847,7 @@ async function caricaTutto(){
   try{ st.obiettivo = await api.obiettivo(p.id) || null; }catch(e){ st.obiettivo = null; }
   try{ st.obiettiviGruppo = new Map((await api.obiettiviGruppo2() || []).map(o => [o.partner_id, o])); }catch(e){}
   await caricaNumeri();
+  await caricaCaselle();
   await caricaPersone();
   await caricaInviti();
   await caricaClienti();
@@ -8575,10 +8580,24 @@ if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { strategia, pathToBron
    partenza, «Ecco la tua strategia»); prima tutto resta com'è. Colori: pesca solo per l'azione principale, verde = fatto
    (sempre con ✓), ambra = attenzione (sempre con !). */
 const chiaveStrategia = () => "growup-team.strategia." + st.profilo.id;
-function sceltaStrategia(){
+function sceltaLocale(){
   try{ const x = JSON.parse(leggiLocale(chiaveStrategia()) || "null"); return x && Array.isArray(x.caselle) ? x : null; }catch(e){ return null; }
 }
-async function salvaSceltaStrategia(x){ salvaLocale(chiaveStrategia(), x ? JSON.stringify(x) : null); }
+/* 067: con la tabella delle caselle la scelta sta nel database; se non risponde (o non c'è), su questo telefono */
+function sceltaStrategia(){ return Array.isArray(st.caselleDb) ? sceltaDaRighe(st.caselleDb) : sceltaLocale(); }
+/* salva (null = torna alla proposta della mappa); true se è andata */
+async function salvaSceltaStrategia(x){
+  if(Array.isArray(st.caselleDb)){
+    try{
+      if(!x) await api.togliCaselleDa(0);
+      else{ await api.salvaCaselle(righeDaScelta(x)); await api.togliCaselleDa(x.n); }
+      st.caselleDb = await api.caselle() || [];
+      return true;
+    }catch(e){ toast("Non riesco a salvare le caselle: riprova tra poco"); return false; }
+  }
+  salvaLocale(chiaveStrategia(), x ? JSON.stringify(x) : null);
+  return true;
+}
 const TIPI_CASELLA = { aiuta:"Persona che aiuti", profondita:"Nuovo in profondità", nuova_linea:"Nuova linea frontale" };
 /* una casella salvata vale solo se la persona è ancora nella mia downline e la linea è ancora una mia linea frontale */
 function casellaValida(c){
@@ -8696,6 +8715,7 @@ function vStrategia(){
     <h2 class="strategia-titolo">${esc(titoloStrategia(caselle))}</h2>
     ${vTappe4(s)}
     ${vCaselle(caselle, s, 3)}
+    ${vInvitatoDaAiutare(caselle)}
     ${vLineeStrategia(s, 3)}
     <div class="strategia-piede"><button class="btn small" data-act="strategia-cambia">Cambia</button>
       <button class="btn small" data-act="strategia-apri">Vedi tutto ›</button></div>
@@ -8722,7 +8742,7 @@ function vSheetStrategia(sh){
     <div class="spread strategia-cima"><span class="eyebrow">La tua strategia</span><button class="x" data-act="chiudi" aria-label="Chiudi">×</button></div>
     <h2 class="strategia-titolo">${esc(x.daScegliere ? "Come vuoi lavorare?" : titoloStrategia(x.caselle))}</h2>
     ${vTappe4(s)}
-    ${x.daScegliere ? vModi(s, "strategia-modo") : vCaselle(x.caselle, s)}
+    ${x.daScegliere ? vModi(s, "strategia-modo") : vCaselle(x.caselle, s) + vInvitatoDaAiutare(x.caselle)}
     ${vLineeStrategia(s)}
     <div class="row strategia-piede"><button class="btn grow" data-act="strategia-cambia">Cambia</button></div>
   </div>`;
@@ -8740,10 +8760,12 @@ function vStrategiaModifica(x){
   const io = st.profilo.id, linee = (s.numerate || []).filter(l => l.id && figli(io).some(p => p.id === l.id));
   const persone = alberoSotto(io, 0).map(y => y.p).map(p => ({ p, n:numeroLinea(s, lineaDiPersona(p.id)) }))
     .sort((a, c) => (a.n || 99) - (c.n || 99) || a.p.nome.localeCompare(c.p.nome, "it"));
+  const sugg = suggerimentiAiuta([]), suggId = new Set(sugg.map(x => x.p.id));
   const opzioni = v => `<option value=""${v === "" ? " selected" : ""}>Da scegliere</option>
     <option value="nuova"${v === "nuova" ? " selected" : ""}>Nuova linea frontale · da trovare</option>
     ${linee.length ? `<optgroup label="Nuovo in profondità">${linee.map(l => `<option value="prof:${esc(l.id)}"${v === "prof:" + l.id ? " selected" : ""}>Nuovo · linea ${l.n} (${esc(l.nome)})</option>`).join("")}</optgroup>` : ""}
-    ${persone.length ? `<optgroup label="Persona che aiuti">${persone.map(({ p, n }) => `<option value="aiuta:${esc(p.id)}"${v === "aiuta:" + p.id ? " selected" : ""}>Aiuti · ${esc(p.nome)}${n ? ` · linea ${n}` : ""}</option>`).join("")}</optgroup>` : ""}`;
+    ${sugg.length ? `<optgroup label="Suggerite">${sugg.map(({ p, perche }) => `<option value="aiuta:${esc(p.id)}"${v === "aiuta:" + p.id ? " selected" : ""}>Aiuti · ${esc(p.nome)} · ${perche}</option>`).join("")}</optgroup>` : ""}
+    ${persone.length ? `<optgroup label="Persona che aiuti">${persone.filter(({ p }) => !suggId.has(p.id)).map(({ p, n }) => `<option value="aiuta:${esc(p.id)}"${v === "aiuta:" + p.id ? " selected" : ""}>Aiuti · ${esc(p.nome)}${n ? ` · linea ${n}` : ""}</option>`).join("")}</optgroup>` : ""}`;
   const caselle = b.caselle.slice(0, b.n);
   while(caselle.length < b.n) caselle.push({ tipo:null });
   return `<div class="strategia-intera">
@@ -8773,12 +8795,12 @@ Object.assign(AZIONI, {
   "strategia-annulla"(){ st.strategiaModifica = false; st.strategiaBozza = null; render(); },
   async "strategia-modo"(el){ const x = strategiaAttuale(), m = el.dataset.modo;
     if(m === "personalizza"){ st.strategiaBozza = { n:x.s.caselle, caselle:proposteModo(x.s, m) }; st.strategiaModifica = true; st.sheet = "strategia"; render(); return; }
-    await salvaSceltaStrategia({ n:x.s.caselle, modo:m, caselle:proposteModo(x.s, m) }); render(); toast("Strategia scelta: la cambi quando vuoi con «Cambia»"); },
+    if(await salvaSceltaStrategia({ n:x.s.caselle, modo:m, caselle:proposteModo(x.s, m) })){ render(); toast("Strategia scelta: la cambi quando vuoi con «Cambia»"); } },
   "strategia-bozza-modo"(el){ const x = strategiaAttuale(), b = st.strategiaBozza; leggiBozzaStrategia();
     b.caselle = proposteModo(x.s, el.dataset.modo, b.n); b.modo = el.dataset.modo; render(); },
   "strategia-meno"(){ leggiBozzaStrategia(); const b = st.strategiaBozza; b.n = Math.max(CASELLE_MIN, b.n - 1); render(); },
   "strategia-piu"(){ leggiBozzaStrategia(); const b = st.strategiaBozza, s = strategiaAttuale().s; b.n = Math.min(s.caselleMax, b.n + 1); render(); },
-  async "strategia-proposta"(){ await salvaSceltaStrategia(null); st.strategiaModifica = false; st.strategiaBozza = null; render(); toast("Di nuovo le caselle proposte dalla mappa"); },
+  async "strategia-proposta"(){ if(!(await salvaSceltaStrategia(null))) return; st.strategiaModifica = false; st.strategiaBozza = null; render(); toast("Di nuovo le caselle proposte dalla mappa"); },
   "strategia-lista"(el){ st.motivoLista = el.dataset.motivo || null; if(st.sheet) chiudiSheet();
     st.vista = "persone"; st.sezPersone = "lista"; st.personaId = null; st.invitoId = null; render(); window.scrollTo(0, 0); }
 });
@@ -8786,7 +8808,7 @@ Object.assign(MODULI, {
   async strategia(f){
     const b = st.strategiaBozza || { n:CASELLE_MIN };
     const caselle = [...f.querySelectorAll("select[name=casella]")].map(el => casellaDaValore(el.value));
-    await salvaSceltaStrategia({ n:b.n, modo:b.modo || null, caselle });
+    if(!(await salvaSceltaStrategia({ n:b.n, modo:b.modo || null, caselle }))) return;
     st.strategiaModifica = false; st.strategiaBozza = null; render(); toast("Caselle salvate");
   }
 });
@@ -8795,6 +8817,94 @@ document.addEventListener("keydown", e => {
   if((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".card.strategia[data-act=strategia-apri]")){ e.preventDefault(); e.target.click(); }
 });
 if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { strategiaAttuale, titoloStrategia });
+
+/* ==== La tua strategia, punto 3: le caselle nel database (067), i suggerimenti, gli invitati che arrivano ====
+   Le righe della tabella: { posizione, tipo: aiuta | profondita | nuova_linea | libera, persona_id, linea_id, creato_il }.
+   La persona scelta non riceve avvisi. Se la tabella non risponde l'app usa il telefono, come prima. */
+function sceltaDaRighe(righe){
+  if(!righe || !righe.length) return null;
+  const n = Math.max(...righe.map(r => Number(r.posizione) || 0));
+  const caselle = Array.from({ length:n }, (_, i) => { const r = righe.find(x => Number(x.posizione) === i + 1);
+    return !r || r.tipo === "libera" ? { tipo:null, dal:r ? r.creato_il : null }
+      : { tipo:r.tipo, persona_id:r.persona_id || undefined, linea_id:r.linea_id || undefined, dal:r.creato_il }; });
+  return { n, caselle };
+}
+function righeDaScelta(x){
+  return Array.from({ length:x.n }, (_, i) => { const c = x.caselle[i] || { tipo:null };
+    return { posizione:i + 1, tipo:c.tipo || "libera", persona_id:c.tipo === "aiuta" ? c.persona_id : null, linea_id:c.tipo === "profondita" ? c.linea_id : null }; });
+}
+async function caricaCaselle(){
+  try{ st.caselleDb = await api.caselle() || []; }catch(e){ st.caselleDb = null; }
+  /* la scelta fatta prima sul telefono passa nel database una volta sola */
+  const loc = sceltaLocale();
+  if(Array.isArray(st.caselleDb) && !st.caselleDb.length && loc && await salvaSceltaStrategia(loc)) salvaLocale(chiaveStrategia(), null);
+  try{ await caselleDaInviti(); }catch(e){}
+}
+/* chi ho invitato io ed è già nella mappa (nella mia struttura, sotto di me) */
+function invitatiInMappa(){
+  const io = st.profilo.id;
+  return (st.partenze || []).filter(x => x.invitato_da_me !== false && x.id !== io && st.struttura.some(p => p.id === x.id) && lineaDiPersona(x.id))
+    .sort((a, b) => String(a.ingresso || "").localeCompare(String(b.ingresso || "")));
+}
+/* Una casella «da trovare»: quando la persona invitata da allora compare nella mappa, diventa «Persona che aiuti».
+   «Nuova linea frontale» ↔ un invitato in prima linea; «Nuovo in profondità» per la linea N ↔ un invitato più in basso in
+   quella linea. Una persona per casella. Le caselle proposte dalla mappa (non ancora scelte) contano dal mese scorso. */
+async function caselleDaInviti(){
+  const io = st.profilo.id, x = strategiaAttuale();
+  if(!x.s.pronta || x.daScegliere) return false;
+  const salvata = sceltaStrategia();
+  const caselle = salvata ? salvata.caselle.slice(0, x.s.caselle) : x.caselle.map(c => Object.assign({ dal:mesePrecedente() + "-01" }, c));
+  const usati = new Set(caselle.filter(c => c.tipo === "aiuta").map(c => c.persona_id)), invitati = invitatiInMappa();
+  const frontale = id => figli(io).some(p => p.id === id);
+  let cambiate = 0;
+  const nuove = caselle.map(c => {
+    if(c.tipo !== "nuova_linea" && c.tipo !== "profondita") return c;
+    const dal = String(c.dal || "").slice(0, 10);
+    const y = invitati.find(p => !usati.has(p.id) && (!dal || String(p.ingresso || "").slice(0, 10) >= dal)
+      && (c.tipo === "nuova_linea" ? frontale(p.id) : !frontale(p.id) && lineaDiPersona(p.id) === c.linea_id));
+    if(!y) return c;
+    usati.add(y.id); cambiate++;
+    return { tipo:"aiuta", persona_id:y.id, linea_id:lineaDiPersona(y.id) };
+  });
+  if(!cambiate) return false;
+  return salvaSceltaStrategia({ n:x.s.caselle, caselle:nuove });
+}
+/* I suggerimenti per «Persona che aiuti»: chi ha fatturato o ha iscritti nuovi negli ultimi mesi (mappe di questo mese e
+   del mese scorso, date di ingresso degli ultimi 2 mesi) e chi ho invitato io. Non chi è già in una casella. */
+function suggerimentiAiuta(caselle){
+  const io = st.profilo.id, gia = new Set((caselle || []).filter(c => c.tipo === "aiuta").map(c => c.persona_id));
+  const dal = spostaMese(meseDi(oggi()), -2) + "-01", invitati = new Set(invitatiInMappa().map(x => x.id));
+  const fatt = id => [st.riep, st.riepPrec].some(l => Number((rigaDi(l || [], id) || {}).vp_personali) > 0);
+  const iscritti = id => figli(id).some(f => (dataIngressoDi(f.id) || "") >= dal);
+  return alberoSotto(io, 0).map(y => y.p).filter(p => !gia.has(p.id) && !st.nascosti.has(p.id))
+    .map(p => ({ p, perche:invitati.has(p.id) ? "invitato da te" : iscritti(p.id) ? "nuovi iscritti" : fatt(p.id) ? "ha fatturato" : "" }))
+    .filter(x => x.perche);
+}
+/* «Hai invitato Luca: vuoi aiutare Luca a fare il Path to Bronze?» (forma neutra: l'app non sa se è un uomo o una donna).
+   Una persona alla volta, la più recente; «Non ora» la toglie su questo telefono. */
+const chiaveInvitatiNo = () => "growup-team.strategia-invitati-no." + st.profilo.id;
+function invitatiNo(){ try{ return new Set(JSON.parse(leggiLocale(chiaveInvitatiNo()) || "[]")); }catch(e){ return new Set(); } }
+function invitatoDaAiutare(caselle){
+  const gia = new Set((caselle || []).filter(c => c.tipo === "aiuta").map(c => c.persona_id)), no = invitatiNo();
+  return invitatiInMappa().filter(x => !gia.has(x.id) && !no.has(x.id)).pop() || null;
+}
+function vInvitatoDaAiutare(caselle){
+  const y = invitatoDaAiutare(caselle);
+  if(!y) return "";
+  const nome = esc(nomeSaluto(y.nome));
+  return `<div class="invitato-aiuta" data-id="${esc(y.id)}"><p class="small" style="margin:0">Hai invitato <b>${nome}</b>: vuoi aiutare ${nome} a fare il Path to Bronze?</p>
+    <div class="row"><button class="btn small" data-act="strategia-invitato-si" data-id="${esc(y.id)}">Sì, in una casella</button>
+      <button class="btn small" data-act="strategia-invitato-no" data-id="${esc(y.id)}">Non ora</button></div></div>`;
+}
+Object.assign(AZIONI, {
+  /* apre «Cambia» con la persona nella prima casella libera (o da trovare, o l'ultima) */
+  "strategia-invitato-si"(el){ const x = strategiaAttuale(), c = x.caselle.slice();
+    let i = c.findIndex(y => !y.tipo); if(i < 0) i = c.findIndex(y => y.tipo === "nuova_linea" || y.tipo === "profondita"); if(i < 0) i = c.length - 1;
+    c[i] = { tipo:"aiuta", persona_id:el.dataset.id, linea_id:lineaDiPersona(el.dataset.id) };
+    st.strategiaBozza = { n:c.length, caselle:c }; st.strategiaModifica = true; st.sheet = "strategia"; render(); },
+  "strategia-invitato-no"(el){ const no = invitatiNo(); no.add(el.dataset.id); salvaLocale(chiaveInvitatiNo(), JSON.stringify([...no])); render(); }
+});
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { suggerimentiAiuta, caselleDaInviti, sceltaStrategia });
 
 /* solo nei test (window.GROWUP_TEST, come GROWUP_API): il calcolo di «Da seguire oggi» e lo stato, per controllarlo criterio
    per criterio. Nell'app vera window.GROWUP_TEST non c'è e non si espone niente. */

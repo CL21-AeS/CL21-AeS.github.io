@@ -7022,6 +7022,127 @@ for(const tema of ["light", "dark"]){
   DB.obiettivi = DB.obiettivi.filter(o => !tutti.includes(o.partner_id));
   DB.persone = DB.persone.filter(p => p.proprietario !== id(70));
 }
+// 99. La tua strategia, punto 3: le caselle nel database (067). «Cambia» salva nella tabella (si ritrovano su un altro
+//     telefono); senza la tabella si salva sul telefono e, quando la tabella c'è, la scelta passa nel database una volta;
+//     i limiti (3 caselle sotto Argento, la persona solo nella downline, la linea solo frontale) anche nell'API; i
+//     suggerimenti per «Persona che aiuti» (ha fatturato, nuovi iscritti, invitato da te); «Hai invitato Luca: vuoi
+//     aiutare Luca a fare il Path to Bronze?» con «Sì, in una casella» e «Non ora»; una casella «da trovare» diventa
+//     «Persona che aiuti» quando la persona invitata compare nella mappa. La persona scelta non riceve avvisi.
+{
+  const id = n => "99000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0");
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const ora = new Date().toISOString();
+  const spMese = (m, k) => { const [y, mm] = m.split("-").map(Number), t = y * 12 + mm - 1 + k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, "0")}`; };
+  const mesePrima = spMese(meseOra(), -1);
+  const cod = n => "7990" + String(n).padStart(3, "0");
+  const io = (n, nome, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:"R", stato:"attivo", codice_invito:"SV" + n + "XX", codice_amway:cod(n),
+    chiave:String(n).padStart(2, "0").repeat(16), privacy_accettata_il:quando(-300), confermato_il:ora, partenza_confermata_il:ora, creato_il:quando(-300),
+    ultimo_aggiornamento:ora, data_iscrizione:giorno(-700) }, extra));
+  const sotto = (n, nome, sponsor, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:id(sponsor), stato:"gestito", gestore_id:id(sponsor),
+    codice_invito:"SV" + n + "XX", codice_amway:cod(n), partenza_confermata_il:ora, creato_il:quando(-300), data_iscrizione:giorno(-500) }, extra));
+  const linee = l => l.map(([n, vpg]) => ({ codice:cod(n), vpg }));
+  const tutti = []; for(let n = 10; n <= 80; n++) tutti.push(id(n));
+  io(20, "Bea Binario"); sotto(21, "Lia Linea", 20); sotto(22, "Leo Linea", 20); sotto(23, "Max Poco", 20);
+  sotto(24, "Nina Nuova", 21, { data_iscrizione:giorno(-30) });
+  // Luca: invitato da Bea più di due mesi fa (prima della strategia), usa l'app, già nella mappa (in prima linea)
+  DB.partners.push({ id:id(25), nome:"Luca Invitato", sponsor_id:id(20), stato:"attivo", codice_invito:"SV25XX", codice_amway:cod(25), invitato_da:id(20),
+    invitato_il:quando(-70), privacy_accettata_il:quando(-70), creato_il:quando(-70), confermato_il:ora, partenza_confermata_il:ora, data_iscrizione:giorno(-72) });
+  mappa(id(20), 110, 600, { mese:mesePrima, linee:linee([[21, 300], [22, 150], [23, 40]]) });
+  mappa(id(20), 100, 500, { linee:linee([[21, 260], [22, 90], [23, 40], [25, 20]]) });
+  mappa(id(21), 80, 260, { linee:linee([[24, 120]]) });
+  mappa(id(22), 100, 90);
+  mappa(id(25), 20, 20);
+  // Cora (Foundation 9%): ha scelto 3 «Nuova linea frontale» 10 giorni fa; poi ha invitato Tina, che ora è nella mappa
+  io(30, "Cora Tre", { qualifica_iniziale:"foundation_9" }); sotto(31, "Ugo Uno", 30); sotto(32, "Ivo Due", 30); sotto(33, "Ada Tre", 30);
+  DB.partners.push({ id:id(34), nome:"Tina Arrivata", sponsor_id:id(30), stato:"attivo", codice_invito:"SV34XX", codice_amway:cod(34), invitato_da:id(30),
+    invitato_il:quando(-4), privacy_accettata_il:quando(-4), creato_il:quando(-4), confermato_il:ora, partenza_confermata_il:ora, data_iscrizione:giorno(-5) });
+  DB.partners.push({ id:id(35), nome:"Vito Vecchio", sponsor_id:id(30), stato:"attivo", codice_invito:"SV35XX", codice_amway:cod(35), invitato_da:id(30),
+    invitato_il:quando(-200), privacy_accettata_il:quando(-200), creato_il:quando(-200), confermato_il:ora, partenza_confermata_il:ora, data_iscrizione:giorno(-201) });
+  mappa(id(30), 150, 900, { mese:mesePrima, linee:linee([[31, 250], [32, 180], [33, 120]]) });
+  mappa(id(30), 150, 700, { linee:linee([[31, 220], [32, 150], [33, 110], [34, 30], [35, 0]]) });
+  DB.caselle = (DB.caselle || []).concat([1, 2, 3].map(i => ({ partner_id:id(30), posizione:i, tipo:"nuova_linea", persona_id:null, linea_id:null, creato_il:quando(-10) })));
+  const eventiPrima = (DB.notificheEventi || []).length;
+
+  const apriCome = async (n, opz) => { const r = await apri(Object.assign({ viewport:{ width:360, height:780 } }, opz || {}), "#chiave=" + String(n).padStart(2, "0").repeat(16));
+    await r.page.locator(".testata h1").waitFor(); return r; };
+
+  // --- Bea: «Cambia» salva nel database; su un altro telefono le caselle ci sono
+  ({ ctx, page } = await apriCome(20));
+  const card = page.locator("#app .card.strategia");
+  await card.waitFor();
+  const prompt = card.locator(".invitato-aiuta");
+  check(await prompt.count() === 1 && (await prompt.textContent()).replace(/\s+/g, " ").includes("Hai invitato Luca: vuoi aiutare Luca a fare il Path to Bronze?"),
+    "invitati: «Hai invitato Luca: vuoi aiutare Luca a fare il Path to Bronze?» (forma neutra)");
+  const sugg = await page.evaluate(() => GROWUP_TEST.suggerimentiAiuta([]).map(x => x.p.nome + ":" + x.perche));
+  check(sugg.includes("Luca Invitato:invitato da te") && sugg.includes("Lia Linea:nuovi iscritti") && sugg.includes("Leo Linea:ha fatturato") && !sugg.some(x => x.startsWith("Nina")),
+    `suggerimenti: invitato da te, nuovi iscritti, ha fatturato (${sugg.join(", ")})`);
+  await prompt.locator("button[data-act=strategia-invitato-si]").click();
+  await page.locator(".sheet form[data-form=strategia]").waitFor();
+  check(await page.locator(".sheet select[name=casella]").nth(0).inputValue() === "aiuta:" + id(25), "«Sì, in una casella»: Luca va nella casella da trovare (la nuova linea frontale)");
+  check(await page.locator(".sheet optgroup[label=Suggerite] option").count() >= 3, "Cambia: il gruppo «Suggerite» in cima alle persone");
+  await page.click(".sheet form[data-form=strategia] button.primary");
+  await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
+  await sync(page);
+  const righe = DB.caselle.filter(x => x.partner_id === id(20)).sort((a, b) => a.posizione - b.posizione);
+  check(righe.length === 3 && righe[0].tipo === "aiuta" && righe[0].persona_id === id(25) && righe[1].persona_id === id(21) && righe[2].tipo === "profondita",
+    "067: le caselle sono nel database (tabella strategia_caselle)");
+  check(!(await page.evaluate(() => Object.keys(localStorage).filter(k => k.includes("growup-team.strategia.")).length)), "067: con il database niente caselle sul telefono");
+  check(!(await page.locator(".sheet .invitato-aiuta").count()), "invitati: Luca è in una casella, la domanda non c'è più");
+  // l'API rifiuta quello che il database rifiuta
+  check(await page.evaluate(async () => { try{ await GROWUP_API.salvaCaselle([{ posizione:4, tipo:"libera" }]); return false; }catch(e){ return true; } }), "067 (API): sotto Argento non più di 3 caselle");
+  check(await page.evaluate(async id => { try{ await GROWUP_API.salvaCaselle([{ posizione:1, tipo:"aiuta", persona_id:id }]); return false; }catch(e){ return true; } }, id(31)),
+    "067 (API): «Persona che aiuti» solo nella propria downline");
+  check(await page.evaluate(async id => { try{ await GROWUP_API.salvaCaselle([{ posizione:1, tipo:"profondita", linea_id:id }]); return false; }catch(e){ return true; } }, id(24)),
+    "067 (API): «Nuovo in profondità» solo per una propria linea frontale");
+  await ctx.close();
+  ({ ctx, page } = await apriCome(20));   // un altro telefono (memoria vuota)
+  await page.locator("#app .card.strategia").waitFor();
+  check(await page.locator("#app .card.strategia .casella.c-aiuta").count() === 2 && await page.locator("#app .card.strategia .casella.c-profondita").count() === 1,
+    "067: su un altro telefono le caselle scelte ci sono");
+  check(!(await page.locator("#app .card.strategia .invitato-aiuta").count()), "invitati: nessuna domanda per chi è già in una casella");
+  await ctx.close();
+  check((DB.notificheEventi || []).length === eventiPrima, "067: la persona scelta non riceve avvisi");
+
+  // --- senza la tabella: si salva sul telefono; quando la tabella c'è, la scelta passa nel database
+  DB.caselle = DB.caselle.filter(x => x.partner_id !== id(20)); DB.senzaCaselle = true;
+  ({ ctx, page } = await apriCome(20));
+  await page.locator("#app .card.strategia").waitFor();
+  await page.click("#app .card.strategia button[data-act=strategia-cambia]");
+  await page.locator(".sheet select[name=casella]").nth(2).selectOption("nuova");
+  await page.locator(".sheet select[name=casella]").nth(1).selectOption("prof:" + id(22));
+  await page.click(".sheet form[data-form=strategia] button.primary");
+  await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
+  check(await page.evaluate(() => Object.keys(localStorage).some(k => k.includes("growup-team.strategia."))), "senza la tabella: le caselle restano sul telefono");
+  await page.evaluate(() => { window.__DB.senzaCaselle = false; });
+  await riapri(page); await page.locator("#app .card.strategia").waitFor();
+  await sync(page);
+  check(DB.caselle.filter(x => x.partner_id === id(20)).length === 3 && DB.caselle.some(x => x.partner_id === id(20) && x.tipo === "profondita" && x.linea_id === id(22)),
+    "con la tabella: la scelta del telefono passa nel database");
+  check(!(await page.evaluate(() => Object.keys(localStorage).some(k => k.includes("growup-team.strategia.")))), "con la tabella: il telefono non la tiene più");
+  // «Non ora»
+  await page.locator("#app .card.strategia .invitato-aiuta button[data-act=strategia-invitato-no]").click();
+  check(!(await page.locator("#app .card.strategia .invitato-aiuta").count()), "invitati: «Non ora» toglie la domanda");
+  await ctx.close();
+  delete DB.senzaCaselle;
+
+  // --- Cora: Tina, invitata dopo la scelta, è nella mappa → la casella diventa «Persona che aiuti» (Vito, di 200 giorni fa, no)
+  ({ ctx, page } = await apriCome(30));
+  await page.locator("#app .card.strategia").waitFor();
+  await page.waitForTimeout(300);
+  const aiuta = page.locator("#app .card.strategia .casella.c-aiuta");
+  check(await aiuta.count() === 1 && await aiuta.locator(".casella-nome").textContent() === "Tina Arrivata",
+    "da trovare → Persona che aiuti: l'invitata dopo la scelta compare nella mappa e prende la prima casella");
+  await sync(page);
+  check(DB.caselle.some(x => x.partner_id === id(30) && x.posizione === 1 && x.tipo === "aiuta" && x.persona_id === id(34))
+    && DB.caselle.filter(x => x.partner_id === id(30) && x.tipo === "nuova_linea").length === 2, "da trovare → Persona che aiuti: salvato nel database, le altre restano da trovare");
+  check(!DB.caselle.some(x => x.persona_id === id(35)), "un invitato di prima della scelta non prende la casella");
+  await page.screenshot({ path:S + "/e2e/99-strategia-invitata-light.png" });
+  await ctx.close();
+  check(!errori.length, "strategia, database: nessun errore nella pagina");
+  DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
+  DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
+  DB.caselle = (DB.caselle || []).filter(x => !tutti.includes(x.partner_id));
+}
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
