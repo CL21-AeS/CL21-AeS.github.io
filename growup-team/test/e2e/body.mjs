@@ -6818,6 +6818,210 @@ for(const tema of ["light", "dark"]){
   DB.obiettivi = DB.obiettivi.filter(o => !tutti.includes(o.partner_id));
 }
 
+// 98. La tua strategia, punto 2: la card in cima a Io e la schermata intera. B (due persone che aiuti e una nuova linea
+//     tratteggiata, con «Lista ›» pesca solo sulla prima), titolo «Fai il tuo Path to Bronze» per chi ha dichiarato meno di
+//     Bronze Foundation; i pallini delle linee nuove e la riga dei 400 VP; la barra delle 4 tappe; le linee (le 3 con più
+//     VP e «altre N»), con la data della mappa; toccandola si apre a schermo intero (Indietro la chiude); «Cambia» e le
+//     caselle ricordate. C: «Come vuoi lavorare?» con quattro scelte dello stesso peso, «Adatta ai tuoi numeri» su una e
+//     nessuna preselezionata; i titoli secondo le caselle. Argento: niente barra, 5 caselle, in Io le prime 3 e «altre 2».
+//     Senza mappa; il nuovo: niente card durante il percorso, «Ecco la tua strategia» nella festa, poi la card.
+//     Niente a capo a 360 px (pulsanti, etichette, tappe), anteprime in chiaro e scuro.
+{
+  const id = n => "98000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0");
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const ora = new Date().toISOString();
+  const spMese = (m, k) => { const [y, mm] = m.split("-").map(Number), t = y * 12 + mm - 1 + k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, "0")}`; };
+  const mesePrima = spMese(meseOra(), -1);
+  const cod = n => "7980" + String(n).padStart(3, "0");
+  const io = (n, nome, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:"R", stato:"attivo", codice_invito:"SU" + n + "XX", codice_amway:cod(n),
+    chiave:String(n).padStart(2, "0").repeat(16), privacy_accettata_il:quando(-300), confermato_il:ora, partenza_confermata_il:ora, creato_il:quando(-300),
+    ultimo_aggiornamento:ora, data_iscrizione:giorno(-700) }, extra));
+  const sotto = (n, nome, sponsor, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:id(sponsor), stato:"gestito", gestore_id:id(sponsor),
+    codice_invito:"SU" + n + "XX", codice_amway:cod(n), partenza_confermata_il:ora, creato_il:quando(-300), data_iscrizione:giorno(-500) }, extra));
+  const linee = l => l.map(([n, vpg]) => ({ codice:cod(n), vpg }));
+  const tutti = []; for(let n = 10; n <= 80; n++) tutti.push(id(n));
+  io(20, "Bea Binario"); sotto(21, "Lia Linea", 20); sotto(22, "Leo Linea", 20); sotto(23, "Max Poco", 20);
+  sotto(24, "Nina Nuova", 21, { data_iscrizione:giorno(-30) }); sotto(25, "Olga Vecchia", 21, { data_iscrizione:giorno(-400) });
+  mappa(id(20), 110, 600, { mese:mesePrima, linee:linee([[21, 300], [22, 150], [23, 40]]) });
+  mappa(id(20), 100, 500, { linee:linee([[21, 260], [22, 90], [23, 40]]) });
+  mappa(id(21), 80, 260, { linee:linee([[24, 120], [25, 60]]) });
+  mappa(id(22), 100, 90, { linee:[] });
+  io(30, "Cora Tre", { qualifica_iniziale:"foundation_9" }); sotto(31, "Ugo Uno", 30); sotto(32, "Ivo Due", 30); sotto(33, "Ada Tre", 30); sotto(34, "Zeno Quattro", 30);
+  mappa(id(30), 150, 900, { mese:mesePrima, linee:linee([[31, 250], [32, 180], [33, 120], [34, 30]]) });
+  mappa(id(30), 150, 700, { linee:linee([[31, 220], [32, 150], [33, 110], [34, 20]]) });
+  io(40, "Dora Argento", { qualifica_iniziale:"argento" }); sotto(41, "Ezio Linea", 40);
+  mappa(id(40), 200, 3000, { mese:mesePrima, linee:linee([[41, 3000]]) }); mappa(id(40), 200, 2500, { linee:linee([[41, 2300]]) });
+  io(60, "Furio Senza");
+  io(70, "Gino Nuovo", { data_iscrizione:giorno(-20), privacy_accettata_il:quando(-19), creato_il:quando(-19), conPercorso:true, incontro_sponsor:giorno(-15) });
+  DB.obiettivi = (DB.obiettivi || []).concat([{ partner_id:id(70), cifra_mese:300, entro:"2027-06-01", perche:"Per la famiglia" }]);
+  mappa(id(70), 60, 60);
+  DB.persone = (DB.persone || []).concat(Array.from({ length:30 }, (_, i) => ({ id:"98p" + i, proprietario:id(70), nome:"Nome Prova " + i, esito:null, creato_il:quando(-18) })));
+  DB.passi = (DB.passi || []).concat([{ id:"98s1", persona_id:"98p1", proprietario:id(70), tipo:"piano", data:giorno(-5) }, { id:"98s2", persona_id:"98p2", proprietario:id(70), tipo:"cliente", data:giorno(-4) }]);
+  DB.activities = (DB.activities || []).concat([{ id:"98a1", partner_id:id(70), tipo:"piano", quantita:1, data:giorno(-5) }, { id:"98a2", partner_id:id(70), tipo:"cliente", quantita:1, data:giorno(-4) }]);
+
+  const apriCome = async (n, opz) => { const r = await apri(Object.assign({ viewport:{ width:360, height:780 } }, opz || {}), "#chiave=" + String(n).padStart(2, "0").repeat(16));
+    await r.page.locator(".testata h1").waitFor(); return r; };
+  /* niente a capo a 360 px: pulsanti, etichette, pill, tappe, tipi di casella, VP delle linee */
+  const aCapo = pg => pg.evaluate(() => {
+    const out = [];
+    for(const e of document.querySelectorAll(".strategia button:not(.modo), .strategia-intera button:not(.modo), .strategia .pill, .strategia-intera .pill, .t4>span, .casella-tipo, .linea-vp, .ptb-vp, .strategia .eyebrow, .strategia-intera .eyebrow, .tappe4-ora")){
+      const r = e.getBoundingClientRect(); if(!r.width) continue;
+      const lh = parseFloat(getComputedStyle(e).lineHeight) || parseFloat(getComputedStyle(e).fontSize) * 1.5;
+      if(r.height > lh * 1.6 && e.tagName !== "BUTTON" || (e.tagName === "BUTTON" && e.getClientRects().length && [...(() => { const g = document.createRange(); g.selectNodeContents(e); return g.getClientRects(); })()].filter(x => x.width > 1).map(x => Math.round(x.top)).filter((t, i, a) => a.indexOf(t) === i).length > 1))
+        out.push(e.className + ": «" + e.textContent.replace(/\s+/g, " ").trim().slice(0, 40) + "»");
+    }
+    if(document.documentElement.scrollWidth > 360) out.push("la pagina scorre di lato");
+    return out; });
+
+  // --- B: Bea
+  ({ ctx, page } = await apriCome(20));
+  const card = page.locator("#app .card.strategia");
+  await card.waitFor();
+  check(await page.evaluate(() => { const c = document.querySelector("#app .card.strategia"), prima = document.querySelector("#app .card");
+    return c === prima; }), "strategia: la card è la prima di Io");
+  check(await card.locator(".strategia-titolo").textContent() === "Fai il tuo Path to Bronze", "strategia: titolo «Fai il tuo Path to Bronze» (nessuna qualifica dichiarata)");
+  check(await card.locator(".tappe4 .t4").count() === 4 && await card.locator(".t4.corso").getAttribute("aria-label") === "Path to Bronze: in corso"
+    && (await card.locator(".t4.corso>span").textContent()).startsWith("● "), "strategia: la barra delle 4 tappe, quella in corso con ● (anche senza colore)");
+  check(await card.locator(".casella").count() === 3, "strategia B: tre caselle");
+  const lia = card.locator(".casella.c-aiuta").first();
+  check(/Persona che aiuti · linea 1/.test(await lia.locator(".casella-tipo").textContent()) && await lia.locator(".casella-nome").textContent() === "Lia Linea",
+    "Persona che aiuti: nome e linea");
+  check((await lia.locator(".ptb-vp").textContent()).replace(/\s+/g, " ").trim() === "80 / 100 VP personali", "Persona che aiuti: VP personali su 100");
+  check(await lia.locator(".pallini").getAttribute("aria-label") === "Linee nuove da 100 VP: 1 su 3" && await lia.locator(".pallini i.si").count() === 1
+    && await lia.locator(".pallini i.si").textContent() === "✓", "Persona che aiuti: tre pallini, uno pieno con ✓");
+  check(await lia.getByText("Il suo Path to Bronze vale almeno 400 VP nella tua linea 1").count() === 1, "Persona che aiuti: la riga dei 400 VP");
+  check(/^VP: mappa (del|dell'|del 1°) /.test((await lia.locator(".casella-mappa").textContent()).trim()), "Persona che aiuti: accanto ai VP la data della mappa");
+  const nuova = card.locator(".casella.c-nuova");
+  check(await nuova.count() === 1 && await nuova.locator(".casella-nome").textContent() === "da trovare" && await nuova.locator("button.primary").count() === 1,
+    "Nuova linea frontale: tratteggiata, «da trovare», «Lista ›» pesca (azione principale)");
+  check(await card.locator("button.primary").count() === 1, "strategia: una sola azione pesca nella card");
+  check(await card.locator(".linee-strategia li").count() === 3 && /Linea 1 · Lia Linea/.test(await card.locator(".linee-strategia li").first().textContent())
+    && (await card.locator(".linee-strategia li.ok .segno-ok").count()) === 1, "strategia: le linee con i VP rispetto alla tappa, ✓ solo dove la soglia c'è");
+  check(/^VP: mappa /.test((await card.locator(".linee-mappa").textContent()).trim()), "strategia: la data della mappa delle linee");
+  check(!/€|euro|arrivi|previst/i.test(await card.textContent()), "strategia: nessuna cifra in euro, nessuna proiezione");
+  check(!(await aCapo(page)).length, "strategia B a 360 px: niente a capo (" + (await aCapo(page)).join("; ") + ")");
+  await page.screenshot({ path:S + "/e2e/98-strategia-b-light.png", fullPage:false });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await page.screenshot({ path:S + "/e2e/98-strategia-b-dark.png", fullPage:false });
+  await page.emulateMedia({ colorScheme:"light" });
+  // la schermata intera: toccando la card
+  await card.locator(".strategia-titolo").click();
+  await page.locator(".sheet .strategia-intera").waitFor();
+  check(await page.evaluate(() => { const b = document.querySelector(".sheet .sheet-box").getBoundingClientRect(); return b.height >= innerHeight - 2 && b.top <= 1; }),
+    "strategia: la schermata intera occupa tutto lo schermo");
+  check(await page.locator(".sheet .casella").count() === 3 && await page.locator(".sheet .linee-strategia li").count() === 3, "schermata intera: tutte le caselle e tutte le linee");
+  check(!(await aCapo(page)).length, "schermata intera a 360 px: niente a capo (" + (await aCapo(page)).join("; ") + ")");
+  await page.screenshot({ path:S + "/e2e/98-strategia-intera-light.png" });
+  await page.goBack(); await page.waitForTimeout(300);
+  check(!(await page.locator(".sheet .strategia-intera").count()) && await page.locator("#app .card.strategia").count() === 1, "Indietro chiude la schermata intera e resta in Io");
+  // «Cambia»: la terza casella diventa «Nuovo in profondità» per la linea 2; si ricorda riaprendo
+  await card.locator("button[data-act=strategia-cambia]").click();
+  await page.locator(".sheet form[data-form=strategia]").waitFor();
+  check(await page.locator(".sheet select[name=casella]").count() === 3, "Cambia: tre caselle da scegliere");
+  check(!(await page.locator(".sheet .quante-caselle").count()), "Cambia sotto Argento: il numero di caselle non si sceglie");
+  await page.locator(".sheet select[name=casella]").nth(2).selectOption("prof:" + id(22));
+  await page.screenshot({ path:S + "/e2e/98-strategia-cambia-light.png" });
+  await page.click(".sheet form[data-form=strategia] button.primary");
+  await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
+  await page.click(".sheet [data-act=chiudi]");
+  const prof = page.locator("#app .card.strategia .casella.c-profondita");
+  check(await prof.count() === 1 && await prof.locator(".casella-nome").textContent() === "da trovare" && (await prof.locator(".grow>.small").textContent()) === "per la linea 2 (Leo Linea)",
+    "Nuovo in profondità: tratteggiata, «da trovare · per la linea 2 (Leo Linea)»");
+  check(await page.locator("#app .card.strategia .strategia-titolo").textContent() === "Fai il tuo Path to Bronze", "titolo: resta «Fai il tuo Path to Bronze» (qualifica sotto Foundation)");
+  await riapri(page); await page.locator("#app .card.strategia").waitFor();
+  check(await page.locator("#app .card.strategia .casella.c-profondita").count() === 1, "Cambia: le caselle scelte restano riaprendo");
+  // «Lista ›» apre la Lista
+  await page.locator("#app .card.strategia .casella.c-profondita button[data-act=strategia-lista]").click();
+  check(await page.locator(".testata h1").textContent() === "Persone" && await page.locator("button[data-sez=lista][aria-selected=true], button[data-sez=lista].on").count() >= 1, "«Lista ›» apre la Lista");
+  await ctx.close();
+
+  // --- C: Cora (Foundation 9% dichiarata), quattro linee di cui tre attive
+  ({ ctx, page } = await apriCome(30));
+  const c = page.locator("#app .card.strategia");
+  await c.waitFor();
+  check(await c.locator(".strategia-titolo").textContent() === "Come vuoi lavorare?", "strategia C: il primo stato è «Come vuoi lavorare?»");
+  const modi = c.locator("button.modo");
+  check(await modi.count() === 4 && JSON.stringify(await modi.evaluateAll(l => l.map(b => b.textContent.replace(/\s+/g, " ").replace("Adatta ai tuoi numeri", "").trim())))
+    === JSON.stringify(["Apri 3 nuove linee frontali", "Aiuta le persone che hai", "Sponsorizza in profondità", "Personalizza · ogni casella a mano"]), "strategia C: le quattro scelte");
+  const pesi = await modi.evaluateAll(l => l.map(b => { const s = getComputedStyle(b); return [s.backgroundColor, s.borderColor, s.fontWeight, Math.round(b.getBoundingClientRect().width)].join(); }));
+  check(new Set(pesi).size === 1 && !(await c.locator("button.modo.primary, button.modo[aria-pressed=true]").count()), "strategia C: le quattro scelte hanno lo stesso peso, nessuna preselezionata");
+  check(await c.locator(".adatta").count() === 1 && /Sponsorizza in profondità/.test(await c.locator("button.modo:has(.adatta)").textContent()),
+    "strategia C: «Adatta ai tuoi numeri» su una sola scelta (metodo CL21: nessun frontale costruisce → in profondità)");
+  check(!(await aCapo(page)).length, "strategia C a 360 px: niente a capo (" + (await aCapo(page)).join("; ") + ")");
+  await page.screenshot({ path:S + "/e2e/98-strategia-c-light.png" });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await page.screenshot({ path:S + "/e2e/98-strategia-c-dark.png" });
+  await page.emulateMedia({ colorScheme:"light" });
+  await c.locator("button.modo[data-modo=nuove_linee]").click();
+  await page.waitForTimeout(200);
+  check(await c.locator(".strategia-titolo").textContent() === "Apri nuove linee frontali" && await c.locator(".casella.c-nuova").count() === 3, "titolo: «Apri nuove linee frontali»");
+  check(await c.locator(".linee-strategia li").count() === 3 && (await c.locator(".linee-strategia").textContent()).includes("altre 1"), "strategia: oltre 3 frontali, le 3 con più VP e «altre 1»");
+  await c.locator("button[data-act=strategia-cambia]").click();
+  await page.locator(".sheet button.modo[data-modo=aiuta]").click();
+  await page.click(".sheet form[data-form=strategia] button.primary");
+  await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
+  check(await page.locator(".sheet .strategia-titolo").textContent() === "Aiuta le tue persone a fare il Path to Bronze", "titolo: «Aiuta le tue persone a fare il Path to Bronze»");
+  await page.click(".sheet button[data-act=strategia-cambia]");
+  await page.locator(".sheet select[name=casella]").nth(2).selectOption("nuova");
+  await page.click(".sheet form[data-form=strategia] button.primary");
+  await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
+  check(await page.locator(".sheet .strategia-titolo").textContent() === "La tua strategia · ibrida", "titolo: «La tua strategia · ibrida»");
+  await page.click(".sheet button[data-act=strategia-cambia]");
+  await page.click(".sheet button[data-act=strategia-proposta]");
+  await page.click(".sheet [data-act=chiudi]");
+  check(await page.locator("#app .card.strategia .strategia-titolo").textContent() === "Come vuoi lavorare?", "«Torna alla proposta della mappa»: di nuovo «Come vuoi lavorare?»");
+  await ctx.close();
+
+  // --- Argento: niente barra, 5 caselle
+  ({ ctx, page } = await apriCome(40));
+  await page.locator("#app .card.strategia").waitFor();
+  check(!(await page.locator("#app .card.strategia .tappe4").count()), "strategia Argento: niente barra delle tappe");
+  await page.click("#app .card.strategia button[data-act=strategia-cambia]");
+  check(await page.locator(".sheet .quante-caselle").count() === 1, "Cambia da Argento: si sceglie quante caselle");
+  await page.click(".sheet button[data-act=strategia-piu]"); await page.click(".sheet button[data-act=strategia-piu]");
+  check(await page.locator(".sheet select[name=casella]").count() === 5, "Cambia da Argento: 5 caselle");
+  await page.click(".sheet form[data-form=strategia] button.primary");
+  await page.locator(".sheet form[data-form=strategia]").waitFor({ state:"detached" });
+  check(await page.locator(".sheet .casella").count() === 5, "schermata intera: tutte e 5 le caselle");
+  await page.click(".sheet [data-act=chiudi]");
+  check(await page.locator("#app .card.strategia .casella").count() === 3 && (await page.locator("#app .card.strategia .altre-caselle").textContent()).trim() === "altre 2",
+    "strategia Argento in Io: le prime 3 e «altre 2»");
+  check(!(await aCapo(page)).length, "strategia Argento a 360 px: niente a capo");
+  await page.screenshot({ path:S + "/e2e/98-strategia-argento-light.png" });
+  await ctx.close();
+
+  // --- senza mappa
+  ({ ctx, page } = await apriCome(60));
+  await page.locator("#app .card.strategia").waitFor();
+  check((await page.locator("#app .card.strategia").textContent()).includes("La tua strategia compare quando arriva la mappa."), "strategia senza mappa: «compare quando arriva la mappa»");
+  await ctx.close();
+
+  // --- il nuovo: festa della partenza con «Ecco la tua strategia», poi la card
+  DB.traguardiAperti = true;
+  ({ ctx, page } = await apriCome(70));
+  await page.locator(".festa").first().waitFor();
+  check(!(await page.locator("#app .card.strategia").count()), "nuovo: nella festa nessuna card in Io");
+  const festa = page.locator(".festa .strategia-festa");
+  check(await festa.count() === 1 && (await festa.textContent()).includes("Ecco la tua strategia") && await festa.locator("li").count() === 3,
+    "festa della partenza: «Ecco la tua strategia» con le tre caselle");
+  await page.screenshot({ path:S + "/e2e/98-festa-strategia-light.png" });
+  await page.click(".festa [data-act=festa-fine]");
+  await page.locator("#app .card.strategia").waitFor();
+  check(await page.locator("#app .card.strategia .casella.c-nuova").count() === 3, "nuovo dopo la partenza: la card con 3 «Nuova linea frontale»");
+  await ctx.close();
+  DB.traguardiAperti = false;
+  // il nuovo prima della partenza completata: tutto come prima, nessuna card
+  const g = DB.partners.find(p => p.id === id(70)); g.partenza_completata_il = null; g.incontro_sponsor = null;
+  ({ ctx, page } = await apriCome(70));
+  await page.waitForTimeout(300);
+  check(!(await page.locator("#app .card.strategia").count()) && await page.locator(".percorso-partenza").count() === 1, "nuovo nel percorso: nessuna card, tutto come prima");
+  await ctx.close();
+  check(!errori.length, "strategia, card: nessun errore nella pagina");
+  DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
+  DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
+  DB.obiettivi = DB.obiettivi.filter(o => !tutti.includes(o.partner_id));
+  DB.persone = DB.persone.filter(p => p.proprietario !== id(70));
+}
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

@@ -3,6 +3,42 @@
 Ultimo aggiornamento: 18 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## La strategia in Io, punto 2: la card in cima a Io (18 novembre 2026, database non toccato)
+
+- **Dove**: la prima card di Io → Il mio giorno (`vStrategia`); sopra restano solo le domande che compaiono una volta sola
+  (condivisione e notifiche), come oggi: dopo la risposta spariscono (confermato da Stefano il 18 novembre). Si vede a chi ha finito il percorso di partenza (e agli avviati,
+  gli admin, chi è in attività da anni). Durante il percorso non c'è (tutto come prima); nella **festa della partenza** c'è
+  il riquadro **«Ecco la tua strategia»** (`vStrategiaFesta`, titolo e prime tre caselle), poi la card.
+- **Card**: «La tua strategia» e quante caselle; il **titolo** (`titoloStrategia`): «Fai il tuo Path to Bronze» se la
+  qualifica dichiarata è sotto Bronze Foundation (anche la percentuale dichiarata sotto il 9%), altrimenti «Apri nuove
+  linee frontali», «Aiuta le tue persone a fare il Path to Bronze» o «La tua strategia · ibrida» secondo le caselle; la
+  **barra delle 4 tappe** (tolta da Argento in su) con «✓» fatta e «●» in corso anche senza colore, nomi brevi
+  (Foundation, Builder) e sotto «Ora: Bronze Foundation 12% · tappa 2 di 4»; le **prime 3 caselle** e «altre N»; più in
+  piccolo **le linee** con i VP rispetto alla prossima tappa (le 3 con più VP e «altre N») e la data della mappa;
+  «Cambia» e «Vedi tutto ›». Toccandola si apre **a schermo intero** (un foglio a tutta altezza: Indietro lo chiude) con
+  tutte le caselle e tutte le linee.
+- **Caselle**: «Persona che aiuti» (tipo e linea, nome, VP personali su 100 con ✓ quando ci sono, tre pallini per le sue
+  linee nuove, pieni con ✓, «Il suo Path to Bronze vale almeno 400 VP nella tua linea N», data della mappa; senza la sua
+  mappa «!» ambra e «nessuna mappa di …»; Path to Bronze completo: «✓ Path to Bronze fatto»); «Nuovo in profondità» e
+  «Nuova linea frontale» tratteggiate, «da trovare» (e «per la linea N (nome)»), con «Lista ›» che apre la Lista: **pesca
+  solo sulla prima**, l'unica azione principale della card.
+- **Situazione C**: il primo stato della card è **«Come vuoi lavorare?»** con quattro pulsanti uguali (stesso colore,
+  bordo, peso e larghezza): Apri 3 nuove linee frontali, Aiuta le persone che hai, Sponsorizza in profondità,
+  Personalizza (ogni casella a mano). Su uno la riga «◆ Adatta ai tuoi numeri», nessuno preselezionato. Una scelta salva
+  le caselle; «Personalizza» apre «Cambia» con le caselle vuote.
+- **«Cambia»**: un elenco per casella (Da scegliere, Nuova linea frontale, «Nuovo · linea N (nome)», «Aiuti · nome ·
+  linea N» per tutta la downline), i quattro modi per riempirle in un tocco, da Argento in su **quante caselle** (− e +,
+  da 3 a 20); «Torna alla proposta della mappa» toglie la scelta. In questo punto la scelta si ricorda **su questo
+  telefono** (`growup-team.strategia.<id>`, con try/catch); il punto 3 la porta nel database. Una casella salvata con una
+  persona uscita dalla downline (o una linea che non è più frontale) torna «Casella libera · da scegliere».
+- **Senza mappa**: «La tua strategia compare quando arriva la mappa.» con «nessuna mappa di …».
+- CLAUDE.md: aggiunta l'eccezione «La tua strategia» alla regola «niente suggerimenti nelle schermate di tutti i giorni».
+- Da sapere: il titolo «Aiuta le tue persone a fare il Path to Bronze» a 360 px va su due righe (è un titolo di 45
+  caratteri); pulsanti, etichette, tappe, tipi di casella e VP restano su una riga.
+Test dell'interfaccia: sezione 98 (B, C con i quattro modi e i titoli, Argento con 5 caselle, senza mappa, nuovo nel
+percorso, nella festa e dopo; niente a capo a 360 px; anteprime `e2e/98-strategia-b-light/dark.png`, `98-strategia-c-*`,
+`98-strategia-intera-light.png`, `98-strategia-cambia-light.png`, `98-strategia-argento-light.png`, `98-festa-strategia-light.png`).
+
 ## La strategia in Io, punto 1: il calcolo (18 novembre 2026, app non cambiata a vista, database non toccato)
 
 Una sola funzione, `strategia(n)` in `app.js` (blocco «La tua strategia» in fondo al file), più `pathToBronze(pid)`. Nessuna
