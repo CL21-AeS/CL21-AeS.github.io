@@ -52,6 +52,8 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 Per tornare a tutto com'era: «Revert» delle PR dalla 5 alla 1 (o chiedere a Claude di riportare la cartella al tag),
 poi, se si vuole, lo script della 067.
 
+La 067 è applicata al database vero dal 18 novembre 2026: per toglierla serve lo script qui sopra.
+
 Da sapere sulla 067: se si annulla la PR 3 ma la tabella resta nel database, l'app torna a ricordare le caselle sul
 telefono (come nel punto 2) e le caselle salvate nella tabella non si vedono più; se si toglie la tabella e la PR 3 resta,
 l'app se ne accorge e usa il telefono.
