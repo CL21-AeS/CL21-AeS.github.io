@@ -514,6 +514,32 @@
     salvaDurata: async (codice, giorni) => { db.durate = (db.durate || []).filter(y => !(y.proprietario === mio().id && y.codice === codice))
       .concat([{ proprietario:mio().id, codice, giorni }]); salva(); },
     /* 060: i numeri della partenza (solo numeri e date) e la × dei nuovi in partenza */
+    /* 067: le caselle della strategia, come nel database: solo mie; 3 caselle (20 da Argento in su); «Persona che aiuti»
+       solo nella mia downline; «Nuovo in profondità» solo per una mia linea frontale; creato_il riparte se la casella cambia */
+    caselle: async () => { const io = mio(); if(!io) throw new Error("non_autenticato"); if(db.senzaCaselle) throw new Error("relation does not exist");
+      return (db.caselle || []).filter(x => x.partner_id === io.id).sort((a, b) => a.posizione - b.posizione).map(x => Object.assign({}, x, { partner_id:undefined })); },
+    salvaCaselle: async righe => { const io = mio(); if(!io) throw new Error("non_autenticato"); if(db.senzaCaselle) throw new Error("relation does not exist");
+      const ord = k => (db.stages.find(x => x.chiave === k) || {}).ordine || 0;
+      const max = ord(io.qualifica_iniziale) >= ord("argento") || Number(io.percentuale_iniziale) >= 21
+        || (db.numeri || []).some(n => n.partner_id === io.id && Number(n.percentuale) >= 21) ? 20 : 3;
+      for(const r of righe){
+        const p = r.persona_id && db.partners.find(x => x.id === r.persona_id), l = r.linea_id && db.partners.find(x => x.id === r.linea_id);
+        if(!(r.posizione >= 1 && r.posizione <= max)) throw new Error("new row violates row-level security policy");
+        if(!["aiuta", "profondita", "nuova_linea", "libera"].includes(r.tipo) || (r.tipo === "aiuta") !== !!r.persona_id || (r.tipo === "profondita") !== !!r.linea_id)
+          throw new Error("violates check constraint");
+        if(r.tipo === "aiuta" && (!p || p.id === io.id || !vedo(io, p))) throw new Error("new row violates row-level security policy");
+        if(r.tipo === "profondita" && (!l || l.sponsor_id !== io.id || !vedo(io, l))) throw new Error("new row violates row-level security policy");
+      }
+      const ora = new Date().toISOString();
+      for(const r of righe){
+        const v = (db.caselle || []).find(x => x.partner_id === io.id && x.posizione === r.posizione);
+        const nuova = { partner_id:io.id, posizione:r.posizione, tipo:r.tipo, persona_id:r.persona_id || null, linea_id:r.linea_id || null,
+          creato_il:v && v.tipo === r.tipo && v.persona_id === (r.persona_id || null) && v.linea_id === (r.linea_id || null) ? v.creato_il : ora };
+        db.caselle = (db.caselle || []).filter(x => x !== v).concat([nuova]);
+      }
+      salva(); return null; },
+    togliCaselleDa: async n => { const io = mio(); if(!io) throw new Error("non_autenticato"); if(db.senzaCaselle) throw new Error("relation does not exist");
+      db.caselle = (db.caselle || []).filter(x => !(x.partner_id === io.id && x.posizione > n)); salva(); return null; },
     partenze: async pid => { const io = mio(); if(!io) throw new Error("non_autenticato");
       if(pid){ const t = db.partners.find(p => p.id === pid); if(!t || (!vedo(io, t) && t.invitato_da !== io.id)) throw new Error("non_autorizzato"); }
       const somma = (id, tipi, campo, dal) => (db.activities || []).filter(a => a.partner_id === id && tipi.includes(a.tipo) && (!dal || a.data >= dal))

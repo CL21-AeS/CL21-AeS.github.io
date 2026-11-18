@@ -2095,6 +2095,80 @@ begin
     execute 'reset role';
   end;
 
+  -- ---- 067: le caselle della strategia: solo del partner, 3 sotto Argento e 20 da Argento in su, solo nella sua downline ----
+  declare
+    eventi int;
+    prima timestamptz;
+  begin
+    execute 'reset role';
+    eventi := (select count(*) from public.notifiche_eventi);
+    perform growup_test.come(u2);  -- A: B è nella sua downline ed è la sua linea frontale
+    insert into public.strategia_caselle (posizione, tipo, persona_id) values (1, 'aiuta', b);
+    insert into public.strategia_caselle (posizione, tipo, linea_id) values (2, 'profondita', b);
+    insert into public.strategia_caselle (posizione, tipo) values (3, 'nuova_linea');
+    perform growup_test.ok((select count(*) from public.strategia_caselle) = 3 and (select partner_id from public.strategia_caselle where posizione = 1) = a,
+                           '067: A salva le sue 3 caselle (persona, in profondità, nuova linea)');
+    perform growup_test.deve_fallire($q$insert into public.strategia_caselle (posizione, tipo) values (4, 'libera')$q$,
+                                     '067: sotto Argento non più di 3 caselle');
+    perform growup_test.deve_fallire(format($q$insert into public.strategia_caselle (partner_id, posizione, tipo) values (%L, 1, 'libera')$q$, c),
+                                     '067: le caselle di un altro non si scrivono');
+    perform growup_test.deve_fallire(format($q$update public.strategia_caselle set persona_id = %L where posizione = 1$q$, c),
+                                     '067: «Persona che aiuti» solo nella propria downline (C è una collega)');
+    perform growup_test.deve_fallire(format($q$update public.strategia_caselle set persona_id = %L where posizione = 1$q$, r),
+                                     '067: «Persona che aiuti» mai lo sponsor');
+    perform growup_test.deve_fallire(format($q$update public.strategia_caselle set persona_id = %L where posizione = 1$q$, a),
+                                     '067: «Persona che aiuti» mai sé stesso');
+    perform growup_test.deve_fallire(format($q$update public.strategia_caselle set linea_id = %L where posizione = 2$q$, c),
+                                     '067: «Nuovo in profondità» solo per una propria linea frontale');
+    perform growup_test.deve_fallire($q$update public.strategia_caselle set tipo = 'aiuta' where posizione = 3$q$,
+                                     '067: «Persona che aiuti» senza la persona no');
+    perform growup_test.deve_fallire($q$update public.strategia_caselle set posizione = 4 where posizione = 3$q$,
+                                     '067: spostare una casella oltre la terza no');
+    -- creato_il resta se la casella non cambia, riparte se cambia
+    execute 'reset role';
+    update public.strategia_caselle set creato_il = now() - interval '10 days' where partner_id = a;
+    prima := (select creato_il from public.strategia_caselle where partner_id = a and posizione = 3);
+    perform growup_test.come(u2);
+    update public.strategia_caselle set tipo = 'nuova_linea' where posizione = 3;
+    perform growup_test.ok((select creato_il from public.strategia_caselle where posizione = 3) = prima, '067: la casella uguale tiene la sua data');
+    update public.strategia_caselle set tipo = 'libera' where posizione = 3;
+    perform growup_test.ok((select creato_il from public.strategia_caselle where posizione = 3) > prima, '067: la casella cambiata riparte da oggi');
+    -- nessun altro le vede: né la persona scelta, né la collega, né lo sponsor admin; nessun avviso
+    perform growup_test.come(u3);  -- B, la persona scelta
+    perform growup_test.ok((select count(*) from public.strategia_caselle) = 0, '067: la persona scelta non vede la casella');
+    perform growup_test.come(u4);  -- C
+    perform growup_test.ok((select count(*) from public.strategia_caselle) = 0, '067: la collega non vede le caselle di A');
+    perform growup_test.ok(growup_test.righe('delete from public.strategia_caselle') = 0, '067: la collega non cancella le caselle di A');
+    perform growup_test.come(u1);  -- R, sponsor e admin
+    perform growup_test.ok((select count(*) from public.strategia_caselle) = 0, '067: lo sponsor (anche admin) non vede le caselle di A');
+    perform growup_test.ok(growup_test.righe($q$update public.strategia_caselle set tipo = 'libera'$q$) = 0, '067: lo sponsor non cambia le caselle di A');
+    execute 'reset role';
+    perform growup_test.ok((select count(*) from public.notifiche_eventi) = eventi, '067: nessun avviso alla persona scelta');
+    perform growup_test.come(null);
+    perform growup_test.deve_fallire('select * from public.strategia_caselle', '067: anon non legge le caselle');
+    perform growup_test.deve_fallire('select public.strategia_caselle_max()', '067: anon non chiama strategia_caselle_max');
+    -- da Argento in su: fino a 20 (qualifica dichiarata), e anche con un mese al 21% in una mappa
+    execute 'reset role';
+    update public.partners set qualifica_iniziale = 'argento' where id = a;
+    perform growup_test.come(u2);
+    perform growup_test.ok(public.strategia_caselle_max() = 20, '067: Argento dichiarato: 20 caselle');
+    insert into public.strategia_caselle (posizione, tipo) select i, 'nuova_linea' from generate_series(4, 20) i;
+    perform growup_test.ok((select count(*) from public.strategia_caselle) = 20, '067: da Argento 20 caselle');
+    perform growup_test.deve_fallire($q$insert into public.strategia_caselle (posizione, tipo) values (21, 'libera')$q$, '067: mai più di 20');
+    execute 'reset role';
+    update public.partners set qualifica_iniziale = null where id = a;
+    perform growup_test.come(u4);  -- C (9% dichiarato)
+    perform growup_test.ok(public.strategia_caselle_max() = 3, '067: C al 9%: 3 caselle');
+    execute 'reset role';
+    insert into public.numeri_mese (partner_id, mese, vpg, percentuale, dati_al)
+      values (c, date_trunc('month', current_date - 100)::date, 10500, 21, now())
+      on conflict (partner_id, mese) do update set percentuale = 21;
+    perform growup_test.come(u4);
+    perform growup_test.ok(public.strategia_caselle_max() = 20, '067: un mese al 21% in una mappa (anche se poi è sceso): 20 caselle');
+    insert into public.strategia_caselle (posizione, tipo) values (5, 'nuova_linea');
+    execute 'reset role';
+  end;
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),
