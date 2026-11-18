@@ -362,6 +362,8 @@ begin
   execute 'reset role';
   perform growup_test.ok((select stato = 'attivo' and sponsor_id = b and gestore_id is null and nome = 'Elena Vera' from public.partners where id = e),
                          'E ora usa l''app, sotto B');
+  perform growup_test.ok((select invitato_da = b and invitato_il is not null from public.partners where id = e),
+                         '066: E era già nella mappa: chi l''ha invitata (B) resta segnato');
   perform growup_test.ok((select count(*) from public.partners where codice_amway = '3000001') = 1, 'la copia di R è sparita');
   perform growup_test.ok((select vpp from public.numeri_mese where partner_id = e and mese = date_trunc('month', current_date)::date) = 40,
                          'E ritrova i VPP importati (numeri ufficiali della mappa)');
@@ -1015,7 +1017,8 @@ begin
   perform growup_test.come(u5);
   perform growup_test.ok((public.guida_conteggi(current_date)->>'personali')::int = att_prima + 1, '035: resta di A anche se va in profondità');
   perform growup_test.come(u3);  -- B non lo conta come suo
-  perform growup_test.ok((public.guida_conteggi(current_date)->>'personali')::int = 0, '035: per B non è un nuovo iscritto personale');
+  -- 066: per B conta solo E (entrata con il suo invito quando era già nella mappa), non il nuovo di A spostato sotto di lui
+  perform growup_test.ok((public.guida_conteggi(current_date)->>'personali')::int = 1, '035: per B non è un nuovo iscritto personale (conta solo E, 066)');
   -- nuovi nel gruppo (056): chi ha la data di ingresso della mappa nel mese, anche dal primo import, una volta sola
   execute 'reset role';
   update public.partners set primo_import_il = null where id = r;

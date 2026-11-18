@@ -1,7 +1,17 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 13 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 18 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
+
+## Chi ha invitato, anche per chi era già nella mappa (18 novembre 2026, migrazione 066, app non toccata)
+
+Corregge il difetto scritto qui sotto («Da sapere», 13 novembre). `entra_con_invito` ora segna `invitato_da` (chi ha
+creato l'invito) e `invitato_il` anche quando il nuovo era già nella mappa importata e prende il suo posto; prima li
+segnava solo il trigger `partners_guida` (035) per chi entrava in attesa. Così lo sponsor lo vede in «I tuoi nuovi in
+partenza» e in «Da seguire oggi», e conta tra i nuovi iscritti personali della Verifica. La funzione è quella della 052 con
+due campi in più: per tornare indietro basta rilanciare quella della 052. Stessa regola nella versione di prova
+(`prova/api-prova.js`). Controlli in `tests_rls.sql` (066; il conteggio dei nuovi iscritti personali di B ora è 1, cioè E).
+Applicata al database vero il 18 novembre 2026.
 
 ## Feste di fase e la versione di prova per Cum Laude 21 (13 novembre 2026, sera, app v122, database non toccato)
 
@@ -59,7 +69,7 @@ Per la presentazione a Cum Laude 21. Scelte di Stefano.
    (la Rubrica c'è solo sui telefoni che la lasciano usare), notifiche finte, nessun collegamento al database. Le date sono
    relative a oggi: la sezione 96 apre la prova il 1° marzo, il 31 dicembre e il 15 febbraio. Pagina di scelta a 360 px in
    chiaro e scuro: `e2e/68-prova-scelta-*.png`. Service worker **v122**, questo STATO.md.
-**Da sapere (difetto dell'app vera, da correggere a parte)**: se un nuovo è **già nella mappa** importata dallo sponsor ed
+**Da sapere (difetto dell'app vera, corretto il 18 novembre con la migrazione 066)**: se un nuovo è **già nella mappa** importata dallo sponsor ed
 entra con l'invito, `entra_con_invito` (052) non segna `invitato_da`: lo sponsor non lo vede in «I tuoi nuovi in partenza»
 né in «Da seguire oggi» (e non conta negli iscritti personali della Verifica). Va bene solo per chi entra prima di essere in
 una mappa (in attesa). Per questo nella prova Luca entra in attesa. Correzione proposta: una migrazione 066 che segna

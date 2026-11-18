@@ -156,7 +156,9 @@
         if(!sotto.length) throw new Error("codice_amway_altra_linea");
         p = sotto.find(c => c.gestore_id === sp.id) || sotto[0];
         for(const c of copie) if(c !== p){ db.partners.filter(x => x.sponsor_id === c.id).forEach(x => { x.sponsor_id = p.id; }); db.partners = db.partners.filter(x => x !== c); }
-        Object.assign(p, dati, { gestore_id:null, sponsor_id:antenatoConApp(p), confermato_il:new Date().toISOString() });
+        /* 066: chi ha invitato resta segnato anche per chi era già nella mappa */
+        Object.assign(p, dati, { gestore_id:null, sponsor_id:antenatoConApp(p), confermato_il:new Date().toISOString(),
+          invitato_da:sp.id, invitato_il:new Date().toISOString() });
       }else{
         p = Object.assign({ id:uid(), sponsor_id:invito.sotto_id || sp.id, area_platino:invito.area_platino || null, codice_amway:codiceA, confermato_il:null,
           invitato_da:sp.id, invitato_il:new Date().toISOString(),
