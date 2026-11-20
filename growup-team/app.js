@@ -276,6 +276,7 @@ const st = {
   guida: { conteggi:{}, cl21:{}, obiettivi:new Map(), fatti:[] },
   seguimi: { attivo:false, condividi:false }, seguimiGiorni: [], seguimiScheda: {},
   analisi: {}, condivisi: {}, analisiId: null,
+  analisiChiusi: {},       // i mesi chiusi delle mappe di chi apro nell'analisi (anche prima dell'anno fiscale): linea più forte
   vista: "io",            // pagina della home: "io", "gruppo" (struttura, inviti) o "scheda" (un partner)
   schedaId: null,         // partner aperto nella scheda
   attScheda: [],          // le sue attività (mese aperto)
@@ -7827,7 +7828,39 @@ async function apriAnalisi(pid){
     const [righe, cond] = await Promise.all([api.analisiPersona(pid), pid === st.profilo.id ? Promise.resolve(null) : api.datiCondivisi(pid)]);
     st.analisi[pid] = righe || []; st.condivisi[pid] = cond || null; render();
   }catch(e){ st.analisi[pid] = []; toast(messaggio(e)); render(); }
+  /* la linea più forte: i mesi chiusi già salvati, anche prima dell'anno fiscale (le mappe degli ultimi 24 mesi) */
+  try{ st.analisiChiusi[pid] = await api.mioReport(pid, spostaMese(meseDi(oggi()), -24) + "-01") || []; }catch(e){ st.analisiChiusi[pid] = []; }
+  render();
 }
+/* I VP veri di una linea frontale in un mese (scelta di Stefano, 20 novembre 2026). Amway toglie dalla VPG di chi sta sopra
+   i VP delle persone al 21% (o più): nella mappa una linea con una persona qualificata dentro risulta quasi a 0. I VP veri
+   sono la VPG della linea più la VPG di ogni persona al 21% in quel mese dentro la linea (a ogni profondità: la VPG di una
+   qualificata non comprende le qualificate sotto di lei). Le VPG al 21% arrivano da st.mesiNove (mappe dal 9% in su). */
+function vpg21(pid, m){
+  const r = ((st.mesiNove && st.mesiNove.get(pid)) || []).find(x => meseDi(x.mese) === m);
+  return r && Number(r.percentuale) >= 21 ? Number(r.vpg) || 0 : 0;
+}
+function vpLineaVeri(codice, vpg, m, sotto){
+  const p = st.struttura.find(x => x.codice_amway === codice);
+  if(!p) return vpg;
+  return vpg + (sotto ? sotto(p.id) : alberoSotto(p.id, 0).map(y => y.p.id)).reduce((t, id) => t + vpg21(id, m), 0);
+}
+/* La linea più forte: la linea frontale con la somma di VP (veri, comprese le qualificate) più alta negli ultimi 12 mesi
+   chiusi disponibili, mai il mese in corso. { nome, vp, mesi } (mesi = mesi chiusi usati; 0 = nessun mese chiuso) */
+function lineaPiuForte(pid){
+  const ora = meseDi(oggi()), giu = new Map();
+  const sotto = id => { if(!giu.has(id)) giu.set(id, alberoSotto(id, 0).map(y => y.p.id)); return giu.get(id); };
+  const mesi = (st.analisiChiusi[pid] || []).filter(r => r.vpg != null && meseDi(r.mese) < ora)
+    .sort((a, b) => a.mese < b.mese ? 1 : -1).slice(0, 12);
+  const somme = new Map();
+  for(const r of mesi) for(const l of (Array.isArray(r.linee) ? r.linee : []))
+    somme.set(l.codice, (somme.get(l.codice) || 0) + vpLineaVeri(l.codice, Number(l.vpg) || 0, meseDi(r.mese), sotto));
+  const [codice, vp] = [...somme.entries()].sort((a, b) => b[1] - a[1])[0] || [];
+  if(codice == null) return { nome:null, vp:0, mesi:mesi.length };
+  const p = st.struttura.find(x => x.codice_amway === codice);
+  return { nome:p ? p.nome : `Codice ${codice}`, vp, mesi:mesi.length };
+}
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { lineaPiuForte, vpLineaVeri });
 function tendenzaDi(valori){
   const v = valori.filter(x => x != null);
   if(v.length < 4) return null;
@@ -7848,16 +7881,20 @@ function vAnalisi(){
   if(!conReport.length) return `${indietro}<div class="card"><span class="eyebrow">${mio ? "La mia analisi" : `Analisi di ${esc(nome)}`}</span>
     <p class="small" style="margin:6px 0 0">Ancora nessun report importato in questo anno fiscale (da settembre).</p></div>`;
   /* le linee frontali: per codice, con nome, VP di gruppo e percentuale di ogni mese */
-  const linee = new Map();
+  /* i VP di ogni linea sono quelli veri: comprese le persone al 21% dentro la linea (vpLineaVeri); la percentuale resta
+     quella della mappa. aggiunti[i] = i VP delle qualificate aggiunti nel mese i (per il peso sul gruppo) */
+  const linee = new Map(), aggiunti = righe.map(() => 0), giu = new Map();
+  const sotto = id => { if(!giu.has(id)) giu.set(id, alberoSotto(id, 0).map(y => y.p.id)); return giu.get(id); };
   righe.forEach((r, i) => (r.linee || []).forEach(l => {
     const k = l.codice; if(!linee.has(k)) linee.set(k, { nome:l.nome || `Codice ${l.codice}`, mesi:righe.map(() => null) });
-    const vp = Number(l.vpg) || 0;
-    linee.get(k).mesi[i] = { vp, pct:l.percentuale != null ? Number(l.percentuale) : percentualeDa(vp) };
+    const vpg = Number(l.vpg) || 0, vp = vpLineaVeri(l.codice, vpg, meseDi(r.mese), sotto);
+    aggiunti[i] += vp - vpg;
+    linee.get(k).mesi[i] = { vp, pct:l.percentuale != null ? Number(l.percentuale) : percentualeDa(vpg) };
   }));
   const ultimo = righe.length - 1 - [...righe].reverse().findIndex(r => r.vpg != null);
-  const gruppoUltimo = Number(righe[ultimo].vpg) || 0;
+  const gruppoUltimo = (Number(righe[ultimo].vpg) || 0) + aggiunti[ultimo];
   const lista = [...linee.values()].sort((a, b) => ((b.mesi[ultimo] || {}).vp || 0) - ((a.mesi[ultimo] || {}).vp || 0));
-  const forte = lista.slice().sort((a, b) => somma(b.mesi.map(x => ({ v:x ? x.vp : 0 })), "v") - somma(a.mesi.map(x => ({ v:x ? x.vp : 0 })), "v"))[0];
+  const forte = lineaPiuForte(pid), caricati = !!st.analisiChiusi[pid];
   const mesi21 = conReport.filter(r => Number(r.percentuale) >= 21).length;
   const media = somma(conReport.map(r => ({ v:Number(r.vpg) || 0 })), "v") / conReport.length;
   const cella = x => x ? `<td class="num p${x.pct || 0}"><b>${num(x.vp)}</b><br><span>${x.pct ? x.pct + "%" : "–"}</span></td>` : `<td class="num faint">–</td>`;
@@ -7899,13 +7936,14 @@ function vAnalisi(){
       <div><b class="num">${conReport.length} su ${righe.length}</b><span>mesi con il report</span></div>
       <div><b class="num">${mesi21}</b><span>mesi al 21%</span></div>
       <div><b class="num">${num(Math.round(media))}</b><span>VP di gruppo medio</span></div>
-      <div><b style="font-size:16px">${forte ? esc(forte.nome) : "–"}</b><span>linea più forte</span></div>
+      <div class="linea-forte"><b style="font-size:16px">${forte.nome ? esc(forte.nome) : "–"}</b><span>linea più forte · ${!caricati ? "…"
+        : forte.mesi === 1 ? "ultimo mese chiuso" : forte.mesi ? `ultimi ${num(forte.mesi)} mesi chiusi` : "dopo la chiusura del primo mese"}</span></div>
     </div>
   </div>
   <div class="card analisi-linee">
     <span class="eyebrow">Andamento delle linee</span>
-    <p class="small" style="margin:4px 0 0">VP di gruppo e percentuale di ogni linea frontale, mese per mese. Peso: quanto conta la linea sul
-      gruppo nell'ultimo mese. Tendenza: ultimi 3 mesi rispetto ai 3 prima.</p>
+    <p class="small" style="margin:4px 0 0">VP di gruppo e percentuale di ogni linea frontale, mese per mese, comprese le persone qualificate
+      (21% e oltre) dentro la linea. Peso: quanto conta la linea sul gruppo nell'ultimo mese. Tendenza: ultimi 3 mesi rispetto ai 3 prima.</p>
     ${lista.length ? tabLinee : `<p class="muted" style="margin:8px 0 0">Nei report non ci sono linee frontali.</p>`}
   </div>
   <div class="card analisi-stabilita">

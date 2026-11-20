@@ -7582,6 +7582,75 @@ for(const tema of ["light", "dark"]){
   DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
   DB.caselle = (DB.caselle || []).filter(x => !tutti.includes(x.partner_id));
 }
+// 104. «Linea più forte» nella mia analisi (20 novembre 2026, scelta di Stefano): la linea frontale con la somma di VP più alta
+//      negli ultimi 12 mesi chiusi disponibili (mai il mese in corso), anche prima dell'anno fiscale, con «ultimi N mesi
+//      chiusi»; senza mesi chiusi «–» e «dopo la chiusura del primo mese». I VP di una linea sono quelli veri: Amway toglie
+//      dalla VPG di chi sta sopra le persone al 21%, quindi alla VPG della linea si aggiunge la VPG di ogni persona al 21%
+//      in quel mese dentro la linea (anche nella tabella «Andamento delle linee»).
+{
+  const id = n => "a4000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0");
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const ora = new Date().toISOString();
+  const spMese = (m, k) => { const [y, mm] = m.split("-").map(Number), t = y * 12 + mm - 1 + k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, "0")}`; };
+  const cod = n => "7940" + String(n).padStart(3, "0");
+  const io = (n, nome, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:"R", stato:"attivo", codice_invito:"LF" + n + "XX", codice_amway:cod(n),
+    chiave:String(n).padStart(2, "0").repeat(16), privacy_accettata_il:quando(-300), confermato_il:ora, partenza_confermata_il:ora, creato_il:quando(-300),
+    ultimo_aggiornamento:ora, data_iscrizione:giorno(-900) }, extra));
+  const sotto = (n, nome, sponsor) => DB.partners.push({ id:id(n), nome, sponsor_id:id(sponsor), stato:"gestito", gestore_id:id(sponsor),
+    codice_invito:"LF" + n + "XX", codice_amway:cod(n), partenza_confermata_il:ora, creato_il:quando(-300), data_iscrizione:giorno(-800) });
+  const linee = l => l.map(([n, vpg]) => ({ codice:cod(n), vpg }));
+  const tutti = []; for(let n = 10; n <= 40; n++) tutti.push(id(n));
+  // Elena: Aldo forte nei 5 mesi chiusi (1.000 VP) e basso nel mese in corso; Bruno 300 VP nei mesi chiusi e 5.000 adesso
+  io(10, "Elena Erica"); sotto(11, "Aldo Acero", 10); sotto(12, "Bruno Bosso", 10);
+  for(let k = 1; k <= 5; k++) mappa(id(10), 120, 1400, { mese:spMese(meseOra(), -k), percentuale:9, linee:linee([[11, 1000], [12, 300]]) });
+  mappa(id(10), 120, 5100, { percentuale:15, linee:linee([[11, 10], [12, 5000]]) });
+  // Franco: 14 mesi chiusi (se ne usano 12). Gino 2.000 VP al mese; Ivo 110 VP nella mappa, ma dentro la sua linea Lara è al
+  // 21% negli ultimi 3 mesi chiusi con 10.000 VP (Amway li toglie dalla VPG di Ivo): Ivo vince
+  io(20, "Franco Felce"); sotto(21, "Gino Gelso", 20); sotto(22, "Ivo Ibisco", 20); sotto(23, "Lara Lentisco", 22);
+  for(let k = 1; k <= 14; k++) mappa(id(20), 150, 2400, { mese:spMese(meseOra(), -k), percentuale:21, linee:linee([[21, 2000], [22, 110]]) });
+  for(let k = 1; k <= 3; k++){ mappa(id(22), 110, 110, { mese:spMese(meseOra(), -k), percentuale:3, linee:linee([[23, 10000]]) });
+    mappa(id(23), 200, 10000, { mese:spMese(meseOra(), -k), percentuale:21 }); }
+  mappa(id(20), 150, 2400, { percentuale:15, linee:linee([[21, 2000], [22, 110]]) });
+  // Ugo: solo la mappa del mese in corso
+  io(30, "Ugo Uva"); sotto(31, "Vera Verbena", 30);
+  mappa(id(30), 100, 300, { linee:linee([[31, 200]]) });
+  const analisi = async n => {
+    const r = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + String(n).padStart(2, "0").repeat(16));
+    ({ ctx, page } = r); await page.locator(".testata h1").waitFor();
+    await page.click(".sezioni-io button[data-sez=guida]");
+    await page.click(".analisi-link[data-act=apri-analisi]");
+    await page.locator(".analisi-riep .linea-forte").waitFor();
+    await page.waitForFunction(() => !document.querySelector(".analisi-riep .linea-forte span").textContent.includes("…"));
+    return (await page.locator(".analisi-riep .linea-forte").innerText()).replace(/\s+/g, " ").trim();
+  };
+
+  let t = await analisi(10);
+  check(t === "Aldo Acero linea più forte · ultimi 5 mesi chiusi", "linea più forte: la più alta nei mesi chiusi resta la più forte anche se bassa nel mese in corso; N = 5, anche prima dell'anno fiscale (" + t + ")");
+  await ctx.close();
+
+  t = await analisi(20);
+  check(t === "Ivo Ibisco linea più forte · ultimi 12 mesi chiusi", "linea più forte: con la persona al 21% dentro la linea vince Ivo; al massimo 12 mesi chiusi (" + t + ")");
+  const fy = Number(meseOra().slice(5)) !== 9;   // a settembre il mese scorso è dell'anno fiscale prima
+  if(fy){
+    const riga = (await page.locator(".analisi-linee tr", { hasText:"Ivo Ibisco" }).innerText()).replace(/\s+/g, " ");
+    check(riga.includes("10.110"), "Andamento delle linee: i VP di Ivo comprendono Lara al 21% (110 + 10.000) (" + riga + ")");
+  }
+  const forte = await page.evaluate(id => GROWUP_TEST.lineaPiuForte(id), id(20));
+  check(forte.vp === 110 * 12 + 30000 && forte.mesi === 12, `linea più forte: la somma dei VP veri negli ultimi 12 mesi chiusi (${JSON.stringify(forte)})`);
+  await page.locator(".analisi-riep").screenshot({ path:S + "/e2e/104-linea-forte-light.png" });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await page.locator(".analisi-riep").screenshot({ path:S + "/e2e/104-linea-forte-dark.png" });
+  await page.emulateMedia({ colorScheme:"light" });
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "analisi a 360 px: la pagina non scorre di lato");
+  await ctx.close();
+
+  t = await analisi(30);
+  check(t === "– linea più forte · dopo la chiusura del primo mese", "linea più forte senza mesi chiusi: «–» e «dopo la chiusura del primo mese» (" + t + ")");
+  await ctx.close();
+  check(!errori.length, "linea più forte: nessun errore nella pagina");
+  DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
+  DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
+}
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
