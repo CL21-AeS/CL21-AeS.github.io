@@ -2169,6 +2169,13 @@ begin
     execute 'reset role';
   end;
 
+  -- ---- 068: il Path to Bronze conta solo le linee nuove (dal 1° giugno 2026); le altre tappe non hanno la data ----
+  execute 'reset role';
+  perform growup_test.ok((select linee_nuove_dal from public.stage_requirements where chiave = 'path_to_bronze') = date '2026-06-01',
+                         '068: Path to Bronze, linee nuove dal 1° giugno 2026');
+  perform growup_test.ok((select count(*) from public.stage_requirements where linee_nuove_dal is not null) = 1,
+                         '068: la data delle linee nuove c''è solo nel Path to Bronze');
+
   -- ---- Nessuna tabella senza RLS ----
   execute 'reset role';
   perform growup_test.ok(not exists (select 1 from pg_tables where schemaname = 'public' and not rowsecurity),

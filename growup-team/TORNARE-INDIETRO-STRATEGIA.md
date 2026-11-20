@@ -49,9 +49,15 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 | 4 | [#237](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/237) | «Oggi per la tua strategia» al posto della lista di oggi: i binari Persone e Fatturato | nessuna | — |
 | 5 | [#238](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/238) | La festa del Path to Bronze e, dopo, le sue linee nuove come suggerimento; service worker v123 | nessuna | — |
 | 6 | [#239](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/239) | «Cambia» per linea: prima la linea, poi chi aiuti solo tra le persone di quella linea | nessuna | — |
+| 7 | [#241](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/241) | Path to Bronze: contano solo le linee nuove (dal 1° giugno 2026); prossima tappa vera per chi è già oltre | `068_linee_nuove_dal.sql` (solo il valore `linee_nuove_dal` del Path to Bronze) | `supabase/068_linee_nuove_dal_togli.sql` (lo rimette vuoto) |
 
-Per tornare a tutto com'era: «Revert» delle PR dalla 6 alla 1 (o chiedere a Claude di riportare la cartella al tag),
-poi, se si vuole, lo script della 067.
+Per tornare a tutto com'era: «Revert» delle PR dalla 7 alla 1 (o chiedere a Claude di riportare la cartella al tag),
+poi, se si vuole, gli script della 068 e della 067.
+
+Da sapere sulla 068: non crea niente, cambia solo un valore della tabella delle tappe. **Per rimetterlo vuoto** incolla
+nell'SQL Editor `supabase/068_linee_nuove_dal_togli.sql` (una riga: `update public.stage_requirements set linee_nuove_dal =
+null where chiave = 'path_to_bronze';`). Con il valore vuoto anche l'app della PR 7 conta di nuovo tutte le linee; l'app di
+prima, con il valore scritto, contava solo le linee nuove nella strategia (non nell'Obiettivo).
 
 La 067 è applicata al database vero dal 18 novembre 2026: per toglierla serve lo script qui sopra.
 
