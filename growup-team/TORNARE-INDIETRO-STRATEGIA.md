@@ -49,7 +49,7 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 | 4 | [#237](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/237) | «Oggi per la tua strategia» al posto della lista di oggi: i binari Persone e Fatturato | nessuna | — |
 | 5 | [#238](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/238) | La festa del Path to Bronze e, dopo, le sue linee nuove come suggerimento; service worker v123 | nessuna | — |
 | 6 | [#239](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/239) | «Cambia» per linea: prima la linea, poi chi aiuti solo tra le persone di quella linea | nessuna | — |
-| 7 | PR7 | Path to Bronze: contano solo le linee nuove (dal 1° giugno 2026); prossima tappa vera per chi è già oltre | `068_linee_nuove_dal.sql` (solo il valore `linee_nuove_dal` del Path to Bronze) | `supabase/068_linee_nuove_dal_togli.sql` (lo rimette vuoto) |
+| 7 | [#241](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/241) | Path to Bronze: contano solo le linee nuove (dal 1° giugno 2026); prossima tappa vera per chi è già oltre | `068_linee_nuove_dal.sql` (solo il valore `linee_nuove_dal` del Path to Bronze) | `supabase/068_linee_nuove_dal_togli.sql` (lo rimette vuoto) |
 
 Per tornare a tutto com'era: «Revert» delle PR dalla 7 alla 1 (o chiedere a Claude di riportare la cartella al tag),
 poi, se si vuole, gli script della 068 e della 067.
