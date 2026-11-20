@@ -54,8 +54,9 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 | 9 | [#243](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/243) | «Linea più forte» dagli ultimi 12 mesi chiusi e i VP veri delle linee con persone al 21% nell'analisi; service worker v125 | nessuna | — |
 | 10 | [#244](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/244) | Correzione: toccando la persona in una casella si apre la sua scheda (non la strategia); service worker v126 | nessuna | — |
 | 11 | [#245](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/245) | Correzione: toccando una casella da trovare («Nuovo in profondità», «Nuova linea frontale», «Casella libera») non si apre niente, solo il suo pulsante; service worker v127 | nessuna | — |
+| 12 | PR12 | La strategia a schermo intero si apre solo con «Vedi tutto ›» (toccando la card non si apre niente); service worker v128 | nessuna | — |
 
-Per tornare a tutto com'era: «Revert» delle PR dalla 11 alla 1 (o chiedere a Claude di riportare la cartella al tag),
+Per tornare a tutto com'era: «Revert» delle PR dalla 12 alla 1 (o chiedere a Claude di riportare la cartella al tag),
 poi, se si vuole, gli script della 068 e della 067.
 
 La 068 è applicata al database vero dal 20 novembre 2026.

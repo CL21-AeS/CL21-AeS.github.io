@@ -3,6 +3,15 @@
 Ultimo aggiornamento: 20 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## La strategia a schermo intero solo con «Vedi tutto ›» (20 novembre 2026, sera, app v128, database non toccato)
+
+Scelta di Stefano: la card «La tua strategia» non si apre più toccandola (titolo, tappe, spazi vuoti); la schermata intera
+si apre **solo con «Vedi tutto ›»**. Restano i tocchi che servono: la casella di una persona e le righe di «Le tue linee»
+aprono la scheda della persona, «Lista ›», «Scegli», «Cambia» e «altre N senza fatturato» fanno quello che dicono, le
+caselle da trovare non aprono niente. Tolti dalla card `data-act="strategia-apri"`, `role="button"` e `tabindex`. Test:
+sezione 98 (toccando il titolo non si apre niente, poi «Vedi tutto ›») e le altre sezioni aprono la schermata intera con
+«Vedi tutto ›».
+
 ## Correzione: le caselle da trovare non aprono niente (20 novembre 2026, sera, app v127, database non toccato)
 
 Segnalato da Stefano: toccando una casella «Nuovo in profondità» (o «Nuova linea frontale», «Casella libera») si apriva la

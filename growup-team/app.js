@@ -9168,7 +9168,9 @@ function vStrategia(){
     ${vModi(s, "strategia-modo")}
     ${vLineeStrategia(s, [])}
   </div>`;
-  return `<div class="card strategia" data-act="strategia-apri" role="button" tabindex="0" aria-label="Apri la tua strategia">
+  /* la schermata intera si apre solo con «Vedi tutto ›» (scelta di Stefano, 20 novembre 2026): toccando il resto della card
+     non si apre niente; le righe delle persone aprono la loro scheda, le caselle da trovare solo il loro pulsante */
+  return `<div class="card strategia">
     <div class="spread"><span class="eyebrow">La tua strategia</span><span class="small">${num(caselle.length)} caselle</span></div>
     ${vDopoPtb(caselle)}
     <h2 class="strategia-titolo">${esc(titoloStrategia(caselle, s))}</h2>
@@ -9319,7 +9321,7 @@ Object.assign(MODULI, {
 });
 /* la card si apre anche dalla tastiera (Invio o spazio), come un pulsante */
 document.addEventListener("keydown", e => {
-  if((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".card.strategia[data-act=strategia-apri], li.casella[data-act=strategia-scheda]")){ e.preventDefault(); e.target.click(); }
+  if((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("li.casella[data-act=strategia-scheda]")){ e.preventDefault(); e.target.click(); }
 });
 if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { strategiaAttuale, titoloStrategia, personeDellaLinea });
 
