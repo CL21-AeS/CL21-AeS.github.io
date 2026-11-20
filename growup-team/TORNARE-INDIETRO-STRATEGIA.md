@@ -52,8 +52,9 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 | 7 | [#241](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/241) | Path to Bronze: contano solo le linee nuove (dal 1° giugno 2026); prossima tappa vera per chi è già oltre | `068_linee_nuove_dal.sql` (solo il valore `linee_nuove_dal` del Path to Bronze) | `supabase/068_linee_nuove_dal_togli.sql` (lo rimette vuoto) |
 | 8 | [#242](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/242) | Tutte le linee che seguo nella card e, toccandole, «Come aiutarlo a qualificare» nella scheda partner | nessuna | — |
 | 9 | [#243](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/243) | «Linea più forte» dagli ultimi 12 mesi chiusi e i VP veri delle linee con persone al 21% nell'analisi; service worker v125 | nessuna | — |
+| 10 | [#244](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/244) | Correzione: toccando la persona in una casella si apre la sua scheda (non la strategia); service worker v126 | nessuna | — |
 
-Per tornare a tutto com'era: «Revert» delle PR dalla 9 alla 1 (o chiedere a Claude di riportare la cartella al tag),
+Per tornare a tutto com'era: «Revert» delle PR dalla 10 alla 1 (o chiedere a Claude di riportare la cartella al tag),
 poi, se si vuole, gli script della 068 e della 067.
 
 La 068 è applicata al database vero dal 20 novembre 2026.

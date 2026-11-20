@@ -3,6 +3,15 @@
 Ultimo aggiornamento: 20 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Correzione: toccando la persona in una casella si apre la sua scheda (20 novembre 2026, sera, app v126, database non toccato)
+
+Segnalato da Stefano: toccando una persona in «La tua strategia» si riapriva la strategia a schermo intero invece della
+scheda della persona. La riga dell'elenco «Le tue linee» funzionava; la casella «Persona che aiuti» invece non era
+toccabile e il tocco passava alla card (che apre la schermata intera). Ora la casella di una persona (nella card e nella
+schermata intera) apre la sua scheda partner con «Come aiutarlo a qualificare» (`data-act="strategia-scheda"` sulla
+casella, anche con Invio o Spazio da tastiera); accanto al nome un «›» dice che si può toccare. Test: sezione 103 (tocco
+come su un telefono, nella card e nella schermata intera).
+
 ## «Linea più forte» dai mesi chiusi e i VP veri delle linee con persone al 21% (20 novembre 2026, app v125, database non toccato)
 
 - **Il controllo sui dati veri** (con il connettore, solo conteggi; nessun nome nei file): nei file della mappa la riga di

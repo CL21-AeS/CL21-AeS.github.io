@@ -909,6 +909,8 @@ html,body{overflow-x:clip}
 .tappe4-ora{margin:-4px 0 0}
 .caselle{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .casella{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card)}
+.casella.c-apri{cursor:pointer}
+.casella.c-apri .casella-nome::after{content:" ›";color:var(--ink3);font-weight:400}
 .casella.c-aiuta{border-left:4px solid var(--scelta)}
 .casella.vuota{flex-direction:row;align-items:center;gap:10px;border:1.5px dashed var(--ink3);background:transparent}
 .casella.vuota .grow{display:flex;flex-direction:column;gap:1px;min-width:0}
