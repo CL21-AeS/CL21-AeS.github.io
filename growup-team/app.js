@@ -3434,6 +3434,7 @@ function vScheda(){
     ${gestito ? "" : vNumeriLista(p.id)}
   </div>
   ${vPartenzaScheda(p)}
+  ${vAiutaQualificare(p)}
   ${vComeArrivarci(p.id, "lui")}
   ${vConfronto(p)}
   <button class="btn wide" style="margin-top:4px" data-act="apri-analisi" data-id="${esc(p.id)}">Analisi di ${esc(nomeSaluto(p.nome))} ›</button>
@@ -8777,10 +8778,10 @@ function lineaDiPersona(pid){
 }
 /* le mie linee frontali numerate: il numero è la posizione per VP nell'ultimo mese chiuso (fermo per tutto il mese),
    poi chi in quel mese non c'era, per nome */
-function lineeNumerate(chiuso, recente){
+function lineeNumerate(chiuso, recente, pid){
   const viste = new Map();
   for(const l of (chiuso ? chiuso.linee : []).concat(recente ? recente.linee : [])) if(!viste.has(l.id || l.nome)) viste.set(l.id || l.nome, l);
-  for(const p of figli(st.profilo.id)) if(!viste.has(p.id)) viste.set(p.id, { id:p.id, nome:p.nome, vp:0 });
+  for(const p of figli(pid || st.profilo.id)) if(!viste.has(p.id)) viste.set(p.id, { id:p.id, nome:p.nome, vp:0 });
   const vpChiuso = l => { const x = chiuso && chiuso.linee.find(y => (y.id || y.nome) === (l.id || l.nome)); return x ? x.vp : -1; };
   return [...viste.values()].sort((a, b) => vpChiuso(b) - vpChiuso(a) || String(a.nome).localeCompare(String(b.nome), "it"))
     .map((l, i) => ({ id:l.id, nome:l.nome, n:i + 1 }));
@@ -8835,11 +8836,16 @@ function modoAdatto(s){
 /* La strategia di chi usa l'app (io). n: quante caselle (da Argento in su il partner ne sceglie da 3 a 20).
    { pronta, motivo?, situazione, attive, chiuso:{ mese, datiAl }, recente:{ mese, datiAl, gruppo }, tappa, tappe4, linee,
      argento, caselle, caselleMax, proposte, modoAdatto, ptb } */
-function strategia(n){
-  const p = st.profilo, chiusoM = mesePrecedente();
-  const argento = strategiaDaArgento(p), caselleMax = argento ? CASELLE_MAX : CASELLE_MIN;
+/* Con pid (una persona della mia downline, punto 2 del 20 novembre 2026) è la stessa strategia calcolata per lei, solo
+   dai dati della mappa: la sua situazione, la sua prossima tappa vera (prossimaTappaDi), le sue linee e la strada proposta.
+   Le caselle che quella persona ha salvato non si leggono mai (restano solo sue). */
+function strategia(n, pid){
+  const io = !pid || pid === st.profilo.id;
+  const p = io ? st.profilo : st.struttura.find(x => x.id === pid), chiusoM = mesePrecedente();
+  if(!p) return { pronta:false, motivo:"persona" };
+  const argento = io ? strategiaDaArgento(p) : daArgentoDi(p.id), caselleMax = argento ? CASELLE_MAX : CASELLE_MIN;
   const caselle = Math.max(CASELLE_MIN, Math.min(caselleMax, Number(n) || CASELLE_MIN));
-  const base = { argento, caselle, caselleMax, nuovo:percorsoAttivo() };
+  const base = { argento, caselle, caselleMax, nuovo:io ? percorsoAttivo() : false, pid:p.id };
   let chiuso = numeriPersona(p.id, chiusoM);
   const recenteN = mappaRecente(p.id);
   const isc = dataIngressoDi(p.id);
@@ -8851,15 +8857,17 @@ function strategia(n){
   const situazione = attive === 0 ? "A" : attive < 3 ? "B" : "C";
   /* la prossima tappa: la prima dal Path to Bronze ad Argento non ancora fatta (punto di partenza: la qualifica dichiarata) */
   const T = tappeStrategia(), partenza = ordineDi(p.qualifica_iniziale);
-  const fatta = t => t.ordine <= partenza || tappaFatta(t);
-  const tappa = argento ? null : T.find(t => !fatta(t)) || null;
+  /* per un'altra persona: la sua prossima tappa vera; le tappe prima di quella sono fatte */
+  const tappaAltro = io ? null : prossimaTappaDi(p.id);
+  const fatta = io ? t => t.ordine <= partenza || tappaFatta(t) : t => !tappaAltro || t.ordine < tappaAltro.ordine;
+  const tappa = argento ? null : io ? T.find(t => !fatta(t)) || null : tappaAltro;
   const tappe4 = argento ? null : TAPPE_STRATEGIA.map(([k, nome, breve]) => {
     const membri = T.filter(t => t.chiave === k || String(t.chiave).startsWith(k + "_"));
     const tutte = membri.length && membri.every(fatta), corso = !tutte && tappa && membri.some(t => t.chiave === tappa.chiave);
     return { chiave:k, nome, breve, stato:tutte ? "fatta" : corso ? "corso" : "da_fare", tappa:corso ? tappa : null };
   });
   const vpLinea = tappa ? Number(tappa.vp_linea) || soglia1 : soglia1;
-  const numerate = lineeNumerate(chiuso, recenteN);
+  const numerate = lineeNumerate(chiuso, recenteN, p.id);
   const nDi = l => { const x = numerate.find(y => (y.id || y.nome) === (l.id || l.nome)); return x ? x.n : null; };
   const vpChiuso = l => { const x = chiuso && chiuso.linee.find(y => (y.id || y.nome) === (l.id || l.nome)); return x ? x.vp : 0; };
   /* le linee con i VP della mappa più recente rispetto alla soglia della tappa (attiva: nel mese chiuso) */
@@ -8991,19 +8999,106 @@ function vTappe4(s){
       <span aria-hidden="true">${t.stato === "fatta" ? "✓ " : t.stato === "corso" ? "● " : ""}${esc(t.breve)}</span></span>`).join("")}</div>
     ${s.tappa ? `<p class="small tappe4-ora">Ora: <b>${esc(s.tappa.nome)}</b>${qui >= 0 ? ` · tappa ${qui + 1} di 4` : ""}</p>` : ""}`;
 }
-/* le linee con i VP rispetto alla prossima tappa: quante (null = tutte), oltre: «altre N» */
-function vLineeStrategia(s, quante){
-  if(!s.linee.length) return "";
-  const l = quante == null ? s.linee : s.linee.slice(0, quante);
-  const verso = s.tappa ? `verso ${esc(s.tappa.nome)}` : "linee attive";
+/* Tutte le linee che seguo (scelta di Stefano, 20 novembre 2026): tutte le mie linee frontali e le persone in profondità
+   che ho scelto nelle caselle («Persona che aiuti» fuori dalle frontali). Prima chi fattura (VP nella mappa più recente),
+   dal più alto; poi «altre N senza fatturato», chiuse finché non si toccano. Toccando una persona si apre la sua scheda
+   partner, con «Come aiutarlo a qualificare». { id, nome, n, vp, soglia, ok, profondita, apri } */
+function lineeSeguite(s, caselle){
+  const vpLinea = s.tappa ? Number(s.tappa.vp_linea) || soglia() : soglia();
+  const apri = id => !!id && id !== st.profilo.id && st.struttura.some(p => p.id === id);
+  const frontali = (s.numerate || []).map(l => { const x = s.linee.find(y => (y.id || y.nome) === (l.id || l.nome)), vp = x ? x.vp : 0;
+    return { id:l.id, nome:l.nome, n:l.n, vp, soglia:x ? x.soglia : vpLinea, ok:vp >= (x ? x.soglia : vpLinea), profondita:false, apri:apri(l.id) }; });
+  const prof = [];
+  for(const c of caselle || []) if(c.tipo === "aiuta" && apri(c.persona_id) && !frontali.some(f => f.id === c.persona_id) && !prof.some(f => f.id === c.persona_id)){
+    const r = mappaRecente(c.persona_id), p = st.struttura.find(x => x.id === c.persona_id);
+    prof.push({ id:p.id, nome:p.nome, n:numeroLinea(s, lineaDiPersona(p.id)), vp:r ? r.gruppo : 0, profondita:true, apri:true });
+  }
+  const tutte = frontali.concat(prof);
+  return { fatturano:tutte.filter(x => x.vp > 0).sort((a, b) => b.vp - a.vp), senza:tutte.filter(x => !(x.vp > 0)) };
+}
+function vLineeStrategia(s, caselle){
+  const { fatturano, senza } = lineeSeguite(s, caselle);
+  if(!fatturano.length && !senza.length) return "";
+  const verso = s.tappa ? `verso ${esc(s.tappa.nome)}` : "linee attive", aperte = !!st.lineeSenzaAperte;
+  const riga = x => { const testo = `<span class="linea-nome">${x.profondita ? "" : x.n ? `Linea ${x.n} · ` : ""}${esc(x.nome)}${x.profondita
+      ? `<span class="linea-dove"> · in profondità${x.n ? `, linea ${x.n}` : ""}</span>` : ""}</span>
+      <span class="linea-vp">${x.profondita ? `<b class="num">${num(x.vp)}</b> VP` : `<b class="num">${num(x.vp)}</b> / ${num(x.soglia)} VP${x.ok ? ` <span class="segno-ok" aria-label="fatto">✓</span>` : ""}`}</span>`;
+    return `<li class="${x.ok ? "ok" : ""}">${x.apri ? `<button class="linea-apri" data-act="strategia-scheda" data-id="${esc(x.id)}" aria-label="Apri la scheda di ${esc(x.nome)}">${testo}<span class="fr" aria-hidden="true">›</span></button>` : testo}</li>`; };
   return `<div class="linee-strategia">
     <p class="small linee-testa"><b>Le tue linee</b> · ${verso}</p>
-    <ul>${l.map(x => `<li class="${x.ok ? "ok" : ""}"><span class="linea-nome">${x.n ? `Linea ${x.n} · ` : ""}${esc(x.nome)}</span>
-      <span class="linea-vp"><b class="num">${num(x.vp)}</b> / ${num(x.soglia)} VP${x.ok ? ` <span class="segno-ok" aria-label="fatto">✓</span>` : ""}</span></li>`).join("")}</ul>
-    ${s.linee.length > l.length ? `<p class="small">altre ${s.linee.length - l.length}</p>` : ""}
+    ${fatturano.length ? `<ul>${fatturano.map(riga).join("")}</ul>` : ""}
+    ${senza.length ? `<button class="riga-apri linee-senza" data-act="linee-senza" aria-expanded="${aperte}"><span class="grow">altre ${num(senza.length)} senza fatturato</span>
+      <span class="fr" aria-hidden="true">${aperte ? "▴" : "▾"}</span></button>
+    ${aperte ? `<ul class="linee-senza-l">${senza.map(riga).join("")}</ul>` : ""}` : ""}
     <p class="small linee-mappa">VP: ${esc(testoMappaStrategia(s.recente && s.recente.mese, s.recente && s.recente.datiAl))}</p>
   </div>`;
 }
+Object.assign(AZIONI, {
+  "linee-senza"(){ st.lineeSenzaAperte = !st.lineeSenzaAperte; render(); },
+  /* dalla card o dalla schermata intera: la scheda partner della persona (la schermata intera si chiude) */
+  "strategia-scheda"(el){ st.sheet = null; st.strategiaModifica = false; AZIONI["apri-scheda"](el); }
+});
+/* ==== «Come aiutarlo a qualificare» nella scheda partner (scelta di Stefano, 20 novembre 2026) ====
+   La strategia calcolata per quella persona con la stessa funzione (strategia(null, pid)), solo dai dati della mappa: la
+   sua situazione (linee attive nel mese chiuso), la sua prossima tappa vera (prossimaTappaDi: mai il Path to Bronze per chi
+   è già oltre), cosa manca con i numeri («linea 2: 150 su 200 VP», «manca la terza linea») e la strada consigliata con la
+   stessa logica delle caselle. Le caselle salvate da quella persona non si leggono mai. Niente euro, niente proiezioni. */
+const ORDINALI = ["prima", "seconda", "terza", "quarta", "quinta"];
+function mancaQualifica(s){
+  const t = s.tappa, n = mappaRecente(s.pid);
+  if(!t || !n) return [];
+  const out = [], ok = (v, min) => v >= min;
+  if(Number(t.vp_personali) > 0) out.push({ ok:ok(n.personali, t.vp_personali), txt:`VP personali: ${num(n.personali)} su ${num(t.vp_personali)}` });
+  if(Number(t.vp_gruppo) > 0) out.push({ ok:ok(n.gruppo, t.vp_gruppo), txt:`VP di gruppo: ${num(n.gruppo)} su ${num(t.vp_gruppo)}` });
+  if(Number(t.linee) > 0){
+    const min = Number(t.vp_linea) || soglia(), nuove = t.linee_nuove_dal ? " nuova" : "";
+    const lt = lineeTappa(t, n.linee).slice().sort((a, b) => b.vp - a.vp).slice(0, t.linee);
+    lt.forEach(l => { const k = numeroLinea(s, l.id); out.push({ ok:ok(l.vp, min), txt:`linea${nuove}${k ? " " + k : ""} (${l.nome}): ${num(l.vp)} su ${num(min)} VP` }); });
+    const mancano = t.linee - lt.length;
+    if(mancano === 1) out.push({ ok:false, txt:`manca la ${ORDINALI[lt.length] || (lt.length + 1) + "ª"} linea${nuove}` });
+    else if(mancano > 1) out.push({ ok:false, txt:`mancano ${mancano} linee${nuove ? " nuove" : ""}` });
+  }
+  return out;
+}
+/* la strada consigliata, con la stessa logica delle caselle: A nuove linee; B prima le nuove linee che mancano, poi per ogni
+   linea attiva aiutare chi la apre (se costruisce) o sponsorizzare in profondità; C il modo che si adatta ai suoi numeri */
+function stradaQualifica(s, nome){
+  const caselle = s.situazione === "C" ? proposteModo(s, s.modoAdatto) : s.proposte, out = [];
+  const nuove = caselle.filter(c => c.tipo === "nuova_linea").length;
+  if(nuove) out.push(nuove === 1 ? `Aprire con ${nome} una linea nuova frontale` : `Aprire con ${nome} ${num(nuove)} linee nuove frontali`);
+  for(const c of caselle){
+    const k = numeroLinea(s, c.linea_id), chi = c.linea_id ? nomeLinea(s, c.linea_id) : "";
+    if(c.tipo === "aiuta") out.push(`Aiutare ${(st.struttura.find(p => p.id === c.persona_id) || {}).nome || chi} dentro la sua linea${k ? " " + k : ""}`);
+    if(c.tipo === "profondita") out.push(`Sponsorizzare in profondità nella sua linea${k ? " " + k : ""}${chi ? ` (${chi})` : ""}`);
+  }
+  return out;
+}
+function vAiutaQualificare(p){
+  if(!p || p.id === st.profilo.id) return "";
+  let s;
+  try{ s = strategia(null, p.id); }catch(e){ return ""; }
+  const nome = nomeSaluto(p.nome);
+  const testa = `<span class="eyebrow">Come aiutarlo a qualificare</span>`;
+  if(!s.pronta) return `<div class="card aiuta-qualificare">${testa}
+    <p class="small" style="margin:6px 0 0">Compare quando arriva la sua mappa: ${esc(testoMappa(mesePrecedente(), null))}.</p></div>`;
+  const situazione = s.attive ? `${plur(s.attive, "linea attiva", "linee attive")} (almeno ${num(soglia())} VP)` : "nessuna linea attiva";
+  const manca = mancaQualifica(s), strada = stradaQualifica(s, nome);
+  return `<div class="card aiuta-qualificare">${testa}
+    <p class="small" style="margin:4px 0 0">Dalla mappa: la situazione di ${esc(nome)}, la prossima tappa e la strada con la logica della strategia.</p>
+    <dl class="aq">
+      <dt>La sua situazione</dt><dd>${esc(situazione)}${s.chiuso.mese ? ` · ${esc(nomeMese(s.chiuso.mese))}` : ""}</dd>
+      <dt>Prossima tappa</dt><dd><b>${s.tappa ? esc(s.tappa.nome) : "Da Argento in su"}</b></dd>
+    </dl>
+    ${s.tappa ? manca.length ? `<p class="small aq-t"><b>Cosa manca</b></p>
+      <ul class="aq-l">${manca.map(x => `<li class="${x.ok ? "ok" : ""}"><span class="segno" aria-hidden="true">${x.ok ? "✓" : "○"}</span><span>${esc(x.txt)}</span></li>`).join("")}</ul>`
+      : `<p class="small aq-t">${esc(testoMappa(meseDi(oggi()), null))}</p>` : ""}
+    ${strada.length ? `<p class="small aq-t"><b>La strada consigliata</b></p>
+      <ul class="aq-l strada">${strada.map(x => `<li><span class="segno" aria-hidden="true">›</span><span>${esc(x)}</span></li>`).join("")}</ul>`
+      : ""}
+    <p class="small linee-mappa" style="margin:8px 0 0">VP: ${esc(testoMappaStrategia(s.recente && s.recente.mese, s.recente && s.recente.datiAl) || testoMappa(meseDi(oggi()), null))}</p>
+  </div>`;
+}
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { lineeSeguite, mancaQualifica, stradaQualifica });
 /* Situazione C: «Come vuoi lavorare?», quattro scelte con lo stesso peso; «Adatta ai tuoi numeri» su una, mai preselezionata */
 const MODI_STRATEGIA = [["nuove_linee", n => `Apri ${n} nuove linee frontali`], ["aiuta", () => "Aiuta le persone che hai"],
   ["profondita", () => "Sponsorizza in profondità"], ["personalizza", () => "Personalizza"]];
@@ -9026,6 +9121,7 @@ function vStrategia(){
     <h2 class="strategia-titolo">Come vuoi lavorare?</h2>
     <p class="small" style="margin:0">${num(s.attive)} linee frontali attive · ${esc(testoMappaStrategia(s.chiuso.mese, s.chiuso.datiAl))}</p>
     ${vModi(s, "strategia-modo")}
+    ${vLineeStrategia(s, [])}
   </div>`;
   return `<div class="card strategia" data-act="strategia-apri" role="button" tabindex="0" aria-label="Apri la tua strategia">
     <div class="spread"><span class="eyebrow">La tua strategia</span><span class="small">${num(caselle.length)} caselle</span></div>
@@ -9034,7 +9130,7 @@ function vStrategia(){
     ${vTappe4(s)}
     ${vCaselle(caselle, s, 3)}
     ${vInvitatoDaAiutare(caselle)}
-    ${vLineeStrategia(s, 3)}
+    ${vLineeStrategia(s, caselle)}
     <div class="strategia-piede"><button class="btn small" data-act="strategia-cambia">Cambia</button>
       <button class="btn small" data-act="strategia-apri">Vedi tutto ›</button></div>
   </div>`;
@@ -9062,7 +9158,7 @@ function vSheetStrategia(sh){
     <h2 class="strategia-titolo">${esc(x.daScegliere ? "Come vuoi lavorare?" : titoloStrategia(x.caselle, x.s))}</h2>
     ${vTappe4(s)}
     ${x.daScegliere ? vModi(s, "strategia-modo") : vCaselle(x.caselle, s) + vInvitatoDaAiutare(x.caselle)}
-    ${vLineeStrategia(s)}
+    ${vLineeStrategia(s, x.daScegliere ? [] : x.caselle)}
     <div class="row strategia-piede"><button class="btn grow" data-act="strategia-cambia">Cambia</button></div>
   </div>`;
 }

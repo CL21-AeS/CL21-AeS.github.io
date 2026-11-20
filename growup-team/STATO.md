@@ -3,12 +3,36 @@
 Ultimo aggiornamento: 20 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Tutte le linee che seguo, con la scheda di ognuno (20 novembre 2026, scelta di Stefano, database non toccato)
+
+- **Nella card «La tua strategia»** (e nella schermata intera), sotto le caselle, «Le tue linee» (`lineeSeguite`,
+  `vLineeStrategia`): **tutte** le mie linee frontali e le persone in profondità che ho scelto nelle caselle («Pino · in
+  profondità, linea 1»). Prima chi fattura (VP nella mappa più recente), dal più alto; poi **«altre N senza fatturato»**,
+  chiuse finché non si toccano. Prima la card mostrava le 3 linee con più VP e «altre N»: ora ci sono tutte quelle che
+  fatturano. C'è anche nella card «Come vuoi lavorare?» (situazione C).
+- **Toccando una persona** (chi è nella mia struttura) si apre la sua **scheda partner** (dalla schermata intera il foglio si
+  chiude), con la parte nuova **«Come aiutarlo a qualificare»** (`vAiutaQualificare`), sopra «Come arrivarci». È la stessa
+  funzione della strategia calcolata per quella persona (`strategia(null, pid)`), solo dai dati della mappa:
+  - la sua situazione (linee attive, almeno 100 VP, nel mese chiuso);
+  - la sua prossima tappa vera (`prossimaTappaDi`, punto 1: mai il Path to Bronze per chi è già oltre);
+  - cosa manca con i numeri (`mancaQualifica`): «VP personali: 80 su 100», «VP di gruppo: 250 su 2.400», «linea 1 (Nina):
+    270 su 100 VP», «manca la terza linea» (per il Path to Bronze «linea nuova»);
+  - la strada consigliata con la logica delle caselle (`stradaQualifica`): «Aprire con Lia 2 linee nuove frontali»,
+    «Aiutare Nina dentro la sua linea 1», «Sponsorizzare in profondità nella sua linea 1 (Nina)» (in C il modo «Adatta ai
+    suoi numeri»). Le frasi usano il nome, non «lui» o «lei»: l'app non sa se è un uomo o una donna.
+- Le caselle salvate da quella persona non si leggono mai (la tabella 067 le fa vedere solo a lei). Niente euro, niente
+  proiezioni. CLAUDE.md: aggiunta l'eccezione, accanto a «Come arrivarci».
+Test: interfaccia sezione 103 (ordine e «altre 2 senza fatturato», la scheda di Lia con situazione, tappa, mancanze e strada,
+Leo con Bronze Foundation dichiarata, dalla schermata intera; anteprime `e2e/103-linee-seguite-light/dark.png` e
+`e2e/103-scheda-aiuta-light/dark.png`); sezione 98 adattata (tutte le linee che fatturano). Controllo rapido di sicurezza:
+a posto (nessuna lettura nuova dal database, nomi passati da `esc()`).
+
 ## Path to Bronze: contano solo le linee nuove (20 novembre 2026, scelta di Stefano, migrazione 068)
 
 - **Migrazione 068** (`supabase/068_linee_nuove_dal.sql`): nella tabella delle tappe `linee_nuove_dal = 2026-06-01` per il
   Path to Bronze. Cambia **solo quel valore** (nessuna tabella, colonna o funzione). Per rimetterlo vuoto (tutte le linee
   contano di nuovo, come prima): `supabase/068_linee_nuove_dal_togli.sql`. Anche in `installa_tutto.sql` e nella versione di
-  prova. **Da applicare al database vero dopo l'unione della PR** (scelta di Stefano), con il connettore o nell'SQL Editor.
+  prova. **Applicata al database vero il 20 novembre 2026**, dopo l'unione della #241 (ok di Stefano), con il connettore: prima il valore era vuoto, dopo è 2026-06-01 (controllato).
 - **Una sola regola, ovunque** (scelta di Stefano): per il Path to Bronze contano solo le linee frontali iscritte da quella
   data (data di ingresso della mappa) con almeno 100 VP; le più vecchie non contano mai, anche se fatturano. Vale per la
   strategia, la festa, la pagina Obiettivo («3 linee frontali nuove (iscritte dal 1 giugno) da almeno 100 VP di gruppo»),
