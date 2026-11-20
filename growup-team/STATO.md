@@ -3,6 +3,27 @@
 Ultimo aggiornamento: 20 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## «Linea più forte» dai mesi chiusi e i VP veri delle linee con persone al 21% (20 novembre 2026, app v125, database non toccato)
+
+- **Il controllo sui dati veri** (con il connettore, solo conteggi; nessun nome nei file): nei file della mappa la riga di
+  una persona al 21% ha i suoi VP totali nella colonna VPG (per esempio più di 10.000) e l'import li salva. Ma Amway **toglie
+  dalla VPG di chi sta sopra** i VP delle persone al 21%: la VPG della linea frontale che le contiene risulta quasi a 0 (110
+  e 300 nei mesi chiusi). Per questo nell'analisi le linee qualificate risultavano a 0 VP. L'import non scarta niente.
+- **I VP veri di una linea** (`vpLineaVeri`, scelta di Stefano: tabella e linea più forte): la VPG della linea più la VPG di
+  ogni persona al 21% o più in quel mese dentro la linea (a ogni profondità; la VPG di una qualificata non comprende quelle
+  sotto di lei). Le VPG al 21% arrivano dalle mappe dal 9% in su (`st.mesiNove`, punto 1). Vale in «Andamento delle linee»
+  (anche la tendenza); il **peso** si calcola sul gruppo con le qualificate, così non supera il 100%; la riga «Tutto il
+  gruppo» resta la VPG della mappa.
+- **Linea più forte** (`lineaPiuForte`): la linea frontale con la somma di VP veri più alta negli **ultimi 12 mesi chiusi
+  disponibili**, mai il mese in corso, compresi i mesi chiusi già salvati prima dell'anno fiscale (all'apertura dell'analisi
+  l'app legge le mappe degli ultimi 24 mesi di quella persona: `api.mioReport`, tabella `numeri_mese` con la regola `vedo`).
+  Sotto il nome «linea più forte · ultimi N mesi chiusi» (N = mesi usati; «ultimo mese chiuso» se è uno); senza mesi chiusi
+  «–» con «dopo la chiusura del primo mese».
+- Service worker **v125** (sale una volta sola, in quest'ultima PR della serie dei punti 7-9).
+Test: interfaccia sezione 104 (una linea forte nei mesi chiusi e bassa nel mese in corso resta la più forte; la linea con
+una persona al 21% dentro vince; al massimo 12 mesi; «10.110» nella tabella; senza mesi chiusi; anteprime
+`e2e/104-linea-forte-light.png` e `-dark.png`). Controllo rapido di sicurezza: a posto.
+
 ## Tutte le linee che seguo, con la scheda di ognuno (20 novembre 2026, scelta di Stefano, database non toccato)
 
 - **Nella card «La tua strategia»** (e nella schermata intera), sotto le caselle, «Le tue linee» (`lineeSeguite`,
