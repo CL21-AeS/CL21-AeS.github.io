@@ -18,6 +18,8 @@
   try{ db = JSON.parse(leggi(K_DATI)); }catch(e){ db = null; }
   /* dati di una versione di prova più vecchia: si ricomincia da capo (anche la sessione) */
   if(!db || !db._prova || db._prova.versione !== window.GROWUP_PROVA_VERSIONE){ db = window.GROWUP_PROVA_DATI(); for(const x of chiaviProva()) if(x !== K_DATI) scrivi(x, null); }
+  /* le due situazioni pronte da guardare (dati-specchio.js): si aggiungono una volta sola, anche a una prova già iniziata */
+  if(window.GROWUP_PROVA_SPECCHIO) window.GROWUP_PROVA_SPECCHIO(db);
   window.__DB = db;
   let dimentica = false;   // «Ricomincia»: i dati di adesso non si salvano più (neanche uscendo dalla pagina)
   const salvaDati = () => { if(!dimentica) scrivi(K_DATI, JSON.stringify(window.__DB)); };
@@ -46,6 +48,12 @@
       testo:"Il primo ingresso di un nuovo partner e il percorso di partenza, fase per fase, fino alla festa." },
     { k:"giulia", titolo:"Sono in attività da tempo", chi:"Giulia Martini",
       testo:"Il primo ingresso di chi è già in attività, l'import della mappa e dei clienti, poi l'app dopo due mesi." }];
+  /* pronte da guardare (dati-specchio.js): l'app in uso, con il Path to Bronze nuovo (contano solo le linee dal 1° giugno 2026) */
+  const PRONTE = [
+    { k:"valenti", titolo:"In attività da anni, con un grande gruppo", chi:"Carla e Bruno Valenti",
+      testo:"Platino Fondatore, 15 linee frontali e una linea con una persona al 21%, l'app in uso da mesi: la strategia, le linee che segui con la scheda di ognuno, la linea più forte." },
+    { k:"nadia", titolo:"Ha appena iniziato", chi:"Nadia Serra",
+      testo:"Iscritta da un mese e mezzo, percorso di partenza finito: il suo Path to Bronze con le linee nuove (1 su 3)." }];
   const K_CHI = "prova.chi";
   /* cambiando persona si esce come da un telefono che passa di mano: via la sessione, il link personale e le altre scelte
      senza nome di persona. Restano le scelte legate a una persona (feste viste, domanda sulla condivisione, «Fatto»…):
@@ -63,7 +71,14 @@
     const d = window.__DB;
     esci();
     let hash;
-    if(k === "luca"){ const l = luca(); hash = l && l.chiave ? "#chiave=" + l.chiave : "#invito=" + d._prova.invitoLuca; }
+    /* le pronte: si entra con il link personale; le domande di una volta sola hanno già la risposta (l'app è in uso) */
+    if(k === "valenti" || k === "nadia"){
+      const sp = d._prova.specchio || {}, pid = k === "valenti" ? "X" : "xn";
+      hash = "#chiave=" + (k === "valenti" ? sp.chiaveValenti : sp.chiaveNadia);
+      for(const c of ["notifiche-chiesto", "primi-passi-no", "domanda-condividi", "tutta-app-avviso"]) scrivi("prova.growup-team." + c + "." + pid, "1");
+      scrivi("prova.salvata." + k, "1");
+    }
+    else if(k === "luca"){ const l = luca(); hash = l && l.chiave ? "#chiave=" + l.chiave : "#invito=" + d._prova.invitoLuca; }
     else {
       const g = giulia();
       hash = g && g.stato !== "gestito" && g.chiave ? "#chiave=" + g.chiave : "#invito=" + d._prova.invitoGiulia;
@@ -218,6 +233,9 @@
       <p class="avviso"><b>Dati inventati.</b> Persone, numeri e nomi sono di fantasia. Niente va al database: tutto resta su questo telefono, e l'app vera non si tocca.</p>
       <p class="small" style="margin:4px 0 0">Chi vuoi essere?</p>
       ${PERSONE.map(p => `<button type="button" class="chi" data-prova="come" data-k="${p.k}"><i>${esc(p.chi)}</i><b>${esc(p.titolo)}</b><span>${esc(p.testo)}</span></button>`).join("")}
+      <span class="eyebrow" style="margin-top:10px">Pronte da guardare</span>
+      <p class="small" style="margin:0">L'app già in uso, con il Path to Bronze nuovo: contano solo le linee iscritte dal 1° giugno 2026.</p>
+      ${PRONTE.map(p => `<button type="button" class="chi" data-prova="come" data-k="${p.k}"><i>${esc(p.chi)}</i><b>${esc(p.titolo)}</b><span>${esc(p.testo)}</span></button>`).join("")}
       <span class="eyebrow" style="margin-top:10px">I file del sito Amway, per gli import (inventati)</span>
       <p class="small" style="margin:0">Scaricali qui, poi entra come Giulia e importali dall'app: si sceglie il file scaricato.</p>
       <button type="button" class="chi" data-prova="mappa"><i>Giulia · «Per iniziare» o Gruppo → Importa da Amway</i><b>La mappa della rete di Giulia</b>
