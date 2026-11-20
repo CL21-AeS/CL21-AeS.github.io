@@ -55,7 +55,7 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 | 10 | [#244](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/244) | Correzione: toccando la persona in una casella si apre la sua scheda (non la strategia); service worker v126 | nessuna | — |
 | 11 | [#245](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/245) | Correzione: toccando una casella da trovare («Nuovo in profondità», «Nuova linea frontale», «Casella libera») non si apre niente, solo il suo pulsante; service worker v127 | nessuna | — |
 | 12 | [#246](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/246) | La strategia a schermo intero si apre solo con «Vedi tutto ›» (toccando la card non si apre niente); service worker v128 | nessuna | — |
-| 13 | PR13 | La prova: «Pronte da guardare» (Valenti, un grande gruppo; Nadia, ha appena iniziato), con il Path to Bronze nuovo | nessuna | — |
+| 13 | [#247](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/247) | La prova: «Pronte da guardare» (Valenti, un grande gruppo; Nadia, ha appena iniziato), con il Path to Bronze nuovo | nessuna | — |
 
 Per tornare a tutto com'era: «Revert» delle PR dalla 13 alla 1 (o chiedere a Claude di riportare la cartella al tag),
 poi, se si vuole, gli script della 068 e della 067.
