@@ -9016,13 +9016,13 @@ function vCasella(c, s, i, primaVuota){
   }
   if(c.tipo === "profondita"){
     const n = numeroLinea(s, c.linea_id), nome = nomeLinea(s, c.linea_id);
-    return `<li class="casella vuota c-profondita" data-i="${i}"><span class="grow"><span class="casella-tipo">${TIPI_CASELLA.profondita}</span>
+    return `<li class="casella vuota c-profondita" data-i="${i}" data-act="casella-ferma"><span class="grow"><span class="casella-tipo">${TIPI_CASELLA.profondita}</span>
       <b class="casella-nome">da trovare</b><span class="small">per la linea ${n || ""}${nome ? ` (${esc(nome)})` : ""}</span></span>
       ${lista(n ? `per la linea ${n}` : "in profondità", primaVuota)}</li>`;
   }
-  if(c.tipo === "nuova_linea") return `<li class="casella vuota c-nuova" data-i="${i}"><span class="grow"><span class="casella-tipo">${TIPI_CASELLA.nuova_linea}</span>
+  if(c.tipo === "nuova_linea") return `<li class="casella vuota c-nuova" data-i="${i}" data-act="casella-ferma"><span class="grow"><span class="casella-tipo">${TIPI_CASELLA.nuova_linea}</span>
       <b class="casella-nome">da trovare</b></span>${lista("per una nuova linea", primaVuota)}</li>`;
-  return `<li class="casella vuota c-scegli" data-i="${i}"><span class="grow"><span class="casella-tipo">Casella libera</span>
+  return `<li class="casella vuota c-scegli" data-i="${i}" data-act="casella-ferma"><span class="grow"><span class="casella-tipo">Casella libera</span>
       <b class="casella-nome">da scegliere</b></span><button class="btn small" data-act="strategia-cambia">Scegli</button></li>`;
 }
 function vCaselle(caselle, s, quante){
@@ -9076,6 +9076,10 @@ function vLineeStrategia(s, caselle){
 }
 Object.assign(AZIONI, {
   "linee-senza"(){ st.lineeSenzaAperte = !st.lineeSenzaAperte; render(); },
+  /* le caselle da trovare o da scegliere (Nuovo in profondità, Nuova linea frontale, Casella libera): toccandole non si
+     apre niente, funziona solo il loro pulsante (Lista › o Scegli). Scelta di Stefano, 20 novembre 2026: prima il tocco
+     passava alla card e apriva la strategia a schermo intero. */
+  "casella-ferma"(){},
   /* dalla card o dalla schermata intera: la scheda partner della persona (la schermata intera si chiude) */
   "strategia-scheda"(el){ st.sheet = null; st.strategiaModifica = false; AZIONI["apri-scheda"](el); }
 });
