@@ -7577,6 +7577,18 @@ for(const tema of ["light", "dark"]){
   t = (await page.locator("#app .card.aiuta-qualificare").innerText()).replace(/\s+/g, " ");
   check(t.includes("Prossima tappa Bronze Foundation 12%") && !t.includes("Path to Bronze"), "Leo: nella scheda la tappa vera, mai il Path to Bronze");
   await ctx.close();
+  // toccando la persona nella sua casella (come su un telefono) si apre la sua scheda, non la strategia; anche dalla schermata intera
+  for(const intera of [false, true]){
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, hasTouch:true, isMobile:true }, "#chiave=" + "10".repeat(16)));
+    await page.locator("#app .card.strategia").waitFor();
+    if(intera){ await page.locator("#app .card.strategia .strategia-titolo").tap(); await page.locator(".sheet .strategia-intera").waitFor(); }
+    await page.locator(`${intera ? ".sheet" : "#app .card.strategia"} li.casella.c-aiuta`, { hasText:"Pino Pioppo" }).tap();
+    await page.locator("#app .card.aiuta-qualificare").waitFor({ timeout:5000 }).catch(() => {});
+    check(!(await page.locator(".sheet .strategia-intera").count()) && await page.locator("#app .card h2", { hasText:"Pino Pioppo" }).count() === 1
+      && await page.locator("#app .card.aiuta-qualificare").count() === 1,
+      `toccando la casella di Pino ${intera ? "nella schermata intera" : "nella card"} si apre la sua scheda (non la strategia)`);
+    await ctx.close();
+  }
   check(!errori.length, "le linee che seguo: nessun errore nella pagina");
   DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
   DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));

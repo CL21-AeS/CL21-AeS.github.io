@@ -8991,10 +8991,13 @@ function vCasella(c, s, i, primaVuota){
   if(c.tipo === "aiuta"){
     const p = st.struttura.find(x => x.id === c.persona_id) || {}, n = numeroLinea(s, c.linea_id), ptb = pathToBronze(c.persona_id);
     const mappa = ptb && ptb.mese ? testoMappaStrategia(ptb.mese, ptb.datiAl) : testoMappa(meseDi(oggi()), null);
+    /* toccando la casella si apre la scheda partner della persona (20 novembre 2026: prima il tocco passava alla card e
+       riapriva la strategia) */
+    const apri = !!p.id && p.id !== st.profilo.id ? ` data-act="strategia-scheda" data-id="${esc(p.id)}" role="button" tabindex="0" aria-label="Apri la scheda di ${esc(p.nome || "")}"` : "";
     /* il Path to Bronze non è il suo obiettivo (Bronze Foundation dichiarata o un mese al 9% con 3 linee): la prossima tappa vera */
     if(!ptbObiettivo(c.persona_id)){
       const v = versoTappa(c.persona_id);
-      return `<li class="casella c-aiuta c-tappa" data-i="${i}">
+      return `<li class="casella c-aiuta c-tappa${apri ? " c-apri" : ""}" data-i="${i}"${apri}>
       <span class="casella-tipo">${TIPI_CASELLA.aiuta}${n ? ` · linea ${n}` : ""}</span>
       <b class="casella-nome">${esc(p.nome || "")}</b>
       <span class="pill">${v.tappa ? `Prossima tappa · ${esc(v.tappa.nome)}` : "Da Argento in su"}</span>
@@ -9002,7 +9005,7 @@ function vCasella(c, s, i, primaVuota){
       <span class="small casella-mappa">${!v.mappa ? `<span class="segno-att" aria-hidden="true">!</span> ` : ""}VP: ${esc(v.mappa ? testoMappaStrategia(v.mese, v.datiAl) : testoMappa(meseDi(oggi()), null))}</span>
     </li>`;
     }
-    return `<li class="casella c-aiuta" data-i="${i}">
+    return `<li class="casella c-aiuta${apri ? " c-apri" : ""}" data-i="${i}"${apri}>
       <span class="casella-tipo">${TIPI_CASELLA.aiuta}${n ? ` · linea ${n}` : ""}</span>
       <b class="casella-nome">${esc(p.nome || "")}</b>
       ${ptb && ptb.completo ? `<span class="pill v">✓ Path to Bronze fatto</span>`
@@ -9312,7 +9315,7 @@ Object.assign(MODULI, {
 });
 /* la card si apre anche dalla tastiera (Invio o spazio), come un pulsante */
 document.addEventListener("keydown", e => {
-  if((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".card.strategia[data-act=strategia-apri]")){ e.preventDefault(); e.target.click(); }
+  if((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".card.strategia[data-act=strategia-apri], li.casella[data-act=strategia-scheda]")){ e.preventDefault(); e.target.click(); }
 });
 if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { strategiaAttuale, titoloStrategia, personeDellaLinea });
 
