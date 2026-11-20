@@ -1,7 +1,34 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 18 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 20 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
+
+## Path to Bronze: contano solo le linee nuove (20 novembre 2026, scelta di Stefano, migrazione 068)
+
+- **Migrazione 068** (`supabase/068_linee_nuove_dal.sql`): nella tabella delle tappe `linee_nuove_dal = 2026-06-01` per il
+  Path to Bronze. Cambia **solo quel valore** (nessuna tabella, colonna o funzione). Per rimetterlo vuoto (tutte le linee
+  contano di nuovo, come prima): `supabase/068_linee_nuove_dal_togli.sql`. Anche in `installa_tutto.sql` e nella versione di
+  prova. **Da applicare al database vero dopo l'unione della PR** (scelta di Stefano), con il connettore o nell'SQL Editor.
+- **Una sola regola, ovunque** (scelta di Stefano): per il Path to Bronze contano solo le linee frontali iscritte da quella
+  data (data di ingresso della mappa) con almeno 100 VP; le più vecchie non contano mai, anche se fatturano. Vale per la
+  strategia, la festa, la pagina Obiettivo («3 linee frontali nuove (iscritte dal 1 giugno) da almeno 100 VP di gruppo»),
+  lo storico, la barra delle tappe e «Come arrivarci» (`lineeTappa` in `app.js`, usata da `mancanze`, `requisiti` e
+  `situazione`). La data di ingresso arriva dalla mappa (colonna «Data di ingresso», in tutti e due i formati del file).
+- **Chi non ha il Path to Bronze come obiettivo** (`ptbObiettivo`): chi ha dichiarato Bronze Foundation o più (anche solo la
+  percentuale) oppure ha già raggiunto la percentuale di Bronze Foundation (9%) con le sue linee (3) attive, cioè con almeno
+  100 VP (`soglia_linea_attiva`), in un mese delle mappe importate, anche con linee vecchie. Percentuale e numero di linee
+  vengono dalla tabella delle tappe; la soglia di 100 VP è una scelta di Claude (Stefano chiedeva «conta per cosa?»: una
+  linea a 0 VP è solo una persona iscritta). Per loro:
+  - strategia: la prossima tappa vera (`prossimaTappaDi`: Bronze Foundation, Bronze Builder, Argento…), il titolo non è più
+    «Fai il tuo Path to Bronze» (ora compare solo se il Path to Bronze è davvero la prossima tappa);
+  - casella «Persona che aiuti» e riga «Senti …» dei binari: «Prossima tappa · Bronze Foundation 9%» con cosa manca dalla
+    mappa più recente («mancano 700 VP di gruppo · mancano 3 linee da almeno 200 VP»), mai «Path to Bronze fatto»;
+  - nessuna festa del Path to Bronze, nemmeno se le linee nuove sono complete.
+- Per sapere chi ha già fatto il 9% l'app legge i mesi delle mappe dal 9% in su delle persone che vede (`api.mesiNove`,
+  tabella `numeri_mese`, già protetta dalla regola `vedo`): nessun dato nuovo, nessuna funzione nuova nel database.
+Test: `sh test/db.sh` (controllo 068); interfaccia sezione 102 (3 linee vecchie da 100 VP: niente Path to Bronze, niente
+festa, Obiettivo a 0 su 3; 3 linee nuove: fatto e festa; già al 9%: prossima tappa vera, niente festa; le caselle di uno
+sponsor con le tre persone; anteprime `e2e/102-ptb-tappa-light.png` e `-dark.png`). Controllo rapido di sicurezza: a posto.
 
 ## La strategia in Io: «Cambia» per linea (19 novembre 2026, richiesta di Stefano, database non toccato)
 

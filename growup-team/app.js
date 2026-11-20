@@ -96,6 +96,8 @@ function creaApi(){
     attesaNelReport: codici => q(sb.rpc("attesa_nel_report", { p_codici:codici })),
     /* 063: i miei numeri ufficiali dalle mappe: gli unici VP dell'app */
     mioReport:    (pid, dal) => q(sb.from("numeri_mese").select("mese,vpp,vpg,percentuale,linee,dati_al,importato_da").eq("partner_id", pid).gte("mese", dal)),
+    /* i mesi delle mappe di chi vedo dalla percentuale di Bronze Foundation in su (Path to Bronze e prossima tappa vera) */
+    mesiNove:     pct => q(sb.from("numeri_mese").select("partner_id,mese,vpp,vpg,percentuale,linee").gte("percentuale", pct)),
     /* 063: la data della mappa di ogni persona che vedo (solo date, per la scheda partner) */
     dateMappe:    dal => q(sb.from("numeri_mese").select("partner_id,mese,dati_al").gte("mese", dal)),
     /* 034 e 063: le bozze d'ordine (anche più di una, con un nome e un cliente) e lo storico dei miei ordini (solo miei, RLS) */
@@ -244,6 +246,7 @@ const st = {
   prossime: new Map(),     // la prossima qualifica di chi vedo (da Platino in su)
   mesiReport: [],          // i miei numeri dei report degli ultimi 13 mesi (percentuale per i mesi da Argento)
   mesiScheda: {},          // gli stessi, per le schede del gruppo
+  mesiNove: new Map(),     // i mesi delle mappe di chi vedo dalla percentuale di Bronze Foundation in su (per persona)
   mesiLinee: new Map(),
   inAttesa: [],            // chi usa l'app nella mia downline ma non è ancora nella mappa (solo il nome)
   attesaReport: [],        // 042: di quelli, chi è nel report che sto importando: { id, nome, codice }    // da Platino in su: i mesi dei report delle mie linee frontali (per Smeraldo, Diamante, Zaffiro)  // "Come arrivarci" aperto (per persona), così resta aperto quando la pagina si ridisegna
@@ -464,6 +467,11 @@ function percentualeDa(vpGruppo){
   for(const l of st.livelli) if(vpGruppo >= Number(l.vp_gruppo)) pct = l.percentuale;
   return pct;
 }
+/* Le linee che contano per una tappa. Il Path to Bronze, con la data linee_nuove_dal nella tabella delle tappe (068, scelta
+   di Stefano del 20 novembre 2026: dal 1° giugno 2026), conta solo le linee frontali iscritte da quel giorno (data di
+   ingresso della mappa, lineaNuova): le più vecchie non contano mai, anche se fatturano. Vale ovunque: Obiettivo, storico,
+   «Come arrivarci», strategia e festa. Senza la data contano tutte. */
+function lineeTappa(t, linee){ return t && t.linee_nuove_dal ? (linee || []).filter(l => lineaNuova(l, t.linee_nuove_dal)) : (linee || []); }
 /* Requisiti di una tappa (dal Path to Bronze in su) nel mese m: cosa manca */
 function mancanze(t, n){
   const out = [];
@@ -471,9 +479,9 @@ function mancanze(t, n){
   if(Number(t.vp_personali) > n.personali) out.push(`mancano ${num(t.vp_personali - n.personali)} VP personali`);
   if(t.vp_gruppo && n.gruppo < t.vp_gruppo) out.push(`mancano ${num(t.vp_gruppo - n.gruppo)} VP di gruppo`);
   if(t.linee){
-    const min = Number(t.vp_linea) || soglia(), ok = n.linee.filter(l => l.vp >= min).length;
-    if(ok < t.linee) out.push(t.linee - ok === 1 && t.linee === 3 ? "manca la terza linea"
-      : `mancano ${t.linee - ok} ${t.linee - ok === 1 ? "linea" : "linee"} da almeno ${num(min)} VP`);
+    const min = Number(t.vp_linea) || soglia(), ok = lineeTappa(t, n.linee).filter(l => l.vp >= min).length, nuove = t.linee_nuove_dal ? " nuova" : "";
+    if(ok < t.linee) out.push(t.linee - ok === 1 && t.linee === 3 ? `manca la terza linea${nuove}`
+      : `mancano ${t.linee - ok} ${t.linee - ok === 1 ? "linea" + nuove : "linee" + (nuove ? " nuove" : "")} da almeno ${num(min)} VP`);
   }
   return out;
 }
@@ -540,6 +548,8 @@ function tappaFatta(t){
   }
   /* i PRIMI 3 clienti, in totale: chi si iscrive il 29 non ha il tempo di farli nel mese */
   if(t.chiave === "primi_clienti") return clientiTotali() >= (t.clienti || 0);
+  /* il Path to Bronze è alle spalle di chi ha già fatto il 9% con 3 linee in un mese delle mappe (ptbObiettivo) */
+  if(t.chiave === "path_to_bronze" && !ptbObiettivo(st.profilo.id)) return true;
   /* dal Path to Bronze in su: un mese passato con quella qualifica (o una più alta) nella sua mappa, oppure il mese
      in corso con tutti i requisiti nella mappa */
   if(st.storico.some(r => ordineDi(r.qualifica) >= t.ordine)) return true;
@@ -602,8 +612,9 @@ function requisiti(t){
     out.push({ ok: !c && n.personali >= t.vp_personali, txt: `${num(t.vp_personali)} VP personali nel mese`, val: c ? "—" : `${num(n.personali)} / ${num(t.vp_personali)}` });
   }
   if(t.linee){
-    const min = Number(t.vp_linea) || soglia(), ok = n.linee.filter(l => l.vp >= min).length;
-    out.push({ ok: !c && ok >= t.linee, txt: `${t.linee} linee frontali da almeno ${num(min)} VP di gruppo`, val: c ? "—" : `${Math.min(ok, t.linee)} / ${t.linee}` });
+    const min = Number(t.vp_linea) || soglia(), ok = lineeTappa(t, n.linee).filter(l => l.vp >= min).length;
+    out.push({ ok: !c && ok >= t.linee, txt: `${t.linee} linee frontali${t.linee_nuove_dal ? ` nuove (iscritte dal ${dataIt(String(t.linee_nuove_dal).slice(0, 10))})` : ""} da almeno ${num(min)} VP di gruppo`,
+      val: c ? "—" : `${Math.min(ok, t.linee)} / ${t.linee}` });
   }
   if(t.vp_gruppo) out.push({ ok: !c && n.gruppo >= t.vp_gruppo, txt: `${num(t.vp_gruppo)} VP di gruppo nel mese`, val: c ? "—" : `${num(n.gruppo)} / ${num(t.vp_gruppo)}` });
   if(c && out.length) out.push({ ok:false, attesa:true, txt:`VP: ${testoMappa(m, null)}`, val:"" });
@@ -740,7 +751,9 @@ function tappaDaGuardare(pid){
   const S = st.stages, p = st.struttura.find(x => x.id === pid) || (pid === st.profilo.id ? st.profilo : {});
   let chiusa = ordineDi(p.qualifica_iniziale);
   if(pid === st.profilo.id) for(const r of st.storico) chiusa = Math.max(chiusa, ordineDi(r.qualifica));
-  return S.find(s => !TAPPE_DI_PERCORSO.includes(s.chiave) && !oltreArgento(s) && s.ordine > chiusa) || null;
+  /* il Path to Bronze non è la tappa di chi ha dichiarato Bronze Foundation o ha già fatto il 9% con 3 linee (ptbObiettivo) */
+  return S.find(s => !TAPPE_DI_PERCORSO.includes(s.chiave) && !oltreArgento(s) && s.ordine > chiusa
+    && !(s.chiave === "path_to_bronze" && !ptbObiettivo(pid))) || null;
 }
 /* { chiave, tappa, dati, sintesi, linee, vpLinea } oppure null (percorso finito o numeri non disponibili) */
 function situazione(pid){
@@ -779,16 +792,16 @@ function situazione(pid){
   const dati = { tappa:t.nome, linee:t.linee, vp_linea:num(vpLinea), vp_personali:num(t.vp_personali) };
   const s = { tappa:t, linee, vpLinea, personali:n.personali, dati,
     sintesi:manc.length ? manc.join(" · ") : "tutti i numeri del mese ci sono" };
-  const okSoglia = n.linee.filter(l => l.vp >= soglia()).length, okLinea = n.linee.filter(l => l.vp >= vpLinea).length;
+  const lt = lineeTappa(t, n.linee), okSoglia = lt.filter(l => l.vp >= soglia()).length, okLinea = lt.filter(l => l.vp >= vpLinea).length;
   if(!n.personali) s.chiave = "fermo";
   else if(Number(t.vp_personali) > n.personali){ s.chiave = "personali"; dati.manca = num(t.vp_personali - n.personali); }
   else if(t.linee && okSoglia < t.linee){
     const m = t.linee - okLinea;
-    s.chiave = n.linee.some(l => l.vp > 0) ? "linee_crescere" : "linee_zero";
+    s.chiave = lt.some(l => l.vp > 0) ? "linee_crescere" : "linee_zero";
     Object.assign(dati, { mancano:m === 1 ? "manca" : "mancano", manca_linee:plur(m, "linea", "linee") });
   }
   else if(t.linee && okLinea < t.linee){
-    const k = tipoLinee(linee.filter(l => l.manca > 0));
+    const k = tipoLinee(linee.filter(l => l.manca > 0 && lt.some(x => x.id === l.id && x.nome === l.nome)));
     s.chiave = "linea_vp." + k.tipo; dati.vicine = k.vicine ? plur(k.vicine, "persona è", "persone sono") : "";
   }
   else if(t.vp_gruppo && n.gruppo < t.vp_gruppo){
@@ -891,6 +904,10 @@ async function caricaNumeri(){
   try{ st.dateMappe = new Map((await api.dateMappe(mesePrecedente() + "-01") || []).map(r => [r.partner_id + "|" + meseDi(r.mese), r.dati_al])); }
   catch(e){ st.dateMappe = new Map(); }
   st.storico = storicoMappe();
+  /* i mesi al 9% o più di chi vedo: chi ha già fatto il 9% con 3 linee non ha più il Path to Bronze come obiettivo */
+  try{ const f = primaFoundation(), m = new Map();
+    for(const r of (f && Number(f.percentuale) ? await api.mesiNove(Number(f.percentuale)) : []) || []) m.set(r.partner_id, (m.get(r.partner_id) || []).concat([r]));
+    st.mesiNove = m; }catch(e){ st.mesiNove = new Map(); }
   st.mesiLinee = new Map();
   if(daPlatino(st.profilo.qualifica_iniziale)){
     const frontali = lineeDi(pid, rigaDi(st.riep, pid)).filter(l => l.id && l.id !== pid && st.struttura.some(p => p.id === l.id));
@@ -8075,16 +8092,17 @@ function festaFaseDaFare(){
    Da lì le sue linee nuove diventano i suggerimenti: in cima alla strategia «Scegli chi aiutare» le mette nelle caselle. */
 const chiaveFestaPtb = pid => `growup-team.festa.${st.profilo.id}.ptb.${pid}`;
 const chiavePtbNo = pid => `growup-team.strategia-ptb-no.${st.profilo.id}.${pid}`;
-/* chi ha il Path to Bronze completo e conta: io (sotto Bronze Foundation) e le persone nelle mie caselle */
+/* chi ha il Path to Bronze completo e conta: io e le persone nelle mie caselle, solo se il Path to Bronze è il loro
+   obiettivo (ptbObiettivo: sotto Bronze Foundation e mai al 9% con 3 linee in una mappa) */
 function ptbCompleti(){
   if(!st.profilo || percorsoAttivo()) return [];
   let x;
   try{ x = strategiaAttuale(); }catch(e){ return []; }
   const out = [];
-  const io = st.profilo.id, mio = sottoFoundation() ? pathToBronze(io) : null;
+  const io = st.profilo.id, mio = ptbObiettivo(io) ? pathToBronze(io) : null;
   if(mio && mio.completo) out.push({ id:io, nome:st.profilo.nome, io:true, ptb:mio });
   for(const c of x.caselle || []) if(c.tipo === "aiuta" && !out.some(y => y.id === c.persona_id)){
-    const p = st.struttura.find(y => y.id === c.persona_id), ptb = p && pathToBronze(p.id);
+    const p = st.struttura.find(y => y.id === c.persona_id), ptb = p && ptbObiettivo(p.id) && pathToBronze(p.id);
     if(ptb && ptb.completo) out.push({ id:p.id, nome:p.nome, io:false, ptb });
   }
   return out;
@@ -8510,6 +8528,11 @@ function testoPtbBreve(ptb){
   if(ptb.personali == null) return `Path to Bronze · ${testoMappa(meseDi(oggi()), null)}`;
   return `${num(ptb.personali)} / ${num(ptb.vpPersonali)} VP personali${ptb.personali >= ptb.vpPersonali ? " ✓" : ""} · ${Math.min(ptb.fatte, ptb.richieste)} su ${ptb.richieste} linee nuove · ${testoMappaStrategia(ptb.mese, ptb.datiAl)}`;
 }
+/* chi non ha il Path to Bronze come obiettivo: la prossima tappa vera e cosa manca, con la data della mappa */
+function testoTappaBreve(pid){
+  const v = versoTappa(pid);
+  return `${testoVersoTappa(v)} · ${v.mappa ? testoMappaStrategia(v.mese, v.datiAl) : testoMappa(meseDi(oggi()), null)}`;
+}
 function rigaBinario(x){
   if(x.k === "lista") return rigaPersona(x.p, true, "Lista");
   if(x.k === "cliente") return rigaCliente(x.y);
@@ -8524,7 +8547,7 @@ function rigaBinario(x){
       : `Nuovo in profondità · da trovare${x.nome ? ` (${esc(x.nome)})` : ""}`}</span></span>
       <button class="btn small" data-act="strategia-lista" data-motivo="${esc(x.motivo)}">Lista ›</button></li>`;
   }
-  if(x.k === "aiuta") return `<li class="bin-riga"><span class="grow"><b>Senti ${esc(x.p.nome)}</b><br><span class="small">Persona che aiuti${x.n ? ` · linea ${x.n}` : ""}</span><br><span class="small">${esc(testoPtbBreve(x.ptb))}</span></span>
+  if(x.k === "aiuta") return `<li class="bin-riga"><span class="grow"><b>Senti ${esc(x.p.nome)}</b><br><span class="small">Persona che aiuti${x.n ? ` · linea ${x.n}` : ""}</span><br><span class="small">${esc(ptbObiettivo(x.p.id) ? testoPtbBreve(x.ptb) : testoTappaBreve(x.p.id))}</span></span>
     <span class="bin-azioni"><button class="btn small" data-act="ds-apri" data-id="${esc(x.p.id)}" aria-label="Apri la scheda di ${esc(x.p.nome)}">Apri scheda</button>
     <button class="btn small" data-act="strategia-oggi-fatto" data-id="${esc(x.p.id)}" aria-label="Fatto: ${esc(x.p.nome)}">Fatto</button></span></li>`;
   if(x.k === "linea"){ const l = x.l, apri = l.id && st.struttura.some(p => p.id === l.id);
@@ -8665,8 +8688,9 @@ function dataIngressoDi(id){
   const d = (st.ingressi && st.ingressi.get(id)) || (p && p.data_iscrizione) || (id === st.profilo.id ? st.profilo.data_iscrizione : null);
   return d ? String(d).slice(0, 10) : null;
 }
-/* «Linee nuove» del Path to Bronze: iscritte dalla data della tabella delle tappe (linee_nuove_dal); se è vuota (scelta di
-   Stefano, 18 novembre 2026) contano tutte le linee frontali. Senza la data di ingresso non si sa: non è nuova. */
+/* «Linee nuove» del Path to Bronze: iscritte dalla data della tabella delle tappe (linee_nuove_dal: dal 1° giugno 2026 con
+   la 068, scelta di Stefano del 20 novembre 2026); se è vuota contano tutte le linee frontali. Senza la data di ingresso
+   non si sa: non è nuova. */
 function lineaNuova(l, dal){
   if(!dal) return true;
   const d = l.id ? dataIngressoDi(l.id) : null;
@@ -8685,6 +8709,64 @@ function pathToBronze(pid){
   const fatte = linee.filter(l => l.ok).length;
   return { personali:n.personali, vpPersonali, linee, fatte, richieste, vpLinea, valore,
            completo:n.personali >= vpPersonali && fatte >= richieste, mese:n.mese, datiAl:n.datiAl };
+}
+/* Il Path to Bronze come obiettivo (scelta di Stefano, 20 novembre 2026). NON lo è per chi ha dichiarato Bronze Foundation
+   o più (anche solo la percentuale: sottoFoundation) né per chi ha già raggiunto la percentuale di Bronze Foundation (9%)
+   con le sue linee (3, almeno soglia_linea_attiva VP ciascuna, anche vecchie) in un mese di una mappa importata. Per loro
+   la strategia, la casella e la scheda mostrano la prossima tappa vera (prossimaTappaDi), mai «ha fatto il suo Path to
+   Bronze», e non parte la festa. Percentuale e linee vengono dalla tabella delle tappe (la prima Bronze Foundation). */
+function primaFoundation(){ return st.stages.filter(s => String(s.chiave).startsWith("foundation")).sort((a, b) => a.ordine - b.ordine)[0] || null; }
+/* i mesi delle mappe di una persona { mese, vpp, vpg, percentuale, linee:[{ codice, vpg }] }: i miei tutti (ultimi 24
+   mesi), degli altri quelli dalla percentuale di Bronze Foundation in su (st.mesiNove, caricati in caricaNumeri) */
+function mesiMappaDi(pid){
+  if(st.profilo && pid === st.profilo.id) return [...(st.mioReport || new Map()).values()];
+  return (st.mesiNove && st.mesiNove.get(pid)) || [];
+}
+function noveConTreLinee(pid){
+  const f = primaFoundation();
+  if(!f || !Number(f.percentuale)) return false;
+  const min = soglia(), quante = Number(f.linee) || 0;
+  return mesiMappaDi(pid).some(r => Number(r.percentuale) >= Number(f.percentuale)
+    && (Array.isArray(r.linee) ? r.linee : []).filter(l => Number(l.vpg) >= min).length >= quante);
+}
+function ptbObiettivo(pid){
+  const p = st.profilo && pid === st.profilo.id ? st.profilo : st.struttura.find(x => x.id === pid);
+  return !!p && sottoFoundation(p) && !noveConTreLinee(pid);
+}
+/* da Argento in su: io (strategiaDaArgento) o una persona della downline (dichiarata, 21% dichiarato o un mese al 21%) */
+function daArgentoDi(pid){
+  if(pid === st.profilo.id) return strategiaDaArgento();
+  const p = st.struttura.find(x => x.id === pid) || {};
+  return ordineDi("argento") > 0 && ordineDi(p.qualifica_iniziale) >= ordineDi("argento") || Number(p.percentuale_iniziale) >= 21
+    || mesiMappaDi(pid).some(r => Number(r.percentuale) >= 21);
+}
+/* i numeri di un mese di una mappa (una riga di numeri_mese) nella forma di mancanze() */
+function numeriDaRiga(r){ return { mappa:true, mese:meseDi(r.mese), personali:Number(r.vpp) || 0, gruppo:Number(r.vpg) || 0, linee:lineeReport({ linee_report:r.linee || [] }) }; }
+/* La prossima tappa vera di una persona (io o della mia downline), dal Path to Bronze ad Argento compresi: la prima non
+   fatta. Fatta: la qualifica dichiarata la comprende; il Path to Bronze anche quando non è il suo obiettivo o è completo;
+   le altre quando un mese delle sue mappe (o la mappa più recente) ha tutti i requisiti della tabella. null da Argento in su. */
+function prossimaTappaDi(pid){
+  const T = tappeStrategia();
+  if(daArgentoDi(pid)) return null;
+  if(pid === st.profilo.id){ const da = ordineDi(st.profilo.qualifica_iniziale); return T.find(t => !(t.ordine <= da || tappaFatta(t))) || null; }
+  const p = st.struttura.find(x => x.id === pid);
+  if(!p) return null;
+  const da = ordineDi(p.qualifica_iniziale), rec = mappaRecente(pid);
+  const mesi = mesiMappaDi(pid).map(numeriDaRiga).concat(rec ? [{ mappa:true, mese:rec.mese, personali:rec.personali, gruppo:rec.gruppo, linee:rec.linee }] : []);
+  return T.find(t => {
+    if(t.ordine <= da) return false;
+    if(t.chiave === "path_to_bronze") return ptbObiettivo(pid) && !(pathToBronze(pid) || {}).completo;
+    return !mesi.some(n => !mancanze(t, n).length);
+  }) || null;
+}
+/* la prossima tappa vera e cosa manca, dalla mappa più recente: { tappa, manca:[…], mese, datiAl } */
+function versoTappa(pid){
+  const tappa = prossimaTappaDi(pid), n = mappaRecente(pid);
+  return { tappa, manca:tappa && n ? mancanze(tappa, Object.assign({ mappa:true }, n)) : [], mese:n ? n.mese : null, datiAl:n ? n.datiAl : null, mappa:!!n };
+}
+function testoVersoTappa(v){
+  if(!v.tappa) return "Da Argento in su";
+  return `Prossima tappa: ${v.tappa.nome}${!v.mappa ? "" : v.manca.length ? " · " + v.manca.join(" · ") : " · tutti i numeri del mese ci sono"}`;
 }
 /* la mia linea frontale in cui sta una persona della mia downline (null se non è sotto di me) */
 function lineaDiPersona(pid){
@@ -8795,7 +8877,7 @@ function strategia(n){
   s.modoAdatto = situazione === "C" ? modoAdatto(s) : null;
   return s;
 }
-if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { strategia, pathToBronze, proposteModo, lineaDiPersona });
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { strategia, pathToBronze, proposteModo, lineaDiPersona, ptbObiettivo, prossimaTappaDi, versoTappa, requisiti, tappaFatta });
 
 /* ==== La tua strategia, punto 2: la card in cima a Io e la schermata intera ====
    Le caselle scelte con «Cambia» si ricordano su questo telefono (growup-team.strategia.<id>, con try/catch); senza una
@@ -8839,9 +8921,10 @@ function strategiaAttuale(){
   while(caselle.length < s.caselle) caselle.push(scelta || s.situazione === "C" ? { tipo:null } : proposteStrategia(s, s.caselle)[caselle.length] || { tipo:null });
   return { s, caselle, scelta, daScegliere };
 }
-/* il titolo: «Fai il tuo Path to Bronze» solo per chi ha dichiarato meno di Bronze Foundation; poi secondo le caselle */
-function titoloStrategia(caselle){
-  if(sottoFoundation()) return "Fai il tuo Path to Bronze";
+/* il titolo: «Fai il tuo Path to Bronze» solo se è la mia prossima tappa vera (sotto Bronze Foundation, senza un mese al 9%
+   con 3 linee, Path to Bronze non ancora fatto); poi secondo le caselle */
+function titoloStrategia(caselle, s){
+  if(s && s.tappa && s.tappa.chiave === "path_to_bronze") return "Fai il tuo Path to Bronze";
   const t = caselle.map(c => c.tipo).filter(Boolean);
   if(!t.length) return "La tua strategia";
   if(t.every(x => x === "nuova_linea")) return "Apri nuove linee frontali";
@@ -8862,6 +8945,17 @@ function vCasella(c, s, i, primaVuota){
   if(c.tipo === "aiuta"){
     const p = st.struttura.find(x => x.id === c.persona_id) || {}, n = numeroLinea(s, c.linea_id), ptb = pathToBronze(c.persona_id);
     const mappa = ptb && ptb.mese ? testoMappaStrategia(ptb.mese, ptb.datiAl) : testoMappa(meseDi(oggi()), null);
+    /* il Path to Bronze non è il suo obiettivo (Bronze Foundation dichiarata o un mese al 9% con 3 linee): la prossima tappa vera */
+    if(!ptbObiettivo(c.persona_id)){
+      const v = versoTappa(c.persona_id);
+      return `<li class="casella c-aiuta c-tappa" data-i="${i}">
+      <span class="casella-tipo">${TIPI_CASELLA.aiuta}${n ? ` · linea ${n}` : ""}</span>
+      <b class="casella-nome">${esc(p.nome || "")}</b>
+      <span class="pill">${v.tappa ? `Prossima tappa · ${esc(v.tappa.nome)}` : "Da Argento in su"}</span>
+      ${v.tappa && v.mappa ? `<span class="small">${esc(v.manca.length ? v.manca.join(" · ") : "tutti i numeri del mese ci sono")}</span>` : ""}
+      <span class="small casella-mappa">${!v.mappa ? `<span class="segno-att" aria-hidden="true">!</span> ` : ""}VP: ${esc(v.mappa ? testoMappaStrategia(v.mese, v.datiAl) : testoMappa(meseDi(oggi()), null))}</span>
+    </li>`;
+    }
     return `<li class="casella c-aiuta" data-i="${i}">
       <span class="casella-tipo">${TIPI_CASELLA.aiuta}${n ? ` · linea ${n}` : ""}</span>
       <b class="casella-nome">${esc(p.nome || "")}</b>
@@ -8936,7 +9030,7 @@ function vStrategia(){
   return `<div class="card strategia" data-act="strategia-apri" role="button" tabindex="0" aria-label="Apri la tua strategia">
     <div class="spread"><span class="eyebrow">La tua strategia</span><span class="small">${num(caselle.length)} caselle</span></div>
     ${vDopoPtb(caselle)}
-    <h2 class="strategia-titolo">${esc(titoloStrategia(caselle))}</h2>
+    <h2 class="strategia-titolo">${esc(titoloStrategia(caselle, s))}</h2>
     ${vTappe4(s)}
     ${vCaselle(caselle, s, 3)}
     ${vInvitatoDaAiutare(caselle)}
@@ -8951,7 +9045,7 @@ function vStrategiaFesta(){
   try{ x = strategiaAttuale(); }catch(e){ return ""; }
   if(!x.s.pronta) return "";
   return `<div class="strategia-festa"><span class="eyebrow">Ecco la tua strategia</span>
-    <h2 class="strategia-titolo">${esc(titoloStrategia(x.caselle))}</h2>
+    <h2 class="strategia-titolo">${esc(titoloStrategia(x.caselle, x.s))}</h2>
     <ul class="festa-caselle">${x.caselle.slice(0, 3).map(c => `<li><span class="casella-tipo">${esc(TIPI_CASELLA[c.tipo] || "Casella libera")}</span>
       <b>${c.tipo === "aiuta" ? esc((st.struttura.find(p => p.id === c.persona_id) || {}).nome || "") : "da trovare"}</b></li>`).join("")}</ul></div>`;
 }
@@ -8965,7 +9059,7 @@ function vSheetStrategia(sh){
   return `<div class="strategia-intera">
     <div class="spread strategia-cima"><span class="eyebrow">La tua strategia</span><button class="x" data-act="chiudi" aria-label="Chiudi">×</button></div>
     ${x.daScegliere ? "" : vDopoPtb(x.caselle)}
-    <h2 class="strategia-titolo">${esc(x.daScegliere ? "Come vuoi lavorare?" : titoloStrategia(x.caselle))}</h2>
+    <h2 class="strategia-titolo">${esc(x.daScegliere ? "Come vuoi lavorare?" : titoloStrategia(x.caselle, x.s))}</h2>
     ${vTappe4(s)}
     ${x.daScegliere ? vModi(s, "strategia-modo") : vCaselle(x.caselle, s) + vInvitatoDaAiutare(x.caselle)}
     ${vLineeStrategia(s)}

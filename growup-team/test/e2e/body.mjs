@@ -7359,6 +7359,122 @@ for(const tema of ["light", "dark"]){
   DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
   DB.caselle = (DB.caselle || []).filter(x => !tutti.includes(x.partner_id));
 }
+// 102. Path to Bronze, solo le linee nuove (20 novembre 2026, scelta di Stefano, migrazione 068): con linee_nuove_dal =
+//      2026-06-01 nella tabella delle tappe contano solo le linee frontali iscritte da quel giorno (data di ingresso della
+//      mappa), anche nell'Obiettivo; le più vecchie mai, anche se fatturano. Chi ha dichiarato Bronze Foundation o più, o ha
+//      già fatto il 9% con 3 linee attive in un mese delle mappe, non ha il Path to Bronze come obiettivo: prossima tappa
+//      vera nella strategia e nella casella, mai «ha fatto il suo Path to Bronze», niente festa.
+{
+  const id = n => "a2000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0");
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const ora = new Date().toISOString();
+  const spMese = (m, k) => { const [y, mm] = m.split("-").map(Number), t = y * 12 + mm - 1 + k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, "0")}`; };
+  const mesePrima = spMese(meseOra(), -1), treMesiFa = spMese(meseOra(), -3);
+  const cod = n => "7920" + String(n).padStart(3, "0");
+  const io = (n, nome, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:"R", stato:"attivo", codice_invito:"PN" + n + "XX", codice_amway:cod(n),
+    chiave:String(n).padStart(2, "0").repeat(16), privacy_accettata_il:quando(-300), confermato_il:ora, partenza_confermata_il:ora, creato_il:quando(-300),
+    ultimo_aggiornamento:ora, data_iscrizione:giorno(-700) }, extra));
+  const VECCHIA = "2025-03-10", NUOVA = giorno(-120);
+  const sotto = (n, nome, sponsor, isc) => DB.partners.push({ id:id(n), nome, sponsor_id:id(sponsor), stato:"gestito", gestore_id:id(sponsor),
+    codice_invito:"PN" + n + "XX", codice_amway:cod(n), partenza_confermata_il:ora, creato_il:quando(-300), data_iscrizione:isc || VECCHIA });
+  const linee = l => l.map(([n, vpg]) => ({ codice:cod(n), vpg }));
+  const tre = (n, isc) => [1, 2, 3].forEach(k => sotto(n + k, ["Uno", "Due", "Tre"][k - 1] + " Di" + n, n, isc));
+  const tutti = []; for(let n = 10; n <= 99; n++) tutti.push(id(n));
+  const ptbTab = DB.stages.find(x => x.chiave === "path_to_bronze");
+  ptbTab.linee_nuove_dal = "2026-06-01";
+  // Rita: 3 linee VECCHIE da almeno 100 VP e 110 VP personali → niente Path to Bronze, niente festa
+  io(10, "Rita Rovere"); tre(10);
+  mappa(id(10), 110, 450, { mese:mesePrima, linee:linee([[11, 130], [12, 120], [13, 105]]) });
+  mappa(id(10), 110, 450, { linee:linee([[11, 130], [12, 120], [13, 100]]) });
+  // Sara: 3 linee NUOVE da almeno 100 VP → Path to Bronze fatto, la festa
+  io(20, "Sara Salice"); tre(20, NUOVA);
+  mappa(id(20), 60, 60, { mese:mesePrima, linee:linee([[21, 50]]) });
+  mappa(id(20), 110, 450, { linee:linee([[21, 130], [22, 120], [23, 100]]) });
+  // Tea: tre mesi fa al 9% con 3 linee attive; oggi linee nuove con il Path to Bronze completo → non è il suo obiettivo
+  io(30, "Tea Tiglio"); tre(30, NUOVA);
+  mappa(id(30), 110, 1300, { mese:treMesiFa, percentuale:9, linee:linee([[31, 500], [32, 300], [33, 120]]) });
+  mappa(id(30), 110, 500, { mese:mesePrima, percentuale:3, linee:linee([[31, 130], [32, 120], [33, 100]]) });
+  mappa(id(30), 110, 500, { linee:linee([[31, 130], [32, 120], [33, 100]]) });
+  // Ugo (Bronze Foundation dichiarata) aiuta Vito (linee vecchie), Nico (linee nuove, completo) e Tina (già al 9%)
+  io(40, "Ugo Ulivo", { qualifica_iniziale:"foundation_9" });
+  sotto(50, "Vito Vecchi", 40); sotto(60, "Nico Nuovi", 40); sotto(70, "Tina Nove", 40); tre(50); tre(60, NUOVA); tre(70, NUOVA);
+  mappa(id(40), 110, 1500, { mese:mesePrima, percentuale:9, linee:linee([[50, 450], [60, 400], [70, 500]]) });
+  mappa(id(40), 110, 1500, { percentuale:9, linee:linee([[50, 450], [60, 400], [70, 500]]) });
+  mappa(id(50), 110, 450, { linee:linee([[51, 130], [52, 120], [53, 100]]) });
+  mappa(id(60), 110, 400, { linee:linee([[61, 130], [62, 120], [63, 100]]) });
+  mappa(id(70), 110, 1300, { mese:treMesiFa, percentuale:9, linee:linee([[71, 500], [72, 300], [73, 120]]) });
+  mappa(id(70), 110, 500, { linee:linee([[71, 130], [72, 120], [73, 100]]) });
+  DB.caselle = (DB.caselle || []).concat([50, 60, 70].map((n, i) => ({ partner_id:id(40), posizione:i + 1, tipo:"aiuta", persona_id:id(n), linea_id:id(n), creato_il:quando(-20) })));
+  const apriCome = async (n, opz) => { const r = await apri(Object.assign({ viewport:{ width:360, height:780 } }, opz || {}), "#chiave=" + String(n).padStart(2, "0").repeat(16));
+    await r.page.locator(".testata h1").waitFor(); return r; };
+  DB.traguardiAperti = true;
+
+  // --- Rita: linee vecchie
+  ({ ctx, page } = await apriCome(10));
+  await page.waitForTimeout(500);
+  let r = await page.evaluate(id => { const T = GROWUP_TEST, p = T.pathToBronze(id), s = T.strategia(), t = T.st.stages.find(x => x.chiave === "path_to_bronze");
+    return { fatte:p.fatte, linee:p.linee.length, completo:p.completo, tappa:s.tappa && s.tappa.chiave, obiettivo:T.ptbObiettivo(id), fatta:T.tappaFatta(t),
+      req:T.requisiti(t).map(x => x.txt + " " + x.val), completi:T.ptbCompleti().length }; }, id(10));
+  check(r.fatte === 0 && r.linee === 0 && !r.completo, `linee vecchie da 100 VP: non contano per il Path to Bronze (${JSON.stringify(r)})`);
+  check(r.obiettivo && r.tappa === "path_to_bronze" && !r.fatta, "linee vecchie: il Path to Bronze resta la prossima tappa, anche nell'Obiettivo (non è fatto)");
+  check(r.req.some(x => x === "3 linee frontali nuove (iscritte dal 1 giugno) da almeno 100 VP di gruppo 0 / 3"),
+    "Obiettivo: il requisito dice «linee frontali nuove (iscritte dal 1 giugno)» e conta 0 su 3 (" + r.req.join(" | ") + ")");
+  check(r.completi === 0 && !(await page.locator(".festa.traguardo").count()), "linee vecchie: niente festa");
+  await ctx.close();
+
+  // --- Sara: linee nuove
+  ({ ctx, page } = await apriCome(20));
+  await page.locator(".festa.traguardo").waitFor();
+  check((await page.locator(".festa.traguardo h1").innerText()).replace(/\s+/g, " ") === "Hai fatto il tuo Path to Bronze!", "linee nuove da 100 VP: Path to Bronze fatto e la festa");
+  r = await page.evaluate(id => { const p = GROWUP_TEST.pathToBronze(id); return { fatte:p.fatte, completo:p.completo, tappa:GROWUP_TEST.strategia().tappa.chiave }; }, id(20));
+  check(r.fatte === 3 && r.completo && r.tappa === "foundation_9", "linee nuove: 3 su 3, la prossima tappa è Bronze Foundation 9%");
+  await page.locator(".festa.traguardo button[data-act=traguardo-chiudi]").click();
+  await ctx.close();
+
+  // --- Tea: già al 9% con 3 linee in un mese delle mappe
+  ({ ctx, page } = await apriCome(30));
+  await page.waitForTimeout(500);
+  r = await page.evaluate(id => { const T = GROWUP_TEST, s = T.strategia(); return { obiettivo:T.ptbObiettivo(id), tappa:s.tappa && s.tappa.chiave, t4:s.tappe4[0].stato,
+    completo:T.pathToBronze(id).completo, completi:T.ptbCompleti().length }; }, id(30));
+  check(!r.obiettivo && r.tappa === "foundation_9" && r.t4 === "fatta", `già al 9% con 3 linee: prossima tappa vera Bronze Foundation 9%, Path to Bronze alle spalle (${JSON.stringify(r)})`);
+  check(r.completo && r.completi === 0 && !(await page.locator(".festa.traguardo").count()), "già al 9%: anche con le linee nuove complete niente festa");
+  check(!/Path to Bronze/.test(await page.locator("#app .card.strategia .strategia-titolo").innerText()), "già al 9%: il titolo della strategia non è «Fai il tuo Path to Bronze»");
+  await ctx.close();
+
+  // --- Ugo: le caselle delle persone che aiuta
+  ({ ctx, page } = await apriCome(40));
+  const t = page.locator(".festa.traguardo");
+  await t.waitFor();
+  check((await t.locator("h1").innerText()).replace(/\s+/g, " ") === "Nico ha fatto il suo Path to Bronze!", "festa solo per chi ha il Path to Bronze come obiettivo (Nico)");
+  await t.locator("button[data-act=traguardo-chiudi]").click();
+  await page.waitForTimeout(400);
+  check(!(await page.locator(".festa.traguardo").count()), "nessuna festa per Tina (già al 9%) né per Vito (linee vecchie)");
+  const card = page.locator("#app .card.strategia");
+  const casella = nome => card.locator("li.casella", { hasText:nome });
+  const tina = (await casella("Tina Nove").innerText()).replace(/\s+/g, " ");
+  check(tina.includes("Prossima tappa · Bronze Foundation 9%") && tina.includes("mancano 700 VP di gruppo") && !/Path to Bronze/.test(tina),
+    "casella di chi è già al 9%: la prossima tappa vera con cosa manca, mai il Path to Bronze (" + tina + ")");
+  const vito = (await casella("Vito Vecchi").innerText()).replace(/\s+/g, " ");
+  check(!vito.includes("Path to Bronze fatto") && (await casella("Vito Vecchi").locator(".pallini i.si").count()) === 0,
+    "casella con linee vecchie: nessuna linea nuova, Path to Bronze non fatto");
+  check((await casella("Nico Nuovi").innerText()).includes("✓ Path to Bronze fatto"), "casella con linee nuove: «✓ Path to Bronze fatto»");
+  check(!(await card.innerText()).includes("Tina ha fatto") && !(await card.innerText()).includes("Tina Nove ha fatto"), "mai «Tina ha fatto il suo Path to Bronze»");
+  await card.scrollIntoViewIfNeeded();
+  await card.screenshot({ path:S + "/e2e/102-ptb-tappa-light.png" });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await card.screenshot({ path:S + "/e2e/102-ptb-tappa-dark.png" });
+  await page.emulateMedia({ colorScheme:"light" });
+  check(await page.evaluate(() => [...document.querySelectorAll("#app .card.strategia li.casella .pill")].every(e => e.scrollWidth <= e.clientWidth + 1)),
+    "casella con la prossima tappa: a 360 px la riga della tappa non va oltre il bordo");
+  await ctx.close();
+
+  ptbTab.linee_nuove_dal = null;
+  DB.traguardiAperti = false;
+  check(!errori.length, "Path to Bronze, linee nuove: nessun errore nella pagina");
+  DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
+  DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
+  DB.caselle = (DB.caselle || []).filter(x => !tutti.includes(x.partner_id));
+}
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
