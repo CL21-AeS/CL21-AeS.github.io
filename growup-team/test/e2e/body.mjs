@@ -4218,15 +4218,15 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   const prima = await tutte();
   await pg.goto(BASE + "prova/");
   await pg.locator(".prova-scelta").waitFor();
-  check(await pg.locator(".prova-scelta button.chi[data-prova=come]").count() === 2 && (await pg.locator(".prova-scelta").innerText()).includes("Dati inventati"),
-    "prova: si sceglie chi essere (due persone), con l'avviso dei dati inventati");
+  check(await pg.locator(".prova-scelta button.chi[data-prova=come]").count() === 4 && (await pg.locator(".prova-scelta").innerText()).includes("Dati inventati"),
+    "prova: si sceglie chi essere (Luca e Giulia, più le due «Pronte da guardare» dal 20 novembre 2026), con l'avviso dei dati inventati");
   const sceltaT = (await pg.locator(".prova-scelta").innerText()).replace(/\s+/g, " ");
   check(sceltaT.includes("Sono appena entrato Il primo ingresso di un nuovo partner e il percorso di partenza, fase per fase, fino alla festa.")
     && sceltaT.includes("Sono in attività da tempo Il primo ingresso di chi è già in attività, l'import della mappa e dei clienti, poi l'app dopo due mesi.")
     && /Luca Bassi/i.test(sceltaT) && /Giulia Martini/i.test(sceltaT) && !/Sara Conti|Stefano e Alessia/i.test(sceltaT),
     "prova: «Sono appena entrato» → Luca, «Sono in attività da tempo» → Giulia; né Sara né Stefano e Alessia");
   check(await pg.locator(".prova-scelta button.chi[data-prova=mappa]").count() === 1 && await pg.locator(".prova-scelta button.chi[data-prova=clienti]").count() === 1
-    && await pg.locator(".prova-scelta button.chi").count() === 4 && !/ordini dei clienti|Stefano e Alessia ·/i.test(sceltaT)
+    && await pg.locator(".prova-scelta button.chi").count() === 6 && !/ordini dei clienti|Stefano e Alessia ·/i.test(sceltaT)
     && await pg.locator(".prova-scelta [data-prova=ricomincia]").count() === 1,
     "prova: solo due file (la mappa e i clienti di Giulia), niente file degli ordini né di Stefano e Alessia; «Ricomincia da capo» c'è");
   await pg.screenshot({ path: S + "/e2e/68-prova-scelta.png", fullPage:true });
@@ -7683,6 +7683,79 @@ for(const tema of ["light", "dark"]){
   check(!errori.length, "linea più forte: nessun errore nella pagina");
   DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
   DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
+}
+// 105. La prova, «Pronte da guardare» (20 novembre 2026, richiesta di Stefano): Carla e Bruno Valenti, in attività da anni
+//      come Stefano e Alessia (Platino Fondatore, 15 frontali, una linea con una persona al 21%, l'app in uso: 7 caselle), e
+//      Nadia Serra, che ha appena iniziato (percorso di partenza finito, Path to Bronze 1 su 3). Tutto con il Path to Bronze
+//      nuovo: Dario (3 linee nuove) fa la festa, Gianni (3 linee vecchie) no, Marisa (già al 9% con 3 linee) ha la prossima
+//      tappa vera. Dati inventati, nessuna richiesta fuori dal nostro sito, nessun errore; anteprime a 360 px chiaro e scuro.
+{
+  const c = await browser.newContext({ viewport:{ width:360, height:780 }, locale:"it-IT", timezoneId:"Europe/Rome", reducedMotion:"reduce" });
+  const pg = await c.newPage();
+  const fuori = [], err = [];
+  pg.on("request", r => { if(!r.url().startsWith("http://127.0.0.1:8765/")) fuori.push(r.url()); });
+  pg.on("pageerror", e => err.push(String(e))); pg.on("console", m => { if(m.type() === "error") err.push(m.text()); });
+  await pg.goto(BASE + "prova/"); await pg.locator(".prova-scelta").waitFor();
+  check(await pg.locator(".prova-scelta [data-prova=come][data-k=valenti]").count() === 1 && await pg.locator(".prova-scelta [data-prova=come][data-k=nadia]").count() === 1
+    && await pg.locator(".prova-scelta [data-prova=come][data-k=luca]").count() === 1 && await pg.locator(".prova-scelta [data-prova=come][data-k=giulia]").count() === 1,
+    "prova: Luca e Giulia come prima, più le due «Pronte da guardare» (Valenti e Nadia)");
+  await pg.screenshot({ path:S + "/e2e/105-prova-scelta-light.png", fullPage:true });
+  await pg.emulateMedia({ colorScheme:"dark" }); await pg.waitForTimeout(100);
+  await pg.screenshot({ path:S + "/e2e/105-prova-scelta-dark.png", fullPage:true });
+  await pg.emulateMedia({ colorScheme:"light" });
+
+  // i Valenti: entrando parte la festa di Dario (3 linee nuove), una volta sola
+  await pg.click("[data-prova=come][data-k=valenti]");
+  await pg.locator(".festa.traguardo").waitFor();
+  check((await pg.locator(".festa.traguardo h1").innerText()).replace(/\s+/g, " ") === "Dario ha fatto il suo Path to Bronze!", "prova, Valenti: la festa del Path to Bronze di Dario (3 linee nuove)");
+  await pg.locator(".festa.traguardo button[data-act=traguardo-chiudi]").click();
+  const card = pg.locator("#app .card.strategia");
+  await card.waitFor();
+  check((await card.locator(".spread .small").first().innerText()).trim() === "7 caselle" && !(await card.locator(".tappe4").count()),
+    "prova, Valenti: Platino Fondatore, 7 caselle e nessuna barra delle tappe");
+  const linee = (await card.locator(".linee-strategia").innerText()).replace(/\s+/g, " ");
+  check(/Fausto Neri/.test(linee) && /Elena Sanna · in profondità, linea 1/.test(linee) && /altre \d+ senza fatturato/.test(linee),
+    "prova, Valenti: le linee che seguono (anche Elena in profondità) e quelle senza fatturato chiuse");
+  await card.screenshot({ path:S + "/e2e/105-valenti-light.png" });
+  await pg.emulateMedia({ colorScheme:"dark" }); await pg.waitForTimeout(100);
+  await card.screenshot({ path:S + "/e2e/105-valenti-dark.png" });
+  await pg.emulateMedia({ colorScheme:"light" });
+  await card.locator("button[data-act=strategia-apri]").click();
+  await pg.locator(".sheet .strategia-intera").waitFor();
+  const cas = async n => (await pg.locator(".sheet li.casella", { hasText:n }).innerText()).replace(/\s+/g, " ");
+  check((await cas("Gianni Rota")).includes("120 / 100 VP personali") && await pg.locator(".sheet li.casella", { hasText:"Gianni Rota" }).locator(".pallini i.si").count() === 0,
+    "prova, Valenti: Gianni ha 3 linee vecchie da 100 VP: nessuna linea nuova");
+  check(/Prossima tappa · Bronze Foundation/.test(await cas("Marisa Leone")) && !/Path to Bronze/.test(await cas("Marisa Leone")),
+    "prova, Valenti: Marisa, già al 9% con 3 linee, ha la prossima tappa vera");
+  await pg.locator(".sheet li.casella", { hasText:"Marisa Leone" }).click();
+  await pg.locator("#app .card.aiuta-qualificare").waitFor();
+  check((await pg.locator("#app .card.aiuta-qualificare").innerText()).includes("La strada consigliata"), "prova, Valenti: la scheda di Marisa con «Come aiutarlo a qualificare»");
+  await pg.click("button[data-act=vista-io]");
+  await pg.click(".sezioni-io button[data-sez=guida]");
+  await pg.click(".analisi-link[data-act=apri-analisi]");
+  await pg.locator(".analisi-riep .linea-forte").waitFor();
+  await pg.waitForFunction(() => !document.querySelector(".analisi-riep .linea-forte span").textContent.includes("…"));
+  check((await pg.locator(".analisi-riep .linea-forte").innerText()).replace(/\s+/g, " ") === "Fausto Neri linea più forte · ultimi 12 mesi chiusi",
+    "prova, Valenti: la linea più forte è Fausto (con Patrizia al 21% dentro), sugli ultimi 12 mesi chiusi");
+
+  // Nadia: ha appena iniziato, il suo Path to Bronze con le linee nuove
+  await pg.click(".prova-barra [data-prova=scegli]"); await pg.locator(".prova-scelta").waitFor();
+  await pg.click("[data-prova=come][data-k=nadia]");
+  const cn = pg.locator("#app .card.strategia");
+  await cn.waitFor();
+  check((await cn.locator(".strategia-titolo").innerText()) === "Fai il tuo Path to Bronze" && await cn.locator(".t4.corso").count() === 1,
+    "prova, Nadia: «Fai il tuo Path to Bronze», la prima tappa in corso");
+  const ln = (await cn.locator(".linee-strategia").innerText()).replace(/\s+/g, " ");
+  check(/Ivo Cattani 120 \/ 100 VP/.test(ln) && /Sonia Lanza 60 \/ 100 VP/.test(ln), "prova, Nadia: le sue due linee nuove (120 e 60 VP su 100)");
+  check(!(await pg.locator(".card.percorso-partenza").count()), "prova, Nadia: il percorso di partenza è finito (tutta l'app)");
+  await cn.screenshot({ path:S + "/e2e/105-nadia-light.png" });
+  await pg.emulateMedia({ colorScheme:"dark" }); await pg.waitForTimeout(100);
+  await cn.screenshot({ path:S + "/e2e/105-nadia-dark.png" });
+  await pg.emulateMedia({ colorScheme:"light" });
+  check(await pg.evaluate(() => document.documentElement.scrollWidth <= 360), "prova, Nadia a 360 px: la pagina non scorre di lato");
+  check(!fuori.length, "prova, pronte: nessuna richiesta fuori dal nostro sito (" + fuori.slice(0, 2).join(", ") + ")");
+  check(!err.length, "prova, pronte: nessun errore (" + err.slice(0, 2).join(" | ") + ")");
+  await c.close();
 }
 await browser.close();
 console.log(`controlli superati: ${ok}`);

@@ -3,6 +3,29 @@
 Ultimo aggiornamento: 20 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## La prova, «Pronte da guardare»: un grande gruppo e chi ha appena iniziato (20 novembre 2026, richiesta di Stefano, database non toccato)
+
+Nella pagina di scelta della versione di prova, sotto Luca e Giulia (che non cambiano), la parte **«Pronte da guardare»**:
+l'app già in uso, con il Path to Bronze nuovo (contano solo le linee iscritte dal 1° giugno 2026). Dati inventati, nel file
+nuovo `prova/dati-specchio.js` (`GROWUP_PROVA_SPECCHIO`), aggiunti una volta sola ai dati della prova (anche a una prova
+già iniziata sul telefono): un gruppo a parte, che non tocca Luca, Giulia né Stefano e Alessia della prova.
+- **Carla e Bruno Valenti** («In attività da anni, con un grande gruppo»): la **forma** del gruppo di Stefano e Alessia,
+  presa dal database vero solo come conteggi (nessun nome, codice o cifra copiati): Platino Fondatore dichiarato, al 21%,
+  15 linee frontali di cui 6 con un gruppo, circa 140 persone su 20 livelli, circa un terzo che fattura, 13 mesi di mappe.
+  Nella linea di Fausto Neri c'è Patrizia Gallo al 21% (gruppo non visibile, come un Platino): nei mesi in cui è al 21%
+  Amway toglie i suoi VP da chi sta sopra (la VPG dei Valenti scende a 5.000-7.000), negli altri mesi no (circa 13.000);
+  nell'analisi Fausto è la linea più forte con i VP veri. L'app in uso da mesi: 7 caselle (Nadia, Dario, Gianni, Marisa,
+  Elena in profondità, in profondità nella linea di Fausto, una nuova linea), Lista, 5 clienti con ordini, agenda di oggi,
+  obiettivo. Il Path to Bronze nuovo: **Dario Conti** con 3 linee nuove → la festa all'apertura; **Gianni Rota** con 3 linee
+  vecchie da 100 VP → nessuna linea nuova; **Marisa Leone**, già al 9% con 3 linee → la sua prossima tappa vera.
+- **Nadia Serra** («Ha appena iniziato»): iscritta da 45 giorni, percorso di partenza finito, frontale dei Valenti; «Fai il
+  tuo Path to Bronze» con 110 VP personali e due linee nuove (120 e 60 VP: 1 su 3), 29 nomi in Lista, i primi 3 clienti.
+- Si entra con il link personale; le domande di una volta sola (notifiche, condivisione, primi passi) sono già risposte.
+- Il titolo non dice «come Stefano e Alessia»: dal 13 novembre la pagina di scelta della prova non mostra il vostro nome
+  (si presenta anche a Cum Laude 21).
+Test: sezione 105 (le due pronte, festa di Dario, Gianni, Marisa e la sua scheda, linea più forte, Nadia; nessuna richiesta
+fuori dal sito, nessun errore; anteprime `e2e/105-*-light/dark.png`); sezione 68 adattata (quattro persone da scegliere).
+
 ## La strategia a schermo intero solo con «Vedi tutto ›» (20 novembre 2026, sera, app v128, database non toccato)
 
 Scelta di Stefano: la card «La tua strategia» non si apre più toccandola (titolo, tappe, spazi vuoti); la schermata intera
