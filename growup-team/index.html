@@ -935,7 +935,24 @@ html,body{overflow-x:clip}
 .linee-strategia .linea-vp{white-space:nowrap;color:var(--ink2)}
 .linee-strategia .linea-vp .num{font-size:14px;color:var(--ink)}
 .linee-strategia .segno-ok{color:var(--verde);font-weight:800}
+.linee-strategia .linea-apri{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:36px;padding:2px 0;
+  border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.linee-strategia li:has(.linea-apri){padding:0}
+.linee-strategia .linea-apri .linea-nome{flex:1}
+.linee-strategia .linea-apri{align-items:baseline;font-size:13px;line-height:1.4}
+.linee-strategia .linea-apri .fr{color:var(--ink3);font-size:13px}
+.linee-strategia .linea-apri .linea-vp .num{font:inherit;font-weight:700;font-variant-numeric:tabular-nums}
+.linee-strategia .linea-dove{color:var(--ink3)}
+.linee-strategia .linee-senza{font-size:13px;min-height:36px}
 .linee-mappa{color:var(--ink3)}
+.aiuta-qualificare .aq{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:10px 0 0;font-size:14px}
+.aiuta-qualificare .aq dt{color:var(--ink3)}
+.aiuta-qualificare .aq dd{margin:0;min-width:0}
+.aiuta-qualificare .aq-t{margin:10px 0 0}
+.aiuta-qualificare .aq-l{list-style:none;margin:4px 0 0;padding:0}
+.aiuta-qualificare .aq-l li{display:flex;gap:8px;font-size:14px;padding:3px 0;text-wrap:pretty}
+.aiuta-qualificare .aq-l .segno{flex:none;width:16px;text-align:center;color:var(--ink3)}
+.aiuta-qualificare .aq-l li.ok .segno{color:var(--verde);font-weight:800}
 .strategia-piede{display:flex;gap:8px;justify-content:flex-end}
 .modi{display:flex;flex-direction:column;gap:8px}
 .btn.modo{justify-content:flex-start;text-align:left;min-height:52px;padding:8px 14px;font-weight:700}

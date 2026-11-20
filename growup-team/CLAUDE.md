@@ -24,6 +24,11 @@
   lavoro proposte dalla mappa (nuove linee frontali, persone da aiutare a fare il Path to Bronze, nuovi in profondità).
   Nella card niente premi, niente cifre in euro, niente proiezioni. Come tornare alla Io di prima:
   `TORNARE-INDIETRO-STRATEGIA.md`.
+  Eccezione voluta da Stefano (20 novembre 2026), accanto a «Come arrivarci»: **«Come aiutarlo a qualificare»** nella scheda
+  partner (si apre toccando una persona nell'elenco delle linee della card «La tua strategia», o dal Gruppo): la strategia
+  calcolata per quella persona con la stessa funzione (`strategia(null, pid)`), solo dai dati della mappa: la sua
+  situazione, la sua prossima tappa vera, cosa manca con i numeri e la strada consigliata con la logica delle caselle. Le
+  caselle salvate da quella persona non si vedono mai (restano solo sue); niente cifre in euro, niente proiezioni.
 - **Versione semplificata per chi inizia**: nei primi 30 giorni del percorso di partenza una parte dell'app si nasconde
   (Verifica, Storico, promemoria dell'import, percorso completo dell'Obiettivo, Gruppo senza partner sotto). La regola sta
   in una sola funzione, `versioneSemplice()` in `app.js`: ogni cosa nuova da nascondere a chi inizia passa da lì. Si

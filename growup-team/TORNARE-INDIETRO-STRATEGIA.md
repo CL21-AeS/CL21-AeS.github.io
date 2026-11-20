@@ -50,8 +50,9 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 | 5 | [#238](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/238) | La festa del Path to Bronze e, dopo, le sue linee nuove come suggerimento; service worker v123 | nessuna | — |
 | 6 | [#239](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/239) | «Cambia» per linea: prima la linea, poi chi aiuti solo tra le persone di quella linea | nessuna | — |
 | 7 | [#241](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/241) | Path to Bronze: contano solo le linee nuove (dal 1° giugno 2026); prossima tappa vera per chi è già oltre | `068_linee_nuove_dal.sql` (solo il valore `linee_nuove_dal` del Path to Bronze) | `supabase/068_linee_nuove_dal_togli.sql` (lo rimette vuoto) |
+| 8 | PR8 | Tutte le linee che seguo nella card e, toccandole, «Come aiutarlo a qualificare» nella scheda partner | nessuna | — |
 
-Per tornare a tutto com'era: «Revert» delle PR dalla 7 alla 1 (o chiedere a Claude di riportare la cartella al tag),
+Per tornare a tutto com'era: «Revert» delle PR dalla 8 alla 1 (o chiedere a Claude di riportare la cartella al tag),
 poi, se si vuole, gli script della 068 e della 067.
 
 Da sapere sulla 068: non crea niente, cambia solo un valore della tabella delle tappe. **Per rimetterlo vuoto** incolla

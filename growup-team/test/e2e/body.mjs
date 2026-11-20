@@ -6822,8 +6822,8 @@ for(const tema of ["light", "dark"]){
 
 // 98. La tua strategia, punto 2: la card in cima a Io e la schermata intera. B (due persone che aiuti e una nuova linea
 //     tratteggiata, con «Lista ›» pesca solo sulla prima), titolo «Fai il tuo Path to Bronze» per chi ha dichiarato meno di
-//     Bronze Foundation; i pallini delle linee nuove e la riga dei 400 VP; la barra delle 4 tappe; le linee (le 3 con più
-//     VP e «altre N»), con la data della mappa; toccandola si apre a schermo intero (Indietro la chiude); «Cambia» e le
+//     Bronze Foundation; i pallini delle linee nuove e la riga dei 400 VP; la barra delle 4 tappe; le linee (dal 20
+//     novembre 2026 tutte quelle che fatturano, sezione 103), con la data della mappa; toccandola si apre a schermo intero (Indietro la chiude); «Cambia» e le
 //     caselle ricordate. C: «Come vuoi lavorare?» con quattro scelte dello stesso peso, «Adatta ai tuoi numeri» su una e
 //     nessuna preselezionata; i titoli secondo le caselle. Argento: niente barra, 5 caselle, in Io le prime 3 e «altre 2».
 //     Senza mappa; il nuovo: niente card durante il percorso, «Ecco la tua strategia» nella festa, poi la card.
@@ -6975,7 +6975,8 @@ for(const tema of ["light", "dark"]){
   await c.locator("button.modo[data-modo=nuove_linee]").click();
   await page.waitForTimeout(200);
   check(await c.locator(".strategia-titolo").textContent() === "Apri nuove linee frontali" && await c.locator(".casella.c-nuova").count() === 3, "titolo: «Apri nuove linee frontali»");
-  check(await c.locator(".linee-strategia li").count() === 3 && (await c.locator(".linee-strategia").textContent()).includes("altre 1"), "strategia: oltre 3 frontali, le 3 con più VP e «altre 1»");
+  check(await c.locator(".linee-strategia li").count() === 4 && !(await c.locator(".linee-strategia .linee-senza").count()),
+    "strategia: tutte le linee frontali che fatturano (4, anche oltre 3), nessuna «senza fatturato» (20 novembre 2026)");
   await c.locator("button[data-act=strategia-cambia]").click();
   await page.locator(".sheet button.modo[data-modo=aiuta]").click();
   await page.click(".sheet form[data-form=strategia] button.primary");
@@ -7471,6 +7472,112 @@ for(const tema of ["light", "dark"]){
   ptbTab.linee_nuove_dal = null;
   DB.traguardiAperti = false;
   check(!errori.length, "Path to Bronze, linee nuove: nessun errore nella pagina");
+  DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
+  DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
+  DB.caselle = (DB.caselle || []).filter(x => !tutti.includes(x.partner_id));
+}
+// 103. Tutte le linee che seguo, con la scheda di ognuno (20 novembre 2026, scelta di Stefano). Nella card «La tua strategia»,
+//      sotto le caselle: tutte le mie linee frontali e le persone in profondità scelte nelle caselle, prima chi fattura e poi
+//      «altre N senza fatturato» chiuse. Toccando una persona si apre la sua scheda con «Come aiutarlo a qualificare»: la
+//      strategia calcolata per lei solo dalla mappa (situazione, prossima tappa vera, cosa manca con i numeri, strada
+//      consigliata). Le caselle salvate da quella persona non si vedono; niente euro, niente proiezioni.
+{
+  const id = n => "a3000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0");
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const ora = new Date().toISOString();
+  const spMese = (m, k) => { const [y, mm] = m.split("-").map(Number), t = y * 12 + mm - 1 + k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, "0")}`; };
+  const mesePrima = spMese(meseOra(), -1);
+  const cod = n => "7930" + String(n).padStart(3, "0");
+  const io = (n, nome, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:"R", stato:"attivo", codice_invito:"LS" + n + "XX", codice_amway:cod(n),
+    chiave:String(n).padStart(2, "0").repeat(16), privacy_accettata_il:quando(-300), confermato_il:ora, partenza_confermata_il:ora, creato_il:quando(-300),
+    ultimo_aggiornamento:ora, data_iscrizione:giorno(-700) }, extra));
+  const sotto = (n, nome, sponsor, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:id(sponsor), stato:"gestito", gestore_id:id(sponsor),
+    codice_invito:"LS" + n + "XX", codice_amway:cod(n), partenza_confermata_il:ora, creato_il:quando(-300), data_iscrizione:giorno(-500) }, extra));
+  const linee = l => l.map(([n, vpg]) => ({ codice:cod(n), vpg }));
+  const tutti = []; for(let n = 10; n <= 60; n++) tutti.push(id(n));
+  // Marta: quattro frontali (Lia e Leo fatturano, Max e Zoe no) e Pino, in profondità nella linea di Lia, in una casella
+  io(10, "Marta Moro");
+  sotto(11, "Lia Lauro", 10); sotto(12, "Leo Larice", 10, { qualifica_iniziale:"foundation_9" }); sotto(13, "Max Mirto", 10); sotto(14, "Zoe Zagara", 10);
+  sotto(21, "Nina Noce", 11); sotto(22, "Olga Olmo", 11); sotto(23, "Pino Pioppo", 21);
+  sotto(31, "Rino Rovo", 12); sotto(32, "Sia Salvia", 12);
+  mappa(id(10), 110, 900, { mese:mesePrima, linee:linee([[11, 500], [12, 300], [13, 0]]) });
+  mappa(id(10), 110, 800, { linee:linee([[11, 450], [12, 250], [13, 0]]) });
+  // Lia: 80 VP personali, una linea attiva il mese scorso (Nina), Olga sotto i 100 VP
+  mappa(id(11), 80, 500, { mese:mesePrima, linee:linee([[21, 300], [22, 40]]) });
+  mappa(id(11), 80, 450, { linee:linee([[21, 270], [22, 60]]) });
+  mappa(id(21), 0, 70, { linee:linee([[23, 70]]) });
+  mappa(id(23), 70, 70);
+  // Leo: Bronze Foundation 9% dichiarata, due linee
+  mappa(id(12), 120, 300, { mese:mesePrima, linee:linee([[31, 150], [32, 60]]) });
+  mappa(id(12), 120, 250, { linee:linee([[31, 150], [32, 40]]) });
+  // le caselle di Marta (una è Pino, in profondità) e quelle di Lia (sue: Marta non le vede mai)
+  DB.caselle = (DB.caselle || []).concat([{ partner_id:id(10), posizione:1, tipo:"aiuta", persona_id:id(11), linea_id:id(11), creato_il:quando(-5) },
+    { partner_id:id(10), posizione:2, tipo:"aiuta", persona_id:id(23), linea_id:id(11), creato_il:quando(-5) },
+    { partner_id:id(10), posizione:3, tipo:"nuova_linea", persona_id:null, linea_id:null, creato_il:quando(-5) },
+    { partner_id:id(11), posizione:1, tipo:"aiuta", persona_id:id(22), linea_id:id(22), creato_il:quando(-5) }]);
+  const apriCome = async n => { const r = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + String(n).padStart(2, "0").repeat(16));
+    await r.page.locator(".testata h1").waitFor(); return r; };
+
+  ({ ctx, page } = await apriCome(10));
+  const card = page.locator("#app .card.strategia");
+  await card.waitFor();
+  const righe = async dove => (await dove.locator(".linee-strategia li").allTextContents()).map(t => t.replace(/\s+/g, " ").trim());
+  let r = await righe(card);
+  check(r.length === 3 && /^Linea 1 · Lia Lauro 450 \/ 100 VP ✓/.test(r[0]) && /^Linea 2 · Leo Larice 250 \/ 100 VP/.test(r[1]) && /^Pino Pioppo · in profondità, linea 1 70 VP/.test(r[2]),
+    "le linee che seguo: prima chi fattura, dal più alto, compresa la persona in profondità della casella (" + r.join(" | ") + ")");
+  const senza = card.locator("button[data-act=linee-senza]");
+  check((await senza.textContent()).replace(/\s+/g, " ").trim().startsWith("altre 2 senza fatturato") && await senza.getAttribute("aria-expanded") === "false",
+    "le linee senza fatturato: «altre 2 senza fatturato», chiuse");
+  await senza.click(); await page.waitForTimeout(200);
+  r = await righe(card);
+  check(r.length === 5 && r.slice(3).some(x => x.includes("Max Mirto")) && r.slice(3).some(x => x.includes("Zoe Zagara")), "toccando «altre 2» si vedono Max e Zoe");
+  check(!/€|euro|arrivi|previst/i.test(await card.textContent()), "le linee che seguo: niente euro, niente proiezioni");
+  await card.scrollIntoViewIfNeeded();
+  await card.screenshot({ path:S + "/e2e/103-linee-seguite-light.png" });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await card.screenshot({ path:S + "/e2e/103-linee-seguite-dark.png" });
+  await page.emulateMedia({ colorScheme:"light" });
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "le linee che seguo a 360 px: la pagina non scorre di lato");
+
+  // Lia: la sua scheda con «Come aiutarlo a qualificare»
+  await card.locator("button.linea-apri", { hasText:"Lia Lauro" }).click();
+  const aq = page.locator("#app .card.aiuta-qualificare");
+  await aq.waitFor();
+  let t = (await aq.innerText()).replace(/\s+/g, " ");
+  check(await page.locator("#app .card h2", { hasText:"Lia Lauro" }).count() === 1 && (await aq.locator(".eyebrow").textContent()) === "Come aiutarlo a qualificare", "toccando Lia si apre la sua scheda con «Come aiutarlo a qualificare» (" + t.slice(0, 60) + ")");
+  check(t.includes("La sua situazione 1 linea attiva (almeno 100 VP)") && t.includes("Prossima tappa Path to Bronze"),
+    "Lia: la sua situazione (1 linea attiva) e la prossima tappa vera (Path to Bronze) (" + t + ")");
+  check(t.includes("VP personali: 80 su 100") && t.includes("linea 1 (Nina Noce): 270 su 100 VP") && t.includes("linea 2 (Olga Olmo): 60 su 100 VP") && t.includes("manca la terza linea"),
+    "Lia: cosa manca con i numeri (VP personali, ogni linea su 100 VP, «manca la terza linea»)");
+  check(t.includes("Aprire con Lia 2 linee nuove frontali") && t.includes("Sponsorizzare in profondità nella sua linea 1 (Nina Noce)"),
+    "Lia: la strada con la logica delle caselle (B: prima le nuove linee, poi in profondità dove chi apre non costruisce)");
+  check(!t.includes("Olga Olmo dentro") && !/Aiutare Olga/.test(t), "Lia: le caselle salvate da Lia non si vedono");
+  check(!/€|euro|arrivi|previst/i.test(t), "«Come aiutarlo a qualificare»: niente euro, niente proiezioni");
+  await aq.scrollIntoViewIfNeeded();
+  await aq.screenshot({ path:S + "/e2e/103-scheda-aiuta-light.png" });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await aq.screenshot({ path:S + "/e2e/103-scheda-aiuta-dark.png" });
+  await page.emulateMedia({ colorScheme:"light" });
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "la scheda a 360 px: la pagina non scorre di lato");
+
+  // Leo: Bronze Foundation 9% dichiarata → prossima tappa vera Bronze Foundation 12%, mai il Path to Bronze
+  r = await page.evaluate(id => { const s = GROWUP_TEST.strategia(null, id); return { tappa:s.tappa && s.tappa.chiave, sit:s.situazione,
+    manca:GROWUP_TEST.mancaQualifica(s).map(x => x.txt), strada:GROWUP_TEST.stradaQualifica(s, "Leo") }; }, id(12));
+  check(r.tappa === "foundation_12" && r.sit === "B", `Leo: prossima tappa vera Bronze Foundation 12% (${JSON.stringify(r)})`);
+  check(r.manca.includes("VP di gruppo: 250 su 2.400") && r.manca.includes("linea 1 (Rino Rovo): 150 su 200 VP") && r.manca.includes("manca la terza linea"),
+    "Leo: cosa manca rispetto a Bronze Foundation 12% («linea 1 (…): 150 su 200 VP», «manca la terza linea»)");
+  // dalla schermata intera: la scheda si apre e il foglio si chiude
+  await page.click("button[data-act=vista-io]");
+  await page.locator("#app .card.strategia .strategia-titolo").click();
+  await page.locator(".sheet .strategia-intera").waitFor();
+  await page.locator(".sheet button.linea-apri", { hasText:"Leo Larice" }).click();
+  await page.locator("#app .card.aiuta-qualificare").waitFor();
+  check(!(await page.locator(".sheet .strategia-intera").count()) && await page.locator("#app .card h2", { hasText:"Leo Larice" }).count() === 1,
+    "dalla schermata intera: toccando Leo si chiude il foglio e si apre la sua scheda");
+  t = (await page.locator("#app .card.aiuta-qualificare").innerText()).replace(/\s+/g, " ");
+  check(t.includes("Prossima tappa Bronze Foundation 12%") && !t.includes("Path to Bronze"), "Leo: nella scheda la tappa vera, mai il Path to Bronze");
+  await ctx.close();
+  check(!errori.length, "le linee che seguo: nessun errore nella pagina");
   DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
   DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
   DB.caselle = (DB.caselle || []).filter(x => !tutti.includes(x.partner_id));
