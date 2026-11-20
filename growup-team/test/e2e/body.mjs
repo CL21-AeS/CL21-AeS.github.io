@@ -6823,7 +6823,7 @@ for(const tema of ["light", "dark"]){
 // 98. La tua strategia, punto 2: la card in cima a Io e la schermata intera. B (due persone che aiuti e una nuova linea
 //     tratteggiata, con «Lista ›» pesca solo sulla prima), titolo «Fai il tuo Path to Bronze» per chi ha dichiarato meno di
 //     Bronze Foundation; i pallini delle linee nuove e la riga dei 400 VP; la barra delle 4 tappe; le linee (dal 20
-//     novembre 2026 tutte quelle che fatturano, sezione 103), con la data della mappa; toccandola si apre a schermo intero (Indietro la chiude); «Cambia» e le
+//     novembre 2026 tutte quelle che fatturano, sezione 103), con la data della mappa; con «Vedi tutto ›» si apre a schermo intero (Indietro la chiude); «Cambia» e le
 //     caselle ricordate. C: «Come vuoi lavorare?» con quattro scelte dello stesso peso, «Adatta ai tuoi numeri» su una e
 //     nessuna preselezionata; i titoli secondo le caselle. Argento: niente barra, 5 caselle, in Io le prime 3 e «altre 2».
 //     Senza mappa; il nuovo: niente card durante il percorso, «Ecco la tua strategia» nella festa, poi la card.
@@ -6906,8 +6906,11 @@ for(const tema of ["light", "dark"]){
   await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
   await page.screenshot({ path:S + "/e2e/98-strategia-b-dark.png", fullPage:false });
   await page.emulateMedia({ colorScheme:"light" });
-  // la schermata intera: toccando la card
-  await card.locator(".strategia-titolo").click();
+  // la schermata intera: con «Vedi tutto ›»
+  // toccando il titolo (il resto della card) non si apre niente; la schermata intera solo con «Vedi tutto ›»
+  await card.locator(".strategia-titolo").click(); await page.waitForTimeout(300);
+  check(!(await page.locator(".sheet .strategia-intera").count()), "toccando il titolo della card non si apre niente (solo «Vedi tutto ›»)");
+  await card.locator("button[data-act=strategia-apri]").click();
   await page.locator(".sheet .strategia-intera").waitFor();
   check(await page.evaluate(() => { const b = document.querySelector(".sheet .sheet-box").getBoundingClientRect(); return b.height >= innerHeight - 2 && b.top <= 1; }),
     "strategia: la schermata intera occupa tutto lo schermo");
@@ -7568,7 +7571,7 @@ for(const tema of ["light", "dark"]){
     "Leo: cosa manca rispetto a Bronze Foundation 12% («linea 1 (…): 150 su 200 VP», «manca la terza linea»)");
   // dalla schermata intera: la scheda si apre e il foglio si chiude
   await page.click("button[data-act=vista-io]");
-  await page.locator("#app .card.strategia .strategia-titolo").click();
+  await page.locator("#app .card.strategia button[data-act=strategia-apri]").click();
   await page.locator(".sheet .strategia-intera").waitFor();
   await page.locator(".sheet button.linea-apri", { hasText:"Leo Larice" }).click();
   await page.locator("#app .card.aiuta-qualificare").waitFor();
@@ -7581,7 +7584,7 @@ for(const tema of ["light", "dark"]){
   for(const intera of [false, true]){
     ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, hasTouch:true, isMobile:true }, "#chiave=" + "10".repeat(16)));
     await page.locator("#app .card.strategia").waitFor();
-    if(intera){ await page.locator("#app .card.strategia .strategia-titolo").tap(); await page.locator(".sheet .strategia-intera").waitFor(); }
+    if(intera){ await page.locator("#app .card.strategia button[data-act=strategia-apri]").tap(); await page.locator(".sheet .strategia-intera").waitFor(); }
     await page.locator(`${intera ? ".sheet" : "#app .card.strategia"} li.casella.c-aiuta`, { hasText:"Pino Pioppo" }).tap();
     await page.locator("#app .card.aiuta-qualificare").waitFor({ timeout:5000 }).catch(() => {});
     check(!(await page.locator(".sheet .strategia-intera").count()) && await page.locator("#app .card h2", { hasText:"Pino Pioppo" }).count() === 1
@@ -7595,7 +7598,7 @@ for(const tema of ["light", "dark"]){
     Object.assign(terza, { tipo, linea_id:tipo === "profondita" ? id(12) : null });
     ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, hasTouch:true, isMobile:true }, "#chiave=" + "10".repeat(16)));
     await page.locator("#app .card.strategia").waitFor();
-    if(intera){ await page.locator("#app .card.strategia .strategia-titolo").tap(); await page.locator(".sheet .strategia-intera").waitFor(); }
+    if(intera){ await page.locator("#app .card.strategia button[data-act=strategia-apri]").tap(); await page.locator(".sheet .strategia-intera").waitFor(); }
     const cas = page.locator(`${intera ? ".sheet" : "#app .card.strategia"} li.casella.${classe}`);
     await cas.locator(".casella-tipo").tap(); await page.waitForTimeout(400);
     const dopo = await page.evaluate(() => ({ vista:GROWUP_TEST.st.vista, sheet:GROWUP_TEST.st.sheet, modifica:!!GROWUP_TEST.st.strategiaModifica }));
