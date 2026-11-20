@@ -55,6 +55,8 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 Per tornare a tutto com'era: «Revert» delle PR dalla 8 alla 1 (o chiedere a Claude di riportare la cartella al tag),
 poi, se si vuole, gli script della 068 e della 067.
 
+La 068 è applicata al database vero dal 20 novembre 2026.
+
 Da sapere sulla 068: non crea niente, cambia solo un valore della tabella delle tappe. **Per rimetterlo vuoto** incolla
 nell'SQL Editor `supabase/068_linee_nuove_dal_togli.sql` (una riga: `update public.stage_requirements set linee_nuove_dal =
 null where chiave = 'path_to_bronze';`). Con il valore vuoto anche l'app della PR 7 conta di nuovo tutte le linee; l'app di

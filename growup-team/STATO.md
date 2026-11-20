@@ -32,7 +32,7 @@ a posto (nessuna lettura nuova dal database, nomi passati da `esc()`).
 - **Migrazione 068** (`supabase/068_linee_nuove_dal.sql`): nella tabella delle tappe `linee_nuove_dal = 2026-06-01` per il
   Path to Bronze. Cambia **solo quel valore** (nessuna tabella, colonna o funzione). Per rimetterlo vuoto (tutte le linee
   contano di nuovo, come prima): `supabase/068_linee_nuove_dal_togli.sql`. Anche in `installa_tutto.sql` e nella versione di
-  prova. **Da applicare al database vero dopo l'unione della PR** (scelta di Stefano), con il connettore o nell'SQL Editor.
+  prova. **Applicata al database vero il 20 novembre 2026**, dopo l'unione della #241 (ok di Stefano), con il connettore: prima il valore era vuoto, dopo è 2026-06-01 (controllato).
 - **Una sola regola, ovunque** (scelta di Stefano): per il Path to Bronze contano solo le linee frontali iscritte da quella
   data (data di ingresso della mappa) con almeno 100 VP; le più vecchie non contano mai, anche se fatturano. Vale per la
   strategia, la festa, la pagina Obiettivo («3 linee frontali nuove (iscritte dal 1 giugno) da almeno 100 VP di gruppo»),
