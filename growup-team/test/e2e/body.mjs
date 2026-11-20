@@ -7589,6 +7589,24 @@ for(const tema of ["light", "dark"]){
       `toccando la casella di Pino ${intera ? "nella schermata intera" : "nella card"} si apre la sua scheda (non la strategia)`);
     await ctx.close();
   }
+  // le caselle da trovare (Nuovo in profondità, Nuova linea frontale): toccandole non si apre niente, solo «Lista ›» funziona
+  const terza = DB.caselle.find(x => x.partner_id === id(10) && x.posizione === 3);
+  for(const [tipo, classe] of [["profondita", "c-profondita"], ["nuova_linea", "c-nuova"]]) for(const intera of [false, true]){
+    Object.assign(terza, { tipo, linea_id:tipo === "profondita" ? id(12) : null });
+    ({ ctx, page } = await apri({ viewport:{ width:360, height:780 }, hasTouch:true, isMobile:true }, "#chiave=" + "10".repeat(16)));
+    await page.locator("#app .card.strategia").waitFor();
+    if(intera){ await page.locator("#app .card.strategia .strategia-titolo").tap(); await page.locator(".sheet .strategia-intera").waitFor(); }
+    const cas = page.locator(`${intera ? ".sheet" : "#app .card.strategia"} li.casella.${classe}`);
+    await cas.locator(".casella-tipo").tap(); await page.waitForTimeout(400);
+    const dopo = await page.evaluate(() => ({ vista:GROWUP_TEST.st.vista, sheet:GROWUP_TEST.st.sheet, modifica:!!GROWUP_TEST.st.strategiaModifica }));
+    check(dopo.vista === "io" && dopo.sheet === (intera ? "strategia" : null) && !dopo.modifica,
+      `toccando la casella «${tipo === "profondita" ? "Nuovo in profondità" : "Nuova linea frontale"}» ${intera ? "nella schermata intera" : "nella card"} non si apre niente (${JSON.stringify(dopo)})`);
+    await cas.locator("button[data-act=strategia-lista]").tap(); await page.waitForTimeout(400);
+    check(await page.evaluate(() => GROWUP_TEST.st.vista === "persone" && GROWUP_TEST.st.sezPersone === "lista"),
+      `«Lista ›» nella casella «${tipo}» ${intera ? "(schermata intera)" : "(card)"} apre la Lista`);
+    await ctx.close();
+  }
+  Object.assign(terza, { tipo:"nuova_linea", linea_id:null });
   check(!errori.length, "le linee che seguo: nessun errore nella pagina");
   DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
   DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));

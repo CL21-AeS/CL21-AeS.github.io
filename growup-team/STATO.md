@@ -3,6 +3,15 @@
 Ultimo aggiornamento: 20 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Correzione: le caselle da trovare non aprono niente (20 novembre 2026, sera, app v127, database non toccato)
+
+Segnalato da Stefano: toccando una casella «Nuovo in profondità» (o «Nuova linea frontale», «Casella libera») si apriva la
+strategia a schermo intero. Scelta di Stefano: toccando quelle caselle **non si apre niente**, funziona solo il loro
+pulsante («Lista ›», «Scegli»). Nella card e nella schermata intera le caselle vuote hanno `data-act="casella-ferma"` (un'azione
+che non fa niente): il tocco non arriva più alla card. Toccando il resto della card (titolo, tappe) si apre ancora la
+strategia a schermo intero, e la casella di una persona apre la sua scheda. Test: sezione 103 (tocco da telefono, nella
+card e nella schermata intera; prima della correzione il test falliva nella card).
+
 ## Correzione: toccando la persona in una casella si apre la sua scheda (20 novembre 2026, sera, app v126, database non toccato)
 
 Segnalato da Stefano: toccando una persona in «La tua strategia» si riapriva la strategia a schermo intero invece della
