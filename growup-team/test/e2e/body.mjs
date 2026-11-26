@@ -8180,6 +8180,52 @@ for(const tema of ["light", "dark"]){
   DB.persone = DB.persone.filter(p => p.proprietario !== "fo107");
 }
 
+// 109. La mia struttura: un solo pulsante «Contrai tutto» / «Espandi tutto» accanto al titolo (26 novembre 2026, richiesta
+//      di Stefano). Contratto: restano solo le linee frontali (con i loro gruppi chiusi); espanso: tutto il gruppo. Usa i rami
+//      chiusi di sempre (st.chiusi). Non va a capo a 360 px; il «?» lo spiega.
+{
+  const id = n => "a4000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0"), ora = new Date().toISOString();
+  DB.partners.push({ id:id(10), nome:"Sergio Struttura", sponsor_id:"R", stato:"attivo", codice_invito:"SS109X", codice_amway:"7960010",
+    chiave:"d9".repeat(16), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, data_iscrizione:"2024-01-10" });
+  const sotto = (n, nome, sp) => DB.partners.push({ id:id(n), nome, sponsor_id:id(sp), stato:"gestito", gestore_id:id(sp), codice_invito:"SS" + n + "XX",
+    codice_amway:"79600" + n, partenza_confermata_il:ora, creato_il:ora, data_iscrizione:"2024-03-01" });
+  sotto(11, "Anna Frontale", 10); sotto(12, "Bruno Frontale", 10); sotto(13, "Carla Frontale", 10);
+  sotto(21, "Dario Sotto", 11); sotto(22, "Elsa Sotto", 21); sotto(23, "Fede Sotto", 12);
+  ({ ctx, page } = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + "d9".repeat(16)));
+  await page.locator(".testata h1").waitFor(); if(await page.locator(".sheet").count()) await page.click(".sheet [data-act=chiudi]").catch(() => {});
+  await page.click("button[data-act=vista-gruppo]");
+  const b = page.locator(".titolo-struttura button[data-act=struttura-tutto]");
+  await b.waitFor();
+  const visibili = async () => (await page.locator(".albero.struttura li.liv:not(.piegato) .nome").allInnerTexts()).map(x => x.split("\n")[0].trim());
+  const geo = await page.evaluate(() => { const r = e => e.getBoundingClientRect(), t = document.querySelector(".titolo-struttura"),
+    e = t.querySelector(".eyebrow"), x = t.querySelector("[data-act=struttura-tutto]");
+    return { stessaRiga:Math.abs((r(e).top + r(e).height / 2) - (r(x).top + r(x).height / 2)) < 12, unaRiga:r(x).height < 48, dentro:r(x).right <= r(t).right + 1 }; });
+  check((await b.innerText()).trim() === "Contrai tutto" && geo.stessaRiga && geo.unaRiga && geo.dentro,
+    `«Contrai tutto» accanto al titolo, su una riga a 360 px (${JSON.stringify(geo)})`);
+  check((await visibili()).length === 7, "all'inizio si vede tutto il gruppo (" + (await visibili()).join(", ") + ")");
+  await page.locator(".card", { has:page.locator(".titolo-struttura") }).screenshot({ path:S + "/e2e/109-contrai-light.png" });
+  await b.click();
+  check(JSON.stringify(await visibili()) === JSON.stringify(["Sergio Struttura", "Anna Frontale", "Bruno Frontale", "Carla Frontale"]),
+    "«Contrai tutto»: restano solo le linee frontali (" + (await visibili()).join(", ") + ")");
+  check((await b.innerText()).trim() === "Espandi tutto" && await b.getAttribute("aria-pressed") === "true", "il pulsante diventa «Espandi tutto»");
+  check(await page.evaluate(() => [...GROWUP_TEST.st.chiusi].length === 2), "usa i rami chiusi di sempre (st.chiusi: le due frontali con un gruppo)");
+  await page.locator(".card", { has:page.locator(".titolo-struttura") }).screenshot({ path:S + "/e2e/109-espandi-light.png" });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await page.locator(".card", { has:page.locator(".titolo-struttura") }).screenshot({ path:S + "/e2e/109-espandi-dark.png" });
+  await page.emulateMedia({ colorScheme:"light" });
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "La mia struttura a 360 px: niente scorrimento di lato");
+  await b.click();
+  check((await visibili()).length === 7 && (await b.innerText()).trim() === "Contrai tutto", "«Espandi tutto»: di nuovo tutto il gruppo");
+  // un ramo chiuso a mano resta compatibile: dopo «Contrai tutto» riaprendo una frontale il pulsante torna «Contrai tutto»
+  await b.click();
+  await page.locator(".albero.struttura li", { hasText:"Anna Frontale" }).locator("button[data-act=piega]").click();
+  check((await visibili()).includes("Dario Sotto") && (await b.innerText()).trim() === "Contrai tutto", "riaperta a mano una frontale: il pulsante torna «Contrai tutto»");
+  await page.locator(".titolo-struttura button[data-act=aiuto]").click();
+  check((await page.locator(".card", { has:page.locator(".titolo-struttura") }).innerText()).includes("«Contrai tutto» lascia solo le tue linee frontali"), "il «?» spiega il pulsante");
+  await ctx.close();
+  DB.partners = DB.partners.filter(p => !String(p.id).startsWith("a4000000"));
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

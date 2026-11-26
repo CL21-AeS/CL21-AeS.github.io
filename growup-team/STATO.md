@@ -3,6 +3,18 @@
 Ultimo aggiornamento: 26 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## La mia struttura: «Contrai tutto» / «Espandi tutto» (26 novembre 2026, richiesta di Stefano, app v131, database non toccato)
+
+- Accanto al titolo «La mia struttura» **un solo pulsante** che alterna «Contrai tutto» (restano visibili solo le linee
+  frontali, con i loro gruppi chiusi) e «Espandi tutto» (tutto il gruppo). Usa i rami chiusi di sempre (`st.chiusi`, azione
+  `struttura-tutto`): dopo «Contrai tutto» ogni ▸ si riapre a mano come prima, e il pulsante torna «Contrai tutto».
+- Le linee frontali sono quelle che si vedono (con le persone nascoste tolte); il pulsante c'è solo se almeno una ha un
+  gruppo, e non con un filtro acceso (elenco senza albero).
+- A 360 px resta su una riga: sulla riga del titolo ci sono solo il titolo, il «?» e il pulsante; «Importa da Amway» sta
+  sotto, a destra (a 360 px andava già a capo lì). Il «?» lo spiega.
+Test: interfaccia sezione 109 (su una riga a 360 px, solo le frontali, «Espandi tutto», un ramo riaperto a mano, il «?»;
+anteprime `e2e/109-*`).
+
 ## I fogli dal basso si chiudono tirando giù (26 novembre 2026, richiesta di Stefano, app v130, database non toccato)
 
 - **Tutti i fogli** che salgono dal basso (`.sheet-box`) hanno in cima una **barretta da afferrare** (`.sheet-maniglia`),
