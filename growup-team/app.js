@@ -2512,6 +2512,7 @@ function vMioMese(){
       ${rigaVp(m)}
       ${nm.mappa && (nm.gruppo > nm.personali || nm.linee.length)
         ? `<div class="spread" style="margin-top:10px"><span>VP di gruppo</span><b class="num">${num(nm.gruppo)}</b></div>` : ""}
+      ${vLineeQualificate(m)}
       <div class="spread" style="margin-top:10px"><span>Nuovi clienti nel mese</span><b class="num">${num(c)}</b></div>
       ${clientiTotali() >= 3 ? "" : `<p class="small" style="margin:4px 0 0">I tuoi primi 3 clienti (anche in mesi diversi) completano la tappa «Primi clienti»: ${num(clientiTotali())} su 3.</p>`}
     </div>` : ""}
@@ -2519,6 +2520,44 @@ function vMioMese(){
   ${vReportDaImportare()}`;
 }
 
+/* «Linee qualificate» in «Il mio mese» (26 novembre 2026, definizione di Stefano): una linea frontale è qualificata quando,
+   nel mese in corso, il volume di tutta la linea arriva ad almeno 10.000 VP, chiunque sia qualificato dentro (frontale o in
+   profondità). I VP sono quelli veri della linea (vpLineaVeri, lo stesso calcolo della «Linea più forte»: la VPG della linea
+   più la VPG di ogni persona al 21% dentro, da st.mesiNove), perché nella mappa Amway una linea con una persona
+   qualificata risulta quasi a 0. Solo il mese in corso, dall'ultima mappa importata del mese; mai da ordini o numeri
+   scritti a mano. Solo per chi ha almeno una linea frontale nella mappa, non nella versione semplificata. */
+const VP_LINEA_QUALIFICATA = 10000;
+function lineeQualificate(m){
+  m = m || meseDi(oggi());
+  const rep = reportMio(m);
+  if(!rep || rep.vpg == null) return { mappa:null, linee:[] };
+  const giu = new Map(), sotto = id => { if(!giu.has(id)) giu.set(id, alberoSotto(id, 0).map(y => y.p.id)); return giu.get(id); };
+  const linee = (Array.isArray(rep.linee) ? rep.linee : []).map(l => {
+    const p = st.struttura.find(x => x.codice_amway === l.codice);
+    return { codice:l.codice, id:p ? p.id : null, nome:p ? p.nome : l.nome || `Codice ${l.codice}`, vp:vpLineaVeri(l.codice, Number(l.vpg) || 0, m, sotto) };
+  });
+  return { mappa:rep, linee:linee.filter(l => l.vp >= VP_LINEA_QUALIFICATA).sort((a, b) => b.vp - a.vp) };
+}
+/* ha almeno una linea frontale in una mappa importata */
+function haLineeInMappa(){ return [...(st.mioReport || new Map()).values()].some(r => Array.isArray(r.linee) && r.linee.length); }
+function vLineeQualificate(m){
+  if(versioneSemplice() || !haLineeInMappa()) return "";
+  const q = lineeQualificate(m), aperto = !!st.qualificateAperte && !!q.mappa;
+  const aiuto = aiutoTesto("linee-qualificate", "Una linea è qualificata quando arriva a 10.000 VP nel mese, contando tutte le persone della linea. "
+    + "Dall'ultima mappa importata: può cambiare fino alla chiusura del mese.");
+  if(!q.mappa) return `<div class="linee-qualificate"><div class="spread" style="margin-top:10px"><span class="con-aiuto"><span>Linee qualificate</span>${aiutoBtn("linee-qualificate")}</span>
+      <span class="small">disponibile dopo l'import della mappa</span></div>${aiuto}</div>`;
+  return `<div class="linee-qualificate"><div class="spread" style="margin-top:10px;gap:6px">
+      <button class="riga-apri qualificate-apri" data-act="apri-qualificate" aria-expanded="${aperto}"><span class="grow"><span>Linee qualificate</span>
+        <span class="small">${esc(testoMappa(m, q.mappa))}</span></span><b class="num">${num(q.linee.length)}</b>
+        <span class="fr" aria-hidden="true">${aperto ? "▴" : "▾"}</span></button>${aiutoBtn("linee-qualificate")}</div>
+    ${aiuto}
+    ${aperto ? q.linee.length ? `<ul class="qualificate-l">${q.linee.map(l => `<li>${l.id
+        ? `<button class="persona" data-act="apri-scheda" data-id="${esc(l.id)}"><span class="grow">${esc(l.nome)}</span><b class="num">${num(l.vp)} VP</b><b aria-hidden="true">›</b></button>`
+        : `<span class="persona"><span class="grow">${esc(l.nome)}</span><b class="num">${num(l.vp)} VP</b></span>`}</li>`).join("")}</ul>`
+      : `<p class="small" style="margin:4px 0 0">Nessuna linea frontale a 10.000 VP in questa mappa.</p>` : ""}</div>`;
+}
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { lineeQualificate, versioneSemplice });
 /* La lista unica di oggi: dalla Lista chi è in ritardo o ha la data oggi, poi i clienti da sentire. Chi ha la data nei
    prossimi giorni o è in corso senza data sta sotto, in una riga che si apre. La prima è «La prossima cosa». */
 function vociOggi(){
@@ -7531,6 +7570,7 @@ Object.assign(AZIONI, {
   "apri-tappa"(){ st.tappaAperta = !st.tappaAperta; render(); },
   "apri-diario"(){ st.diarioAperto = !st.diarioAperto; render(); },
   "apri-mese"(){ st.meseAperto = !st.meseAperto; render(); },
+  "apri-qualificate"(){ st.qualificateAperte = !st.qualificateAperte; render(); },
   "apri-dopo"(){ st.dopoAperto = !st.dopoAperto; render(); },
   /* «La prossima cosa»: Lista → la scheda con «Segna un passo» aperto; cliente → la sua scheda. «Più tardi» → nuova data */
   "prossima-fatto"(el){ const cli = el.dataset.k === "cliente";

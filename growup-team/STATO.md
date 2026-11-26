@@ -3,6 +3,25 @@
 Ultimo aggiornamento: 26 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Io → Il mio mese: «Linee qualificate» nel mese in corso (26 novembre 2026, definizione di Stefano, app v132, database non toccato)
+
+- **Definizione (di Stefano)**: una linea frontale è qualificata quando, nel mese in corso, il volume di tutta la linea arriva
+  ad almeno **10.000 VP**, chiunque sia qualificato dentro (frontale o in profondità). Soglia fissa (`VP_LINEA_QUALIFICATA`).
+- **I VP veri della linea**: nella mappa Amway una linea con dentro una persona al 21% risulta quasi a 0 VP, quindi si usa lo
+  stesso calcolo della «Linea più forte» (`vpLineaVeri`: la VPG della linea più la VPG di ogni persona al 21% dentro la linea,
+  da `st.mesiNove`, le mappe dal 9% in su). Nessun calcolo nuovo: `lineeQualificate()` lo applica alle linee della mappa del
+  mese in corso (`reportMio`). Per il mese in corso i dati ci sono già (le righe al 21% del mese arrivano con l'import).
+- **Dove**: nella parte aperta di «Il mio mese», la riga «**Linee qualificate**» con il numero e la data della mappa
+  («mappa del 26 novembre»); toccandola si vedono le linee frontali qualificate con i loro VP (dalla più alta); toccando un
+  nome si apre la sua scheda. Il «?»: «Una linea è qualificata quando arriva a 10.000 VP nel mese, contando tutte le persone
+  della linea. Dall'ultima mappa importata: può cambiare fino alla chiusura del mese.»
+- Solo dai dati delle mappe importate (mai ordini o numeri scritti a mano). Senza la mappa del mese in corso: «disponibile
+  dopo l'import della mappa». Compare solo per chi ha almeno una linea frontale in una mappa importata, mai nella versione
+  semplificata. C'è anche nella versione di prova (Carla e Bruno Valenti).
+Test: interfaccia sezione 108 (una linea con una persona al 21% in profondità conta 12.200 VP; 10.000 sì, 9.999 no; la frontale
+al 21% una volta sola; numero, data, «?», nomi e VP, il tocco sul nome; mappa del mese assente; senza linee; versione
+semplificata; la prova; anteprime `e2e/108-qualificate-light/dark.png`).
+
 ## La mia struttura: «Contrai tutto» / «Espandi tutto» (26 novembre 2026, richiesta di Stefano, app v131, database non toccato)
 
 - Accanto al titolo «La mia struttura» **un solo pulsante** che alterna «Contrai tutto» (restano visibili solo le linee
