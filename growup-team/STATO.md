@@ -3,6 +3,23 @@
 Ultimo aggiornamento: 26 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## I fogli dal basso si chiudono tirando giù (26 novembre 2026, richiesta di Stefano, app v130, database non toccato)
+
+- **Tutti i fogli** che salgono dal basso (`.sheet-box`) hanno in cima una **barretta da afferrare** (`.sheet-maniglia`),
+  centrata, area da toccare alta 30 px; resta in vista anche quando il foglio scorre.
+- **Tirando giù la barretta**, oppure **il contenuto quando è già in cima**, il foglio segue il dito: lasciato oltre un terzo
+  della sua altezza, o con un gesto veloce verso il basso, si chiude; altrimenti torna su. **Toccare la barretta chiude.**
+  Con il mouse (computer) si trascina la barretta.
+- **Con qualcosa di scritto** nel foglio prima si chiede «**Vuoi uscire senza salvare?**» (la stessa finestra del tasto
+  Indietro, il cui testo ora è questo): «Annulla» lascia il foglio con quello che c'era scritto, «Esci» lo chiude.
+- **Non disturba**: il contenuto non in cima scorre e basta, i movimenti di lato non contano, dai bordi dello schermo (20 px)
+  resta il gesto Indietro di Android e iPhone, il tasto Indietro chiude come prima, i campi (testo, menu) non si trascinano.
+- **Riduci animazioni**: il foglio torna su o si chiude di colpo, senza movimento.
+- Codice: `tiraInizio`, `tiraMuovi`, `tiraFine`, `chiudiFoglioChiedendo` in `app.js` (eventi touch, perché su iPhone il
+  contenuto si trascina solo così; pointer per il mouse).
+Test: interfaccia sezione 107, in Chrome con tocchi veri (come Android) e in **WebKit** (il motore di Safari: come installarlo
+in `test/LEGGIMI.md`, variabile `WEBKIT_PATH`); anteprime `e2e/107-*`. Sezione 78 adattata al nuovo testo della domanda.
+
 ## Avvisi degli appuntamenti con l'ora (26 novembre 2026, richiesta di Stefano, migrazione 069 NON ancora applicata)
 
 - **«Avvisami»** sotto l'ora (agenda di Lista e Clienti, «Prossima cosa» dopo un passo, incontro con lo sponsor): pulsanti

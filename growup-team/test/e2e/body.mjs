@@ -4966,7 +4966,7 @@ for(const tema of ["light", "dark"]){
   check(!(await foglio()) && await page.locator("#app h2", { hasText:"Primo Numero" }).count() === 1, `indietro ${tema}: Indietro chiude il foglio e lascia la scheda aperta`);
   await indietro(0);
   check(await titolo() === "Persone", `indietro ${tema}: il secondo Indietro torna alla Lista`);
-  // campi compilati: «Uscire senza salvare?» (finestra dell'app); con «Annulla» il foglio resta com'era e un altro Indietro
+  // campi compilati: «Vuoi uscire senza salvare?» (finestra dell'app); con «Annulla» il foglio resta com'era e un altro Indietro
   // chiede di nuovo, senza uscire dall'app (sul telefono la finestra di sistema non contava come tocco e Chrome saltava la voce)
   const domanda = page.locator(".domanda-uscita");
   let nativa = 0; page.on("dialog", () => { nativa++; });
@@ -4978,8 +4978,8 @@ for(const tema of ["light", "dark"]){
   await page.goBack({ waitUntil:"commit" }); await aspetta(1);
   await domanda.waitFor();
   check(await foglio() === 1 && await page.inputValue(".sheet input[name=nome]") === "Nome Da Non Perdere"
-    && (await domanda.innerText()).includes("Uscire senza salvare?") && nativa === 0,
-    `indietro ${tema}: con campi compilati chiede «Uscire senza salvare?» nella finestra dell'app`);
+    && (await domanda.innerText()).includes("Vuoi uscire senza salvare?") && nativa === 0,
+    `indietro ${tema}: con campi compilati chiede «Vuoi uscire senza salvare?» nella finestra dell'app`);
   if(tema === "light") await page.screenshot({ path: S + `/e2e/78-uscire-light.png` });
   await domanda.locator("button[data-act=uscita-annulla]").click();
   await aspetta(2);
@@ -7981,6 +7981,203 @@ for(const tema of ["light", "dark"]){
   }
   DB.partners = DB.partners.filter(p => !["av106", "al106", "nu106"].includes(p.id));
   DB.persone = DB.persone.filter(p => !String(p.id).startsWith("a106"));
+}
+
+// 107. I fogli dal basso si chiudono tirando giù (26 novembre 2026, richiesta di Stefano). In cima a ogni foglio la barretta
+//      (area da toccare di almeno 24 px, centrata); tirando giù la barretta, o il contenuto quando è in cima, il foglio segue
+//      il dito: oltre un terzo dell'altezza o con un gesto veloce si chiude, altrimenti torna su; toccare la barretta chiude.
+//      Con qualcosa di scritto prima «Vuoi uscire senza salvare?». Lo scorrimento normale, i movimenti di lato e il gesto
+//      Indietro dai bordi non cambiano. Con «riduci animazioni» niente animazioni. Chrome (tocchi veri, come Android) e
+//      WebKit (come Safari su iPhone, se il motore è installato: WEBKIT_PATH, vedi test/LEGGIMI.md).
+{
+  const ora = new Date().toISOString(), CH = "c7".repeat(16);
+  DB.partners.push({ id:"fo107", nome:"Fabio Fogli", sponsor_id:"R", stato:"attivo", chiave:CH, codice_invito:"FO107X", codice_amway:"7940001",
+    privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, data_iscrizione:"2024-01-10" });
+  DB.persone = (DB.persone || []).concat([{ id:"b1070000-0000-4000-8000-000000000001", proprietario:"fo107", nome:"Tina Tira", fase:"lista", esito:null,
+    creato_il:ora, prossima_data:null, prossima_ora:null, prossima_nota:null, prossima_per:null, prossima_come:null }]);
+  const apriAgenda = async pg => {
+    if(await pg.locator(".sheet").count()) return;
+    await pg.locator(".persone li", { hasText:"Tina Tira" }).locator("button.cal").click();
+    await pg.locator(".sheet h2", { hasText:"In agenda" }).waitFor(); await pg.waitForTimeout(350); };
+  const aperto = pg => pg.locator("#sheet .sheet-box").count();
+  const entra = async (opz, br) => {
+    const r = await apri(Object.assign({ viewport:{ width:360, height:640 }, hasTouch:true, isMobile:true }, opz || {}), "#chiave=" + CH);
+    await r.page.locator(".testata h1").waitFor(); if(await r.page.locator(".sheet").count()) await r.page.click(".sheet [data-act=chiudi]").catch(() => {});
+    await r.page.click("button[data-act=vista-persone]"); await r.page.click("button[data-sez=lista]").catch(() => {});
+    return r; };
+  /* tocchi veri di Chrome (CDP): da (x, y) a (x + dx, y + dy) in n passi, ms tra un passo e l'altro */
+  const trascinaCdp = async (pg, cdp, x, y, dx, dy, n, ms) => {
+    await cdp.send("Input.dispatchTouchEvent", { type:"touchStart", touchPoints:[{ x, y }] });
+    for(let i = 1; i <= n; i++){ await cdp.send("Input.dispatchTouchEvent", { type:"touchMove", touchPoints:[{ x:x + dx * i / n, y:y + dy * i / n }] }); if(ms) await pg.waitForTimeout(ms); }
+    await cdp.send("Input.dispatchTouchEvent", { type:"touchEnd", touchPoints:[] }); await pg.waitForTimeout(350); };
+  const sopra = async (pg, sel) => pg.locator(sel).first().evaluate(e => { const r = e.getBoundingClientRect(); return { x:r.left + r.width / 2, y:r.top + r.height / 2 }; });
+  const altezza = pg => pg.locator("#sheet .sheet-box").evaluate(e => e.offsetHeight);
+
+  ({ ctx, page } = await entra({ reducedMotion:"no-preference" }));
+  const cdp = await ctx.newCDPSession(page);
+  // la barretta in tutti i fogli
+  await apriAgenda(page);
+  const m = await page.locator("#sheet .sheet-maniglia").evaluate(e => { const r = e.getBoundingClientRect(), b = e.closest(".sheet-box").getBoundingClientRect(),
+    i = e.querySelector("i").getBoundingClientRect(); return { h:r.height, centro:Math.abs((i.left + i.width / 2) - (b.left + b.width / 2)), primo:e === e.parentNode.firstElementChild }; });
+  check(m.h >= 24 && m.centro <= 1 && m.primo, `la barretta in cima al foglio, centrata, area alta almeno 24 px (${JSON.stringify(m)})`);
+  await page.locator("#sheet .sheet-box").screenshot({ path:S + "/e2e/107-barretta-light.png" });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await page.locator("#sheet .sheet-box").screenshot({ path:S + "/e2e/107-barretta-dark.png" });
+  await page.emulateMedia({ colorScheme:"light" });
+  // toccare la barretta chiude
+  await page.locator("#sheet .sheet-maniglia").tap(); await page.waitForTimeout(300);
+  check(!(await aperto(page)), "toccare la barretta chiude il foglio");
+  // tirare giù la barretta poco: torna su; oltre un terzo: si chiude
+  await apriAgenda(page);
+  let h = await altezza(page), p0 = await sopra(page, "#sheet .sheet-maniglia");
+  await trascinaCdp(page, cdp, p0.x, p0.y, 0, h * 0.2, 10, 30);
+  check(await aperto(page) && await page.locator("#sheet .sheet-box").evaluate(e => !e.style.transform), "tirata poco (un quinto): il foglio torna su");
+  await cdp.send("Input.dispatchTouchEvent", { type:"touchStart", touchPoints:[{ x:p0.x, y:p0.y }] });
+  for(let i = 1; i <= 8; i++){ await cdp.send("Input.dispatchTouchEvent", { type:"touchMove", touchPoints:[{ x:p0.x, y:p0.y + h * 0.3 * i / 8 }] }); await page.waitForTimeout(30); }
+  const segue = await page.locator("#sheet .sheet-box").evaluate(e => e.getBoundingClientRect().top);
+  await cdp.send("Input.dispatchTouchEvent", { type:"touchEnd", touchPoints:[] }); await page.waitForTimeout(350);
+  check(segue > p0.y + h * 0.15, "mentre si tira, il foglio segue il dito");
+  check(await aperto(page), "lasciato a meno di un terzo: resta aperto");
+  await trascinaCdp(page, cdp, p0.x, p0.y, 0, h * 0.45, 12, 30);
+  check(!(await aperto(page)), "tirata oltre un terzo dell'altezza: il foglio si chiude");
+  // gesto veloce
+  await apriAgenda(page); p0 = await sopra(page, "#sheet .sheet-maniglia");
+  await trascinaCdp(page, cdp, p0.x, p0.y, 0, 90, 3, 10);
+  check(!(await aperto(page)), "gesto veloce verso il basso (90 px): il foglio si chiude");
+  // il contenuto in cima: tirandolo giù si chiude
+  await apriAgenda(page); h = await altezza(page); p0 = await sopra(page, "#sheet .sheet-box h2");
+  await trascinaCdp(page, cdp, p0.x, p0.y, 0, h * 0.45, 12, 30);
+  check(!(await aperto(page)), "contenuto già in cima, tirato giù oltre un terzo: il foglio si chiude");
+  // lo scorrimento normale: verso l'alto scorre, il foglio resta; non in cima, verso il basso scorre e basta
+  await apriAgenda(page); p0 = await sopra(page, "#sheet .sheet-box legend");
+  await trascinaCdp(page, cdp, p0.x, p0.y + 200, 0, -200, 10, 20);
+  const scorso = await page.locator("#sheet .sheet-box").evaluate(e => e.scrollTop);
+  check(await aperto(page) && scorso > 50, `trascinando verso l'alto il foglio scorre e resta aperto (scrollTop ${scorso})`);
+  p0 = await sopra(page, "#sheet .sheet-box legend");
+  await trascinaCdp(page, cdp, 180, 200, 0, 120, 10, 20);
+  const dopo = await page.locator("#sheet .sheet-box").evaluate(e => ({ y:e.scrollTop, t:e.style.transform }));
+  check(await aperto(page) && dopo.y < scorso && !dopo.t, `non in cima: trascinando giù scorre il contenuto, il foglio non si chiude (${JSON.stringify(dopo)})`);
+  await page.locator("#sheet .sheet-box").evaluate(e => { e.scrollTop = 0; });
+  // di lato e dal bordo: niente
+  p0 = await sopra(page, "#sheet .sheet-box h2");
+  await trascinaCdp(page, cdp, 60, p0.y, 200, 40, 10, 20);
+  check(await aperto(page), "un movimento di lato non chiude il foglio");
+  await trascinaCdp(page, cdp, 8, p0.y, 0, 300, 10, 20);
+  check(await aperto(page) && await page.locator("#sheet .sheet-box").evaluate(e => !e.style.transform), "dal bordo sinistro (gesto Indietro del telefono): il foglio non si muove");
+  // Indietro del telefono: chiude come prima
+  await page.goBack(); await page.waitForTimeout(300);
+  check(!(await aperto(page)), "il tasto Indietro del telefono chiude ancora il foglio");
+  // con qualcosa di scritto: prima la domanda
+  await apriAgenda(page);
+  await page.fill("#sheet input[name=nota]", "da ricordare");
+  p0 = await sopra(page, "#sheet .sheet-maniglia"); h = await altezza(page);
+  await trascinaCdp(page, cdp, p0.x, p0.y, 0, h * 0.5, 12, 30);
+  const domanda = page.locator(".domanda-uscita");
+  check(await domanda.count() === 1 && (await domanda.innerText()).includes("Vuoi uscire senza salvare?") && await aperto(page)
+    && await page.locator("#sheet input[name=nota]").inputValue() === "da ricordare", "modulo scritto: «Vuoi uscire senza salvare?» e il foglio resta su con quello che hai scritto");
+  await page.screenshot({ path:S + "/e2e/107-domanda-light.png" });
+  await page.click(".domanda-uscita [data-act=uscita-annulla]");
+  check(await aperto(page) && await page.locator("#sheet input[name=nota]").inputValue() === "da ricordare", "«Annulla»: si resta nel foglio");
+  await page.locator("#sheet .sheet-maniglia").tap(); await page.waitForTimeout(200);
+  check(await domanda.count() === 1, "toccare la barretta con il modulo scritto: anche qui la domanda");
+  await page.click(".domanda-uscita [data-act=uscita-esci]"); await page.waitForTimeout(300);
+  check(!(await aperto(page)), "«Esci»: il foglio si chiude");
+  // con le animazioni: tornando su il foglio si muove
+  await apriAgenda(page); p0 = await sopra(page, "#sheet .sheet-maniglia");
+  await cdp.send("Input.dispatchTouchEvent", { type:"touchStart", touchPoints:[{ x:p0.x, y:p0.y }] });
+  for(let i = 1; i <= 6; i++){ await cdp.send("Input.dispatchTouchEvent", { type:"touchMove", touchPoints:[{ x:p0.x, y:p0.y + 15 * i }] }); await page.waitForTimeout(40); }
+  await cdp.send("Input.dispatchTouchEvent", { type:"touchEnd", touchPoints:[] });
+  check(await page.locator("#sheet .sheet-box").evaluate(e => e.getAnimations().length > 0), "con le animazioni: il foglio torna su con un movimento");
+  await page.waitForTimeout(400);
+  await page.locator("#sheet .sheet-maniglia").tap(); await page.waitForTimeout(300);
+  // tutti i fogli: anche quello del Profilo
+  await page.click("button[data-act=vista-profilo]"); await page.click("button[data-act=avviso-predefinito]");
+  await page.locator(".sheet h2", { hasText:"Avviso predefinito" }).waitFor();
+  check(await page.locator("#sheet .sheet-maniglia").count() === 1, "anche gli altri fogli hanno la barretta (Avviso predefinito)");
+  await ctx.close();
+
+  // «riduci animazioni»: niente animazioni, il foglio torna su o si chiude di colpo
+  ({ ctx, page } = await entra({ reducedMotion:"reduce" }));
+  const cdp2 = await ctx.newCDPSession(page);
+  await apriAgenda(page); p0 = await sopra(page, "#sheet .sheet-maniglia");
+  await cdp2.send("Input.dispatchTouchEvent", { type:"touchStart", touchPoints:[{ x:p0.x, y:p0.y }] });
+  for(let i = 1; i <= 6; i++){ await cdp2.send("Input.dispatchTouchEvent", { type:"touchMove", touchPoints:[{ x:p0.x, y:p0.y + 15 * i }] }); await page.waitForTimeout(40); }
+  await cdp2.send("Input.dispatchTouchEvent", { type:"touchEnd", touchPoints:[] });
+  check(await page.locator("#sheet .sheet-box").evaluate(e => e.getAnimations().length === 0 && !e.style.transform), "riduci animazioni: torna su senza animazione");
+  h = await altezza(page);
+  await trascinaCdp(page, cdp2, p0.x, p0.y, 0, h * 0.5, 10, 20);
+  check(!(await aperto(page)) && !(await page.locator("body > .sheet").count()), "riduci animazioni: si chiude senza il foglio che scende");
+  await ctx.close();
+
+  // con il mouse (computer): si trascina la barretta
+  ({ ctx, page } = await entra({ hasTouch:false, isMobile:false }));
+  await apriAgenda(page); p0 = await sopra(page, "#sheet .sheet-maniglia"); h = await altezza(page);
+  await page.mouse.move(p0.x, p0.y); await page.mouse.down(); await page.mouse.move(p0.x, p0.y + h * 0.5, { steps:12 }); await page.mouse.up(); await page.waitForTimeout(300);
+  check(!(await aperto(page)), "con il mouse: trascinando la barretta il foglio si chiude");
+  await ctx.close();
+
+  // WebKit, come Safari su iPhone (eventi di tocco creati nella pagina: WebKit su Linux non ha i tocchi del telefono)
+  const wkPath = process.env.WEBKIT_PATH || "";
+  if(!wkPath || !fs.existsSync(wkPath)) console.log("ATTENZIONE: WebKit non trovato (WEBKIT_PATH), prova Safari saltata: vedi test/LEGGIMI.md");
+  else {
+    const { webkit } = await import("/opt/node22/lib/node_modules/playwright/index.mjs");
+    const wb = await webkit.launch({ executablePath:wkPath });
+    const wc = await wb.newContext({ viewport:{ width:360, height:640 }, hasTouch:true, isMobile:true, locale:"it-IT", timezoneId:"Europe/Rome", reducedMotion:"reduce" });
+    await wc.route(/cdn\.jsdelivr\.net/, r => r.abort());
+    await wc.route(/challenges\.cloudflare\.com/, r => r.fulfill({ contentType:"text/javascript", body:
+      "window.turnstile={render:function(el,o){el.textContent='captcha';setTimeout(function(){o.callback('tok-prova')},50)}};" }));
+    const wp = await wc.newPage(); const werr = [];
+    wp.on("pageerror", e => werr.push(String(e))); wp.on("dialog", d => d.accept());
+    await wp.addInitScript(([db, mk]) => { window.__DB = db; window.GROWUP_TEST = {}; eval(mk); }, [DB, mock]);
+    await wp.goto(BASE + "#chiave=" + CH); await wp.locator(".testata h1").waitFor();
+    if(await wp.locator(".sheet").count()) await wp.click(".sheet [data-act=chiudi]").catch(() => {});
+    await wp.click("button[data-act=vista-persone]"); await wp.click("button[data-sez=lista]").catch(() => {});
+    const tira = (sel, dx, dy, n, y0) => wp.evaluate(([sel, dx, dy, n, y0]) => new Promise(ok => {
+      const el = document.querySelector(sel), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = y0 != null ? y0 : r.top + r.height / 2;
+      const ev = (tipo, px, py) => { const t = { identifier:1, target:el, clientX:px, clientY:py, pageX:px, pageY:py };
+        const e = new Event(tipo, { bubbles:true, cancelable:true });
+        Object.defineProperty(e, "touches", { value:tipo === "touchend" ? [] : [t] }); Object.defineProperty(e, "changedTouches", { value:[t] });
+        el.dispatchEvent(e); return e.defaultPrevented; };
+      ev("touchstart", x, y); let i = 0, bloccati = 0;
+      const passo = () => { i++; if(ev("touchmove", x + dx * i / n, y + dy * i / n)) bloccati++;
+        if(i < n) setTimeout(passo, 25); else { ev("touchend", x + dx, y + dy); setTimeout(() => ok(bloccati), 250); } };
+      setTimeout(passo, 25); }), [sel, dx, dy, n, y0]);
+    const wAperto = () => wp.locator("#sheet .sheet-box").count();
+    const wAgenda = async () => { await wp.locator(".persone li", { hasText:"Tina Tira" }).locator("button.cal").click(); await wp.locator(".sheet h2", { hasText:"In agenda" }).waitFor(); };
+    await wAgenda();
+    const wm = await wp.locator("#sheet .sheet-maniglia").evaluate(e => e.getBoundingClientRect().height);
+    check(wm >= 24, "Safari (WebKit): la barretta c'è, alta almeno 24 px");
+    const wh = await wp.locator("#sheet .sheet-box").evaluate(e => e.offsetHeight);
+    await tira("#sheet .sheet-maniglia", 0, wh * 0.2, 8);
+    check(await wAperto() === 1, "Safari: tirata poco, il foglio torna su");
+    const bloccati = await tira("#sheet .sheet-maniglia", 0, wh * 0.5, 10);
+    check(!(await wAperto()) && bloccati > 0, "Safari: tirata oltre un terzo, il foglio si chiude (e la pagina sotto non scorre)");
+    await wAgenda();
+    await tira("#sheet .sheet-box h2", 0, wh * 0.5, 10);
+    check(!(await wAperto()), "Safari: il contenuto in cima, tirato giù, chiude il foglio");
+    await wAgenda();
+    await wp.locator("#sheet .sheet-box").evaluate(e => { e.scrollTop = 150; });
+    const nb = await tira("#sheet .sheet-box legend", 0, wh * 0.5, 10);
+    check(await wAperto() === 1 && nb === 0, "Safari: con il contenuto non in cima il gesto è dello scorrimento, il foglio resta");
+    await wp.locator("#sheet .sheet-box").evaluate(e => { e.scrollTop = 0; });
+    await wp.locator("#sheet .sheet-box").evaluate(e => { e.scrollTop = 0; });
+    const bordo = await wp.evaluate(() => new Promise(ok => { const el = document.querySelector("#sheet .sheet-box h2");
+      const ev = (tipo, py) => { const t = { identifier:1, target:el, clientX:6, clientY:py }; const e = new Event(tipo, { bubbles:true, cancelable:true });
+        Object.defineProperty(e, "touches", { value:tipo === "touchend" ? [] : [t] }); Object.defineProperty(e, "changedTouches", { value:[t] }); el.dispatchEvent(e); };
+      ev("touchstart", 150); for(let i = 1; i <= 10; i++) ev("touchmove", 150 + i * 40); ev("touchend", 550); setTimeout(() => ok(!!document.querySelector("#sheet .sheet-box")), 200); }));
+    check(bordo, "Safari: dal bordo sinistro (gesto Indietro) il foglio non si chiude");
+    await wp.fill("#sheet input[name=nota]", "scritto");
+    await tira("#sheet .sheet-maniglia", 0, wh * 0.5, 10);
+    check(await wAperto() === 1 && (await wp.locator(".domanda-uscita").innerText()).includes("Vuoi uscire senza salvare?"), "Safari: modulo scritto, prima la domanda");
+    await wp.click(".domanda-uscita [data-act=uscita-esci]"); await wp.waitForTimeout(200);
+    check(!(await wAperto()), "Safari: «Esci» chiude");
+    await wAgenda();
+    await wp.locator("#sheet .sheet-box").screenshot({ path:S + "/e2e/107-safari-light.png" });
+    check(!werr.length, "Safari: nessun errore (" + werr.slice(0, 2).join(" | ") + ")");
+    await wb.close();
+  }
+  DB.partners = DB.partners.filter(p => p.id !== "fo107");
+  DB.persone = DB.persone.filter(p => p.proprietario !== "fo107");
 }
 
 await browser.close();
