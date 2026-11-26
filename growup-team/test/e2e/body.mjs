@@ -8226,6 +8226,108 @@ for(const tema of ["light", "dark"]){
   DB.partners = DB.partners.filter(p => !String(p.id).startsWith("a4000000"));
 }
 
+// 108. Io → Il mio mese: «Linee qualificate» nel mese in corso (26 novembre 2026, definizione di Stefano). Una linea frontale
+//      è qualificata quando il volume di tutta la linea arriva ad almeno 10.000 VP, con i VP veri (vpLineaVeri: comprese le
+//      persone al 21% in profondità, che Amway toglie dalla VPG della linea), dall'ultima mappa del mese in corso.
+{
+  const id = n => "a3000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0");
+  const ora = new Date().toISOString(), quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const spMese = (m, k) => { const [y, mm] = m.split("-").map(Number), t = y * 12 + mm - 1 + k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, "0")}`; };
+  const mesePrima = spMese(meseOra(), -1), cod = n => "7950" + String(n).padStart(3, "0");
+  const chiave = n => String(n).padStart(2, "0").repeat(16).slice(0, 32).replace(/^../, "e" + String(n % 10));
+  const io = (n, nome, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:"R", stato:"attivo", codice_invito:"LQ" + n + "XX", codice_amway:cod(n),
+    chiave:chiave(n), privacy_accettata_il:quando(-300), confermato_il:ora, partenza_confermata_il:ora, creato_il:quando(-300),
+    ultimo_aggiornamento:ora, data_iscrizione:"2024-02-01" }, extra));
+  const sotto = (n, nome, sponsor) => DB.partners.push({ id:id(n), nome, sponsor_id:id(sponsor), stato:"gestito", gestore_id:id(sponsor),
+    codice_invito:"LQ" + n + "XX", codice_amway:cod(n), partenza_confermata_il:ora, creato_il:quando(-300), data_iscrizione:"2024-03-01" });
+  // Lia: 4 linee frontali. Uno (200 VP nella mappa) ha Dora al 21% in profondità (12.000 VP); Due 9.999; Tre 10.000;
+  // Quattro è lei stessa al 21% (15.000 VP nella sua riga). Sei, nella linea di Due, era al 21% solo il mese scorso.
+  io(10, "Lia Linee");
+  sotto(11, "Uno Linea", 10); sotto(12, "Due Linea", 10); sotto(13, "Tre Linea", 10); sotto(14, "Quattro Linea", 10);
+  sotto(15, "Ezio Mezzo", 11); sotto(16, "Dora Fonda", 15); sotto(17, "Sei Prima", 12);
+  const linee = l => l.map(([n, vpg]) => ({ codice:cod(n), vpg }));
+  mappa(id(10), 120, 35299, { percentuale:21, linee:linee([[11, 200], [12, 9999], [13, 10000], [14, 15000]]) });
+  mappa(id(16), 200, 12000, { percentuale:21 });
+  mappa(id(14), 150, 15000, { percentuale:21 });
+  mappa(id(17), 200, 11000, { mese:mesePrima, percentuale:21 });
+  mappa(id(17), 100, 900, { percentuale:9 });
+  // Max: frontali solo nella mappa del mese scorso
+  io(20, "Max Mancante"); sotto(21, "Una Sola", 20);
+  mappa(id(20), 100, 400, { mese:mesePrima, linee:linee([[21, 300]]) });
+  // Nino: nessuna linea frontale nella mappa
+  io(30, "Nino Niente"); mappa(id(30), 100, 100, { linee:[] });
+  const apriCome = async (n, opz) => { const r = await apri(Object.assign({ viewport:{ width:360, height:780 } }, opz || {}), "#chiave=" + chiave(n));
+    await r.page.locator(".testata h1").waitFor(); if(await r.page.locator(".sheet").count()) await r.page.click(".sheet [data-act=chiudi]").catch(() => {}); return r; };
+  const apriMeseIo = async pg => { await pg.click("button[data-act=vista-io]").catch(() => {}); await apriMese(pg); };
+
+  ({ ctx, page } = await apriCome(10));
+  await page.waitForTimeout(400);
+  const q = await page.evaluate(() => GROWUP_TEST.lineeQualificate().linee.map(l => l.nome + ":" + l.vp));
+  check(JSON.stringify(q) === JSON.stringify(["Quattro Linea:15000", "Uno Linea:12200", "Tre Linea:10000"]),
+    "linee qualificate: la linea con una persona al 21% in profondità conta i VP veri (12.200), 10.000 sì, 9.999 no, la frontale al 21% una volta sola (" + q.join(" | ") + ")");
+  await apriMeseIo(page);
+  const riga = page.locator(".mio-mese .linee-qualificate");
+  const t = (await riga.innerText()).replace(/\s+/g, " ");
+  check(/Linee qualificate mappa (del|dell') .* 3 /.test(t + " "), "Il mio mese: «Linee qualificate» con il numero (3) e la data della mappa (" + t + ")");
+  await riga.locator("button[data-act=aiuto]").click();
+  check((await riga.innerText()).includes("Una linea è qualificata quando arriva a 10.000 VP nel mese, contando tutte le persone della linea. Dall'ultima mappa importata: può cambiare fino alla chiusura del mese."),
+    "il «?» delle linee qualificate");
+  await riga.locator("button[data-act=apri-qualificate]").click();
+  const nomi = (await riga.locator(".qualificate-l li").allInnerTexts()).map(x => x.replace(/\s+/g, " ").trim());
+  check(nomi.length === 3 && nomi[0].startsWith("Quattro Linea 15.000 VP") && nomi[1].startsWith("Uno Linea 12.200 VP") && nomi[2].startsWith("Tre Linea 10.000 VP"),
+    "toccando la riga: i nomi delle linee qualificate con i loro VP (" + nomi.join(" | ") + ")");
+  check(!(await riga.innerText()).includes("Due Linea"), "la linea a 9.999 VP non è qualificata");
+  await page.locator(".mio-mese").screenshot({ path:S + "/e2e/108-qualificate-light.png" });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await page.locator(".mio-mese").screenshot({ path:S + "/e2e/108-qualificate-dark.png" });
+  await page.emulateMedia({ colorScheme:"light" });
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "linee qualificate a 360 px: niente scorrimento di lato");
+  await riga.locator(".qualificate-l button", { hasText:"Uno Linea" }).click();
+  await page.waitForTimeout(300);
+  check(await page.evaluate(id => GROWUP_TEST.st.vista === "scheda" && GROWUP_TEST.st.schedaId === id, id(11)), "toccando un nome si apre la sua scheda");
+  await ctx.close();
+
+  // mappa del mese assente
+  ({ ctx, page } = await apriCome(20));
+  await apriMeseIo(page);
+  check(/^Linee qualificate \?? ?disponibile dopo l'import della mappa$/.test((await page.locator(".mio-mese .linee-qualificate").innerText()).replace(/\s+/g, " ").trim()),
+    "senza la mappa del mese in corso: «disponibile dopo l'import della mappa»");
+  await ctx.close();
+  // nessuna linea frontale nella mappa: niente riga
+  ({ ctx, page } = await apriCome(30));
+  await apriMeseIo(page);
+  check(!(await page.locator(".mio-mese .linee-qualificate").count()), "senza linee frontali nella mappa: niente «Linee qualificate»");
+  await ctx.close();
+  // la versione semplificata (primi 30 giorni del percorso): niente riga
+  DB.partners.find(p => p.id === id(10)).conPercorso = true;
+  Object.assign(DB.partners.find(p => p.id === id(10)), { data_iscrizione:quando(-5).slice(0, 10), privacy_accettata_il:quando(-2), partenza_completata_il:null });
+  DB.conPercorso = true;
+  ({ ctx, page } = await apriCome(10));
+  await page.waitForTimeout(300);
+  const semplice = await page.evaluate(() => GROWUP_TEST.versioneSemplice ? GROWUP_TEST.versioneSemplice() : null);
+  await apriMeseIo(page);
+  check(semplice === true && !(await page.locator(".linee-qualificate").count()), "versione semplificata: niente «Linee qualificate»");
+  await ctx.close();
+  delete DB.conPercorso;
+
+  // la versione di prova: Carla e Bruno Valenti, con un grande gruppo
+  {
+    const c = await browser.newContext({ viewport:{ width:360, height:780 }, locale:"it-IT", timezoneId:"Europe/Rome", reducedMotion:"reduce" });
+    const pg = await c.newPage(); const err = [];
+    pg.on("pageerror", e => err.push(String(e))); pg.on("dialog", d => d.accept());
+    await pg.addLocatorHandler(pg.locator(".festa.traguardo"), async t => { await t.locator("button[data-act=traguardo-chiudi]").click(); });
+    await pg.goto(BASE + "prova/"); await pg.locator(".prova-scelta").waitFor();
+    await pg.click("[data-prova=come][data-k=valenti]"); await pg.locator("button[data-act=vista-io]").waitFor();
+    await pg.click("button[data-act=vista-io]"); await apriMese(pg);
+    const lq = pg.locator(".mio-mese .linee-qualificate");
+    check(await lq.count() === 1 && /Linee qualificate/.test(await lq.innerText()), "prova, Valenti: «Linee qualificate» in «Il mio mese» (" + (await lq.count() ? (await lq.innerText()).replace(/\s+/g, " ") : "niente") + ")");
+    check(!err.length, "prova, linee qualificate: nessun errore (" + err.slice(0, 2).join(" | ") + ")");
+    await c.close();
+  }
+  DB.partners = DB.partners.filter(p => !String(p.id).startsWith("a3000000"));
+  DB.numeri = (DB.numeri || []).filter(x => !String(x.partner_id).startsWith("a3000000"));
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
