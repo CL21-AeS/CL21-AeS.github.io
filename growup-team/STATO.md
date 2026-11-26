@@ -51,7 +51,7 @@ anteprime `e2e/109-*`).
 Test: interfaccia sezione 107, in Chrome con tocchi veri (come Android) e in **WebKit** (il motore di Safari: come installarlo
 in `test/LEGGIMI.md`, variabile `WEBKIT_PATH`); anteprime `e2e/107-*`. Sezione 78 adattata al nuovo testo della domanda.
 
-## Avvisi degli appuntamenti con l'ora (26 novembre 2026, richiesta di Stefano, migrazione 069 NON ancora applicata)
+## Avvisi degli appuntamenti con l'ora (26 novembre 2026, richiesta di Stefano, migrazioni 069 e 069b applicate)
 
 - **«Avvisami»** sotto l'ora (agenda di Lista e Clienti, «Prossima cosa» dopo un passo, incontro con lo sponsor): pulsanti
   grandi All'ora · 15 min · 30 min · 1 ora · Altro; «Altro» apre 5 min · 2 ore · Il giorno prima · Nessun avviso ·
@@ -77,7 +77,14 @@ in `test/LEGGIMI.md`, variabile `WEBKIT_PATH`); anteprime `e2e/107-*`. Sezione 7
   Io con la lista di oggi (`apriDaAvviso`). `./?persona=…` (040) vale ancora per gli avvisi partiti prima.
 - **Il pianificatore** passa da ogni 15 a **ogni 5 minuti** (069b, solo su Supabase, come la 039b). Il riepilogo delle 8:30
   ora ha una finestra di 5 minuti (8:30-8:34): un giro solo, e comunque `notifiche_inviate` non lo ripete.
-- **Database (069, da applicare solo con l'ok di Stefano, prima la 069 e poi la 069b)**: colonne nuove in `persone`
+- **Applicate al database vero il 26 novembre 2026** (ok di Stefano, dopo l'unione delle PR #248-#251), con il connettore:
+  prima la 069 (controllato: 3 colonne in `persone`, 5 in `partners`, i 2 trigger, la funzione nuova, che gli utenti non
+  possono chiamare; la data di salvataggio non si scrive dal telefono; nessun dato cambiato), poi la 069b (il lavoro
+  `growup-notifiche` ora è `*/5 * * * *`, stesso comando). Primo giro dopo la 069: risposta 200 della Edge Function.
+  Da sapere: ogni tanto la Edge Function ci mette più di 5 secondi e il pianificatore smette di aspettare la risposta
+  («Timeout of 5000 ms» in `net._http_response`, 4 volte su 24 già prima della 069); la funzione arriva comunque in fondo,
+  invia e segna le notifiche da sola.
+- **Database (069)**: colonne nuove in `persone`
   (`prossima_avviso`, `prossima_giorno_prima`, `prossima_avviso_dal`) e in `partners` (`incontro_sponsor_ora`,
   `incontro_avviso`, `incontro_avviso_dal`, `avviso_predefinito`, `avviso_piano_ieri`), due trigger, `titolo_avviso`, la
   nuova `notifiche_da_inviare`. RLS invariata: le persone solo il proprietario, la riga del partner solo lui (sponsor e
