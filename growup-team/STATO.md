@@ -1,7 +1,47 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 20 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 26 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
+
+## Avvisi degli appuntamenti con l'ora (26 novembre 2026, richiesta di Stefano, migrazione 069 NON ancora applicata)
+
+- **«Avvisami»** sotto l'ora (agenda di Lista e Clienti, «Prossima cosa» dopo un passo, incontro con lo sponsor): pulsanti
+  grandi All'ora · 15 min · 30 min · 1 ora · Altro; «Altro» apre 5 min · 2 ore · Il giorno prima · Nessun avviso ·
+  Personalizza (numero + minuti/ore/giorni, al massimo 7 giorni). Si vede solo quando c'è l'ora (senza ora nessun avviso).
+  Componenti in `app.js`: `campoAvviso`, `leggiAvviso`, `aggiornaAvvisami`, `testoAvviso`.
+- **Predefiniti nel Profilo**: «Avviso predefinito degli appuntamenti» (all'inizio 30 minuti) e «Avviso il giorno prima per
+  i piani» (acceso). Un appuntamento nuovo parte da lì; uno già salvato riapre con le sue scelte.
+- **Doppio avviso solo per il piano** (`prossima_per = 'piano'`): «Avvisami anche il giorno prima» (acceso all'inizio):
+  il giorno prima alla stessa ora «Domani hai un piano: conferma l'appuntamento.». Mai se l'avviso scelto è già «Il giorno
+  prima».
+- **L'incontro con lo sponsor** ha ora un'**ora facoltativa** (scelta di Stefano del 26 novembre: prima c'era solo il
+  giorno) con «Avvisami» (senza il giorno prima). Testo: «Hai l'incontro con il tuo sponsor. Tocca per aprire il percorso.».
+- **Quando parte** (`notifiche_da_inviare`, 069): mai prima dell'orario scelto, al massimo 5 minuti dopo, una volta sola
+  (`notifiche_inviate`). Un avviso il cui orario è già passato quando si salva non parte (scelta di Stefano del 26
+  novembre, vale per tutti gli avvisi: il database segna quando l'appuntamento è stato salvato, `prossima_avviso_dal` e
+  `incontro_avviso_dal`, con un trigger). Gli appuntamenti salvati prima (colonne vuote) restano a 30 minuti, senza secondo
+  avviso, e la chiave dell'avviso a 30 minuti è quella di prima: un avviso già partito non riparte. Se si cambia ora, tipo o
+  avviso vale l'ultima scelta. Titolo «Growup · alle 10:30», «domani alle 10:30» o «il 3 dicembre alle 10:30»; per
+  «All'ora» il testo è «È l'ora del tuo appuntamento». Sempre senza nomi.
+- **Il tocco sulla notifica**: l'indirizzo ha solo il tipo e l'id interno: `./?apri=contatto&id=…` (scheda del contatto),
+  `./?apri=cliente&id=…` (scheda del cliente), `./?apri=incontro` (il percorso di partenza aperto sulla fase dell'incontro,
+  con «Fase in corso ›» per tornare alla fase attuale; mai la scheda dello sponsor). Se la scheda non c'è più o non è mia:
+  Io con la lista di oggi (`apriDaAvviso`). `./?persona=…` (040) vale ancora per gli avvisi partiti prima.
+- **Il pianificatore** passa da ogni 15 a **ogni 5 minuti** (069b, solo su Supabase, come la 039b). Il riepilogo delle 8:30
+  ora ha una finestra di 5 minuti (8:30-8:34): un giro solo, e comunque `notifiche_inviate` non lo ripete.
+- **Database (069, da applicare solo con l'ok di Stefano, prima la 069 e poi la 069b)**: colonne nuove in `persone`
+  (`prossima_avviso`, `prossima_giorno_prima`, `prossima_avviso_dal`) e in `partners` (`incontro_sponsor_ora`,
+  `incontro_avviso`, `incontro_avviso_dal`, `avviso_predefinito`, `avviso_piano_ieri`), due trigger, `titolo_avviso`, la
+  nuova `notifiche_da_inviare`. RLS invariata: le persone solo il proprietario, la riga del partner solo lui (sponsor e
+  upline non leggono queste colonne). La Edge Function non cambia (nessun nuovo deploy). Per toglierla:
+  `069_avvisi_appuntamenti_togli.sql`. Anche in `installa_tutto.sql` e nella versione di prova.
+- Service worker **v129**. Corretto anche un test dell'interfaccia che negli ultimi 10 giorni del mese trovava due blocchi
+  «Da seguire» (sezione della prova di Giulia).
+Test: `sh test/db.sh` (controlli 069: ogni scelta parte all'orario giusto, non un minuto prima, fino a 5 minuti dopo, una
+volta sola; il doppio avviso solo per il piano e una volta sola; niente doppio negli altri casi; salvato dopo l'orario non
+parte; indirizzi senza nomi; il riepilogo delle 8:30 una volta sola; nessuno cambia le scelte di un altro); interfaccia
+sezione 106 (le scelte, Personalizza, il piano, il Profilo, l'incontro, il tocco per ogni tipo, l'id di un altro partner →
+Io, scheda cancellata → Io, la versione di prova; anteprime `e2e/106-*-light/dark.png`). Revisione di sicurezza: a posto.
 
 ## La prova, «Pronte da guardare»: un grande gruppo e chi ha appena iniziato (20 novembre 2026, richiesta di Stefano, database non toccato)
 
