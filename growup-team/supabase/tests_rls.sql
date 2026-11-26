@@ -1268,6 +1268,8 @@ begin
     perform growup_test.ok((select prossima_per from public.persone where id = pp) = 'fissare_piano', '057: C non cambia l''agenda di B');
     perform growup_test.come(u4);
     execute 'reset role';
+    -- 069: un appuntamento salvato prima della 069 non ha la data di salvataggio (qui si simula, per l'avviso delle 10:00)
+    update public.persone set prossima_avviso_dal = null where id = pp;
     execute 'set local role service_role';
     select titolo, corpo, url into t40, c40, u40 from public.notifiche_da_inviare(alle10) where chiave like 'passo-%';
     n_prima := (select count(*) from public.notifiche_da_inviare(alle10 - interval '15 minutes') where chiave like 'passo-%');
@@ -1281,11 +1283,209 @@ begin
     c41 := (select corpo from public.notifiche_da_inviare(alle10) where chiave like 'passo-%');
     execute 'reset role';
     perform growup_test.ok(t40 = 'Growup · alle 10:30' and c40 like 'Hai un passo da fare con una persona della tua Lista%'
-                           and u40 = './?persona=' || pp and position('Segreto' in c40) = 0, '040: alle 10:00 l''avviso delle 10:30, senza nome');
-    perform growup_test.ok(n_prima = 0 and n_dopo = 0, '040: né 45 minuti prima né 15 minuti prima');
+                           and u40 = './?apri=contatto&id=' || pp and position('Segreto' in c40) = 0, '040: alle 10:00 l''avviso delle 10:30, senza nome');
+    perform growup_test.ok(n_prima = 0 and n_dopo = 0, '040: né 15 minuti prima né 15 minuti dopo l''orario dell''avviso');
     perform growup_test.ok(n_ancora = 0, '040: l''avviso non si manda due volte');
     perform growup_test.ok(c41 like 'Hai un passo da fare con un tuo cliente%', '040: per un cliente «con un tuo cliente»');
     delete from public.persone where id = pp; delete from public.notifiche_telefoni; delete from public.notifiche_inviate;
+  end;
+
+  -- ---- 069: gli avvisi degli appuntamenti con l'ora (Avvisami, il doppio avviso del piano, l'incontro con lo sponsor) ----
+  declare
+    oggi69 date := (now() at time zone 'Europe/Rome')::date;
+    d69 date := oggi69 + 8;             -- il giorno dell'appuntamento: anche l'avviso di 7 giorni prima è nel futuro
+    p69 uuid; q69 uuid; z69 uuid; scelta int; alle69 timestamp; n_giusto int; n_prima int; n_dopo5 int; n_dopo6 int;
+    t69 text; c69 text; u69 text; k69 text;
+    al timestamptz;   -- un orario italiano come timestamptz
+  begin
+    perform growup_test.come(u3);  -- B
+    insert into public.notifiche_telefoni (endpoint, p256dh, auth) values ('https://fcm.googleapis.com/fcm/send/prova-b69', 'chiaveB', 'authB');
+    insert into public.persone (nome, prossima_data, prossima_ora, prossima_per, prossima_avviso)
+      values ('Nome Segreto', d69, time '10:00', 'followup', 30) returning id into p69;
+    perform growup_test.ok((select prossima_avviso = 30 and not prossima_giorno_prima and prossima_avviso_dal is not null
+                              from public.persone where id = p69), '069: B salva l''avviso con l''appuntamento (con la data di salvataggio)');
+    perform growup_test.deve_fallire(format($q$update public.persone set prossima_avviso_dal = now() - interval '1 year' where id = %L$q$, p69),
+                                     '069: la data di salvataggio non si scrive dal telefono');
+    perform growup_test.deve_fallire(format($q$update public.persone set prossima_avviso = 10081 where id = %L$q$, p69), '069: al massimo 7 giorni prima');
+    perform growup_test.deve_fallire(format($q$update public.persone set prossima_avviso = -2 where id = %L$q$, p69), '069: niente valori strani');
+    perform growup_test.come(u4);  -- C, altra linea
+    update public.persone set prossima_avviso = 0, prossima_giorno_prima = true where id = p69;
+    perform growup_test.ok(not exists (select 1 from public.persone where id = p69), '069: C non vede l''appuntamento di B');
+    execute 'reset role';
+    perform growup_test.ok((select prossima_avviso = 30 and not prossima_giorno_prima from public.persone where id = p69), '069: C non cambia l''avviso di B');
+
+    -- ogni scelta: l'avviso parte all'orario giusto, non un minuto prima, fino a 5 minuti dopo, non 6 minuti dopo
+    foreach scelta in array array[0, 5, 15, 30, 60, 120, 1440, 4320, 10080] loop
+      update public.persone set prossima_avviso = scelta where id = p69;
+      delete from public.notifiche_inviate;
+      alle69 := (d69 + time '10:00') - make_interval(mins => scelta);
+      al := alle69 at time zone 'Europe/Rome';
+      execute 'set local role service_role';
+      n_giusto := (select count(*) from public.notifiche_da_inviare(al) where chiave like 'passo-' || p69 || '%');
+      n_prima := (select count(*) from public.notifiche_da_inviare(al - interval '1 minute') where chiave like 'passo-' || p69 || '%');
+      n_dopo5 := (select count(*) from public.notifiche_da_inviare(al + interval '5 minutes') where chiave like 'passo-' || p69 || '%');
+      n_dopo6 := (select count(*) from public.notifiche_da_inviare(al + interval '6 minutes') where chiave like 'passo-' || p69 || '%');
+      select chiave into k69 from public.notifiche_da_inviare(al) where chiave like 'passo-' || p69 || '%';
+      perform public.notifiche_segna(b, k69);
+      n_dopo5 := n_dopo5 + 10 * (select count(*) from public.notifiche_da_inviare(al + interval '5 minutes') where chiave like 'passo-' || p69 || '%');
+      execute 'reset role';
+      perform growup_test.ok(n_giusto = 1 and n_prima = 0 and n_dopo5 = 1 and n_dopo6 = 0,
+        format('069: avviso %s minuti prima: parte alle %s, non prima, al massimo 5 minuti dopo, una volta sola (%s/%s/%s/%s)',
+               scelta, to_char(alle69, 'DD/MM HH24:MI'), n_giusto, n_prima, n_dopo5, n_dopo6));
+    end loop;
+    -- i testi: senza nomi, «È l'ora del tuo appuntamento» all'ora, il giorno nel titolo
+    update public.persone set prossima_avviso = 0 where id = p69;
+    delete from public.notifiche_inviate;
+    execute 'set local role service_role';
+    select titolo, corpo, url into t69, c69, u69 from public.notifiche_da_inviare((d69 + time '10:00') at time zone 'Europe/Rome')
+     where chiave like 'passo-' || p69 || '%';
+    execute 'reset role';
+    perform growup_test.ok(t69 = 'Growup · alle 10:00' and c69 like 'È l''ora del tuo appuntamento%' and u69 = './?apri=contatto&id=' || p69
+                           and position('Segreto' in t69 || c69 || u69) = 0, '069: all''ora «È l''ora del tuo appuntamento», senza nome (' || coalesce(c69, 'niente') || ')');
+    update public.persone set prossima_avviso = 1440 where id = p69;
+    execute 'set local role service_role';
+    select titolo, corpo into t69, c69 from public.notifiche_da_inviare((d69 - 1 + time '10:00') at time zone 'Europe/Rome')
+     where chiave like 'passo-' || p69 || '%';
+    execute 'reset role';
+    perform growup_test.ok(t69 = 'Growup · domani alle 10:00' and c69 like 'Hai un passo da fare con una persona della tua Lista%',
+                           '069: il giorno prima «domani alle 10:00» (' || coalesce(t69, 'niente') || ')');
+    -- nessun avviso
+    update public.persone set prossima_avviso = -1 where id = p69;
+    delete from public.notifiche_inviate;
+    execute 'set local role service_role';
+    n_giusto := (select count(*) from public.notifiche_da_inviare(al) where chiave like '%' || p69 || '%')
+              + (select count(*) from public.notifiche_da_inviare((d69 + time '10:00') at time zone 'Europe/Rome') where chiave like '%' || p69 || '%');
+    execute 'reset role';
+    perform growup_test.ok(n_giusto = 0, '069: «Nessun avviso»: nessuna notifica');
+
+    -- il doppio avviso solo per il piano: il giorno prima alla stessa ora, una volta sola
+    update public.persone set prossima_avviso = 30, prossima_per = 'piano', prossima_giorno_prima = true where id = p69;
+    delete from public.notifiche_inviate;
+    al := (d69 - 1 + time '10:00') at time zone 'Europe/Rome';
+    execute 'set local role service_role';
+    select titolo, corpo, url, chiave into t69, c69, u69, k69 from public.notifiche_da_inviare(al) where chiave like '%' || p69 || '%';
+    n_giusto := (select count(*) from public.notifiche_da_inviare(al) where chiave like '%' || p69 || '%');
+    perform public.notifiche_segna(b, k69);
+    n_dopo5 := (select count(*) from public.notifiche_da_inviare(al + interval '4 minutes') where chiave like '%' || p69 || '%');
+    n_prima := (select count(*) from public.notifiche_da_inviare((d69 + time '09:30') at time zone 'Europe/Rome') where chiave like 'passo-' || p69 || '%');
+    execute 'reset role';
+    perform growup_test.ok(n_giusto = 1 and k69 like 'piano-ieri-%' and t69 = 'Growup · domani alle 10:00'
+                           and c69 = 'Domani hai un piano: conferma l''appuntamento.' and u69 = './?apri=contatto&id=' || p69,
+                           '069: piano: il giorno prima alla stessa ora «Domani hai un piano: conferma l''appuntamento.» (' || coalesce(c69, 'niente') || ')');
+    perform growup_test.ok(n_dopo5 = 0 and n_prima = 1, '069: piano: il secondo avviso una volta sola, e il giorno dopo l''avviso scelto (30 minuti prima)');
+    -- non per gli altri tipi
+    update public.persone set prossima_per = 'followup' where id = p69;
+    delete from public.notifiche_inviate;
+    execute 'set local role service_role';
+    n_giusto := (select count(*) from public.notifiche_da_inviare(al) where chiave like '%' || p69 || '%');
+    execute 'reset role';
+    perform growup_test.ok(n_giusto = 0, '069: il secondo avviso solo per il piano (follow-up: niente il giorno prima)');
+    -- interruttore spento
+    update public.persone set prossima_per = 'piano', prossima_giorno_prima = false where id = p69;
+    execute 'set local role service_role';
+    n_giusto := (select count(*) from public.notifiche_da_inviare(al) where chiave like '%' || p69 || '%');
+    execute 'reset role';
+    perform growup_test.ok(n_giusto = 0, '069: piano con «Avvisami anche il giorno prima» spento: niente il giorno prima');
+    -- avviso scelto «Il giorno prima»: uno solo
+    update public.persone set prossima_giorno_prima = true, prossima_avviso = 1440 where id = p69;
+    execute 'set local role service_role';
+    n_giusto := (select count(*) from public.notifiche_da_inviare(al) where chiave like '%' || p69 || '%');
+    k69 := (select chiave from public.notifiche_da_inviare(al) where chiave like '%' || p69 || '%');
+    execute 'reset role';
+    perform growup_test.ok(n_giusto = 1 and k69 like 'passo-%', '069: avviso «Il giorno prima» su un piano: una notifica sola');
+    -- già passato quando si salva: non parte (il secondo avviso e l'avviso scelto)
+    update public.persone set prossima_avviso = 30 where id = p69;
+    update public.persone set prossima_avviso_dal = al + interval '1 minute' where id = p69;
+    execute 'set local role service_role';
+    n_giusto := (select count(*) from public.notifiche_da_inviare(al + interval '2 minutes') where chiave like '%' || p69 || '%');
+    n_prima := (select count(*) from public.notifiche_da_inviare((d69 + time '09:30') at time zone 'Europe/Rome') where chiave like '%' || p69 || '%');
+    execute 'reset role';
+    perform growup_test.ok(n_giusto = 0 and n_prima = 1, '069: salvato dopo l''orario del giorno prima: il secondo avviso non parte, l''avviso scelto sì');
+    update public.persone set prossima_avviso_dal = (d69 + time '09:31') at time zone 'Europe/Rome' where id = p69;
+    execute 'set local role service_role';
+    n_prima := (select count(*) from public.notifiche_da_inviare((d69 + time '09:32') at time zone 'Europe/Rome') where chiave like '%' || p69 || '%');
+    execute 'reset role';
+    perform growup_test.ok(n_prima = 0, '069: salvato dopo l''orario dell''avviso scelto: non parte');
+    -- cambiare ora o avviso: vale l'ultima scelta, e la data di salvataggio riparte
+    update public.persone set prossima_avviso_dal = now() - interval '1 day' where id = p69;
+    perform growup_test.come(u3);
+    update public.persone set prossima_nota = 'solo la nota' where id = p69;
+    execute 'reset role';
+    perform growup_test.ok((select prossima_avviso_dal = now() - interval '1 day' from public.persone where id = p69), '069: cambiando solo la nota la data di salvataggio resta');
+    perform growup_test.come(u3);
+    update public.persone set prossima_ora = time '11:00' where id = p69;
+    execute 'reset role';
+    perform growup_test.ok((select prossima_avviso_dal = now() from public.persone where id = p69), '069: cambiando l''ora la data di salvataggio riparte');
+    delete from public.notifiche_inviate;
+    execute 'set local role service_role';
+    n_giusto := (select count(*) from public.notifiche_da_inviare((d69 + time '10:30') at time zone 'Europe/Rome') where chiave like 'passo-' || p69 || '%');
+    n_prima := (select count(*) from public.notifiche_da_inviare((d69 + time '09:30') at time zone 'Europe/Rome') where chiave like 'passo-' || p69 || '%');
+    execute 'reset role';
+    perform growup_test.ok(n_giusto = 1 and n_prima = 0, '069: cambiata l''ora, l''avviso segue l''ora nuova');
+    -- un cliente: «con un tuo cliente», indirizzo del cliente
+    update public.persone set esito = 'cliente', prossima_per = 'consegna' where id = p69;
+    execute 'set local role service_role';
+    select corpo, url into c69, u69 from public.notifiche_da_inviare((d69 + time '10:30') at time zone 'Europe/Rome') where chiave like 'passo-' || p69 || '%';
+    execute 'reset role';
+    perform growup_test.ok(c69 like 'Hai un passo da fare con un tuo cliente%' and u69 = './?apri=cliente&id=' || p69, '069: cliente: l''indirizzo apre la scheda del cliente');
+    -- senza ora nessun avviso
+    update public.persone set prossima_ora = null where id = p69;
+    execute 'set local role service_role';
+    n_giusto := (select count(*) from public.notifiche_da_inviare((d69 + time '10:30') at time zone 'Europe/Rome') where chiave like '%' || p69 || '%');
+    execute 'reset role';
+    perform growup_test.ok(n_giusto = 0, '069: senza ora nessun avviso');
+
+    -- le scelte predefinite nel Profilo e l'incontro con lo sponsor: solo il partner stesso
+    perform growup_test.come(u3);  -- B
+    perform growup_test.ok((public.collega_profilo()->>'avviso_predefinito')::int = 30 and (public.collega_profilo()->>'avviso_piano_ieri')::boolean,
+                           '069: all''inizio avviso predefinito 30 minuti e il giorno prima per i piani acceso');
+    update public.partners set avviso_predefinito = 15, avviso_piano_ieri = false,
+                               incontro_sponsor = oggi69 + 2, incontro_sponsor_ora = time '18:00', incontro_avviso = 60 where id = b;
+    perform growup_test.ok((public.collega_profilo()->>'avviso_predefinito')::int = 15 and not (public.collega_profilo()->>'avviso_piano_ieri')::boolean
+                           and public.collega_profilo()->>'incontro_sponsor_ora' = '18:00:00' and (public.collega_profilo()->>'incontro_avviso')::int = 60
+                           and public.collega_profilo()->>'incontro_avviso_dal' is not null,
+                           '069: B sceglie i suoi predefiniti, l''ora e l''avviso del primo incontro');
+    perform growup_test.deve_fallire(format($q$update public.partners set avviso_predefinito = 10081 where id = %L$q$, b), '069: predefinito al massimo 7 giorni');
+    perform growup_test.deve_fallire(format($q$update public.partners set incontro_avviso_dal = now() where id = %L$q$, b), '069: la data di salvataggio dell''incontro non si scrive');
+    perform growup_test.deve_fallire(format($q$select avviso_predefinito from public.partners where id = %L$q$, b), '069: i predefiniti non si leggono dalla tabella (solo dal proprio profilo)');
+    perform growup_test.come(u1);  -- R, upline di B
+    update public.partners set avviso_predefinito = 0, incontro_sponsor_ora = time '07:00', incontro_avviso = -1 where id = b;
+    perform growup_test.come(u4);  -- C, altra linea
+    update public.partners set avviso_predefinito = 0, incontro_sponsor_ora = time '07:00' where id = b;
+    execute 'reset role';
+    perform growup_test.ok((select avviso_predefinito = 15 and incontro_sponsor_ora = time '18:00' and incontro_avviso = 60 from public.partners where id = b),
+                           '069: né l''upline né un''altra linea cambiano le scelte di B');
+    delete from public.notifiche_inviate;
+    execute 'set local role service_role';
+    select titolo, corpo, url into t69, c69, u69 from public.notifiche_da_inviare((oggi69 + 2 + time '17:00') at time zone 'Europe/Rome')
+     where chiave like 'incontro-%' and partner_id = b;
+    n_prima := (select count(*) from public.notifiche_da_inviare((oggi69 + 2 + time '16:59') at time zone 'Europe/Rome') where chiave like 'incontro-%');
+    execute 'reset role';
+    perform growup_test.ok(c69 = 'Hai l''incontro con il tuo sponsor. Tocca per aprire il percorso.' and u69 = './?apri=incontro'
+                           and t69 = public.titolo_avviso(oggi69 + 2, time '18:00', oggi69 + 2) and n_prima = 0,
+                           '069: l''incontro con lo sponsor un''ora prima, senza nomi, apre il percorso (' || coalesce(c69, 'niente') || ')');
+    perform growup_test.come(u3);
+    update public.partners set incontro_sponsor_ora = null where id = b;
+    execute 'reset role';
+    execute 'set local role service_role';
+    n_giusto := (select count(*) from public.notifiche_da_inviare((oggi69 + 2 + time '17:00') at time zone 'Europe/Rome') where chiave like 'incontro-%');
+    execute 'reset role';
+    perform growup_test.ok(n_giusto = 0, '069: incontro senza ora: nessun avviso');
+
+    -- il riepilogo delle 8:30 resta uno solo con il pianificatore ogni 5 minuti
+    perform growup_test.come(u3);
+    insert into public.notifiche_previste (giorno, persone) values (oggi69, 2) on conflict (partner_id, giorno) do update set persone = 2;
+    execute 'reset role';
+    execute 'set local role service_role';
+    n_giusto := (select count(*) from public.notifiche_da_inviare((oggi69 + time '08:30') at time zone 'Europe/Rome') where chiave like 'mattino-%' and partner_id = b);
+    n_dopo5 := (select count(*) from public.notifiche_da_inviare((oggi69 + time '08:35') at time zone 'Europe/Rome') where chiave like 'mattino-%')
+             + (select count(*) from public.notifiche_da_inviare((oggi69 + time '08:40') at time zone 'Europe/Rome') where chiave like 'mattino-%');
+    perform public.notifiche_segna(b, 'mattino-' || oggi69);
+    n_dopo6 := (select count(*) from public.notifiche_da_inviare((oggi69 + time '08:34') at time zone 'Europe/Rome') where chiave like 'mattino-%');
+    execute 'reset role';
+    perform growup_test.ok(n_giusto = 1 and n_dopo5 = 0 and n_dopo6 = 0, '069: il riepilogo delle 8:30 parte una volta sola (giri delle 8:35 e 8:40 vuoti)');
+    delete from public.persone where id = p69; delete from public.notifiche_telefoni; delete from public.notifiche_inviate; delete from public.notifiche_previste;
+    update public.partners set incontro_sponsor = null, incontro_sponsor_ora = null, incontro_avviso = null, avviso_predefinito = 30, avviso_piano_ieri = true where id = b;
   end;
 
   -- ---- 041: si entra solo con un invito personale ----

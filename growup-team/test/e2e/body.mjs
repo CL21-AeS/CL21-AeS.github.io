@@ -6560,7 +6560,8 @@ for(const tema of ["light", "dark"]){
   const seg = await pg.evaluate(() => window.__DB.seguimi.find(x => x.partner_id === "G"));
   check(seg && seg.attivo && seg.condividi, "prova Giulia, due mesi dopo: Seguimi acceso e condiviso");
   /* «Da seguire oggi»: almeno tre motivi diversi */
-  const ds = pg.locator(".card.da-seguire, .ds-blocco"); await ds.waitFor();   // strategia, punto 4: nel binario Persone
+  /* strategia, punto 4: nel binario Persone (negli ultimi 10 giorni del mese c'è anche il blocco del binario Fatturato) */
+  const ds = pg.locator(".card.da-seguire, .ds-blocco").filter({ hasText:"Sara Conti" }); await ds.waitFor();
   const righe = (await ds.locator(".da-seguire-l > li").allInnerTexts()).map(x => x.replace(/\s+/g, " "));
   check(righe.length >= 3 && righe.some(r => r.includes("Sara Conti") && r.includes("Incontro con lo sponsor non ancora fissato"))
     && righe.some(r => r.includes("Paola Greco") && r.includes("Non aggiorna da 9 giorni"))
@@ -7757,6 +7758,231 @@ for(const tema of ["light", "dark"]){
   check(!err.length, "prova, pronte: nessun errore (" + err.slice(0, 2).join(" | ") + ")");
   await c.close();
 }
+// 106. Avvisi degli appuntamenti con l'ora (26 novembre 2026, richiesta di Stefano, migrazione 069). Sotto l'ora «Avvisami»
+//      (All'ora · 15 min · 30 min · 1 ora · Altro → 5 min · 2 ore · Il giorno prima · Nessun avviso · Personalizza, al
+//      massimo 7 giorni), predefinito dal Profilo (all'inizio 30 minuti); solo per il piano «Avvisami anche il giorno prima»
+//      (acceso all'inizio, predefinito dal Profilo). Anche l'incontro con lo sponsor ha l'ora e l'avviso. Il tocco sulla
+//      notifica («?apri=contatto|cliente&id=…», «?apri=incontro») apre la scheda giusta, solo se è mia; altrimenti Io.
+{
+  const ora = new Date().toISOString(), giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+  const CH = "b6".repeat(16), CH2 = "b7".repeat(16), CH3 = "b8".repeat(16);
+  DB.partners.push({ id:"av106", nome:"Ada Avvisi", sponsor_id:"R", stato:"attivo", chiave:CH, codice_invito:"AV106X", codice_amway:"7930001",
+    privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, data_iscrizione:giorno(-400) });
+  DB.partners.push({ id:"al106", nome:"Altro Partner", sponsor_id:"R", stato:"attivo", chiave:CH2, codice_invito:"AL106X", codice_amway:"7930002",
+    privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, data_iscrizione:giorno(-400) });
+  DB.partners.push({ id:"nu106", nome:"Nina Nuova", sponsor_id:"R", stato:"attivo", chiave:CH3, codice_invito:"NU106X", codice_amway:"7930003",
+    data_iscrizione:giorno(-3), privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, conPercorso:true });
+  const P = (id, prop, nome, extra) => Object.assign({ id, proprietario:prop, nome, fase:"lista", esito:null, creato_il:ora, prossima_data:null, prossima_ora:null,
+    prossima_nota:null, prossima_per:null, prossima_come:null }, extra || {});
+  DB.persone = (DB.persone || []).concat([
+    P("a1060000-0000-4000-8000-000000000001", "av106", "Carlo Contatto"),
+    P("a1060000-0000-4000-8000-000000000002", "av106", "Vecchio Appuntamento", { fase:"invitato", prossima_data:giorno(2), prossima_ora:"10:00:00", prossima_per:"piano" }),
+    P("a1060000-0000-4000-8000-000000000003", "av106", "Clara Cliente", { esito:"cliente", fase:"cliente" }),
+    P("a1060000-0000-4000-8000-000000000004", "al106", "Persona Di Altri", { prossima_data:giorno(0), prossima_ora:"18:00:00", prossima_per:"contatto" })]);
+  const [C1, V1, CL1, ALTRI] = [1, 2, 3, 4].map(n => "a1060000-0000-4000-8000-00000000000" + n);
+  const dbP = async (pg, id) => pg.evaluate(id => (window.__DBOUT || window.__DB).persone.find(x => x.id === id), id);
+  const dbPartner = async (pg, id) => pg.evaluate(id => (window.__DBOUT || window.__DB).partners.find(x => x.id === id), id);
+  const entra = async (q, opz) => { const r = await apri(Object.assign({ viewport:{ width:360, height:780 } }, opz || {}), (q || "") + "#chiave=" + CH);
+    await r.page.locator(".testata h1").waitFor(); if(await r.page.locator(".sheet").count()) await r.page.click(".sheet [data-act=chiudi]").catch(() => {}); return r; };
+  const apriAgenda = async (pg, nome) => {
+    await pg.click("button[data-act=vista-persone]"); await pg.click("button[data-sez=lista]").catch(() => {});
+    await pg.locator(".persone li", { hasText:nome }).locator("button.cal").click();
+    await pg.locator(".sheet h2", { hasText:"In agenda" }).waitFor(); };
+  const box = pg => pg.locator(".sheet fieldset.avvisami");
+  const senzaToast = pg => pg.evaluate(() => { const t = document.getElementById("toast"); if(t) t.innerHTML = ""; });
+
+  ({ ctx, page } = await entra());
+  // --- l'agenda: «Avvisami» compare solo con l'ora, 30 minuti all'inizio
+  await apriAgenda(page, "Carlo Contatto");
+  check(await box(page).count() === 1 && !(await box(page).isVisible()), "Avvisami: senza ora non si vede (senza ora nessun avviso)");
+  check(!(await page.locator(".sheet").innerText()).includes("30 minuti prima"), "agenda: il vecchio «Ti avvisiamo 30 minuti prima» non c'è più");
+  await page.check(`.sheet input[name=quando][value="${giorno(1)}"]`, { force:true });
+  await page.fill(".sheet input[name=ora]", "18:30");
+  await box(page).waitFor();
+  check(await box(page).locator("input[name=avviso][value='30']").isChecked(), "Avvisami: all'inizio 30 minuti");
+  check((await box(page).locator(".avvisi-primi").innerText()).replace(/\s+/g, " ").trim() === "All'ora 15 min 30 min 1 ora Altro", "Avvisami: All'ora · 15 min · 30 min · 1 ora · Altro");
+  check(!(await box(page).locator(".avvisi-altri").isVisible()) && !(await box(page).locator(".avviso-ieri").isVisible()), "Altro chiuso; niente «giorno prima» se non è un piano");
+  const alti = await box(page).locator(".avvisi-primi .chip span, .avvisi-primi .avviso-altro").evaluateAll(l => l.map(e => e.getBoundingClientRect()));
+  check(alti.every(r => r.height >= 44) && new Set(alti.map(r => Math.round(r.top))).size === 1, "Avvisami: pulsanti grandi (almeno 44 px) su una riga a 360 px");
+  // Altro: la seconda riga, Personalizza
+  await box(page).locator("button[data-act=avviso-altro]").click();
+  check((await box(page).locator(".avvisi-altri").innerText()).replace(/\s+/g, " ").trim() === "5 min 2 ore Il giorno prima Nessun avviso Personalizza",
+    "Altro: 5 min · 2 ore · Il giorno prima · Nessun avviso · Personalizza");
+  await box(page).locator("input[name=avviso][value=pers]").check({ force:true });
+  check(await box(page).locator(".avviso-pers").isVisible(), "Personalizza: numero e minuti/ore/giorni");
+  await box(page).locator("input[name=avviso_n]").fill("8"); await box(page).locator("select[name=avviso_u]").selectOption("1440");
+  await page.click(".sheet button.primary");
+  await page.locator(".sheet .errore", { hasText:"al massimo 7 giorni" }).waitFor();
+  check(true, "Personalizza: più di 7 giorni non si salva");
+  await box(page).locator("input[name=avviso_n]").fill("3"); await box(page).locator("select[name=avviso_u]").selectOption("60");
+  await page.click(".sheet button.primary"); await page.locator(".sheet").waitFor({ state:"detached" });
+  let x = await dbP(page, C1);
+  check(x.prossima_ora === "18:30" && x.prossima_avviso === 180 && x.prossima_giorno_prima === false, "Personalizza 3 ore: salvato con l'appuntamento (180 minuti, niente giorno prima)");
+  // riaperto: Personalizza con 3 ore
+  await page.locator(".persone li", { hasText:"Carlo Contatto" }).locator("button.cal").click(); await page.locator(".sheet h2", { hasText:"In agenda" }).waitFor();
+  check(await box(page).locator("input[name=avviso][value=pers]").isChecked() && await box(page).locator("input[name=avviso_n]").inputValue() === "3"
+    && await box(page).locator("select[name=avviso_u]").inputValue() === "60" && await box(page).locator(".avvisi-altri").isVisible(), "riaperto: Personalizza, 3 ore");
+  // il piano: l'interruttore del giorno prima, acceso all'inizio
+  await page.check(".sheet input[name=per][value=piano]", { force:true });
+  check(await box(page).locator(".avviso-ieri").isVisible() && await box(page).locator("input[name=avviso_ieri]").isChecked(), "piano: «Avvisami anche il giorno prima», acceso");
+  await box(page).locator("input[name=avviso][value='1440']").check({ force:true });
+  check(!(await box(page).locator(".avviso-ieri").isVisible()), "piano con avviso «Il giorno prima»: niente secondo interruttore");
+  await box(page).locator("input[name=avviso][value='60']").check({ force:true });
+  check(await box(page).locator(".avviso-ieri").isVisible(), "piano con 1 ora: l'interruttore torna");
+  await senzaToast(page);
+  await page.locator(".sheet .sheet-box").screenshot({ path:S + "/e2e/106-agenda-light.png" });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await page.locator(".sheet .sheet-box").screenshot({ path:S + "/e2e/106-agenda-dark.png" });
+  await page.emulateMedia({ colorScheme:"light" });
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "agenda con Avvisami a 360 px: niente scorrimento di lato");
+  await page.click(".sheet button.primary"); await page.locator(".sheet").waitFor({ state:"detached" });
+  x = await dbP(page, C1);
+  check(x.prossima_per === "piano" && x.prossima_avviso === 60 && x.prossima_giorno_prima === true, "piano salvato: 1 ora e il giorno prima");
+  // follow-up: niente giorno prima; Nessun avviso
+  await page.locator(".persone li", { hasText:"Carlo Contatto" }).locator("button.cal").click(); await page.locator(".sheet h2", { hasText:"In agenda" }).waitFor();
+  await page.check(".sheet input[name=per][value=followup]", { force:true });
+  check(!(await box(page).locator(".avviso-ieri").isVisible()), "follow-up: niente «giorno prima»");
+  await box(page).locator("button[data-act=avviso-altro]").isVisible();
+  if(!(await box(page).locator(".avvisi-altri").isVisible())) await box(page).locator("button[data-act=avviso-altro]").click();
+  await box(page).locator("input[name=avviso][value='-1']").check({ force:true });
+  await page.click(".sheet button.primary"); await page.locator(".sheet").waitFor({ state:"detached" });
+  x = await dbP(page, C1);
+  check(x.prossima_per === "followup" && x.prossima_avviso === -1 && x.prossima_giorno_prima === false, "follow-up con «Nessun avviso»: salvato -1, niente giorno prima");
+  // un appuntamento salvato prima della 069: 30 minuti, senza secondo avviso
+  await page.locator(".persone li", { hasText:"Vecchio Appuntamento" }).locator("button.cal").click(); await page.locator(".sheet h2", { hasText:"In agenda" }).waitFor();
+  check(await box(page).isVisible() && await box(page).locator("input[name=avviso][value='30']").isChecked() && !(await box(page).locator("input[name=avviso_ieri]").isChecked()),
+    "appuntamento di prima: 30 minuti e il giorno prima spento");
+  await page.click(".sheet [data-act=chiudi]");
+
+  // --- il Profilo: avviso predefinito e il giorno prima per i piani
+  await page.click("button[data-act=vista-io]");
+  await page.click("[data-act=vista-profilo]");
+  const vp = page.locator("button.voce-profilo[data-act=avviso-predefinito]");
+  check((await vp.innerText()).replace(/\s+/g, " ").includes("Avviso predefinito degli appuntamenti 30 minuti prima"), "Profilo: «Avviso predefinito degli appuntamenti», 30 minuti prima");
+  const ip = page.locator("button.interruttore[data-act=avviso-piano-ieri]");
+  check((await ip.innerText()).includes("Avviso il giorno prima per i piani") && await ip.getAttribute("aria-checked") === "true", "Profilo: «Avviso il giorno prima per i piani», acceso");
+  await senzaToast(page);
+  await page.locator(".card.voci-profilo").screenshot({ path:S + "/e2e/106-profilo-light.png" });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await page.locator(".card.voci-profilo").screenshot({ path:S + "/e2e/106-profilo-dark.png" });
+  await page.emulateMedia({ colorScheme:"light" });
+  await vp.click(); await page.locator(".sheet h2", { hasText:"Avviso predefinito" }).waitFor();
+  check(await box(page).isVisible() && await box(page).locator("input[name=avviso][value='30']").isChecked(), "Profilo: il foglio con le stesse scelte");
+  await box(page).locator("input[name=avviso][value='15']").check({ force:true });
+  await page.click(".sheet button.primary"); await page.locator(".sheet").waitFor({ state:"detached" });
+  await ip.click(); await page.waitForTimeout(200);
+  let pa = await dbPartner(page, "av106");
+  check(pa.avviso_predefinito === 15 && pa.avviso_piano_ieri === false && (await vp.innerText()).includes("15 minuti prima") && await ip.getAttribute("aria-checked") === "false",
+    "Profilo: predefinito 15 minuti, giorno prima per i piani spento (salvati)");
+  // un appuntamento nuovo parte dai predefiniti
+  await page.click("button[data-act=profilo-indietro]").catch(() => {});
+  await page.click("button[data-act=vista-persone]"); await page.click("button[data-sez=clienti]");
+  await page.locator(".persone li", { hasText:"Clara Cliente" }).locator("button.cal").click(); await page.locator(".sheet h2", { hasText:"In agenda" }).waitFor();
+  await page.check(`.sheet input[name=quando][value="${giorno(1)}"]`, { force:true });
+  await page.fill(".sheet input[name=ora]", "11:00");
+  check(await box(page).locator("input[name=avviso][value='15']").isChecked() && !(await box(page).locator(".avviso-ieri").isVisible()), "nuovo appuntamento: parte dal predefinito (15 min); cliente: niente piano");
+  await page.click(".sheet button.primary"); await page.locator(".sheet").waitFor({ state:"detached" });
+  x = await dbP(page, CL1);
+  check(x.prossima_avviso === 15 && x.prossima_ora === "11:00", "cliente: avviso 15 minuti salvato");
+  await page.click("button[data-sez=lista]");
+  await page.locator(".persone li", { hasText:"Carlo Contatto" }).locator("button.cal").click(); await page.locator(".sheet h2", { hasText:"In agenda" }).waitFor();
+  await page.fill(".sheet input[name=ora]", ""); await page.fill(".sheet input[name=ora]", "20:00");
+  await page.check(".sheet input[name=per][value=piano]", { force:true });
+  check(await box(page).locator(".avviso-ieri").isVisible(), "piano: l'interruttore c'è");
+  await page.click(".sheet [data-act=chiudi]");
+  await sync(page); await ctx.close();
+
+  // --- il tocco sulla notifica
+  ({ ctx, page } = await entra("?apri=contatto&id=" + C1));
+  await page.waitForTimeout(300);
+  let s = await page.evaluate(() => ({ v:GROWUP_TEST.st.vista, p:GROWUP_TEST.st.personaId, sez:GROWUP_TEST.st.sezPersone, q:location.search }));
+  check(s.v === "persone" && s.p === "a1060000-0000-4000-8000-000000000001" && s.sez === "lista" && s.q === "", "tocco su un avviso della Lista: si apre la scheda del contatto (e l'indirizzo si pulisce)");
+  check((await page.locator("#app").innerText()).includes("Carlo Contatto"), "la scheda del contatto si vede");
+  await ctx.close();
+  ({ ctx, page } = await entra("?apri=cliente&id=" + CL1));
+  await page.waitForTimeout(300);
+  s = await page.evaluate(() => ({ v:GROWUP_TEST.st.vista, p:GROWUP_TEST.st.personaId, sez:GROWUP_TEST.st.sezPersone }));
+  check(s.v === "persone" && s.p === "a1060000-0000-4000-8000-000000000003" && s.sez === "clienti", "tocco su un avviso di un cliente: la scheda del cliente");
+  await ctx.close();
+  ({ ctx, page } = await entra("?apri=contatto&id=" + ALTRI));
+  await page.waitForTimeout(300);
+  s = await page.evaluate(() => ({ v:GROWUP_TEST.st.vista, p:GROWUP_TEST.st.personaId }));
+  check(s.v === "io" && !s.p && !(await page.locator("#app").innerText()).includes("Persona Di Altri"), "l'id di un contatto di un altro partner non apre niente: Io");
+  await ctx.close();
+  ({ ctx, page } = await entra("?apri=cliente&id=a1060000-0000-4000-8000-0000000000ff"));
+  await page.waitForTimeout(300);
+  s = await page.evaluate(() => ({ v:GROWUP_TEST.st.vista, p:GROWUP_TEST.st.personaId, lista:!!document.querySelector("#app .oggi-lista") }));
+  check(s.v === "io" && !s.p && s.lista, "scheda cancellata: si apre Io con la lista di oggi");
+  await ctx.close();
+  ({ ctx, page } = await entra("?apri=incontro"));
+  await page.waitForTimeout(300);
+  check(await page.evaluate(() => GROWUP_TEST.st.vista === "io" && !GROWUP_TEST.st.percorsoFase), "incontro, a partenza finita: Io");
+  await ctx.close();
+
+  // --- l'incontro con lo sponsor: ora facoltativa e Avvisami; il tocco apre il percorso sulla fase dell'incontro
+  const entraNina = async q => { const r = await apri({ viewport:{ width:360, height:780 } }, (q || "") + "#chiave=" + CH3);
+    await r.page.getByText("Ciao Nina").waitFor(); if(await r.page.locator(".sheet").count()) await r.page.click(".sheet [data-act=chiudi]").catch(() => {}); return r; };
+  ({ ctx, page } = await entraNina());
+  await page.click(".oggi-lista button[data-act=incontro-fissa]");
+  await page.locator(".sheet h2", { hasText:"Il primo incontro con il tuo sponsor" }).waitFor();
+  check(!(await box(page).isVisible()), "incontro: senza ora niente Avvisami");
+  await page.check(`.sheet input[name=quando][value="${giorno(1)}"]`, { force:true });
+  await page.fill(".sheet input[name=ora]", "18:00");
+  await box(page).locator("input[name=avviso][value='60']").check({ force:true });
+  check(!(await box(page).locator(".avviso-ieri").count()), "incontro: niente «giorno prima» (solo per il piano)");
+  await senzaToast(page);
+  await page.locator(".sheet .sheet-box").screenshot({ path:S + "/e2e/106-incontro-light.png" });
+  await page.emulateMedia({ colorScheme:"dark" }); await page.waitForTimeout(100);
+  await page.locator(".sheet .sheet-box").screenshot({ path:S + "/e2e/106-incontro-dark.png" });
+  await page.emulateMedia({ colorScheme:"light" });
+  await page.click(".sheet button.primary");
+  await page.getByText("Primo incontro con lo sponsor: domani alle 18:00").waitFor();
+  pa = await dbPartner(page, "nu106");
+  check(pa.incontro_sponsor === giorno(1) && pa.incontro_sponsor_ora === "18:00" && pa.incontro_avviso === 60, "incontro: giorno, ora e avviso salvati");
+  check((await page.locator(".percorso-l li", { hasText:"Primo incontro" }).innerText()).includes("fissato per domani alle 18:00"), "percorso: «fissato per domani alle 18:00»");
+  await sync(page); await ctx.close();
+  // 30 nomi: la fase in corso diventa il primo ordine; il tocco sull'avviso apre comunque la fase dell'incontro
+  DB.persone = DB.persone.concat(Array.from({ length:30 }, (_, i) => P("nu106n" + i, "nu106", "Nome Nina " + (i + 1))));
+  ({ ctx, page } = await entraNina("?apri=incontro"));
+  await page.waitForTimeout(300);
+  const pc = page.locator(".card.percorso-partenza");
+  check((await pc.locator(".fase-titolo").innerText()).trim() === "Partenza con lo sponsor" && (await pc.innerText()).includes("fissato per domani alle 18:00")
+    && await pc.locator("button[data-act=percorso-fase-corso]").count() === 1, "tocco sull'avviso dell'incontro: il percorso aperto sulla fase dell'incontro");
+  await pc.locator("button[data-act=percorso-fase-corso]").click();
+  check((await pc.locator(".fase-titolo").innerText()).trim() === "Il primo ordine", "«Fase in corso ›» torna al primo ordine");
+  await ctx.close();
+  DB.persone = DB.persone.filter(p => !String(p.id).startsWith("nu106n"));
+
+  // --- la versione di prova: le stesse scelte
+  {
+    const c = await browser.newContext({ viewport:{ width:360, height:780 }, locale:"it-IT", timezoneId:"Europe/Rome", reducedMotion:"reduce" });
+    const pg = await c.newPage(); const err = [];
+    pg.on("pageerror", e => err.push(String(e))); pg.on("dialog", d => d.accept());
+    await pg.addLocatorHandler(pg.locator(".festa.traguardo"), async t => { await t.locator("button[data-act=traguardo-chiudi]").click(); });
+    await pg.goto(BASE + "prova/"); await pg.locator(".prova-scelta").waitFor();
+    await pg.click("[data-prova=come][data-k=giulia]"); await pg.getByText("ti diamo il benvenuto in Growup").waitFor();
+    await pg.click(".prova-barra [data-prova=due-mesi]"); await pg.locator("button[data-act=vista-persone]").waitFor();
+    await pg.click("button[data-act=vista-persone]"); await pg.click("button[data-sez=lista]").catch(() => {});
+    await pg.locator(".persone li button.cal").first().click(); await pg.locator(".sheet h2", { hasText:"In agenda" }).waitFor();
+    await pg.check(".sheet input[name=quando]", { force:true }).catch(() => {});
+    await pg.fill(".sheet input[name=ora]", "19:00");
+    await pg.locator(".sheet fieldset.avvisami").waitFor();
+    await pg.locator(".sheet input[name=avviso][value='15']").check({ force:true });
+    await pg.check(".sheet input[name=per][value=piano]", { force:true });
+    check(await pg.locator(".sheet .avviso-ieri").isVisible(), "prova: Avvisami e il giorno prima per il piano");
+    await pg.click(".sheet button.primary"); await pg.locator(".sheet").waitFor({ state:"detached" });
+    check(await pg.evaluate(() => (window.__DB.persone || []).some(p => p.proprietario === "G" && p.prossima_avviso === 15 && p.prossima_giorno_prima === true)),
+      "prova: l'avviso si salva");
+    await pg.click("button[data-act=vista-io]"); await pg.click("[data-act=vista-profilo]");
+    check(await pg.locator("button[data-act=avviso-predefinito]").count() === 1 && await pg.locator("button[data-act=avviso-piano-ieri]").count() === 1,
+      "prova: nel Profilo le due voci degli avvisi");
+    check(!err.length, "prova, avvisi: nessun errore (" + err.slice(0, 2).join(" | ") + ")");
+    await c.close();
+  }
+  DB.partners = DB.partners.filter(p => !["av106", "al106", "nu106"].includes(p.id));
+  DB.persone = DB.persone.filter(p => !String(p.id).startsWith("a106"));
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

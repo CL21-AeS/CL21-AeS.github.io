@@ -173,7 +173,12 @@
     },
     /* 058-059: le proprie date (punto con l'upline, primo incontro, partenza completata), solo sulla propria riga */
     aggiornaMio: async (pid, campi) => { const p = db.partners.find(x => x.id === pid && pid === (mio() || {}).id);
-      if(p) for(const k of ["punto_upline", "punto_upline_fatto", "incontro_sponsor", "partenza_completata_il"]) if(k in campi) p[k] = campi[k]; salva(); },
+      /* 069: anche l'ora e l'avviso dell'incontro con lo sponsor e le scelte predefinite degli avvisi, con i limiti del database */
+      const avvisoOk = v => v == null || (Number.isInteger(v) && v >= -1 && v <= 10080);
+      if(!avvisoOk(campi.incontro_avviso) || ("avviso_predefinito" in campi && (campi.avviso_predefinito == null || !avvisoOk(campi.avviso_predefinito))))
+        throw new Error("violates check constraint");
+      if(p) for(const k of ["punto_upline", "punto_upline_fatto", "incontro_sponsor", "partenza_completata_il", "incontro_sponsor_ora", "incontro_avviso",
+        "avviso_predefinito", "avviso_piano_ieri"]) if(k in campi) p[k] = campi[k]; salva(); },
     accettaPrivacy: async pid => { const p = db.partners.find(x => x.id === pid); p.privacy_accettata_il = new Date().toISOString(); salva(); },
     obiettivo: async pid => (db.obiettivi || []).find(o => o.partner_id === pid) || null,
     salvaObiettivo: async o => { db.obiettivi = (db.obiettivi || []).filter(x => x.partner_id !== o.partner_id).concat([o]); salva(); },
@@ -446,6 +451,9 @@
       if(campi.prossima_per != null && !["contatto", "contatto_persona", "fissare_piano", "piano", "followup", "consegna", "riordino",
         "come_trovato", "far_provare", "auguri", "altro"].includes(campi.prossima_per)) throw new Error("violates check constraint");
       if(campi.prossima_come != null && !["telefono", "whatsapp", "persona"].includes(campi.prossima_come)) throw new Error("violates check constraint");
+      /* 069: l'avviso al massimo 7 giorni prima (-1 = nessun avviso) */
+      if(campi.prossima_avviso != null && !(Number.isInteger(campi.prossima_avviso) && campi.prossima_avviso >= -1 && campi.prossima_avviso <= 10080))
+        throw new Error("violates check constraint");
       if(x) Object.assign(x, campi); salva(); },
     cancellaPersona: async id => { db.persone = db.persone.filter(y => !(y.id === id && y.proprietario === mio().id));
       db.passi = (db.passi || []).filter(y => y.persona_id !== id);

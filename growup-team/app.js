@@ -983,11 +983,12 @@ async function vaiHome(profilo){
   if(st.fase === "home") setTimeout(avvisoTuttaApp, 0);
   if(st.fase === "home") statoNotifiche().then(() => { render(); aggiornaPreviste(); });
   /* la scorciatoia sull'icona (pressione lunga): «Importa da Amway» */
-  /* il tocco sull'avviso del prossimo passo (040): apre la scheda della persona, nella Lista o nei Clienti */
-  const daNotifica = (location.search.match(/[?&]persona=([0-9a-f-]{36})/) || [])[1];
-  if(st.fase === "home" && daNotifica){
-    const p = (st.persone || []).find(x => x.id === daNotifica);
-    if(p){ st.vista = "persone"; st.sezPersone = p.esito === "cliente" ? "clienti" : "lista"; st.invitoId = null; st.personaId = p.id; }
+  /* il tocco sugli avvisi degli appuntamenti (069): «./?apri=contatto|cliente&id=<id>» apre la scheda della persona, solo
+     se è mia; «./?apri=incontro» il percorso di partenza sulla fase dell'incontro con lo sponsor; se non si può aprire, Io
+     con la lista di oggi. «./?persona=<id>» (040) vale ancora per gli avvisi partiti prima della 069. */
+  const qs = new URLSearchParams(location.search), apri = qs.get("apri") || (qs.has("persona") ? "persona" : "");
+  if(apri){
+    if(st.fase === "home") apriDaAvviso(apri, qs.get("id") || qs.get("persona"));
     try{ history.replaceState(null, "", location.pathname + location.hash); }catch(e){}
   }
   /* 065: il tocco sugli avvisi del gruppo (nuovo entrato, al suo posto nella mappa, fasi del percorso): «./?partner=<id>»
@@ -1193,7 +1194,23 @@ function render(){
   /* 065: aperto dal tocco su un avviso, la scheda non si poteva aprire: si va a «I tuoi nuovi in partenza» */
   if(st.vaiNuoviPartenza && st.vista === "gruppo"){ st.vaiNuoviPartenza = false;
     const np = document.querySelector(".card.nuovi-partenza"); if(np) np.scrollIntoView({ block:"start" }); }
+  /* 069: aperto dal tocco su un avviso: il percorso sulla fase dell'incontro, o la lista di oggi */
+  if(st.scorriA && st.vista === "io"){ const q = st.scorriA; st.scorriA = null;
+    const el = document.querySelector("#app " + q); if(el) el.scrollIntoView({ block:"start" }); }
 }
+/* 069: dove porta il tocco su un avviso di appuntamento (solo il tipo e l'id interno nell'indirizzo) */
+function apriDaAvviso(tipo, id){
+  st.sheet = null; st.invitoId = null; st.target = null;
+  if(tipo === "incontro" && percorsoAttivo()){
+    st.vista = "io"; st.sezIo = "giorno"; st.personaId = null; st.percorsoFase = "sponsor"; st.scorriA = ".percorso-partenza"; return;
+  }
+  if(["contatto", "cliente", "persona"].includes(tipo) && /^[0-9a-f-]{36}$/.test(id || "")){
+    const p = (st.persone || []).find(x => x.id === id && (!x.proprietario || x.proprietario === st.profilo.id));
+    if(p){ st.vista = "persone"; st.sezPersone = p.esito === "cliente" ? "clienti" : "lista"; st.personaId = p.id; return; }
+  }
+  st.vista = "io"; st.sezIo = "giorno"; st.personaId = null; st.scorriA = ".oggi-lista";
+}
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { apriDaAvviso });
 /* le righe di filtri che scorrono di lato: il filtro acceso resta sempre in vista (anche dopo un ridisegno) */
 function filtroInVista(){
   document.querySelectorAll("#app .filtri").forEach(f => {
@@ -1508,6 +1525,7 @@ function vProfilo(){
   ${vSeguimiProfilo()}
   <div class="card voci-profilo">
     ${vNotificheProfilo()}
+    ${vAvvisiProfilo()}
     ${voce("mia-chiave", "Il mio link personale")}
     ${puoInstallare() && leggiLocale(CHIAVE_INSTALLA_NO) === "1" ? voce("installa-si", "Installa l'app") : ""}
     ${ppNascosti ? voce("primi-passi-si", "Mostra di nuovo i Primi passi") : ""}
@@ -1715,7 +1733,7 @@ function vDomandaNotifiche(){
     <h3 style="margin-top:4px">Vuoi un promemoria ogni mattina?</h3>
     <p class="small" style="margin:6px 0 0">${iosSenzaHome()
       ? "Su iPhone le notifiche arrivano solo con Growup installata sulla Home (e iOS 16.4 o più). Installala, poi attivale dal Profilo."
-      : "Alle 8:30 ti diciamo cosa c'è da fare oggi, e 30 minuti prima di un passo con l'ora ti avvisiamo. Senza nomi. Le spegni quando vuoi dal Profilo."}</p>
+      : "Alle 8:30 ti diciamo cosa c'è da fare oggi, e prima di un passo con l'ora ti avvisiamo (di solito 30 minuti prima: lo scegli tu). Senza nomi. Le spegni quando vuoi dal Profilo."}</p>
     <div class="row" style="gap:8px;margin-top:10px">${iosSenzaHome()
       ? `<button class="btn grow" data-act="notifiche-no">Ho capito</button>`
       : `<button class="btn primary grow" data-act="notifiche-si">Sì, attiva</button><button class="btn grow" data-act="notifiche-no">Non ora</button>`}</div>
@@ -1746,6 +1764,25 @@ function vNotificheProfilo(){
       : negato ? "Bloccate dalle impostazioni del telefono: permettile da lì" : "Ogni mattina alle 8:30 e prima dei passi con l'ora"}</span></span>
     <span class="toggle${on ? " on" : ""}" aria-hidden="true"></span></button>
   ${on ? `<button class="voce-profilo" data-act="notifiche-prova"><span class="grow">Manda una notifica di prova</span><span class="fr" aria-hidden="true">›</span></button>` : ""}`;
+}
+/* 069: le scelte predefinite degli avvisi degli appuntamenti (partners.avviso_predefinito, avviso_piano_ieri) */
+function vAvvisiProfilo(){
+  const ieri = pianoIeriPredefinito();
+  return `<button class="voce-profilo" data-act="avviso-predefinito"><span class="grow">Avviso predefinito degli appuntamenti<br>
+      <span class="small">${esc(testoAvviso(avvisoPredefinito()))}</span></span><span class="fr" aria-hidden="true">›</span></button>
+    <button class="interruttore avviso-piano-ieri" role="switch" aria-checked="${ieri}" data-act="avviso-piano-ieri">
+      <span class="grow" style="text-align:left">Avviso il giorno prima per i piani<br><span class="small">Alla stessa ora: «Domani hai un piano: conferma l'appuntamento.»</span></span>
+      <span class="toggle${ieri ? " on" : ""}" aria-hidden="true"></span></button>`;
+}
+function vSheetAvvisoPredefinito(s){
+  if(s !== "avviso-predefinito") return "";
+  return `<h2>Avviso predefinito degli appuntamenti</h2>
+    <p class="small">Quando metti l'ora a un appuntamento, l'avviso parte da qui. Puoi cambiarlo ogni volta sotto l'ora.</p>
+    <form data-form="avviso-predefinito" novalidate>
+      ${campoAvviso({ valore:avvisoPredefinito() })}
+      ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
+      <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button><button class="btn primary grow">Salva</button></div>
+    </form>`;
 }
 /* i numeri dei prossimi 14 giorni per il riepilogo del mattino: solo numeri, mai nomi */
 let ultimePreviste = "", previsteT = null;
@@ -2322,14 +2359,18 @@ function faseInCorso(fasi){
 const SOLO_MAPPA = "Manca solo la mappa del primo ordine";
 const rigaAttesa = () => `<p class="ordine-attesa"><span class="segno-attesa" aria-hidden="true">!</span><span><b>Ordine confermato</b> · in attesa della mappa</span></p>`;
 function vPercorso(){
-  const x = fasiPercorso(), f = x.fasi[x.qui], p = st.profilo;
+  const x = fasiPercorso(), p = st.profilo;
+  /* 069: dal tocco sull'avviso dell'incontro si vede la fase dell'incontro, anche se quella in corso è un'altra */
+  const vista = st.percorsoFase ? x.fasi.findIndex(y => y.k === st.percorsoFase) : -1;
+  const f = x.fasi[vista >= 0 ? vista : x.qui], altra = vista >= 0 && vista !== x.qui;
   const riga = (ok, titolo, sotto, extra) => `<li class="${ok ? "fatto" : ""}"><span class="segno" aria-hidden="true">${ok ? "✓" : ""}</span>
     <span class="grow"><b>${titolo}</b>${sotto ? `<br><span class="small">${sotto}</span>` : ""}</span>${extra || ""}</li>`;
   const entro = piuGiorni(String(p.privacy_accettata_il || p.creato_il || oggi()).slice(0, 10), ORE_NOMI / 24);
   let corpo = "";
   if(f.k === "sponsor") corpo = `<ul class="percorso-l">
       ${(() => { const d = p.incontro_sponsor ? String(p.incontro_sponsor).slice(0, 10) : "", fatto = giornoFatto(d);
-        return riga(fatto, "Primo incontro con il tuo sponsor", fatto ? `fatto ${esc(dataIt(d))}` : d ? `fissato per ${esc(riassuntoAgenda(d))}` : "data da fissare",
+        const ora = p.incontro_sponsor_ora ? String(p.incontro_sponsor_ora).slice(0, 5) : null;
+        return riga(fatto, "Primo incontro con il tuo sponsor", fatto ? `fatto ${esc(dataIt(d))}` : d ? `fissato per ${esc(riassuntoAgenda(d, ora))}` : "data da fissare",
           fatto ? "" : `<button class="btn small" data-act="incontro-fissa">${d ? "Cambia" : "Fissa ›"}</button>`); })()}
       ${riga(x.nomi >= NOMI_PARTENZA, `${NOMI_PARTENZA} nomi nella Lista`, `${num(Math.min(x.nomi, NOMI_PARTENZA))} / ${NOMI_PARTENZA}${x.nomi < NOMI_PARTENZA ? ` · entro ${esc(riassuntoAgenda(entro < oggi() ? oggi() : entro))}` : ""}`,
         x.nomi < NOMI_PARTENZA ? `<button class="btn small" data-act="guida-vai" data-dove="lista">Lista ›</button>` : "")}</ul>`;
@@ -2353,7 +2394,8 @@ function vPercorso(){
     <div class="spread"><span class="eyebrow">Percorso di partenza</span><span class="small">Fase ${x.qui + 1} di ${x.fasi.length}</span></div>
     <ol class="fasi" aria-label="Le fasi del percorso">${x.fasi.map((y, i) => `<li class="${y.fatto ? "fatta" : i === x.qui ? "qui" : y.attesa ? "attesa" : "poi"}${!y.fatto && y.attesa ? " con-attesa" : ""}"><i></i>
       <span>${!y.fatto && y.attesa ? `<span class="segno-attesa piccolo" aria-label="in attesa della mappa">!</span> ` : i > x.qui && !y.fatto ? `<span class="lucchetto" aria-label="non ancora">🔒</span> ` : ""}${esc(y.nome)}</span></li>`).join("")}</ol>
-    <div class="spread"><h3 class="fase-titolo">${esc(f.titolo)}</h3>${f.k === "binari" ? fatto : ""}</div>
+    <div class="spread"><h3 class="fase-titolo">${esc(f.titolo)}</h3>${f.k === "binari" ? fatto : ""}${altra
+      ? `<button class="btn link small" data-act="percorso-fase-corso">Fase in corso ›</button>` : ""}</div>
     ${corpo}
   </div>`;
 }
@@ -4014,7 +4056,7 @@ function toastImport(e){
 /* ---- 10. Fogli in basso ---- */
 function vSheet(){
   const s = st.sheet;
-  const sp = vSheetAgenda(s) || vSheetIncontro(s) || vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s) || vSheetListino(s) || vSheetMiei(s) || vSheetGuida(s) || vSheetStrategia(s);
+  const sp = vSheetAgenda(s) || vSheetIncontro(s) || vSheetAvvisoPredefinito(s) || vSheetPersone(s) || vSheetTarget(s) || vSheetClienti(s) || vSheetOrdiniAmway(s) || vSheetListino(s) || vSheetMiei(s) || vSheetGuida(s) || vSheetStrategia(s);
   if(sp) return sp;
   if(s === "codici-tolti") return `<h2>Codici Amway tolti</h2>
     <p class="small">Le persone tolte dalla struttura prima della conferma: con questi codici non si entra finché non li sblocchi.</p>
@@ -5006,20 +5048,126 @@ function vNumeriLista(pid){
 function opzioni(nome, valori, scelto){
   return `<div class="opzioni">${valori.map(v => `<label class="chip"><input type="radio" name="${nome}" value="${esc(v)}"${v === scelto ? " checked" : ""}><span>${esc(v)}</span></label>`).join("")}</div>`;
 }
-function campiProssima(titolo, p){
+/* ---- «Avvisami» (069, 26 novembre 2026, scelta di Stefano): sotto l'ora di un appuntamento si sceglie quando arriva la
+   notifica. Le scelte si salvano con l'appuntamento (persone.prossima_avviso, partners.incontro_avviso: minuti prima,
+   0 = all'ora, -1 = nessun avviso, al massimo 7 giorni). Predefinito: quello del Profilo (partners.avviso_predefinito,
+   all'inizio 30 minuti). Solo per il piano, «Avvisami anche il giorno prima» (predefinito: avviso_piano_ieri, acceso).
+   Gli appuntamenti salvati prima (colonna vuota) restano a 30 minuti, senza secondo avviso. ---- */
+const AVVISO_PREDEFINITO = 30, AVVISO_MAX = 7 * 1440, GIORNO = 1440;
+const AVVISI_PRIMI = [[0, "All'ora"], [15, "15 min"], [30, "30 min"], [60, "1 ora"]];
+const AVVISI_ALTRI = [[5, "5 min"], [120, "2 ore"], [GIORNO, "Il giorno prima"], [-1, "Nessun avviso"]];
+const UNITA_AVVISO = [[1, "minuti"], [60, "ore"], [GIORNO, "giorni"]];
+function avvisoPredefinito(){ const v = st.profilo && st.profilo.avviso_predefinito; return v == null ? AVVISO_PREDEFINITO : Number(v); }
+function pianoIeriPredefinito(){ const v = st.profilo && st.profilo.avviso_piano_ieri; return v == null ? true : !!v; }
+/* l'avviso di un appuntamento già salvato con l'ora (vuoto = 30, come prima della 069), altrimenti il predefinito */
+function avvisoDi(p){ return p && p.prossima_ora ? (p.prossima_avviso == null ? AVVISO_PREDEFINITO : Number(p.prossima_avviso)) : avvisoPredefinito(); }
+function pianoIeriDi(p){ return p && p.prossima_ora && p.prossima_per === "piano" ? !!p.prossima_giorno_prima : pianoIeriPredefinito(); }
+/* «30 minuti prima», «All'ora», «Il giorno prima», «3 giorni prima», «Nessun avviso» */
+function testoAvviso(m){
+  m = Number(m);
+  if(m < 0) return "Nessun avviso";
+  if(m === 0) return "All'ora";
+  if(m === GIORNO) return "Il giorno prima";
+  const [u, nome, uno] = m % GIORNO === 0 ? [GIORNO, "giorni", "1 giorno"] : m % 60 === 0 ? [60, "ore", "1 ora"] : [1, "minuti", "1 minuto"];
+  return `${m / u === 1 ? uno : `${m / u} ${nome}`} prima`;
+}
+/* il campo «Avvisami». o: { valore, piano (mostra l'interruttore del giorno prima), ieri, nascosto (finché non c'è l'ora),
+   prefisso (per i nomi dei campi, se nello stesso modulo ce ne fosse più d'uno) } */
+function campoAvviso(o){
+  const v = Number(o.valore), n = (o.prefisso || "") + "avviso";
+  const noti = AVVISI_PRIMI.concat(AVVISI_ALTRI).map(x => x[0]), pers = !noti.includes(v), altro = pers || AVVISI_ALTRI.some(x => x[0] === v);
+  const [u] = UNITA_AVVISO.slice().reverse().find(([k]) => v > 0 && v % k === 0) || [1];
+  const chip = (val, t) => `<label class="chip"><input type="radio" name="${n}" value="${val}"${!pers && val === v ? " checked" : ""}><span>${esc(t)}</span></label>`;
+  return `<fieldset class="field avvisami" data-avvisami data-piano="${o.piano ? 1 : 0}"${o.nascosto ? " hidden" : ""}><legend>Avvisami</legend>
+    <div class="avvisi-primi">${AVVISI_PRIMI.map(([val, t]) => chip(val, t)).join("")}
+      <button type="button" class="avviso-altro${altro ? " on" : ""}" data-act="avviso-altro" aria-expanded="${altro}">Altro</button></div>
+    <div class="avvisi-altri"${altro ? "" : " hidden"}>${AVVISI_ALTRI.map(([val, t]) => chip(val, t)).join("")}
+      <label class="chip"><input type="radio" name="${n}" value="pers"${pers ? " checked" : ""}><span>Personalizza</span></label></div>
+    <div class="avviso-pers"${pers ? "" : " hidden"}><input type="number" name="${n}_n" min="1" max="${AVVISO_MAX}" inputmode="numeric"
+        value="${pers && v > 0 ? v / u : ""}" aria-label="Quanto prima">
+      <select name="${n}_u" aria-label="Minuti, ore o giorni">${UNITA_AVVISO.map(([k, t]) => `<option value="${k}"${k === u ? " selected" : ""}>${t}</option>`).join("")}</select>
+      <span class="small">prima · al massimo 7 giorni</span></div>
+    ${o.piano === undefined ? "" : `<label class="interruttore avviso-ieri"${o.piano && v !== GIORNO ? "" : " hidden"}>
+      <span class="grow">Avvisami anche il giorno prima<br><span class="small">alla stessa ora: «Domani hai un piano: conferma l'appuntamento.»</span></span>
+      <input type="checkbox" name="${(o.prefisso || "")}avviso_ieri" role="switch"${o.ieri ? " checked" : ""}><span class="toggle" aria-hidden="true"></span></label>`}
+  </fieldset>`;
+}
+/* legge «Avvisami»: { avviso, ieri } oppure { errore } */
+function leggiAvviso(f, prefisso){
+  const n = (prefisso || "") + "avviso", s = (f.querySelector(`input[name=${n}]:checked`) || {}).value;
+  const ieri = !!(f.querySelector(`input[name=${(prefisso || "")}avviso_ieri]`) || {}).checked;
+  if(s == null || s === "") return { avviso:avvisoPredefinito(), ieri };
+  if(s !== "pers") return { avviso:Number(s), ieri };
+  const q = Number((f.querySelector(`input[name=${n}_n]`) || {}).value), u = Number((f.querySelector(`select[name=${n}_u]`) || {}).value) || 1;
+  if(!q || q < 1 || !Number.isInteger(q)) return { errore:"Scrivi quanti minuti, ore o giorni prima vuoi l'avviso." };
+  if(q * u > AVVISO_MAX) return { errore:"L'avviso può arrivare al massimo 7 giorni prima." };
+  return { avviso:q * u, ieri };
+}
+/* mostra o nasconde le parti di «Avvisami» senza ridisegnare il foglio (i campi scritti restano) */
+function aggiornaAvvisami(f){
+  if(!f) return;
+  f.querySelectorAll("[data-avvisami]").forEach(box => {
+    const ora = f.querySelector("input[type=time]");
+    if(ora) box.hidden = !ora.value;
+    const s = (box.querySelector("input[type=radio]:checked") || {}).value;
+    const pers = box.querySelector(".avviso-pers"); if(pers) pers.hidden = s !== "pers";
+    const altri = box.querySelector(".avvisi-altri"), btn = box.querySelector(".avviso-altro");
+    const inAltri = !!box.querySelector(".avvisi-altri input:checked");
+    if(btn) btn.classList.toggle("on", inAltri || (altri && !altri.hidden));
+    const ieri = box.querySelector(".avviso-ieri");
+    if(ieri){ const per = (f.querySelector("input[name=per]:checked") || {}).value;
+      const piano = per !== undefined ? per === "piano" : box.dataset.piano === "1";
+      ieri.hidden = !piano || Number(s) === GIORNO || (s === "pers" && Number((box.querySelector(".avviso-pers input") || {}).value) *
+        Number((box.querySelector(".avviso-pers select") || {}).value) === GIORNO); }
+  });
+}
+Object.assign(AZIONI, {
+  "avviso-altro"(el){
+    const box = el.closest("[data-avvisami]"), altri = box && box.querySelector(".avvisi-altri");
+    if(!altri) return;
+    altri.hidden = !altri.hidden; el.setAttribute("aria-expanded", String(!altri.hidden)); aggiornaAvvisami(el.form || el.closest("form"));
+  }
+});
+document.addEventListener("change", e => { const f = e.target && e.target.closest && e.target.closest("form"); if(f && f.querySelector("[data-avvisami]")) aggiornaAvvisami(f); });
+document.addEventListener("input", e => { const f = e.target && e.target.closest && e.target.closest("form"); if(f && f.querySelector("[data-avvisami]")) aggiornaAvvisami(f); });
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { testoAvviso, leggiAvviso });
+Object.assign(AZIONI, {
+  "avviso-predefinito"(){ st.errore = ""; st.sheet = "avviso-predefinito"; render(); },
+  async "avviso-piano-ieri"(){
+    const v = !pianoIeriPredefinito();
+    try{ await api.aggiornaMio(st.profilo.id, { avviso_piano_ieri:v }); st.profilo = Object.assign({}, st.profilo, { avviso_piano_ieri:v }); render();
+      toast(v ? "Per i piani anche l'avviso il giorno prima" : "Per i piani niente avviso il giorno prima"); }
+    catch(e){ toast(messaggio(e)); }
+  }
+});
+Object.assign(MODULI, {
+  async "avviso-predefinito"(f){
+    const a = leggiAvviso(f);
+    if(a.errore){ mostraErroreForm(f, a.errore); return; }
+    try{ await salvaPunto({ avviso_predefinito:a.avviso }, `Avviso predefinito: ${testoAvviso(a.avviso).toLowerCase()}`); }
+    catch(e){ mostraErroreForm(f, messaggio(e)); }
+  }
+});
+function campiProssima(titolo, p, persona){
+  const chi = p || persona;
   return `<fieldset class="field"><legend>${esc(titolo)}</legend>
       <div class="opzioni">${[["", "Nessuna"], ["1", "Domani"], ["3", "Tra 3 giorni"], ["7", "Tra una settimana"]].map(([v, t]) =>
         `<label class="chip"><input type="radio" name="tra" value="${v}"${v === "" && !p ? " checked" : ""}><span>${t}</span></label>`).join("")}</div>
       <div class="giorno-ora"><input type="date" name="prossima_data" min="${oggi()}" value="${esc(p && p.prossima_data || "")}" aria-label="Oppure scegli il giorno">
         <label class="ora-facoltativa"><input type="time" name="prossima_ora" value="${esc(p && p.prossima_ora ? String(p.prossima_ora).slice(0, 5) : "")}"
-          aria-label="Ora (facoltativa)"><span class="small">Ora (facoltativa): ti avvisiamo 30 minuti prima</span></label></div>
+          aria-label="Ora (facoltativa)"><span class="small">Ora (facoltativa)</span></label></div>
+      ${campoAvviso({ valore:avvisoDi(p), piano:!!(chi && chi.prossima_per === "piano"), ieri:p ? pianoIeriDi(p) : pianoIeriPredefinito(), nascosto:!(p && p.prossima_ora) })}
       <input name="prossima_nota" maxlength="200" placeholder="Cosa (facoltativo)" value="${esc(p && p.prossima_nota || "")}"></fieldset>`;
 }
 function leggiProssima(f){
   const tra = (f.querySelector("input[name=tra]:checked") || {}).value || "";
   const data = f.prossima_data.value || (tra ? piuGiorni(oggi(), Number(tra)) : null);
   const ora = data && f.prossima_ora && f.prossima_ora.value ? f.prossima_ora.value.slice(0, 5) : null;
-  return { prossima_data:data, prossima_ora:ora, prossima_nota:data ? f.prossima_nota.value.trim() || null : null };
+  /* 069: con l'ora, l'avviso scelto (e per il piano il giorno prima); senza ora nessun avviso */
+  const a = ora ? leggiAvviso(f) : { avviso:null, ieri:false };
+  if(a.errore) return { errore:a.errore };
+  return { prossima_data:data, prossima_ora:ora, prossima_nota:data ? f.prossima_nota.value.trim() || null : null,
+           prossima_avviso:a.avviso, prossima_giorno_prima:!!(ora && a.ieri) };
 }
 
 /* ---- L'agenda (057): «In agenda · nome» e «Com'è andata?». Vale per Lista e Clienti (sono tutti in persone). ---- */
@@ -5048,26 +5196,30 @@ function vSheetAgenda(s){
         <label class="giorno-scelto"><span class="small">Oppure scegli il giorno</span><input type="date" name="giorno" min="${oggi()}" value="${giorni.includes(scelto) ? "" : esc(scelto)}"></label></fieldset>
       <fieldset class="field"><legend>Come</legend><div class="opzioni">${AGENDA_COME.map(([k, t]) => chip("come", k, t, k === come)).join("")}</div></fieldset>
       <label class="field agenda-ora"><span>Ora <i>(facoltativa)</i></span>
-        <span class="row" style="gap:10px;align-items:center"><input type="time" name="ora" value="${esc(p.prossima_ora ? String(p.prossima_ora).slice(0, 5) : "")}">
-        <span class="small">Ti avvisiamo 30 minuti prima</span></span></label>
+        <input type="time" name="ora" value="${esc(p.prossima_ora ? String(p.prossima_ora).slice(0, 5) : "")}"></label>
+      ${campoAvviso({ valore:avvisoDi(p), piano:per === "piano", ieri:pianoIeriDi(p), nascosto:!p.prossima_ora })}
       <label class="field"><span>Nota <i>(facoltativa)</i></span><input name="nota" maxlength="200" value="${esc(p.prossima_nota || "")}"></label>
       ${err}
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
       ${p.prossima_data ? `<button type="button" class="btn ghost wide" style="margin-top:8px" data-act="agenda-togli" data-id="${esc(p.id)}">Togli dall'agenda</button>` : ""}
     </form>`;
 }
-/* il primo incontro con lo sponsor (percorso di partenza, fase 2): si sceglie solo il giorno */
+/* il primo incontro con lo sponsor (percorso di partenza, fase 2): il giorno e, dalla 069, l'ora facoltativa con «Avvisami» */
 function vSheetIncontro(s){
   if(s !== "incontro-sponsor") return "";
   const p = st.profilo, d = p.incontro_sponsor ? String(p.incontro_sponsor).slice(0, 10) : "", scelto = d >= oggi() ? d : "";
   const giorni = [0, 1, 2].map(i => piuGiorni(oggi(), i));
   const etichetta = (d, i) => i === 0 ? "Oggi" : i === 1 ? "Domani" : GIORNI_SETT[new Date(d + "T12:00:00").getDay()].replace(/^./, x => x.toUpperCase());
   return `<h2>Il primo incontro con il tuo sponsor</h2>
-    <p class="small">Insieme scegliete i prodotti del primo ordine e preparate i primi contatti. Qui segni il giorno.</p>
+    <p class="small">Insieme scegliete i prodotti del primo ordine e preparate i primi contatti. Qui segni il giorno e, se vuoi, l'ora.</p>
     <form data-form="incontro" novalidate>
       <fieldset class="field"><legend>Quando</legend><div class="opzioni">${giorni.map((d, i) =>
         `<label class="chip"><input type="radio" name="quando" value="${d}"${d === scelto ? " checked" : ""}><span>${etichetta(d, i)}</span></label>`).join("")}</div>
         <label class="giorno-scelto"><span class="small">Oppure scegli il giorno</span><input type="date" name="giorno" min="${oggi()}" value="${giorni.includes(scelto) ? "" : esc(scelto)}"></label></fieldset>
+      <label class="field agenda-ora"><span>Ora <i>(facoltativa)</i></span>
+        <input type="time" name="ora" value="${esc(scelto && p.incontro_sponsor_ora ? String(p.incontro_sponsor_ora).slice(0, 5) : "")}"></label>
+      ${campoAvviso({ valore:scelto && p.incontro_sponsor_ora ? (p.incontro_avviso == null ? AVVISO_PREDEFINITO : Number(p.incontro_avviso)) : avvisoPredefinito(),
+                      nascosto:!(scelto && p.incontro_sponsor_ora) })}
       ${st.errore ? `<p class="errore">${esc(st.errore)}</p>` : ""}
       <div class="row" style="margin-top:16px"><button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button><button class="btn primary grow">Salva</button></div>
     </form>`;
@@ -5078,14 +5230,18 @@ async function salvaPunto(campi, msg){
   st.sheet = null; render(); toast(msg);
 }
 Object.assign(AZIONI, {
-  "incontro-fissa"(){ st.errore = ""; st.sheet = "incontro-sponsor"; render(); }
+  "incontro-fissa"(){ st.errore = ""; st.sheet = "incontro-sponsor"; render(); },
+  "percorso-fase-corso"(){ st.percorsoFase = null; render(); }
 });
 Object.assign(MODULI, {
   async incontro(f){
     const giorno = f.giorno.value || (f.querySelector("input[name=quando]:checked") || {}).value;
     if(!giorno){ mostraErroreForm(f, "Scegli il giorno."); return; }
     if(giorno < oggi()){ mostraErroreForm(f, "Scegli oggi o un giorno che deve ancora venire."); return; }
-    try{ await salvaPunto({ incontro_sponsor:giorno }, `Primo incontro con lo sponsor: ${riassuntoAgenda(giorno)}`); }
+    const ora = f.ora && f.ora.value ? f.ora.value.slice(0, 5) : null, a = ora ? leggiAvviso(f) : { avviso:null };
+    if(a.errore){ mostraErroreForm(f, a.errore); return; }
+    try{ await salvaPunto({ incontro_sponsor:giorno, incontro_sponsor_ora:ora, incontro_avviso:a.avviso },
+      `Primo incontro con lo sponsor: ${riassuntoAgenda(giorno, ora)}`); }
     catch(e){ mostraErroreForm(f, messaggio(e)); }
   }
 });
@@ -5147,10 +5303,13 @@ Object.assign(MODULI, {
     const giorno = f.giorno.value || v("quando");
     if(!giorno){ mostraErroreForm(f, "Scegli quando."); return; }
     if(giorno < oggi()){ mostraErroreForm(f, "Scegli oggi o un giorno che deve ancora venire."); return; }
-    const ora = f.ora.value ? f.ora.value.slice(0, 5) : null, come = v("come");
+    const ora = f.ora.value ? f.ora.value.slice(0, 5) : null, come = v("come"), per = v("per") || perProposto(p);
+    /* 069: l'avviso scelto; il giorno prima solo per il piano; senza ora nessun avviso */
+    const a = ora ? leggiAvviso(f) : { avviso:null, ieri:false };
+    if(a.errore){ mostraErroreForm(f, a.errore); return; }
     try{
       await api.modificaPersona(p.id, { prossima_data:giorno, prossima_ora:ora, prossima_nota:f.nota.value.trim() || null,
-        prossima_per:v("per") || perProposto(p), prossima_come:come, nascosta_io:false });
+        prossima_per:per, prossima_come:come, nascosta_io:false, prossima_avviso:a.avviso, prossima_giorno_prima:!!(ora && per === "piano" && a.ieri) });
       st.agendaTitolo = null; st.agendaPer = null;
       await dopoPersone(`In agenda: ${riassuntoAgenda(giorno, ora, come)}`);
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
@@ -5488,13 +5647,13 @@ function vSheetPersone(s){
         <fieldset class="field"><legend>${tipo === "piano" ? "Com'è andato" : "Come ha reagito"}</legend>${opzioni("reazione", t.reazione)}</fieldset>` : ""}
       ${tipo === "chiusura" ? `<fieldset class="field"><legend>Com'è finita</legend>${opzioni("esito", Object.values(ESITI))}</fieldset>` : ""}
       <label class="field"><span>Nota <i>(facoltativa)</i></span><input name="nota" maxlength="1000"></label>
-      ${tipo === "chiusura" ? `<div data-per-esito="partner" hidden>${campiProssima("Prossima cosa", null)}</div>
+      ${tipo === "chiusura" ? `<div data-per-esito="partner" hidden>${campiProssima("Prossima cosa", null, p)}</div>
         <fieldset class="field" data-per-esito="non_ora" hidden><legend>Tra quanto lo risenti</legend>
           <div class="opzioni">${RISENTI.map(([v, t]) => `<label class="chip"><input type="radio" name="risenti" value="${v}"${v === "3" ? " checked" : ""}><span>${t}</span></label>`).join("")}</div>
           <input type="date" name="risenti_data" min="${piuGiorni(oggi(), 3)}" aria-label="Oppure scegli il giorno">
           <p class="nota">Te lo ricordo 2 giorni prima.</p></fieldset>
         <div data-per-esito="senza_risposta" hidden>${campoRicordaChiuso()}</div>`
-        : campiProssima(t.prossima, null)}
+        : campiProssima(t.prossima, null, p)}
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
     </form>`}`;
   }
@@ -5857,6 +6016,7 @@ Object.assign(MODULI, {
     if(data > oggi()){ mostraErroreForm(f, "Il passo non può essere nel futuro: per quello c'è la prossima cosa."); return; }
     let pr = { prossima_data:null, prossima_ora:null, prossima_nota:null };
     if(tipo !== "chiusura" || esito === "partner") pr = leggiProssima(f);
+    if(pr.errore){ mostraErroreForm(f, pr.errore); return; }
     if(tipo === "chiusura" && esito === "senza_risposta") pr = prossimaChiuso(scelto("ricorda") !== "no");
     if(tipo === "chiusura" && esito === "non_ora"){
       const quando = f.risenti_data.value || piuMesi(oggi(), Number(scelto("risenti") || 3));
@@ -5876,7 +6036,9 @@ Object.assign(MODULI, {
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
   async prossima(f){
-    try{ await api.modificaPersona(st.personaId, Object.assign(leggiProssima(f), { nascosta_io:false })); await dopoPersone("Prossima cosa salvata"); }
+    const pr = leggiProssima(f);
+    if(pr.errore){ mostraErroreForm(f, pr.errore); return; }
+    try{ await api.modificaPersona(st.personaId, Object.assign(pr, { nascosta_io:false })); await dopoPersone("Prossima cosa salvata"); }
     catch(e){ mostraErroreForm(f, messaggio(e)); }
   }
 });
