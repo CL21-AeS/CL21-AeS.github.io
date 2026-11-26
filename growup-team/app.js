@@ -2885,9 +2885,16 @@ function vStruttura(){
         <span class="small">${numeriRiga(rIo)}</span></div>
       <button class="piega" data-act="piega" data-id="${esc(io)}" data-quanti="${righe.length}" aria-expanded="${!chiusoIo}"
         aria-label="${chiusoIo ? "Mostra" : "Nascondi"} il tuo gruppo">${chiusoIo ? "▸" : "▾"} ${righe.length}</button></li>`;
+  /* «Contrai tutto» / «Espandi tutto» (26 novembre 2026, scelta di Stefano): un solo pulsante accanto al titolo, sui rami
+     chiusi di sempre (st.chiusi). Contratto = restano solo le linee frontali (io aperto, ogni frontale con un gruppo chiuso). */
+  const frontaliConGruppo = righe.filter(r => !r.path.slice(1).length && righe.some(x => x.path.includes(r.p.id))).map(r => r.p.id);
+  const contratto = frontaliConGruppo.length > 0 && !chiusoIo && frontaliConGruppo.every(id => st.chiusi.has(id));
+  const btnTutto = frontaliConGruppo.length && !filtro ? `<button class="btn small ghost tutto-struttura" data-act="struttura-tutto"
+      data-ids="${esc(frontaliConGruppo.join(" "))}" aria-pressed="${contratto}">${contratto ? "Espandi tutto" : "Contrai tutto"}</button>` : "";
   return `<div class="card">
-    <div class="spread"><span class="con-aiuto"><span class="eyebrow">La mia struttura</span>${tutte.length ? aiutoBtn("struttura") : ""}</span>
-      ${btnAmway("Importa da Amway", "small")}</div>
+    <div class="spread titolo-struttura"><span class="con-aiuto"><span class="eyebrow">La mia struttura</span>${tutte.length ? aiutoBtn("struttura") : ""}</span>
+      ${btnTutto}</div>
+    <div class="importa-struttura">${btnAmway("Importa da Amway", "small")}</div>
     ${tutte.length ? aiutoTesto("struttura", `Il tuo gruppo come nel report Amway. Il numero a sinistra è il livello: 1 sei tu, 2 chi hai sponsorizzato tu,
       3 chi hanno sponsorizzato loro, e così via. Ogni livello ha il suo colore:
       <span class="legenda-livelli"><span><span class="livello l0">1</span>tu</span>${COLORI_LIVELLI.map((c, i) =>
@@ -2895,7 +2902,8 @@ function vStruttura(){
       dopo il nocciola si riparte dal blu. Il pallino accanto al nome: <span class="legenda-app"><i class="pallino-app"></i>usa l'app</span>
       <span class="legenda-app"><i class="pallino-app no"></i>senza app</span>. Per chi usa l'app, «attivo», «rallenta» e «fermo» dicono
       quando ha aggiornato i suoi numeri: entro 7 giorni, entro 14, oltre. ▾ chiude o apre il gruppo di una persona; tocca un nome
-      per aprire la sua scheda.${completa ? " In grigio le persone nascoste, al loro posto: Mostra o Nascondi su ogni riga." : ""}`) : ""}
+      per aprire la sua scheda. «Contrai tutto» lascia solo le tue linee frontali, con i loro gruppi chiusi; «Espandi tutto» riapre
+      tutto il gruppo.${completa ? " In grigio le persone nascoste, al loro posto: Mostra o Nascondi su ogni riga." : ""}`) : ""}
     ${righe.length > 1 ? `<input type="search" id="cerca-struttura" class="cerca" placeholder="Cerca un nome nel tuo gruppo…"
         autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Cerca un nome nel tuo gruppo" value="${esc(st.cerca || "")}">
       <p class="small" id="cerca-esito" aria-live="polite" style="margin:6px 0 0"></p>` : ""}
@@ -4374,6 +4382,14 @@ const AZIONI = {
       if(era) st.preferiti.add(id); else st.preferiti.delete(id);
       render(); toast(messaggio(e));
     }
+  },
+  /* un solo pulsante: contrae tutto (restano le linee frontali) o espande tutto */
+  "struttura-tutto"(el){
+    /* le linee frontali come si vedono (con le persone nascoste tolte), dal pulsante stesso */
+    if(el.getAttribute("aria-pressed") === "true") st.chiusi = new Set();
+    else st.chiusi = new Set((el.dataset.ids || "").split(" ").filter(Boolean));
+    st.espansi = new Set();
+    render();
   },
   piega(el){
     const id = el.dataset.id, insieme = senzaAccenti(st.cerca) ? st.espansi : st.chiusi;

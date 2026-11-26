@@ -778,6 +778,10 @@ label.field>span.con-incolla{display:flex;gap:8px;align-items:stretch;margin:0;f
 .rubrica-molti li.doppione{box-shadow:inset 4px 0 0 var(--giallo);padding-left:10px}
 .chip input:checked+span{background:var(--scelta);border-color:var(--scelta);color:var(--scelta-ink)}
 .chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+/* La mia struttura: «Contrai tutto» / «Espandi tutto» sulla riga del titolo, sempre su una riga; «Importa da Amway» sotto, a destra */
+.titolo-struttura{flex-wrap:nowrap;gap:8px}
+.titolo-struttura .tutto-struttura{flex:none;white-space:nowrap}
+.importa-struttura{display:flex;justify-content:flex-end;margin-top:6px}
 /* 069: «Avvisami» sotto l'ora di un appuntamento: pulsanti grandi (almeno 44 px), la prima riga sempre su una riga sola */
 .avvisami .avvisi-primi{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
 .avvisami .avvisi-altri{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
