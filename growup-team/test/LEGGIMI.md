@@ -12,6 +12,15 @@ dell'app che non arriva (risposta 404 dal nostro sito); se un passo si blocca, i
 e mostra gli errori raccolti. Gli screenshot finiscono in `e2e/*.png`.
 `head.mjs` importa Playwright da `/opt/node22/lib/node_modules/playwright`: adattare il percorso se serve.
 
+La sezione 107 (fogli che si chiudono tirando giù) prova anche **WebKit**, il motore di Safari su iPhone. Serve il motore
+della stessa versione di Playwright, indicato con `WEBKIT_PATH` (senza, quella parte si salta con un avviso):
+
+```sh
+PLAYWRIGHT_BROWSERS_PATH=/tmp/pw node /opt/node22/lib/node_modules/playwright/cli.js install webkit
+node /opt/node22/lib/node_modules/playwright/cli.js install-deps webkit
+WEBKIT_PATH=/tmp/pw/webkit-<numero>/pw_run.sh S=$T node $T/e2e/test.mjs
+```
+
 **Database** (Postgres 16 o più recente, locale), dalla cartella `growup-team`:
 
 ```sh

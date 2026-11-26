@@ -370,6 +370,12 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .sheet{position:fixed;inset:0;background:rgba(8,10,14,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
 .sheet-box{background:var(--card);width:100%;max-width:640px;max-height:90vh;overflow:auto;border-radius:18px 18px 0 0;
   padding:18px var(--pad) calc(18px + env(safe-area-inset-bottom))}
+/* la barretta da afferrare in cima a ogni foglio: resta in vista mentre il foglio scorre; l'area da toccare è alta 30 px */
+.sheet-maniglia{position:sticky;top:-18px;z-index:3;display:flex;justify-content:center;align-items:center;width:calc(100% + 2 * var(--pad));
+  height:30px;margin:-18px calc(-1 * var(--pad)) 4px;padding:0;border:0;border-radius:18px 18px 0 0;background:var(--card);cursor:grab;touch-action:none}
+.sheet-maniglia i{display:block;width:40px;height:5px;border-radius:3px;background:var(--ink3);opacity:.45}
+.sheet-maniglia:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}
+.sheet-maniglia:active{cursor:grabbing}
 /* Persone: i Clienti */
 .avviso-cliente{border-left:4px solid var(--giallo)}
 .righe-ordine{list-style:none;margin:0;padding:0}

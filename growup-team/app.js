@@ -1180,7 +1180,9 @@ function render(){
   const foglio = document.getElementById("sheet");
   if(!st.sheet) chiudiFoglioPiano(foglio);
   /* il foglio aperto si riscrive solo se è cambiato, e quello che si stava scrivendo resta */
-  const fhtml = st.sheet ? `<div class="sheet" data-act="chiudi-fuori"><div class="sheet-box" role="dialog" aria-modal="true">${vSheet()}</div></div>` : "";
+  /* in cima a ogni foglio la barretta da afferrare: tirandola giù (o toccandola) il foglio si chiude */
+  const fhtml = st.sheet ? `<div class="sheet" data-act="chiudi-fuori"><div class="sheet-box" role="dialog" aria-modal="true"><button type="button" class="sheet-maniglia"
+    data-act="sheet-maniglia" aria-label="Chiudi il foglio (o trascinalo giù)"><i aria-hidden="true"></i></button>${vSheet()}</div></div>` : "";
   if(fhtml !== ultimoFoglio || !foglio.firstElementChild !== !fhtml){
     const stesso = !!fhtml && !!ultimoFoglio && st.sheet === ultimoFoglioNome, f = stesso ? fotoCampi(foglio) : null;
     foglio.innerHTML = fhtml; ultimoFoglio = fhtml; ultimoFoglioNome = st.sheet;
@@ -8217,7 +8219,10 @@ function chiudiFoglioPiano(contenitore){
   const copia = vecchio.cloneNode(true);
   copia.removeAttribute("data-act"); copia.style.pointerEvents = "none"; copia.setAttribute("aria-hidden", "true");
   document.body.appendChild(copia);
-  anima(copia.firstElementChild, [{ transform:"none" }, { transform:"translateY(100%)" }], { dur:220, ease:"cubic-bezier(.4,0,1,1)" });
+  /* chiuso tirando giù: scende da dove l'ha lasciato il dito */
+  const da = (vecchio.firstElementChild && vecchio.firstElementChild.style.transform) || "none";
+  copia.style.background = ""; copia.style.opacity = "";
+  anima(copia.firstElementChild, [{ transform:da }, { transform:"translateY(100%)" }], { dur:220, ease:"cubic-bezier(.4,0,1,1)" });
   anima(copia, [{ opacity:1 }, { opacity:0 }], { dur:240 }).then(() => copia.remove());
 }
 
@@ -8536,13 +8541,13 @@ function indietroPagina(){
 ["pointerup", "touchend", "click", "keydown", "input", "change"].forEach(t => document.addEventListener(t, () => {
   if(storiaInAttesa || (st.sheet && document.getElementById("sheet").contains(document.activeElement))) allineaStoria();
 }, { capture:true, passive:true }));
-/* «Uscire senza salvare?»: una finestra dell'app (quella del telefono non conta come tocco sulla pagina) */
+/* «Vuoi uscire senza salvare?»: una finestra dell'app (quella del telefono non conta come tocco sulla pagina) */
 function chiediUscita(){
   if(domandaUscita) return;
   domandaUscita = document.createElement("div");
   domandaUscita.className = "domanda-uscita";
   domandaUscita.innerHTML = `<div class="domanda-uscita-box" role="alertdialog" aria-modal="true" aria-labelledby="domanda-uscita-t">
-    <p id="domanda-uscita-t"><b>Uscire senza salvare?</b></p><p class="small">Quello che hai scritto in questo foglio si perde.</p>
+    <p id="domanda-uscita-t"><b>Vuoi uscire senza salvare?</b></p><p class="small">Quello che hai scritto in questo foglio si perde.</p>
     <div class="row"><button type="button" class="btn ghost grow" data-act="uscita-annulla">Annulla</button>
       <button type="button" class="btn primary grow" data-act="uscita-esci">Esci</button></div></div>`;
   document.body.appendChild(domandaUscita);
@@ -8575,6 +8580,96 @@ window.addEventListener("popstate", () => {
   allineaStoria();
 });
 try{ history.scrollRestoration = "manual"; }catch(e){}
+
+/* ---- I fogli dal basso si chiudono tirando giù (26 novembre 2026, richiesta di Stefano) ----
+   Vale per tutti i fogli (.sheet-box). Si afferra la barretta in cima, oppure il contenuto quando è già in cima: il foglio
+   segue il dito; lasciato oltre un terzo della sua altezza, o con un gesto veloce verso il basso, si chiude, altrimenti
+   torna su. Toccare la barretta chiude. Con qualcosa di scritto nel foglio prima si chiede «Vuoi uscire senza salvare?»
+   (la stessa finestra del tasto Indietro). Non tocca lo scorrimento normale (il contenuto non in cima scorre e basta, i
+   movimenti di lato non contano), né il gesto Indietro dai bordi dello schermo (Android e iPhone). Con «riduci
+   animazioni» niente animazioni: il foglio si chiude o torna su di colpo. Con il dito: eventi touch (su iPhone il
+   contenuto si trascina solo così); con il mouse: la barretta (pointer). */
+const TIRA_SOGLIA = 1 / 3, TIRA_VELOCE = 0.6, TIRA_BORDO = 20, TIRA_AVVIO = 8;
+let tira = null;
+function tiraInizio(box, x, y, maniglia){
+  tira = { box, x, y, maniglia, attivo:false, dy:0, campioni:[[performance.now(), y]] };
+}
+function tiraSegui(dy){
+  const b = tira.box, h = b.offsetHeight || 1;
+  tira.dy = Math.max(0, dy);
+  b.style.transition = "none"; b.style.transform = tira.dy ? `translateY(${tira.dy}px)` : "";
+  if(b.parentNode) b.parentNode.style.background = `rgba(8,10,14,${(.5 * (1 - Math.min(1, tira.dy / h))).toFixed(3)})`;
+}
+/* quando il dito si muove: decide se il gesto è nostro, poi il foglio segue. true = il movimento è del foglio */
+function tiraMuovi(x, y){
+  if(!tira) return false;
+  const dx = x - tira.x, dy = y - tira.y;
+  if(!tira.attivo){
+    if(Math.abs(dx) > TIRA_AVVIO && Math.abs(dx) > Math.abs(dy)){ tira = null; return false; }   // di lato: non è nostro
+    if(dy < 0 && !tira.maniglia){ tira = null; return false; }                                   // verso l'alto: si scorre
+    if(dy < TIRA_AVVIO) return false;
+    if(!tira.maniglia && tira.box.scrollTop > 0){ tira = null; return false; }
+    tira.attivo = true; tira.y += TIRA_AVVIO;
+  }
+  tira.campioni.push([performance.now(), y]); if(tira.campioni.length > 6) tira.campioni.shift();
+  tiraSegui(y - tira.y);
+  return true;
+}
+function tiraRimetti(b){
+  const da = b.style.transform;
+  b.style.transform = ""; b.style.transition = "";
+  if(b.parentNode) b.parentNode.style.background = "";
+  if(da) anima(b, [{ transform:da }, { transform:"none" }], { dur:220, ease:"cubic-bezier(.2,.9,.3,1)" });
+}
+/* chiudere il foglio dall'app (barretta o gesto): con qualcosa di scritto prima la domanda, e il foglio resta su */
+function chiudiFoglioChiedendo(b){
+  if(st.sheet && foglioCompilato()){ if(b) tiraRimetti(b); chiediUscita(); return; }
+  chiudiSheet(); render();
+}
+function tiraFine(y){
+  const t = tira; tira = null;
+  if(!t || !t.attivo) return;
+  const h = t.box.offsetHeight || 1, [t0, y0] = t.campioni[0], ms = performance.now() - t0, v = ms > 0 ? (y - y0) / ms : 0;
+  if(t.dy > h * TIRA_SOGLIA || (v > TIRA_VELOCE && t.dy > 30)) chiudiFoglioChiedendo(t.box);
+  else tiraRimetti(t.box);
+}
+document.addEventListener("touchstart", e => {
+  tira = null;
+  if(!st.sheet || domandaUscita || e.touches.length !== 1) return;
+  const box = e.target.closest && e.target.closest("#sheet .sheet-box");
+  if(!box) return;
+  const t = e.touches[0], maniglia = !!e.target.closest(".sheet-maniglia");
+  /* dai bordi dello schermo è il gesto Indietro del telefono: non lo tocchiamo */
+  if(t.clientX < TIRA_BORDO || t.clientX > innerWidth - TIRA_BORDO) return;
+  if(!maniglia){
+    if(box.scrollTop > 0 || e.target.closest("input, textarea, select, [contenteditable], [data-no-swipe], .filtri")) return;
+    /* dentro un riquadro che scorre per conto suo e non è in cima: si scorre quello */
+    for(let n = e.target; n && n !== box; n = n.parentElement) if(n.scrollTop > 0) return;
+  }
+  tiraInizio(box, t.clientX, t.clientY, maniglia);
+}, { passive:true });
+document.addEventListener("touchmove", e => {
+  if(!tira || e.touches.length !== 1) return;
+  const t = e.touches[0];
+  if(tiraMuovi(t.clientX, t.clientY) && e.cancelable) e.preventDefault();
+}, { passive:false });
+document.addEventListener("touchend", e => { if(tira) tiraFine(e.changedTouches && e.changedTouches.length ? e.changedTouches[0].clientY : tira.y); }, { passive:true });
+document.addEventListener("touchcancel", () => { const t = tira; tira = null; if(t && t.attivo) tiraRimetti(t.box); }, { passive:true });
+/* con il mouse (computer): si trascina la barretta */
+document.addEventListener("pointerdown", e => {
+  if(e.pointerType !== "mouse" || e.button !== 0 || !st.sheet || domandaUscita) return;
+  const m = e.target.closest && e.target.closest("#sheet .sheet-maniglia");
+  if(m) tiraInizio(m.closest(".sheet-box"), e.clientX, e.clientY, true);
+});
+document.addEventListener("pointermove", e => { if(tira && e.pointerType === "mouse") tiraMuovi(e.clientX, e.clientY); });
+document.addEventListener("pointerup", e => { if(tira && e.pointerType === "mouse"){ const att = tira.attivo; tiraFine(e.clientY); if(att) tiraClickNo = true; } });
+/* dopo un trascinamento con il mouse il clic sulla barretta non conta (non chiude due volte) */
+let tiraClickNo = false;
+document.addEventListener("click", e => { if(tiraClickNo){ tiraClickNo = false; if(e.target.closest && e.target.closest(".sheet-maniglia")){ e.stopPropagation(); e.preventDefault(); } } }, true);
+Object.assign(AZIONI, {
+  /* toccare la barretta chiude il foglio */
+  "sheet-maniglia"(el){ chiudiFoglioChiedendo(el.closest(".sheet-box")); }
+});
 
 document.addEventListener("submit", e => {
   const f = e.target.closest("form[data-form]");
