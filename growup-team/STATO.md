@@ -3,6 +3,29 @@
 Ultimo aggiornamento: 27 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## «Segna un passo»: la prossima cosa è un vero appuntamento in agenda (27 novembre 2026, richiesta di Stefano, app v137, database non toccato)
+
+- **Il difetto**: in fondo a «Segna un passo» la «prossima cosa» salvava solo giorno, ora, nota e avviso, mai «per cosa» e
+  «come». Così il giorno fissato non era un vero appuntamento (niente icona accesa, niente «Fatto», niente «Com'è andata?»),
+  oppure restava il «per cosa» vecchio (dopo il Contatto, il giorno dopo l'app chiedeva di nuovo «Contattato / Non risponde»).
+- **Adesso** in fondo al modulo c'è il blocco «**E adesso? Metti in agenda la prossima cosa**» con la stessa parte del form
+  del calendario: Per cosa, Quando (Nessuna, Oggi, Domani, il giorno dopo, oppure scegli il giorno), Come, Ora facoltativa,
+  Avvisami, Nota. «**Nessuna**» è scelta all'inizio: finché non si sceglie un giorno, Come, Ora, Avvisami e Nota non si vedono.
+- «**Per cosa**» arriva già scelto dal passo segnato, ma si cambia (si può saltare una fase): Contatto → Fissare il piano;
+  Invito → Piano; Piano → Follow-up; Follow-up → Follow-up; Chiusura Partner → Altro, con la nota «Primo passo insieme».
+- **Una funzione sola** per tutte e due le strade (`campiAgenda` per i campi, `leggiAgenda` per leggerli con gli stessi
+  controlli, `salvaAgenda` per salvarli): si salvano sempre giorno, ora, nota, per cosa, come, avviso e giorno prima. Con
+  «Nessuna» l'agenda si svuota del tutto (`AGENDA_VUOTA`, che ora svuota anche avviso e giorno prima): mai un «per cosa» vecchio.
+- **Regola generale**: ogni data salvata ha il suo «per cosa». «Non ora» (con i mesi) salva «contatto»; «Chiuso senza
+  risposta» con il promemoria a 6 mesi lo faceva già. Le loro scelte restano quelle di prima.
+- Tolti `campiProssima`, `leggiProssima`, il foglio «Prossima cosa» (non si apriva più da nessuna parte) e i titoli
+  «Quando ci ritorni sopra», «Data dell'appuntamento», «Quando lo risenti» di `TIPI_PASSO`.
+- **Lasciato com'era** (fuori dalla Lista): il «Rimanda» dei Clienti salva solo giorno e nota. Da decidere con Stefano.
+Test: interfaccia sezione 114 (titolo, Per cosa già scelto per Contatto, Invito, Piano, Follow-up e Chiusura Partner, «Nessuna»
+all'inizio, i giorni e la data scritta, giorno passato rifiutato, salvataggio completo, «Fatto» e icona accesa, «Com'è andata?»
+con «Piano fissato / Non ora / Non risponde», «Nessuna» che svuota tutto, Non ora e Chiuso senza risposta con «contatto»; niente a
+capo a 360 px nel modulo; anteprime `design/anteprime/114-agenda-light/dark.png`).
+
 ## Chiusura come Partner = contatto, invito e piano fatti (27 novembre 2026, regola di Stefano, app v136, migrazione 070 applicata)
 
 - **Regola di Stefano**: nessuno diventa Partner senza contatto, invito e piano. Il follow-up invece non è automatico (si può

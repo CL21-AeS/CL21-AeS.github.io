@@ -4797,17 +4797,18 @@ function giorniFermo(p){
 function daRisentire(p){ return p.esito === "senza_risposta" && !!p.prossima_data && p.prossima_data <= oggi(); }
 const TIPI_PASSO = {
   contatto: { nome:"Contatto", come:["Telefono", "Messaggio", "Di persona", "Social"],
-    reazione:["Aperto, incuriosito", "Gentile ma tiepido", "Dice che ha poco tempo", "Non ha risposto"], prossima:"Quando ci ritorni sopra" },
+    reazione:["Aperto, incuriosito", "Gentile ma tiepido", "Dice che ha poco tempo", "Non ha risposto"] },
   invito: { nome:"Invito", come:["Piano a casa", "Videochiamata", "Uno-a-uno al bar", "Evento"],
-    reazione:["Sì, appuntamento fissato", "Deve confermare", "Ha rimandato", "No"], prossima:"Data dell'appuntamento" },
+    reazione:["Sì, appuntamento fissato", "Deve confermare", "Ha rimandato", "No"] },
   piano: { nome:"Piano", come:["A casa sua", "A casa mia", "Videochiamata", "Al bar", "Evento"],
-    reazione:["Molto interessato", "Interessato", "Deve pensarci", "Poco interessato", "Non si è presentato"], prossima:"Quando lo risenti" },
+    reazione:["Molto interessato", "Interessato", "Deve pensarci", "Poco interessato", "Non si è presentato"] },
   followup: { nome:"Follow-up", come:["Telefono", "Messaggio", "Di persona", "Videochiamata"],
-    reazione:["Vuole partire", "Ha ancora dubbi", "Deve parlarne in famiglia", "Ha rimandato", "Non ha risposto"], prossima:"Quando lo risenti" },
-  chiusura: { nome:"Chiusura", prossima:"" },
-  nota: { nome:"Nota", prossima:"Prossima cosa da fare" }
+    reazione:["Vuole partire", "Ha ancora dubbi", "Deve parlarne in famiglia", "Ha rimandato", "Non ha risposto"] },
+  chiusura: { nome:"Chiusura" },
+  nota: { nome:"Nota" }
 };
-const PROSSIMA_CHIUSURA = { partner:"Primo passo insieme", cliente:"Quando risentirlo", non_ora:"Quando riprovare", no:"" };
+/* chiuso come Partner, la nota già scritta nella prossima cosa (si cambia) */
+const NOTA_DOPO_PARTNER = "Primo passo insieme";
 /* "Non ora": tra quanti mesi risentirlo (il promemoria arriva 2 giorni prima) */
 const RISENTI = [["1", "1 mese"], ["3", "3 mesi"], ["6", "6 mesi"], ["12", "1 anno"]], RISENTI_PRIMA = 2;
 /* L'agenda (057, consegna 4): per cosa e come si sente la persona il giorno scelto. Giorno, ora e nota sono quelli della
@@ -5104,8 +5105,7 @@ function campoRicordaChiuso(){
 }
 /* chiudere senza risposta: il passo di chiusura e, se lo voglio, il promemoria tra 6 mesi in agenda */
 function prossimaChiuso(ricorda){
-  return ricorda ? { prossima_data:piuMesi(oggi(), RICORDA_CHIUSO_MESI), prossima_per:"contatto", prossima_come:null, prossima_ora:null, prossima_nota:null }
-    : { prossima_data:null, prossima_per:null, prossima_come:null, prossima_ora:null, prossima_nota:null };
+  return ricorda ? Object.assign({}, AGENDA_VUOTA, { prossima_data:piuMesi(oggi(), RICORDA_CHIUSO_MESI), prossima_per:"contatto" }) : Object.assign({}, AGENDA_VUOTA);
 }
 function vFermo(p){
   const g = giorniFermo(p);
@@ -5198,7 +5198,7 @@ function leggiAvviso(f, prefisso){
 function aggiornaAvvisami(f){
   if(!f) return;
   f.querySelectorAll("[data-avvisami]").forEach(box => {
-    const ora = f.querySelector("input[type=time]");
+    const ora = f.querySelector("input[type=time]");  // una sola ora per modulo
     if(ora) box.hidden = !ora.value;
     const s = (box.querySelector("input[type=radio]:checked") || {}).value;
     const pers = box.querySelector(".avviso-pers"); if(pers) pers.hidden = s !== "pers";
@@ -5206,7 +5206,7 @@ function aggiornaAvvisami(f){
     const inAltri = !!box.querySelector(".avvisi-altri input:checked");
     if(btn) btn.classList.toggle("on", inAltri || (altri && !altri.hidden));
     const ieri = box.querySelector(".avviso-ieri");
-    if(ieri){ const per = (f.querySelector("input[name=per]:checked") || {}).value;
+    if(ieri){ const per = (f.querySelector("input[data-agenda-per]:checked") || {}).value;
       const piano = per !== undefined ? per === "piano" : box.dataset.piano === "1";
       ieri.hidden = !piano || Number(s) === GIORNO || (s === "pers" && Number((box.querySelector(".avviso-pers input") || {}).value) *
         Number((box.querySelector(".avviso-pers select") || {}).value) === GIORNO); }
@@ -5239,33 +5239,78 @@ Object.assign(MODULI, {
     catch(e){ mostraErroreForm(f, messaggio(e)); }
   }
 });
-function campiProssima(titolo, p, persona){
-  const chi = p || persona;
-  return `<fieldset class="field"><legend>${esc(titolo)}</legend>
-      <div class="opzioni">${[["", "Nessuna"], ["1", "Domani"], ["3", "Tra 3 giorni"], ["7", "Tra una settimana"]].map(([v, t]) =>
-        `<label class="chip"><input type="radio" name="tra" value="${v}"${v === "" && !p ? " checked" : ""}><span>${t}</span></label>`).join("")}</div>
-      <div class="giorno-ora"><input type="date" name="prossima_data" min="${oggi()}" value="${esc(p && p.prossima_data || "")}" aria-label="Oppure scegli il giorno">
-        <label class="ora-facoltativa"><input type="time" name="prossima_ora" value="${esc(p && p.prossima_ora ? String(p.prossima_ora).slice(0, 5) : "")}"
-          aria-label="Ora (facoltativa)"><span class="small">Ora (facoltativa)</span></label></div>
-      ${campoAvviso({ valore:avvisoDi(p), piano:!!(chi && chi.prossima_per === "piano"), ieri:p ? pianoIeriDi(p) : pianoIeriPredefinito(), nascosto:!(p && p.prossima_ora) })}
-      <input name="prossima_nota" maxlength="200" placeholder="Cosa (facoltativo)" value="${esc(p && p.prossima_nota || "")}"></fieldset>`;
+/* ---- La parte del form «agenda» che si usa anche in «Segna un passo» (27 novembre 2026, richiesta di Stefano): Per cosa,
+   Quando, Come, Ora facoltativa, Avvisami e Nota. Le due strade danno lo stesso risultato: un vero appuntamento in agenda
+   (inAgenda), con l'icona del calendario accesa, «Fatto» e «Com'è andata?».
+   o: { p (la persona), per (già scelto), nota (già scritta), px (prefisso dei nomi dei campi, se nello stesso modulo ci sono
+   altri campi con lo stesso nome), nessuna (c'è la scelta «Nessuna», scelta all'inizio) } ---- */
+function campiAgenda(o){
+  const p = o.p, px = o.px || "", cli = p.esito === "cliente", per = o.per || perProposto(p);
+  const giorni = [0, 1, 2].map(i => piuGiorni(oggi(), i));
+  const etichetta = (d, i) => i === 0 ? "Oggi" : i === 1 ? "Domani" : GIORNI_SETT[new Date(d + "T12:00:00").getDay()].replace(/^./, x => x.toUpperCase());
+  const scelto = o.nessuna ? "" : p.prossima_data && p.prossima_data >= oggi() ? p.prossima_data : "";
+  const come = o.nessuna ? "" : p.prossima_come || "", ora = o.nessuna || !p.prossima_ora ? "" : String(p.prossima_ora).slice(0, 5);
+  const nota = o.nota !== undefined ? o.nota : o.nessuna ? "" : p.prossima_nota || "";
+  const chip = (nome, v, t, on, extra) => `<label class="chip"><input type="radio" name="${px}${nome}" value="${esc(v)}"${on ? " checked" : ""}${extra || ""}><span>${esc(t)}</span></label>`;
+  return `<fieldset class="field"><legend>Per cosa</legend><div class="opzioni">${AGENDA_PER[cli ? "cliente" : "lista"].map(([k, t]) => chip("per", k, t, k === per, " data-agenda-per")).join("")}</div></fieldset>
+      <fieldset class="field" data-agenda-quando="${px}"><legend>Quando</legend><div class="opzioni">${o.nessuna ? chip("quando", "", "Nessuna", true) : ""}${
+        giorni.map((d, i) => chip("quando", d, etichetta(d, i), d === scelto)).join("")}</div>
+        <label class="giorno-scelto"><span class="small">Oppure scegli il giorno</span><input type="date" name="${px}giorno" min="${oggi()}" value="${giorni.includes(scelto) ? "" : esc(scelto)}"></label></fieldset>
+      <div class="agenda-dettagli"${o.nessuna ? " hidden" : ""}>
+      <fieldset class="field"><legend>Come</legend><div class="opzioni">${AGENDA_COME.map(([k, t]) => chip("come", k, t, k === come)).join("")}</div></fieldset>
+      <label class="field agenda-ora"><span>Ora <i>(facoltativa)</i></span>
+        <input type="time" name="${px}ora" value="${esc(ora)}"></label>
+      ${campoAvviso({ valore:o.nessuna ? avvisoPredefinito() : avvisoDi(p), piano:per === "piano", ieri:o.nessuna ? pianoIeriPredefinito() : pianoIeriDi(p), nascosto:!ora, prefisso:px })}
+      <label class="field"><span>Nota <i>(facoltativa)</i></span><input name="${px}nota" maxlength="200" value="${esc(nota)}"></label></div>`;
 }
-function leggiProssima(f){
-  const tra = (f.querySelector("input[name=tra]:checked") || {}).value || "";
-  const data = f.prossima_data.value || (tra ? piuGiorni(oggi(), Number(tra)) : null);
-  const ora = data && f.prossima_ora && f.prossima_ora.value ? f.prossima_ora.value.slice(0, 5) : null;
-  /* 069: con l'ora, l'avviso scelto (e per il piano il giorno prima); senza ora nessun avviso */
-  const a = ora ? leggiAvviso(f) : { avviso:null, ieri:false };
+/* legge la parte «agenda» del modulo, con gli stessi controlli per tutte e due le strade: { campi } oppure { errore }.
+   Con «Nessuna» (solo dove c'è) l'agenda si svuota del tutto: mai un prossima_per vecchio. */
+function leggiAgenda(f, p, o){
+  o = o || {};
+  const px = o.px || "", campo = n => f.querySelector(`[name=${px}${n}]`);
+  const v = n => (f.querySelector(`input[name=${px}${n}]:checked`) || {}).value || null;
+  const giorno = (campo("giorno") && campo("giorno").value) || v("quando");
+  if(!giorno) return o.nessuna ? { campi:Object.assign({}, AGENDA_VUOTA) } : { errore:"Scegli quando." };
+  if(giorno < oggi()) return { errore:"Scegli oggi o un giorno che deve ancora venire." };
+  const ora = campo("ora") && campo("ora").value ? campo("ora").value.slice(0, 5) : null, come = v("come"), per = v("per") || perProposto(p);
+  /* 069: l'avviso scelto; il giorno prima solo per il piano; senza ora nessun avviso */
+  const a = ora ? leggiAvviso(f, px) : { avviso:null, ieri:false };
   if(a.errore) return { errore:a.errore };
-  return { prossima_data:data, prossima_ora:ora, prossima_nota:data ? f.prossima_nota.value.trim() || null : null,
-           prossima_avviso:a.avviso, prossima_giorno_prima:!!(ora && a.ieri) };
+  return { campi:{ prossima_data:giorno, prossima_ora:ora, prossima_nota:(campo("nota") && campo("nota").value.trim()) || null,
+    prossima_per:per, prossima_come:come, prossima_avviso:a.avviso, prossima_giorno_prima:!!(ora && per === "piano" && a.ieri) } };
+}
+/* Quando: toccando un giorno la data scritta a mano si svuota, scrivendo una data i giorni si spengono; con un giorno scelto
+   compaiono Come, Ora, Avvisami e Nota (dove c'è «Nessuna» restano nascosti finché non si sceglie un giorno) */
+document.addEventListener("change", e => {
+  const t = e.target, q = t && t.closest && t.closest("[data-agenda-quando]");
+  if(!q) return;
+  const px = q.dataset.agendaQuando, data = q.querySelector(`input[name=${px}giorno]`);
+  if(t.name === px + "quando" && data) data.value = "";
+  if(t.name === px + "giorno" && t.value) q.querySelectorAll(`input[name=${px}quando]`).forEach(r => { r.checked = false; });
+  const nessuna = q.querySelector(`input[name=${px}quando][value=""]`), d = q.parentElement.querySelector(".agenda-dettagli");
+  if(!nessuna || !d) return;
+  const giorno = (data && data.value) || (q.querySelector(`input[name=${px}quando]:checked`) || {}).value;
+  if(!giorno) nessuna.checked = true;
+  d.hidden = !giorno;
+});
+/* «Segna un passo»: «Per cosa» arriva già scelto dal passo appena segnato (solo un suggerimento: si cambia, e si può saltare
+   una fase). Chiusura come Partner: «Altro», con la nota «Primo passo insieme». */
+const PER_DOPO_PASSO = { contatto:"fissare_piano", invito:"piano", piano:"followup", followup:"followup", chiusura:"altro" };
+/* il blocco «E adesso?» in fondo a «Segna un passo» */
+function agendaDopoPasso(p, tipo){
+  return `<div class="agenda-dopo"><p class="agenda-dopo-titolo">E adesso? Metti in agenda la prossima cosa</p>
+    ${campiAgenda({ p, px:"ag_", nessuna:true, per:PER_DOPO_PASSO[tipo] || perProposto(p), nota:tipo === "chiusura" ? NOTA_DOPO_PARTNER : "" })}</div>`;
+}
+/* salva l'appuntamento: la funzione sola usata da tutte le strade che scrivono l'agenda di una persona della Lista */
+async function salvaAgenda(p, campi){
+  await api.modificaPersona(p.id, campi);
 }
 
 /* ---- L'agenda (057): «In agenda · nome» e «Com'è andata?». Vale per Lista e Clienti (sono tutti in persone). ---- */
 function vSheetAgenda(s){
   const p = st.persone.find(x => x.id === st.agendaId);
   if(!p || (s !== "agenda" && s !== "agenda-fatto")) return "";
-  const cli = p.esito === "cliente", annulla = `<button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>`;
+  const annulla = `<button type="button" class="btn ghost grow" data-act="chiudi">Annulla</button>`;
   const err = st.errore ? `<p class="errore">${esc(st.errore)}</p>` : "";
   if(s === "agenda-fatto"){
     const r = RISPOSTE_AGENDA[p.prossima_per] || RISPOSTE_AGENDA.altro;
@@ -5275,21 +5320,9 @@ function vSheetAgenda(s){
     <p class="nota">Solo la risposta segna il passo: una telefonata per fissare il piano non è ancora un piano.</p>${err}
     <button class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Annulla</button>`;
   }
-  const per = st.agendaPer || p.prossima_per || perProposto(p), come = p.prossima_come || "";
-  const giorni = [0, 1, 2].map(i => piuGiorni(oggi(), i));
-  const etichetta = (d, i) => i === 0 ? "Oggi" : i === 1 ? "Domani" : GIORNI_SETT[new Date(d + "T12:00:00").getDay()].replace(/^./, x => x.toUpperCase());
-  const scelto = p.prossima_data && p.prossima_data >= oggi() ? p.prossima_data : "";
-  const chip = (nome, v, t, on) => `<label class="chip"><input type="radio" name="${nome}" value="${esc(v)}"${on ? " checked" : ""}><span>${esc(t)}</span></label>`;
   return `<h2>${esc(st.agendaTitolo || `In agenda · ${nomeSaluto(p.nome)}`)}</h2>
     <form data-form="agenda" novalidate>
-      <fieldset class="field"><legend>Per cosa</legend><div class="opzioni">${AGENDA_PER[cli ? "cliente" : "lista"].map(([k, t]) => chip("per", k, t, k === per)).join("")}</div></fieldset>
-      <fieldset class="field"><legend>Quando</legend><div class="opzioni">${giorni.map((d, i) => chip("quando", d, etichetta(d, i), d === scelto)).join("")}</div>
-        <label class="giorno-scelto"><span class="small">Oppure scegli il giorno</span><input type="date" name="giorno" min="${oggi()}" value="${giorni.includes(scelto) ? "" : esc(scelto)}"></label></fieldset>
-      <fieldset class="field"><legend>Come</legend><div class="opzioni">${AGENDA_COME.map(([k, t]) => chip("come", k, t, k === come)).join("")}</div></fieldset>
-      <label class="field agenda-ora"><span>Ora <i>(facoltativa)</i></span>
-        <input type="time" name="ora" value="${esc(p.prossima_ora ? String(p.prossima_ora).slice(0, 5) : "")}"></label>
-      ${campoAvviso({ valore:avvisoDi(p), piano:per === "piano", ieri:pianoIeriDi(p), nascosto:!p.prossima_ora })}
-      <label class="field"><span>Nota <i>(facoltativa)</i></span><input name="nota" maxlength="200" value="${esc(p.prossima_nota || "")}"></label>
+      ${campiAgenda({ p, per:st.agendaPer || p.prossima_per || perProposto(p) })}
       ${err}
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
       ${p.prossima_data ? `<button type="button" class="btn ghost wide" style="margin-top:8px" data-act="agenda-togli" data-id="${esc(p.id)}">Togli dall'agenda</button>` : ""}
@@ -5354,7 +5387,7 @@ Object.assign(AZIONI, {
     }catch(e){ toast(messaggio(e)); }
   }
 });
-const AGENDA_VUOTA = { prossima_data:null, prossima_ora:null, prossima_nota:null, prossima_per:null, prossima_come:null };
+const AGENDA_VUOTA = { prossima_data:null, prossima_ora:null, prossima_nota:null, prossima_per:null, prossima_come:null, prossima_avviso:null, prossima_giorno_prima:false };
 Object.assign(AZIONI, {
   "agenda"(el){ st.agendaId = el.dataset.id || st.personaId; st.agendaPer = null; st.agendaTitolo = null; st.errore = ""; st.sheet = "agenda"; render(); },
   "agenda-fatto"(el){ st.agendaId = el.dataset.id || st.personaId; st.errore = ""; st.sheet = "agenda-fatto"; render(); },
@@ -5390,19 +5423,13 @@ Object.assign(MODULI, {
   async agenda(f){
     const p = st.persone.find(x => x.id === st.agendaId);
     if(!p) return;
-    const v = n => (f.querySelector(`input[name=${n}]:checked`) || {}).value || null;
-    const giorno = f.giorno.value || v("quando");
-    if(!giorno){ mostraErroreForm(f, "Scegli quando."); return; }
-    if(giorno < oggi()){ mostraErroreForm(f, "Scegli oggi o un giorno che deve ancora venire."); return; }
-    const ora = f.ora.value ? f.ora.value.slice(0, 5) : null, come = v("come"), per = v("per") || perProposto(p);
-    /* 069: l'avviso scelto; il giorno prima solo per il piano; senza ora nessun avviso */
-    const a = ora ? leggiAvviso(f) : { avviso:null, ieri:false };
-    if(a.errore){ mostraErroreForm(f, a.errore); return; }
+    const r = leggiAgenda(f, p);
+    if(r.errore){ mostraErroreForm(f, r.errore); return; }
+    const a = r.campi;
     try{
-      await api.modificaPersona(p.id, { prossima_data:giorno, prossima_ora:ora, prossima_nota:f.nota.value.trim() || null,
-        prossima_per:per, prossima_come:come, nascosta_io:false, prossima_avviso:a.avviso, prossima_giorno_prima:!!(ora && per === "piano" && a.ieri) });
+      await salvaAgenda(p, Object.assign(a, { nascosta_io:false }));
       st.agendaTitolo = null; st.agendaPer = null;
-      await dopoPersone(`In agenda: ${riassuntoAgenda(giorno, ora, come)}`);
+      await dopoPersone(`In agenda: ${riassuntoAgenda(a.prossima_data, a.prossima_ora, a.prossima_come)}`);
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
   }
 });
@@ -5739,13 +5766,13 @@ function vSheetPersone(s){
       ${tipo === "chiusura" ? `<fieldset class="field"><legend>Com'è finita</legend>${opzioni("esito", Object.values(ESITI))}</fieldset>${
         mancanoPerPartner(p) ? `<p class="nota" data-per-esito="partner" hidden>${esc(mancanoPerPartner(p))}</p>` : ""}` : ""}
       <label class="field"><span>Nota <i>(facoltativa)</i></span><input name="nota" maxlength="1000"></label>
-      ${tipo === "chiusura" ? `<div data-per-esito="partner" hidden>${campiProssima("Prossima cosa", null, p)}</div>
+      ${tipo === "chiusura" ? `<div data-per-esito="partner" hidden>${agendaDopoPasso(p, tipo)}</div>
         <fieldset class="field" data-per-esito="non_ora" hidden><legend>Tra quanto lo risenti</legend>
           <div class="opzioni">${RISENTI.map(([v, t]) => `<label class="chip"><input type="radio" name="risenti" value="${v}"${v === "3" ? " checked" : ""}><span>${t}</span></label>`).join("")}</div>
           <input type="date" name="risenti_data" min="${piuGiorni(oggi(), 3)}" aria-label="Oppure scegli il giorno">
           <p class="nota">Te lo ricordo 2 giorni prima.</p></fieldset>
         <div data-per-esito="senza_risposta" hidden>${campoRicordaChiuso()}</div>`
-        : campiProssima(t.prossima, null, p)}
+        : agendaDopoPasso(p, tipo)}
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
     </form>`}`;
   }
@@ -5754,11 +5781,6 @@ function vSheetPersone(s){
     <form data-form="chiudi-contatto" novalidate>
       ${campoRicordaChiuso()}
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Chiudi contatto</button></div>
-    </form>`;
-  if(s === "prossima" && p) return `<h2>Prossima cosa con ${esc(nomeSaluto(p.nome))}</h2>
-    <form data-form="prossima" novalidate>
-      ${campiProssima("Quando", p)}
-      <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Salva</button></div>
     </form>`;
   return "";
 }
@@ -5891,7 +5913,6 @@ Object.assign(AZIONI, {
     try{ await api.modificaPersona(el.dataset.id, { nascosta_io:false }); await dopoPersone("Di nuovo in Io"); }
     catch(e){ toast(messaggio(e)); }
   },
-  prossima(){ st.errore = ""; st.sheet = "prossima"; render(); },
   async "persona-cancella"(){
     const p = st.persone.find(x => x.id === st.personaId);
     if(!p || !confirm(`Togliere ${p.nome} dalla tua lista? Si cancellano anche i suoi passi (i numeri già contati restano).`)) return;
@@ -5910,7 +5931,7 @@ Object.assign(AZIONI, {
     catch(e){ toast(messaggio(e)); }
   },
   async "togli-prossima"(){
-    try{ await api.modificaPersona(st.personaId, { prossima_data:null, prossima_ora:null, prossima_nota:null, prossima_per:null, prossima_come:null }); await dopoPersone("Tolto dall'agenda"); }
+    try{ await api.modificaPersona(st.personaId, AGENDA_VUOTA); await dopoPersone("Tolto dall'agenda"); }
     catch(e){ toast(messaggio(e)); }
   },
   "persona-calendario"(){
@@ -6106,32 +6127,27 @@ Object.assign(MODULI, {
     if(tipo === "chiusura" && !esito){ mostraErroreForm(f, "Scegli com'è finita."); return; }
     const data = f.data.value || oggi();
     if(data > oggi()){ mostraErroreForm(f, "Il passo non può essere nel futuro: per quello c'è la prossima cosa."); return; }
-    let pr = { prossima_data:null, prossima_ora:null, prossima_nota:null };
-    if(tipo !== "chiusura" || esito === "partner") pr = leggiProssima(f);
-    if(pr.errore){ mostraErroreForm(f, pr.errore); return; }
+    /* «E adesso?»: un vero appuntamento in agenda, con gli stessi controlli del form «agenda»; «Nessuna» la svuota */
+    let pr = Object.assign({}, AGENDA_VUOTA);
+    if(tipo !== "chiusura" || esito === "partner"){ const r = leggiAgenda(f, p, { px:"ag_", nessuna:true });
+      if(r.errore){ mostraErroreForm(f, r.errore); return; } pr = r.campi; }
     if(tipo === "chiusura" && esito === "senza_risposta") pr = prossimaChiuso(scelto("ricorda") !== "no");
     if(tipo === "chiusura" && esito === "non_ora"){
       const quando = f.risenti_data.value || piuMesi(oggi(), Number(scelto("risenti") || 3));
       if(quando <= oggi()){ mostraErroreForm(f, "Scegli un giorno nel futuro."); return; }
       const ricordo = piuGiorni(quando, -RISENTI_PRIMA);
-      pr = { prossima_data:ricordo > oggi() ? ricordo : oggi(), prossima_ora:null, prossima_nota:`da risentire il ${dataIt(quando)}` };
+      pr = Object.assign({}, AGENDA_VUOTA, { prossima_data:ricordo > oggi() ? ricordo : oggi(), prossima_per:"contatto", prossima_nota:`da risentire il ${dataIt(quando)}` });
     }
     try{
       await api.nuoviPassi([{ id:uuid(), persona_id:p.id, tipo, data, come:scelto("come"), reazione:scelto("reazione"),
         esito:tipo === "chiusura" ? esito : null, nota:f.nota.value.trim() || null }]);
       /* un passo nuovo riporta la persona su Io, se l'avevo tolta */
-      await api.modificaPersona(p.id, Object.assign(pr, { nascosta_io:false }));
+      await salvaAgenda(p, Object.assign(pr, { nascosta_io:false }));
       /* chiuso come Cliente: esce dalla lista ed entra nei Clienti, con la sua scheda */
       if(tipo === "chiusura" && esito === "cliente"){ st.vista = "persone"; st.sezPersone = "clienti"; st.filtroClienti = "tutti"; }
       await dopoPersone(tipo === "chiusura" && esito === "cliente" ? `${nomeSaluto(p.nome)} è tra i tuoi clienti`
         : `${TIPI_PASSO[tipo].nome}${tipo === "chiusura" ? " · " + ESITI[esito] : ""} segnato`);
     }catch(e){ mostraErroreForm(f, messaggio(e)); }
-  },
-  async prossima(f){
-    const pr = leggiProssima(f);
-    if(pr.errore){ mostraErroreForm(f, pr.errore); return; }
-    try{ await api.modificaPersona(st.personaId, Object.assign(pr, { nascosta_io:false })); await dopoPersone("Prossima cosa salvata"); }
-    catch(e){ mostraErroreForm(f, messaggio(e)); }
   }
 });
 
@@ -6144,11 +6160,6 @@ document.addEventListener("change", e => {
   if(e.target && e.target.name === "risenti" && e.target.form) e.target.form.risenti_data.value = "";
   if(e.target && e.target.name === "risenti_data" && e.target.value && e.target.form)
     e.target.form.querySelectorAll("input[name=risenti]").forEach(r => { r.checked = false; });
-  /* scegliendo "Domani / Tra 3 giorni…" la data scritta a mano si svuota, e viceversa */
-  if(e.target && e.target.name === "tra" && e.target.form) e.target.form.prossima_data.value = "";
-  if(e.target && e.target.name === "prossima_data" && e.target.value && e.target.form){
-    const n = e.target.form.querySelector("input[name=tra][value='']"); if(n) n.checked = true;
-  }
 });
 document.addEventListener("input", e => {
   if(e.target && e.target.id === "cerca-lista"){

@@ -8635,6 +8635,149 @@ async function tavola(path, ritagli, scuro){
   togliChiusi();
 }
 
+// 114. «Segna un passo»: la prossima cosa è un vero appuntamento in agenda (27 novembre 2026, richiesta di Stefano). In fondo
+//      al modulo il blocco «E adesso? Metti in agenda la prossima cosa» con la stessa parte del form «agenda» (Per cosa,
+//      Quando, Come, Ora, Avvisami, Nota). «Nessuna» è scelta all'inizio e svuota l'agenda del tutto. «Per cosa» arriva già
+//      scelto dal passo segnato (Contatto → Fissare il piano, Invito → Piano, Piano e Follow-up → Follow-up, Chiusura Partner →
+//      Altro con «Primo passo insieme»), ma si cambia. Salvato, è in agenda come dal calendario: icona accesa, «Fatto», e
+//      «Com'è andata?» con le risposte giuste (non più «Contattato / Non risponde» dopo il contatto).
+{
+  preparaChiusi();
+  const pid = idChiusi(1);
+  const nuova = (n, nome, extra) => DB.persone.push(Object.assign({ id:idChiusi(n), proprietario:pid, nome, fase:"lista", esito:null, prossima_data:null,
+    prossima_nota:null, prossima_per:null, prossima_come:null, creato_il:new Date(Date.now() - 5 * 864e5).toISOString() }, extra || {}));
+  nuova(30, "Luca Lista"); nuova(31, "Marta Vecchia", { prossima_data:dataPiu(3), prossima_per:"contatto", prossima_come:"telefono", prossima_ora:"10:00", prossima_nota:"vecchia" });
+  ({ ctx, page } = await apriChiusi());
+  const ritagli = { light:[], dark:[] };
+  /* il foglio intero (alto quanto serve) e la scheda, in chiaro e in scuro, senza il messaggio di conferma sopra */
+  const nascondiToast = v => page.evaluate(v => { const t = document.getElementById("toast"); if(t) t.style.visibility = v; }, v);
+  const fotoFoglio = async titolo => { await nascondiToast("hidden"); await page.setViewportSize({ width:360, height:2000 });
+    for(const tema of ["light", "dark"]){ await page.emulateMedia({ colorScheme:tema }); await page.waitForTimeout(80);
+      ritagli[tema].push({ titolo, png:await page.locator(".sheet-box").screenshot() }); }
+    await page.emulateMedia({ colorScheme:"light" }); await page.setViewportSize({ width:360, height:780 }); await nascondiToast(""); };
+  const blocco = page.locator(".sheet .agenda-dopo");
+  const perScelto = () => page.locator(".sheet input[name=ag_per]:checked").getAttribute("value");
+  const aCapoBlocco = () => aCapoIn(page.locator(".sheet"), ".agenda-dopo-titolo, .agenda-dopo legend, .agenda-dopo label.chip span, .agenda-dopo .giorno-scelto .small, .opzioni.tipi .btn");
+  const persona = id => DB.persone.find(x => x.id === id);
+
+  // Luca, in lista: Segna un passo · Contatto
+  await schedaChiusi(page, "Luca Lista");
+  await page.click("button[data-act=passo]");
+  check(await blocco.locator(".agenda-dopo-titolo").innerText() === "E adesso? Metti in agenda la prossima cosa", "114: il titolo «E adesso? Metti in agenda la prossima cosa»");
+  check(await blocco.locator(".agenda-dopo-titolo").evaluate(e => e.scrollWidth <= e.clientWidth), "114: il titolo sta tutto su una riga a 360 px (senza puntini)");
+  check(await perScelto() === "fissare_piano", "114: dopo il contatto «Per cosa» è già «Fissare il piano»");
+  check(await page.locator(".sheet input[name=ag_quando][value='']").isChecked() && await blocco.locator(".agenda-dettagli").isHidden(),
+    "114: all'inizio è scelta «Nessuna» e Come, Ora, Avvisami e Nota non si vedono");
+  check(JSON.stringify(await blocco.locator("fieldset[data-agenda-quando] label.chip span").allInnerTexts()).startsWith('["Nessuna","Oggi","Domani"'), "114: Quando: Nessuna, Oggi, Domani, il giorno dopo");
+  check(JSON.stringify((await blocco.locator("fieldset").first().locator("label.chip span").allInnerTexts())) === JSON.stringify(["Contatto", "Contatto di persona", "Fissare il piano", "Piano", "Follow-up", "Altro"]),
+    "114: Per cosa: le stesse scelte del calendario");
+  await page.click(".sheet label.chip:has-text('Telefono')");
+  await page.click(".sheet .agenda-dopo label.chip:has(span:text-is('Domani'))");
+  check(await blocco.locator(".agenda-dettagli").isVisible(), "114: scelto il giorno compaiono Come, Ora, Avvisami e Nota");
+  await page.click(".sheet .agenda-dopo label.chip:has(span:text-is('WhatsApp'))");
+  await page.fill(".sheet input[name=ag_ora]", "18:30");
+  check(await blocco.locator("[data-avvisami]").isVisible(), "114: con l'ora c'è «Avvisami»");
+  check(!(await aCapoBlocco()).length, "114: Contatto, a 360 px niente va a capo (" + (await aCapoBlocco()).join(" | ") + ")");
+  await fotoFoglio("Contatto: E adesso?");
+  // tornando a «Nessuna» la data e i dettagli si spengono; scrivendo una data i giorni si spengono
+  await page.click(".sheet .agenda-dopo label.chip:has(span:text-is('Nessuna'))");
+  check(await blocco.locator(".agenda-dettagli").isHidden(), "114: con «Nessuna» i dettagli si nascondono");
+  await page.fill(".sheet input[name=ag_giorno]", dataPiu(5)); await page.dispatchEvent(".sheet input[name=ag_giorno]", "change");
+  check(!(await page.locator(".sheet input[name=ag_quando]:checked").count()) && await blocco.locator(".agenda-dettagli").isVisible(), "114: scrivendo una data i giorni si spengono e compaiono i dettagli");
+  await page.fill(".sheet input[name=ag_giorno]", dataPiu(-1)); await page.dispatchEvent(".sheet input[name=ag_giorno]", "change");
+  await page.click(".sheet button:has-text('Salva')");
+  check(await page.locator(".sheet .errore").getByText("Scegli oggi o un giorno che deve ancora venire.").isVisible(), "114: un giorno passato: lo stesso controllo del calendario");
+  await page.click(".sheet .agenda-dopo label.chip:has(span:text-is('Domani'))");
+  check(await page.locator(".sheet input[name=ag_giorno]").inputValue() === "", "114: toccando un giorno la data scritta si svuota");
+  await page.click(".sheet button:has-text('Salva')");
+  await page.getByText("Contatto segnato").waitFor();
+  await sync(page);
+  let l = persona(idChiusi(30));
+  check(l.prossima_data === dataPiu(1) && l.prossima_per === "fissare_piano" && l.prossima_come === "whatsapp" && String(l.prossima_ora).slice(0, 5) === "18:30"
+    && l.prossima_avviso != null && l.prossima_giorno_prima === false && l.prossima_nota === null, "114: salvati giorno, per cosa, come, ora e avviso");
+  check(DB.passi.some(x => x.persona_id === idChiusi(30) && x.tipo === "contatto" && x.come === "Telefono"), "114: il passo «Contatto» ha il suo «Come» (Telefono), separato da quello dell'agenda");
+  // è un vero appuntamento: «Fatto» nella scheda, icona accesa nella Lista, «Com'è andata?» per fissare il piano
+  check(await page.locator(".prossima button[data-act=agenda-fatto]").isVisible(), "114: nella scheda c'è «Fatto»");
+  const fotoScheda = async titolo => { await nascondiToast("hidden");
+    for(const tema of ["light", "dark"]){ await page.emulateMedia({ colorScheme:tema }); await page.waitForTimeout(80);
+      ritagli[tema].push({ titolo, png:await page.locator("#app .card").first().screenshot() }); }
+    await page.emulateMedia({ colorScheme:"light" }); await nascondiToast(""); };
+  await fotoScheda("Luca: in agenda dopo il contatto");
+  await page.click(".prossima button[data-act=agenda-fatto]");
+  check(JSON.stringify(await page.locator(".sheet .risposte-agenda button").allInnerTexts()) === JSON.stringify(["Piano fissato", "Non ora", "Non risponde"]),
+    "114: «Com'è andata?» chiede del piano da fissare, non «Contattato / Non risponde»");
+  await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=torna-lista]");
+  const riga = page.locator(".persone li", { hasText:"Luca Lista" });
+  check(await riga.locator("button.cal.on").count() === 1, "114: nella Lista l'icona del calendario è accesa");
+  for(const tema of ["light", "dark"]){ await page.emulateMedia({ colorScheme:tema }); await page.waitForTimeout(80);
+    ritagli[tema].push({ titolo:"Luca nella Lista: icona accesa", png:await riga.screenshot() }); }
+  await page.emulateMedia({ colorScheme:"light" });
+
+  // Piano: «Per cosa» è il follow-up; si può cambiare (qui «Altro»)
+  await schedaChiusi(page, "Luca Lista");
+  await page.click("button[data-act=passo]"); await page.click(".sheet button[data-tipo=piano]");
+  check(await perScelto() === "followup", "114: dopo il piano «Per cosa» è già «Follow-up»");
+  await page.click(".sheet .agenda-dopo label.chip:has(span:text-is('Domani'))");
+  check(!(await aCapoBlocco()).length, "114: Piano, a 360 px niente va a capo (" + (await aCapoBlocco()).join(" | ") + ")");
+  await fotoFoglio("Piano: E adesso?");
+  await page.click(".sheet .agenda-dopo label.chip:has(span:text-is('Altro'))");
+  await page.fill(".sheet input[name=ag_nota]", "portargli il catalogo");
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("Piano segnato").waitFor(); await sync(page);
+  l = persona(idChiusi(30));
+  check(l.prossima_per === "altro" && l.prossima_nota === "portargli il catalogo" && l.prossima_come === null && l.prossima_ora === null && l.prossima_avviso === null,
+    "114: «Per cosa» si cambia; salvati anche come, ora e avviso (vuoti), niente resta di prima");
+  // Invito e Follow-up: Piano e Follow-up; Chiusura → Partner: Altro con «Primo passo insieme»
+  await page.click("button[data-act=passo]"); await page.click(".sheet button[data-tipo=invito]");
+  check(await perScelto() === "piano", "114: dopo l'invito «Per cosa» è già «Piano»");
+  await page.click(".sheet button[data-tipo=followup]");
+  check(await perScelto() === "followup", "114: dopo il follow-up «Per cosa» è già «Follow-up»");
+  await page.click(".sheet button[data-tipo=chiusura]");
+  check(await blocco.isHidden(), "114: chiusura senza esito: niente blocco «E adesso?»");
+  await page.click(".sheet label.chip:has-text('Partner')");
+  check(await blocco.isVisible() && await perScelto() === "altro" && await page.locator(".sheet input[name=ag_nota]").inputValue() === "Primo passo insieme",
+    "114: chiusura Partner: «Altro» con la nota «Primo passo insieme»");
+  await page.click(".sheet .agenda-dopo label.chip:has(span:text-is('Domani'))");
+  check(!(await aCapoBlocco()).length, "114: Chiusura Partner, a 360 px niente va a capo (" + (await aCapoBlocco()).join(" | ") + ")");
+  await fotoFoglio("Chiusura Partner: E adesso?");
+  await page.click(".sheet [data-act=chiudi]");
+
+  // «Nessuna» svuota l'agenda del tutto: Marta aveva un contatto in agenda, segnato il contatto non resta niente di vecchio
+  await schedaChiusi(page, "Marta Vecchia");
+  await page.click("button[data-act=passo]");
+  check(await page.locator(".sheet input[name=ag_quando][value='']").isChecked(), "114: anche con un appuntamento già in agenda si parte da «Nessuna»");
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("Contatto segnato").waitFor(); await sync(page);
+  const m = persona(idChiusi(31));
+  check(["prossima_data", "prossima_ora", "prossima_nota", "prossima_per", "prossima_come", "prossima_avviso"].every(k => m[k] == null) && m.prossima_giorno_prima === false,
+    "114: con «Nessuna» l'agenda si svuota del tutto (anche prossima_per)");
+  check(await page.locator(".prossima").getByText("Nessun giorno").isVisible(), "114: nella scheda «Nessun giorno»");
+
+  // Non ora e Chiuso senza risposta: la loro data ha sempre il suo «per cosa» (contatto)
+  await page.click("button[data-act=passo]"); await page.click(".sheet button[data-tipo=chiusura]");
+  await page.click(".sheet label.chip:has(span:text-is('Non ora'))"); await page.click(".sheet label.chip:has-text('3 mesi')");
+  check(await blocco.isHidden(), "114: Non ora mantiene le sue scelte (mesi), senza il blocco «E adesso?»");
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("Chiusura · Non ora segnato").waitFor(); await sync(page);
+  const mn = persona(idChiusi(31));
+  check(mn.esito === "non_ora" && mn.prossima_per === "contatto" && /da risentire il/.test(mn.prossima_nota) && mn.prossima_data > oggiStr && mn.prossima_ora == null,
+    "114: Non ora salva anche «per cosa» = contatto");
+  await page.click("button[data-act=riapri-persona]"); await page.locator("#app .card").first().locator(".percorso-persona").waitFor();
+  await page.click("button[data-act=passo]"); await page.click(".sheet button[data-tipo=chiusura]");
+  await page.click(".sheet label.chip:has(span:text-is('Chiuso senza risposta'))");
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("Chiusura · Chiuso senza risposta segnato").waitFor(); await sync(page);
+  check(persona(idChiusi(31)).prossima_per === "contatto" && persona(idChiusi(31)).prossima_data > oggiStr, "114: Chiuso senza risposta con il promemoria: «per cosa» = contatto");
+
+  // il calendario usa la stessa funzione: stessi controlli (serve il giorno)
+  await schedaChiusi(page, "Luca Lista");
+  await page.click(".prossima button[data-act=agenda]");
+  await page.click(".sheet button:has-text('Salva')").catch(() => {});
+  check(await page.locator(".sheet input[name=quando][value='']").count() === 0, "114: nel calendario non c'è «Nessuna»");
+  await page.click(".sheet [data-act=chiudi]").catch(() => {});
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "114: a 360 px niente scorrimento di lato");
+  await tavola(S + "/e2e/114-agenda-light.png", ritagli.light); await tavola(S + "/e2e/114-agenda-dark.png", ritagli.dark, true);
+  await ctx.close();
+  togliChiusi();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
