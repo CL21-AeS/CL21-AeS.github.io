@@ -8328,6 +8328,101 @@ for(const tema of ["light", "dark"]){
   DB.numeri = (DB.numeri || []).filter(x => !String(x.partner_id).startsWith("a3000000"));
 }
 
+// ---- Persone chiuse (27 novembre 2026, richiesta di Stefano, sezioni 110-113): le persone delle anteprime a 360 px ----
+// Paola ha nella Lista: Anna chiusa come Partner senza passi, Bruno Partner con tutti i passi, Carla «No», Dino «Non ora»
+// con il giorno in cui risentirlo, Elsa aperta in fase Piano (e Fabio chiuso senza risposta, solo per i controlli).
+const idChiusi = n => "a5000000-0000-4000-8000-0000000000" + String(n).padStart(2, "0"), chiaveChiusi = "e7".repeat(16);
+const ANTEPRIMA_CHIUSI = ["Anna Partner", "Bruno Completo", "Carla No", "Dino Nonora", "Elsa Piano"];
+const dataPiu = n => new Intl.DateTimeFormat("en-CA", { timeZone:"Europe/Rome" }).format(new Date(Date.now() + n * 864e5));
+const risentiChiusi = "da risentire il " + giornoMappaIt(dataPiu(90) + "T12:00:00");
+/* «dal 27 novembre», «dall'8 novembre», «dal 1° dicembre» (come dalGiorno nell'app; le date dei test sono di quest'anno) */
+const dalIt = d => { const g = giornoMappaIt(d + "T12:00:00"), n = parseInt(g, 10); return n === 1 ? "dal 1°" + g.slice(1) : n === 8 || n === 11 ? "dall'" + g : "dal " + g; };
+function preparaChiusi(){
+  const ora = new Date().toISOString(), pid = idChiusi(1);
+  DB.partners = DB.partners.filter(p => p.id !== pid).concat([{ id:pid, nome:"Paola Percorsi", sponsor_id:"R", stato:"attivo", codice_invito:"PC110X",
+    codice_amway:"7970001", chiave:chiaveChiusi, privacy_accettata_il:ora, confermato_il:ora, partenza_confermata_il:ora, creato_il:ora, data_iscrizione:"2024-01-10" }]);
+  DB.persone = (DB.persone || []).filter(p => p.proprietario !== pid);
+  DB.passi = (DB.passi || []).filter(p => p.proprietario !== pid);
+  let k = 0;
+  const persona = (n, nome, fase, esito, extra) => { DB.persone.push(Object.assign({ id:idChiusi(n), proprietario:pid, nome, fase, esito, prossima_data:null, prossima_nota:null,
+    creato_il:new Date(Date.now() - (60 - n) * 864e5).toISOString() }, extra || {})); };
+  const passo = (n, tipo, giorni, esito) => DB.passi.push({ id:idChiusi(n) + "-" + String(++k).padStart(2, "0"), persona_id:idChiusi(n), proprietario:pid, tipo,
+    data:dataPiu(-giorni), esito:esito || null, importato:false, attivita_id:null, creato_il:new Date(Date.now() - 864e5 * giorni - (100 - k) * 1000).toISOString() });
+  persona(10, "Anna Partner", "lista", "partner"); passo(10, "chiusura", 0, "partner");
+  persona(11, "Bruno Completo", "followup", "partner");
+  passo(11, "contatto", 20); passo(11, "invito", 15); passo(11, "piano", 10); passo(11, "followup", 5); passo(11, "chiusura", 0, "partner");
+  persona(12, "Carla No", "contattato", "no"); passo(12, "contatto", 9); passo(12, "chiusura", 0, "no");
+  persona(13, "Dino Nonora", "piano", "non_ora", { prossima_data:dataPiu(88), prossima_nota:risentiChiusi });
+  passo(13, "contatto", 30); passo(13, "invito", 25); passo(13, "piano", 20); passo(13, "chiusura", 2, "non_ora");
+  persona(14, "Elsa Piano", "piano", null); passo(14, "contatto", 12); passo(14, "invito", 8); passo(14, "piano", 3);
+  persona(15, "Fabio Silenzio", "contattato", "senza_risposta"); passo(15, "contatto", 40); passo(15, "chiusura", 0, "senza_risposta");
+}
+const togliChiusi = () => { const pid = idChiusi(1);
+  DB.partners = DB.partners.filter(p => p.id !== pid); DB.persone = (DB.persone || []).filter(p => p.proprietario !== pid);
+  DB.passi = (DB.passi || []).filter(p => p.proprietario !== pid); DB.activities = DB.activities.filter(a => a.partner_id !== pid); };
+const apriChiusi = async () => { const r = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + chiaveChiusi);
+  await r.page.locator(".testata h1").waitFor(); if(await r.page.locator(".sheet").count()) await r.page.click(".sheet [data-act=chiudi]").catch(() => {});
+  await r.page.click("button[data-act=vista-persone]"); return r; };
+const schedaChiusi = async (pg, nome) => { if(await pg.locator("button[data-act=torna-lista]").count()) await pg.click("button[data-act=torna-lista]");
+  await pg.locator("button[data-act=apri-persona]", { hasText:nome }).click(); await pg.locator("button[data-act=passo]").waitFor(); };
+/* una tavola con più ritagli affiancati (le anteprime delle persone in un'immagine sola, in chiaro o in scuro) */
+async function tavola(path, ritagli, scuro){
+  const c = await browser.newContext({ viewport:{ width:400, height:400 }, colorScheme:scuro ? "dark" : "light" }), pg = await c.newPage();
+  await pg.setContent(`<body style="margin:0;padding:16px;display:flex;gap:16px;align-items:flex-start;background:${scuro ? "#0b1712" : "#f3efe6"};font:600 13px system-ui;color:${scuro ? "#cfd8d3" : "#33443c"}">${
+    ritagli.map(r => `<figure style="margin:0;width:360px"><figcaption style="margin:0 0 6px">${r.titolo}</figcaption><img style="display:block;width:360px" src="data:image/png;base64,${r.png.toString("base64")}"></figure>`).join("")}</body>`);
+  await pg.screenshot({ path, fullPage:true }); await c.close();
+}
+
+// 110. Scheda di una persona chiusa (27 novembre 2026, richiesta di Stefano): con l'esito, al posto della barra delle fasi
+//      una sola riga con la data del passo di chiusura più recente. Partner e Cliente in verde («✓ Partner dal …»), No e
+//      Chiuso senza risposta neutri, Non ora con il giorno in cui risentirlo. Solo visualizzazione: fase ed esito non
+//      cambiano. «Riapri il percorso» riporta la barra. Senza esito la barra è quella di prima. Su una riga a 360 px.
+{
+  preparaChiusi();
+  ({ ctx, page } = await apriChiusi());
+  const attese = { "Anna Partner":`✓ Partner ${dalIt(dataPiu(0))}`, "Bruno Completo":`✓ Partner ${dalIt(dataPiu(0))}`,
+    "Carla No":`Percorso chiuso · No · ${giornoMappaIt(dataPiu(0) + "T12:00:00")}`, "Dino Nonora":`Non ora · ${risentiChiusi}`,
+    "Fabio Silenzio":`Chiuso senza risposta · ${giornoMappaIt(dataPiu(0) + "T12:00:00")}` };
+  const ritagli = { light:[], dark:[] };
+  for(const nome of ANTEPRIMA_CHIUSI.concat(["Fabio Silenzio"])){
+    await schedaChiusi(page, nome);
+    const card = page.locator("#app .card").first(), riga = card.locator(".chiusura-persona");
+    if(attese[nome]){
+      const t = (await riga.innerText()).trim();
+      check(t === attese[nome] && !(await card.locator(".percorso-persona").count()), `scheda di ${nome}: «${attese[nome]}» al posto della barra (${t})`);
+      const g = await riga.evaluate(e => ({ dentro:e.scrollWidth <= e.clientWidth, alta:e.getBoundingClientRect().height, verde:e.classList.contains("ok"),
+        colore:getComputedStyle(e).color, verdeVar:getComputedStyle(document.documentElement).getPropertyValue("--verde").trim() }));
+      check(g.dentro && g.alta < 44, `scheda di ${nome}: la riga di chiusura non va a capo a 360 px (${JSON.stringify(g)})`);
+      check(g.verde === (nome === "Anna Partner" || nome === "Bruno Completo"), `scheda di ${nome}: ${g.verde ? "verde" : "stile neutro"}`);
+    }else{
+      check(await card.locator(".percorso-persona li.qui").innerText() === "Piano fatto" && !(await card.locator(".chiusura-persona").count()),
+        `scheda di ${nome} (aperta): la barra delle fasi come prima, su «Piano fatto»`);
+    }
+    check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), `scheda di ${nome} a 360 px: niente scorrimento di lato`);
+    if(ANTEPRIMA_CHIUSI.includes(nome)) for(const tema of ["light", "dark"]){
+      await page.emulateMedia({ colorScheme:tema }); await page.waitForTimeout(80);
+      ritagli[tema].push({ titolo:nome, png:await card.screenshot() });
+    }
+    await page.emulateMedia({ colorScheme:"light" });
+  }
+  await tavola(S + "/e2e/110-schede-light.png", ritagli.light); await tavola(S + "/e2e/110-schede-dark.png", ritagli.dark, true);
+  // fase ed esito restano quelli del database: Anna (chiusa senza passi) è ancora «lista»
+  await sync(page);
+  check(DB.persone.find(p => p.id === idChiusi(10)).fase === "lista", "solo visualizzazione: la fase di Anna resta quella calcolata (lista)");
+  // Cliente: verde, «✓ Cliente dal …»
+  check(await page.evaluate(([id, d]) => { const st = GROWUP_TEST.st, p = Object.assign({}, st.persone.find(x => x.id === id), { esito:"cliente" });
+    return GROWUP_TEST.rigaChiusura(p).includes(`chiusura-persona ok">✓ Cliente ${d}<`); }, [idChiusi(10), dalIt(dataPiu(0))]), "Cliente: «✓ Cliente dal …» in verde");
+  // «Riapri il percorso»: torna la barra, sulla fase di prima
+  await schedaChiusi(page, "Carla No");
+  await page.click("button[data-act=riapri-persona]");
+  const card = page.locator("#app .card").first();
+  await card.locator(".percorso-persona").waitFor();
+  check(await card.locator(".percorso-persona li.qui").innerText() === "Contattato" && !(await card.locator(".chiusura-persona").count()),
+    "«Riapri il percorso»: torna la barra delle fasi (Carla su «Contattato»)");
+  await ctx.close();
+  togliChiusi();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

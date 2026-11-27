@@ -1,7 +1,20 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 26 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 27 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
+
+## Lista: la scheda di una persona chiusa (27 novembre 2026, richiesta di Stefano, app v133, database non toccato)
+
+- Nella scheda di una persona della Lista **con un esito**, al posto della barra delle fasi (`ol.percorso-persona`) c'è
+  **una sola riga** (`rigaChiusura` in `app.js`) con la data del passo di chiusura più recente:
+  - Partner / Cliente, in verde: «✓ Partner dal 27 novembre» («dall'8», «dal 1°»);
+  - No: «Percorso chiuso · No · 27 novembre»; Chiuso senza risposta: «Chiuso senza risposta · 27 novembre», stile neutro;
+  - Non ora: «Non ora · da risentire il 25 febbraio» (il giorno scelto chiudendo; se manca, la data in agenda), neutro.
+- Solo visualizzazione: fase ed esito restano quelli calcolati dal database (`persona_ricalcola`). Senza esito la barra è
+  quella di prima; «Riapri il percorso» la riporta. La riga non va a capo a 360 px (una riga, con i puntini se servisse).
+Test: interfaccia sezione 110 (le cinque persone delle anteprime: Partner senza passi, Partner con tutti i passi, No, Non
+ora con la data, aperta in fase Piano; più Chiuso senza risposta e Cliente; nessun a capo a 360 px; «Riapri il percorso»;
+anteprime `design/anteprime/110-schede-light/dark.png`).
 
 ## Io → Il mio mese: «Linee qualificate» nel mese in corso (26 novembre 2026, definizione di Stefano, app v132, database non toccato)
 
