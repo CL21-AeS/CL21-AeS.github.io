@@ -3,7 +3,7 @@
 Ultimo aggiornamento: 27 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
-## Chiusura come Partner = contatto, invito e piano fatti (27 novembre 2026, regola di Stefano, app v136, migrazione 070 DA APPLICARE)
+## Chiusura come Partner = contatto, invito e piano fatti (27 novembre 2026, regola di Stefano, app v136, migrazione 070 applicata)
 
 - **Regola di Stefano**: nessuno diventa Partner senza contatto, invito e piano. Il follow-up invece non è automatico (si può
   sponsorizzare subito dopo il piano).
@@ -23,6 +23,13 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
   chiusura»). Nel modulo «Segna un passo», scegliendo Chiusura → Partner, una riga piccola sotto la scelta: «Segna anche
   contatto, invito e piano.» o solo quelli che mancano («Segna anche invito e piano.», «Segna anche il piano.»); niente se ci
   sono tutti (`mancanoPerPartner`). La versione di prova (`prova/api-prova.js`) fa lo stesso del database.
+- **Applicata al database vero il 27 novembre 2026** (ok di Stefano, dopo l'unione delle PR #253-#256), con il connettore.
+  Prima controllato che `passi_prima` sul database fosse uguale a quella della 020 (solo senza commenti). Dopo: la colonna
+  `segnato_con` con il suo collegamento (on delete cascade), il trigger `passi_chiusura_partner`; la funzione non si chiama
+  dal telefono e la colonna non si scrive né si cambia; RLS invariata; nessun dato cambiato (stessi passi, attività e
+  persone, nessun passo automatico). Prova vera in un blocco annullato alla fine: chiusura Partner senza passi → contatto,
+  invito, piano e chiusura in quest'ordine, fase «piano», +2 attività (l'invito senza); cancellando la chiusura tutto torna
+  com'era. Avvisi di sicurezza di Supabase: gli stessi di prima, nessuno nuovo.
 - Per toglierla: `070_chiusura_partner_togli.sql` (i passi già aggiunti restano come passi normali). Anche in
   `installa_tutto.sql`. Revisione di sicurezza (controllo rapido): a posto, riga 070 in `SICUREZZA.md`.
 Test: `sh test/db.sh` (controlli 070: senza passi = +1 contatto e +1 piano, l'invito senza attività, ordine, data,
