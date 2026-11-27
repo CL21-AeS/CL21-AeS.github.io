@@ -5182,7 +5182,7 @@ function campoAvviso(o){
       <select name="${n}_u" aria-label="Minuti, ore o giorni">${UNITA_AVVISO.map(([k, t]) => `<option value="${k}"${k === u ? " selected" : ""}>${t}</option>`).join("")}</select>
       <span class="small">prima · al massimo 7 giorni</span></div>
     ${o.piano === undefined ? "" : `<label class="interruttore avviso-ieri"${o.piano && v !== GIORNO ? "" : " hidden"}>
-      <span class="grow">Avvisami anche il giorno prima<br><span class="small">alla stessa ora: «Domani hai un piano: conferma l'appuntamento.»</span></span>
+      <span class="grow">Avvisami anche il giorno prima<br><span class="small">alla stessa ora, per confermare il piano</span></span>
       <input type="checkbox" name="${(o.prefisso || "")}avviso_ieri" role="switch"${o.ieri ? " checked" : ""}><span class="toggle" aria-hidden="true"></span></label>`}
   </fieldset>`;
 }
@@ -5304,9 +5304,20 @@ function agendaDopoPasso(p, tipo){
   return `<div class="agenda-dopo"><p class="agenda-dopo-titolo">E adesso? Metti in agenda la prossima cosa</p>
     ${campiAgenda({ p, px:"ag_", nessuna:true, per:PER_DOPO_PASSO[tipo] || perProposto(p), nota:tipo === "chiusura" ? NOTA_DOPO_PARTNER : "" })}</div>`;
 }
-/* salva l'appuntamento: la funzione sola usata da tutte le strade che scrivono l'agenda di una persona della Lista */
+/* salva l'appuntamento: la funzione sola usata da tutte le strade che scrivono l'agenda (il calendario, «E adesso?» di
+   «Segna un passo», «Quando è il piano?» dopo «Com'è andata?»).
+   Un Piano in calendario segna subito l'invito (27 novembre 2026, regola di Stefano): l'appuntamento è fissato davvero.
+   Solo per una persona della Lista senza esito che non ha ancora un invito: un passo «invito» di oggi, «Sì, appuntamento
+   fissato»; il contatto, se manca, lo aggiunge il database (071). Mai due inviti: si guarda dopo aver ricaricato i passi
+   (anche quello appena segnato). Spostando o togliendo l'appuntamento l'invito resta. Lo fa l'app, non un trigger su
+   persone: così non ci sono aggiornamenti in cerchio tra persone e passi. */
 async function salvaAgenda(p, campi){
   await api.modificaPersona(p.id, campi);
+  if(campi.prossima_per !== "piano" || !campi.prossima_data) return;
+  const [persone, passi] = await Promise.all([api.persone(), api.passi()]);   // i dati di adesso (un errore qui non segna niente)
+  const ora = (persone || []).find(x => x.id === p.id);
+  if(!ora || ora.esito || (passi || []).some(s => s.persona_id === p.id && s.tipo === "invito")) return;
+  await api.nuoviPassi([{ id:uuid(), persona_id:p.id, tipo:"invito", data:oggi(), reazione:"Sì, appuntamento fissato" }]);
 }
 
 /* ---- L'agenda (057): «In agenda · nome» e «Com'è andata?». Vale per Lista e Clienti (sono tutti in persone). ---- */

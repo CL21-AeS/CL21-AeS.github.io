@@ -3,6 +3,27 @@
 Ultimo aggiornamento: 27 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Un Piano in calendario segna subito l'invito (27 novembre 2026, regola di Stefano, app v139, database non toccato)
+
+- Quando si salva un appuntamento con **Per cosa = «Piano»** per una persona della Lista **senza esito** che non ha ancora un
+  passo «invito», si aggiunge un passo «invito» con la data di oggi e la reazione «Sì, appuntamento fissato». Il contatto, se
+  manca, lo aggiunge il database (071), quindi +1 contatto nei numeri; il piano no (non c'è ancora stato).
+- Vale per le tre strade, perché passano tutte da `salvaAgenda`: la scheda del calendario, il blocco «E adesso?» di «Segna
+  un passo» e «Quando è il piano?» dopo «Com'è andata?». Mai due inviti: prima di aggiungerlo si rileggono i passi (anche
+  quello appena segnato, per esempio dopo «Piano fissato»). Se l'appuntamento si sposta o si toglie, l'invito resta. Niente
+  per Clienti e persone chiuse (anche «Non ora»).
+- **Fatto nell'app, non nel database**: un trigger su `persone` che scrive in `passi` (che a sua volta ricalcola `persone`)
+  avrebbe creato aggiornamenti in cerchio. Il «Ricordamelo» della persona ferma non è un appuntamento fissato: non segna niente.
+- Sotto «Avvisami anche il giorno prima» la descrizione ora è «alla stessa ora, per confermare il piano» (prima andava a capo
+  a 360 px). Il testo della notifica non cambia.
+- **Restano a capo a 360 px** (già prima, rimandati da Stefano il 27 novembre): il testo «In agenda» nella scheda e il testo
+  sotto il nome nella riga della Lista quando l'appuntamento ha giorno, ora e «per cosa».
+Test: `sh test/db.sh` (un invito di oggi su una persona In lista = contatto automatico e +1 contatto, nient'altro); interfaccia
+sezione 116 (calendario con Piano: invito di oggi e contatto automatico, +1 contatto, «Fatto», icona accesa, passi nella
+scheda; spostando nessun invito in più, togliendo l'invito resta; con l'invito già segnato niente in più; «Non ora» niente;
+«E adesso?» con Piano dopo un contatto; un invito segnato a mano; «Piano fissato» e «Quando è il piano?» = un invito solo;
+niente a capo nella scheda del calendario; anteprime `design/anteprime/116-piano-light/dark.png`).
+
 ## I passi precedenti si spuntano da soli (27 novembre 2026, richiesta di Stefano, app v138, migrazione 071 da applicare)
 
 - **Database (071, `071_passi_precedenti.sql`)**: allarga la regola della 070 (una funzione sola, `passi_precedenti`, al posto
