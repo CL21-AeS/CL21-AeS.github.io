@@ -9046,6 +9046,58 @@ async function tavola(path, ritagli, scuro){
   togliChiusi();
 }
 
+// 118. Il «Rimanda» dei Clienti è un vero appuntamento (27 novembre 2026, scelta di Stefano). Salva anche il suo «per cosa»
+//      (come proposto dal calendario: riordino, come si è trovato o auguri) e svuota il resto dell'agenda (niente come, ora o
+//      avviso vecchi): icona accesa, «Fatto», «Com'è andata?». «Togli il rinvio» e un ordine nuovo svuotano l'agenda del tutto.
+{
+  preparaChiusi();
+  const pid = idChiusi(1);
+  DB.persone.push({ id:idChiusi(80), proprietario:pid, nome:"Zeno Cliente", fase:"lista", esito:"cliente", prossima_data:dataPiu(1), prossima_ora:"10:00",
+    prossima_come:"telefono", prossima_per:"consegna", prossima_nota:"vecchia", prossima_avviso:60, creato_il:new Date(Date.now() - 40 * 864e5).toISOString() });
+  DB.passi.push({ id:idChiusi(80) + "-c", persona_id:idChiusi(80), proprietario:pid, tipo:"chiusura", esito:"cliente", data:dataPiu(-30), importato:false, attivita_id:null,
+    creato_il:new Date(Date.now() - 30 * 864e5).toISOString() });
+  ({ ctx, page } = await apriChiusi());
+  const ritagli = { light:[], dark:[] };
+  const foto = async (titolo, loc) => { await page.evaluate(() => { const t = document.getElementById("toast"); if(t) t.style.visibility = "hidden"; });
+    for(const tema of ["light", "dark"]){ await page.emulateMedia({ colorScheme:tema }); await page.waitForTimeout(80);
+      ritagli[tema].push({ titolo, png:await page.locator(loc).first().screenshot() }); }
+    await page.emulateMedia({ colorScheme:"light" }); await page.evaluate(() => { const t = document.getElementById("toast"); if(t) t.style.visibility = ""; }); };
+  const zeno = () => DB.persone.find(x => x.id === idChiusi(80));
+  await page.click("button[data-sez=clienti]");
+  await page.locator("button[data-act=apri-cliente]", { hasText:"Zeno Cliente" }).click();
+  await page.click("button[data-act=rimanda-cliente]");
+  check(await page.locator(".sheet p.small").first().innerText().then(t => t.includes("Quel giorno lo trovi in agenda.")), "118: il foglio dice che quel giorno è in agenda");
+  check((await page.locator(".sheet button[data-act=rimanda-togli]").innerText()).trim() === `Togli il rinvio del ${giornoMappaIt(dataPiu(1) + "T12:00:00")}`
+    && !(await aCapoIn(page.locator(".sheet"), "button, label.chip span")).length, "118: «Togli il rinvio del …» e le scelte non vanno a capo a 360 px");
+  await page.click(".sheet label.chip:has-text('2 settimane')");
+  await page.fill(".sheet input[name=nota]", "ne ha ancora mezzo flacone");
+  await foto("Zeno: Rimanda", ".sheet-box");
+  await page.click(".sheet button:has-text('Rimanda')"); await page.getByText("Rimandato").waitFor(); await sync(page);
+  const z = zeno();
+  check(z.prossima_data === dataPiu(14) && z.prossima_per === "riordino" && z.prossima_nota === "ne ha ancora mezzo flacone"
+    && z.prossima_ora == null && z.prossima_come == null && z.prossima_avviso == null && z.prossima_giorno_prima === false,
+    "118: il rinvio salva giorno, «per cosa» (riordino) e nota; niente ora, come o avviso vecchi");
+  check(await page.locator(".prossima button[data-act=agenda-fatto]").isVisible()
+    && (await page.locator(".prossima .prossima-dettagli").innerText()).trim() === "riordino · ne ha ancora mezzo flacone", "118: nella scheda è in agenda, con «Fatto»");
+  await foto("Zeno: la scheda dopo il rinvio", "#app .card >> nth=0");
+  await page.click(".prossima button[data-act=agenda-fatto]");
+  check(JSON.stringify(await page.locator(".sheet .risposte-agenda button").allInnerTexts()) === JSON.stringify(["Ha riordinato", "Non ora", "Non risponde"]),
+    "118: «Com'è andata?» chiede del riordino");
+  await page.click(".sheet [data-act=chiudi]");
+  await page.click("button[data-act=torna-clienti]");
+  const riga = page.locator(".persone li", { hasText:"Zeno Cliente" });
+  check(await riga.locator("button.cal.on").count() === 1 && !(await aCapoIn(riga, ".grow > .small")).length, "118: nella riga dei Clienti l'icona è accesa, su una riga");
+  await foto("Zeno nei Clienti", ".persone li:has-text('Zeno Cliente')");
+  // «Togli il rinvio» svuota l'agenda del tutto
+  await page.locator("button[data-act=apri-cliente]", { hasText:"Zeno Cliente" }).click();
+  await page.click("button[data-act=rimanda-cliente]"); await page.click(".sheet button[data-act=rimanda-togli]"); await page.getByText("Rinvio tolto").waitFor(); await sync(page);
+  check(["prossima_data", "prossima_ora", "prossima_nota", "prossima_per", "prossima_come", "prossima_avviso"].every(k => zeno()[k] == null), "118: «Togli il rinvio» svuota l'agenda del tutto");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "118: a 360 px niente scorrimento di lato");
+  await tavola(S + "/e2e/118-rimanda-light.png", ritagli.light); await tavola(S + "/e2e/118-rimanda-dark.png", ritagli.dark, true);
+  await ctx.close();
+  togliChiusi();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

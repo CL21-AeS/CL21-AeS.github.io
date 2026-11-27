@@ -3,6 +3,18 @@
 Ultimo aggiornamento: 27 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Clienti: il «Rimanda» è un vero appuntamento (27 novembre 2026, scelta di Stefano, app v141, database non toccato)
+
+- «Rimanda» salva anche il suo **«per cosa»** (quello proposto dal calendario per un cliente: riordino, come si è trovato o
+  auguri) e svuota il resto dell'agenda (niente come, ora o avviso vecchi). Così quel giorno il cliente ha l'icona accesa,
+  «Fatto» e «Com'è andata?» (per il riordino: «Ha riordinato / Non ora / Non risponde»). Fino a quella data non compare tra
+  quelli da sentire, come prima; il foglio ora dice «Quel giorno lo trovi in agenda.».
+- «Togli il rinvio» e un **ordine nuovo** svuotano l'agenda del tutto (`AGENDA_VUOTA`): mai un «per cosa» vecchio. Il
+  pulsante si legge «Togli il rinvio del 28 novembre» (prima «(oggi è da risentire il …)», che andava a capo a 360 px).
+Test: interfaccia sezione 118 (il rinvio con giorno, per cosa e nota e niente di vecchio, «Fatto» e «Com'è andata?», icona
+accesa nella riga, «Togli il rinvio» che svuota tutto, niente a capo nel foglio; anteprime
+`design/anteprime/118-rimanda-light/dark.png`).
+
 ## Il testo dell'appuntamento non va più a capo a 360 px (27 novembre 2026, scelta di Stefano, app v140, database non toccato)
 
 - **Riga della Lista**: con un appuntamento, al posto della fase (si vede già dai pallini) solo **quando e per cosa**:
@@ -82,7 +94,7 @@ i conteggi, la cancellazione, «Com'è andata?», Riapri; anteprime `design/ante
   risposta» con il promemoria a 6 mesi lo faceva già. Le loro scelte restano quelle di prima.
 - Tolti `campiProssima`, `leggiProssima`, il foglio «Prossima cosa» (non si apriva più da nessuna parte) e i titoli
   «Quando ci ritorni sopra», «Data dell'appuntamento», «Quando lo risenti» di `TIPI_PASSO`.
-- **Lasciato com'era** (fuori dalla Lista): il «Rimanda» dei Clienti salva solo giorno e nota. Da decidere con Stefano.
+- (Il «Rimanda» dei Clienti salvava solo giorno e nota: sistemato subito dopo, con l'ok di Stefano, app v141.)
 Test: interfaccia sezione 114 (titolo, Per cosa già scelto per Contatto, Invito, Piano, Follow-up e Chiusura Partner, «Nessuna»
 all'inizio, i giorni e la data scritta, giorno passato rifiutato, salvataggio completo, «Fatto» e icona accesa, «Com'è andata?»
 con «Piano fissato / Non ora / Non risponde», «Nessuna» che svuota tutto, Non ora e Chiuso senza risposta con «contatto»; niente a
