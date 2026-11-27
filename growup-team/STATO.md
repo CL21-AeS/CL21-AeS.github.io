@@ -3,6 +3,15 @@
 Ultimo aggiornamento: 27 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Lista: la riga di una persona chiusa (27 novembre 2026, richiesta di Stefano, app v134, database non toccato)
+
+- Nella riga della Lista (`rigaPersona`) una persona **con un esito** non ha più i 5 pallini delle fasi: chiusa come
+  **Partner o Cliente** ha un piccolo **✓ verde** (`.esito-si`, `role="img"`, `aria-label` «Partner» o «Cliente»); con gli
+  altri esiti (No, Non ora, Chiuso senza risposta) niente. Il testo sotto il nome non cambia. Chi è in percorso ha i pallini
+  come prima.
+Test: interfaccia sezione 111 (Partner senza passi e con tutti i passi, No, Non ora, Chiuso senza risposta, Cliente, aperta in
+fase Piano con 4 pallini accesi; il ✓ verde con aria-label; anteprime `design/anteprime/111-lista-light/dark.png`).
+
 ## Lista: la scheda di una persona chiusa (27 novembre 2026, richiesta di Stefano, app v133, database non toccato)
 
 - Nella scheda di una persona della Lista **con un esito**, al posto della barra delle fasi (`ol.percorso-persona`) c'è

@@ -8423,6 +8423,42 @@ async function tavola(path, ritagli, scuro){
   togliChiusi();
 }
 
+// 111. Riga della Lista di una persona chiusa (27 novembre 2026, richiesta di Stefano): con l'esito niente 5 pallini; Partner
+//      e Cliente hanno un piccolo ✓ verde con aria-label, gli altri esiti niente. Il testo sotto il nome non cambia.
+{
+  preparaChiusi();
+  ({ ctx, page } = await apriChiusi());
+  const riga = nome => page.locator(".persone li", { has:page.locator("button[data-act=apri-persona]", { hasText:nome }) });
+  for(const nome of ["Anna Partner", "Bruno Completo"]){
+    const r = riga(nome), v = r.locator(".esito-si");
+    check(!(await r.locator(".punti").count()) && await v.count() === 1 && (await v.innerText()).trim() === "✓"
+      && await v.getAttribute("aria-label") === "Partner" && await v.getAttribute("role") === "img", `Lista, ${nome}: niente pallini, un ✓ con aria-label «Partner»`);
+    check(await v.evaluate(e => { const x = document.createElement("i"); x.style.color = "var(--verde)"; document.body.append(x);
+      const verde = getComputedStyle(x).color; x.remove(); return getComputedStyle(e).color === verde; }), `Lista, ${nome}: il ✓ è verde`);
+    check((await r.locator(".persona .grow .small").last().innerText()).trim() === "Partner", `Lista, ${nome}: sotto il nome «Partner», come prima`);
+  }
+  for(const nome of ["Carla No", "Dino Nonora", "Fabio Silenzio"]){
+    const r = riga(nome);
+    check(!(await r.locator(".punti").count()) && !(await r.locator(".esito-si").count()), `Lista, ${nome}: niente pallini e niente ✓`);
+  }
+  check((await riga("Carla No").locator(".persona .grow .small").last().innerText()).trim() === "No", "Lista, Carla: sotto il nome «No», come prima");
+  check((await riga("Dino Nonora").locator(".persona .grow .small").last().innerText()).startsWith("Non ora · "), "Lista, Dino: sotto il nome «Non ora · …», come prima");
+  check(await riga("Elsa Piano").locator(".punti i").count() === 5 && await riga("Elsa Piano").locator(".punti i.on").count() === 4
+    && !(await riga("Elsa Piano").locator(".esito-si").count()), "Lista, Elsa (aperta, in fase Piano): i 5 pallini come prima, 4 accesi");
+  check(await page.evaluate(id => { const p = Object.assign({}, GROWUP_TEST.st.persone.find(x => x.id === id), { esito:"cliente" });
+    return /class="esito-si" role="img" aria-label="Cliente">✓</.test(GROWUP_TEST.rigaPersona(p)) && !GROWUP_TEST.rigaPersona(p).includes("punti"); }, idChiusi(10)),
+    "riga di una persona chiusa come Cliente: ✓ con aria-label «Cliente»");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "Lista a 360 px: niente scorrimento di lato");
+  const lista = page.locator(".card", { hasText:"La mia lista" }).locator("ul.persone");
+  for(const tema of ["light", "dark"]){
+    await page.emulateMedia({ colorScheme:tema }); await page.waitForTimeout(80);
+    await lista.screenshot({ path:S + `/e2e/111-lista-${tema}.png` });
+  }
+  await page.emulateMedia({ colorScheme:"light" });
+  await ctx.close();
+  togliChiusi();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }
