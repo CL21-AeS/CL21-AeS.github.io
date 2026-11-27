@@ -3,6 +3,22 @@
 Ultimo aggiornamento: 27 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Il testo dell'appuntamento non va più a capo a 360 px (27 novembre 2026, scelta di Stefano, app v140, database non toccato)
+
+- **Riga della Lista**: con un appuntamento, al posto della fase (si vede già dai pallini) solo **quando e per cosa**:
+  «Domani · 18:30 · fissare il piano». «Oggi» e «Domani» senza la data. In ritardo «In ritardo · follow-up» (la data è nella
+  scheda). «Non ora» si legge «Non ora · 25 febbraio» (il giorno in cui risentirlo). Senza appuntamento come prima.
+- **Scheda, riquadro «In agenda»**: in grassetto il quando («Domani · 18:30», «2 dicembre · 18:30», «In ritardo · 24
+  novembre» senza l'ora), sotto piccolo come, per cosa e nota («WhatsApp · fissare il piano»).
+- Se un testo non ci sta (una nota lunga, «contatto di persona» con la data) finisce con i **puntini** (classe `.una-riga`):
+  il testo intero si vede toccando «Cambia». Lo stesso nella riga e nella scheda dei **Clienti**.
+- Anche altrove (Io, «Com'è andata?») «Oggi» e «Domani» non hanno più la data dopo (`testoProssima`).
+- Funzioni: `quandoAgenda`, `rigaAgenda`, `dettagliAgenda`, `risentiDi`, `testoAgendaScheda`.
+Test: interfaccia sezione 117 (le righe di Lista e Clienti e il riquadro della scheda per Domani, in ritardo, Non ora, una nota
+lunga e un cliente; una riga sola, l'icona del calendario dentro la riga, i puntini solo dove servono; una nota con codice si
+vede come testo; anteprime `design/anteprime/117-agenda-corta-light/dark.png`). Aggiornati i controlli che aspettavano il
+testo lungo (sezioni 50, 58 e 82).
+
 ## Un Piano in calendario segna subito l'invito (27 novembre 2026, regola di Stefano, app v139, database non toccato)
 
 - Quando si salva un appuntamento con **Per cosa = «Piano»** per una persona della Lista **senza esito** che non ha ancora un
@@ -16,8 +32,8 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
   avrebbe creato aggiornamenti in cerchio. Il «Ricordamelo» della persona ferma non è un appuntamento fissato: non segna niente.
 - Sotto «Avvisami anche il giorno prima» la descrizione ora è «alla stessa ora, per confermare il piano» (prima andava a capo
   a 360 px). Il testo della notifica non cambia.
-- **Restano a capo a 360 px** (già prima, rimandati da Stefano il 27 novembre): il testo «In agenda» nella scheda e il testo
-  sotto il nome nella riga della Lista quando l'appuntamento ha giorno, ora e «per cosa».
+- (Il testo «In agenda» nella scheda e quello sotto il nome nella riga della Lista andavano ancora a capo: sistemati subito dopo,
+  vedi sopra.)
 Test: `sh test/db.sh` (un invito di oggi su una persona In lista = contatto automatico e +1 contatto, nient'altro); interfaccia
 sezione 116 (calendario con Piano: invito di oggi e contatto automatico, +1 contatto, «Fatto», icona accesa, passi nella
 scheda; spostando nessun invito in più, togliendo l'invito resta; con l'invito già segnato niente in più; «Non ora» niente;
@@ -117,10 +133,9 @@ cancellazione, Riapri; anteprime `design/anteprime/113-partner-light/dark.png`).
 Test: interfaccia sezione 112 (ordine e classi dei pulsanti, colore pesca, Invita con il nome già scritto, Partner con e senza
 Target collegato, Cliente, No, Non ora, aperta in fase Piano; nessun pulsante a capo a 360 px; anteprime
 `design/anteprime/112-schede-light/dark.png`).
-- **Da sistemare più avanti** (scelta di Stefano del 27 novembre: per ora restano così, c'erano già prima): a 360 px vanno a
-  capo «Piano fatto» sotto la barra delle fasi di una persona aperta, il testo sotto il nome nella riga della Lista di un
-  «Non ora» con la data dell'anno dopo («Non ora · 23 febbraio 2027 · da risentire il 25 febbraio») e «In agenda» nella
-  sua scheda.
+- **Da sistemare più avanti** (scelta di Stefano del 27 novembre: per ora resta così, c'era già prima): a 360 px va a
+  capo «Piano fatto» sotto la barra delle fasi di una persona aperta. (Il testo sotto il nome di un «Non ora» e «In agenda»
+  nella scheda sono stati sistemati lo stesso giorno, app v140.)
 
 ## Lista: la riga di una persona chiusa (27 novembre 2026, richiesta di Stefano, app v134, database non toccato)
 

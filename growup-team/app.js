@@ -4951,8 +4951,32 @@ function passoProposto(p){
 function testoProssima(p){
   if(!p.prossima_data) return "";
   const g = giorniTra(oggi(), p.prossima_data);
-  return `${g < 0 ? "In ritardo · " : g === 0 ? "Oggi · " : g === 1 ? "Domani · " : ""}${dataIt(p.prossima_data)}${p.prossima_ora ? " · " + String(p.prossima_ora).slice(0, 5) : ""}${
+  /* «Oggi» e «Domani» bastano, senza la data (27 novembre 2026, scelta di Stefano: il testo stava su due righe a 360 px) */
+  return `${g < 0 ? "In ritardo · " + dataIt(p.prossima_data) : g === 0 ? "Oggi" : g === 1 ? "Domani" : dataIt(p.prossima_data)}${p.prossima_ora ? " · " + String(p.prossima_ora).slice(0, 5) : ""}${
     p.prossima_come ? " · " + nomeCome(p.prossima_come).toLowerCase() : ""}${p.prossima_per ? " · " + nomePer(p.prossima_per).toLowerCase() : ""}${p.prossima_nota ? " · " + p.prossima_nota : ""}`;
+}
+/* A 360 px il testo intero dell'appuntamento andava a capo (27 novembre 2026, scelta di Stefano): nella riga della Lista e dei
+   Clienti solo quando e per cosa; nella scheda, in grassetto quando e sotto, piccolo, come, per cosa e nota. Se non ci sta,
+   i puntini (classe .una-riga). «Oggi», «Domani», «2 dicembre», con l'ora se c'è; «In ritardo · 24 novembre» senza l'ora. */
+function quandoAgenda(p){
+  if(!p.prossima_data) return "";
+  const g = giorniTra(oggi(), p.prossima_data);
+  /* in ritardo l'ora non serve più (e con la data non ci starebbe) */
+  return g < 0 ? "In ritardo · " + dataIt(p.prossima_data)
+    : `${g === 0 ? "Oggi" : g === 1 ? "Domani" : dataIt(p.prossima_data)}${p.prossima_ora ? " · " + String(p.prossima_ora).slice(0, 5) : ""}`;
+}
+/* «Domani · 18:30 · fissare il piano» (la riga); in ritardo «In ritardo · follow-up» (la data è nella scheda) */
+function rigaAgenda(p){ return [p.prossima_data && p.prossima_data < oggi() ? "In ritardo" : quandoAgenda(p),
+  p.prossima_per ? nomePer(p.prossima_per).toLowerCase() : ""].filter(Boolean).join(" · "); }
+/* «WhatsApp · fissare il piano · nota» (sotto il quando, nella scheda) */
+function dettagliAgenda(p){ return [p.prossima_come ? nomeCome(p.prossima_come) : "", p.prossima_per ? nomePer(p.prossima_per).toLowerCase() : "", p.prossima_nota || ""].filter(Boolean).join(" · "); }
+/* «Non ora · 25 febbraio»: il giorno in cui risentirlo (scelto chiudendo), se no la data in agenda */
+function risentiDi(p){ const m = /^da risentire il (.+)$/.exec(p.prossima_nota || ""); return m ? m[1] : p.prossima_data ? dataIt(p.prossima_data) : ""; }
+/* il riquadro «In agenda» della scheda (Lista e Clienti): quando in grassetto, sotto i dettagli; la × lo toglie */
+function testoAgendaScheda(p, togli){
+  const d = dettagliAgenda(p);
+  return `<span class="row prossima-testo" style="gap:6px;align-items:center"><b class="grow una-riga${inAgenda(p) ? " agenda-testo" : ""}">${esc(quandoAgenda(p))}</b>
+        ${togli}</span>${d ? `<span class="small prossima-dettagli una-riga">${esc(d)}</span>` : ""}`;
 }
 /* Su Io, come promemoria: tutte le persone con cui è iniziato un percorso (da Contattato in poi), aperte o "Non ora"
    con una data, tranne quelle che ho tolto da Io. Prima chi ha una data (in ritardo, oggi, prossimi giorni), poi le altre. */
@@ -4985,8 +5009,10 @@ function rigaPersona(p, suIo, tag){
   const f = FASI[indiceFase(p.fase)], fermo = giorniFermo(p);
   return `<li class="${suIo ? "su-io" : "con-cal"}${fermo ? " fermo" : ""}"><button class="persona" data-act="apri-persona" data-id="${esc(p.id)}">
       <span class="grow"><b>${esc(p.nome)}</b>${tag ? ` <span class="pill mini tag tag-lista">${esc(tag)}</span>` : ""}${maiComprato(p) ? ` <span class="pill g mini">Mai comprato</span>` : ""}${p.origine
-        ? `<br><span class="small origine">${esc(p.origine)}</span>` : ""}<br><span class="small">${p.esito ? ESITI[p.esito] : p.fase === "lista" && !p.prossima_data && inListaDa(p) ? esc("In lista " + inListaDa(p)) : f.nome}${p.prossima_data ? ` · <span class="${inAgenda(p) ? "agenda-testo" : ""}">${esc(testoProssima(p))}</span>`
-        : fermo ? ` · <span class="fermo-testo">fermo da ${fermo} giorni</span>` : ""}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
+        ? `<br><span class="small origine">${esc(p.origine)}</span>` : ""}<br><span class="small">${p.esito === "non_ora" ? esc(`Non ora${risentiDi(p) ? " · " + risentiDi(p) : ""}`)
+        : !p.esito && inAgenda(p) ? `<span class="agenda-testo una-riga">${esc(rigaAgenda(p))}</span>`
+        : `${p.esito ? ESITI[p.esito] : p.fase === "lista" && !p.prossima_data && inListaDa(p) ? esc("In lista " + inListaDa(p)) : f.nome}${p.prossima_data
+          ? ` · <span class="${inAgenda(p) ? "agenda-testo" : ""}">${esc(quandoAgenda(p))}</span>` : fermo ? ` · <span class="fermo-testo">fermo da ${fermo} giorni</span>` : ""}`}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
       ${p.esito ? (p.esito === "partner" || p.esito === "cliente" ? `<span class="esito-si" role="img" aria-label="${ESITI[p.esito]}">✓</span>` : "")
         : `<span class="punti" aria-hidden="true">${FASI.map((x, i) => `<i class="${i <= indiceFase(p.fase) ? "on" : ""}"></i>`).join("")}</span>`}
     </button>${suIo ? `<button class="x" data-act="togli-da-io" data-id="${esc(p.id)}" aria-label="Togli ${esc(p.nome)} da Io">×</button>` : btnAgenda(p)}</li>`;
@@ -5041,7 +5067,7 @@ function rigaChiusura(p){
   else t = `${p.esito === "no" ? "Percorso chiuso · No" : ESITI[p.esito]}${quando ? " · " + dataIt(quando) : ""}`;
   return `<p class="chiusura-persona${p.esito === "partner" || p.esito === "cliente" ? " ok" : ""}">${esc(t)}</p>`;
 }
-if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { rigaChiusura, rigaPersona, mancanoPerPartner, mancanoPrima });
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { rigaChiusura, rigaPersona, mancanoPerPartner, mancanoPrima, rigaAgenda, quandoAgenda, dettagliAgenda, testoAgendaScheda });
 function vPersona(){
   const p = st.persone.find(x => x.id === st.personaId);
   if(!p) return `<button class="btn link" data-act="torna-lista" style="padding:0">‹ La mia lista</button><p class="muted">Nome non trovato.</p>`;
@@ -5068,8 +5094,7 @@ function vPersona(){
     ${p.esito ? rigaChiusura(p) : `<ol class="percorso-persona" aria-label="Percorso">${FASI.map((x, k) => `<li class="${k < i ? "fatta" : k === i ? "qui" : ""}"><i></i><span>${x.nome}</span></li>`).join("")}</ol>`}
     <div class="prossima">
       <span class="small">In agenda</span>
-      ${p.prossima_data ? `<span class="row prossima-testo" style="gap:6px;align-items:center"><b class="grow${inAgenda(p) ? " agenda-testo" : ""}">${esc(testoProssima(p))}</b>
-        <button class="x" data-act="togli-prossima" aria-label="Togli dall'agenda">×</button></span>` : `<b>Nessun giorno</b>`}
+      ${p.prossima_data ? testoAgendaScheda(p, `<button class="x" data-act="togli-prossima" aria-label="Togli dall'agenda">×</button>`) : `<b>Nessun giorno</b>`}
       <span class="row" style="gap:6px;margin-top:6px">
         ${inAgenda(p) ? `<button class="btn small primary" data-act="agenda-fatto" data-id="${esc(p.id)}">Fatto</button>` : ""}
         <button class="btn small" data-act="agenda" data-id="${esc(p.id)}">${p.prossima_data ? "Cambia" : "Metti in agenda"}</button>
@@ -6757,7 +6782,7 @@ function vClienti(){
     ${rigaCerchie(tutti)}
     ${cerchiaVuota(tutti) || (l.length ? `<ul class="persone">${l.map(p => { const s = statoCliente(p);
       return `<li class="con-cal"><button class="persona" data-act="apri-cliente" data-id="${esc(p.id)}">
-        <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${inAgenda(p) ? `<span class="agenda-testo">${esc(testoProssima(p))}</span>` : s.primo && s.key !== "fermo" ? (s.primo.codice ? `${esc(s.primo.nome)} · finisce il ${dataIt(s.primo.finisce)}` : `prossimo ordine atteso il ${dataIt(s.primo.finisce)}`) : esc(abitudine(p) || "nessun ordine")}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
+        <span class="grow"><b>${esc(p.nome)}</b><br><span class="small">${inAgenda(p) ? `<span class="agenda-testo una-riga">${esc(rigaAgenda(p))}</span>` : s.primo && s.key !== "fermo" ? (s.primo.codice ? `${esc(s.primo.nome)} · finisce il ${dataIt(s.primo.finisce)}` : `prossimo ordine atteso il ${dataIt(s.primo.finisce)}`) : esc(abitudine(p) || "nessun ordine")}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
         <span class="etichette">${etichetteOrdini(p)}<span class="pill ${s.cl}">${esc(s.txt)}</span></span></button>${btnAgenda(p)}</li>`; }).join("")}</ul>`
       : `<p class="muted" style="margin:10px 0 0">${filtro.id === "sentire" && !cerchia ? "Nessuno da sentire adesso." : "Nessun cliente qui."}</p>`)}`
     : `<p class="muted" style="margin:8px 0 0">Ancora nessun cliente. Entrano da qui con "+ Cliente", oppure dalla Lista quando chiudi una persona come Cliente.</p>`}
@@ -6783,8 +6808,7 @@ function vCliente(){
       <button class="btn primary grow" data-act="ordine-nuovo">+ Ordine</button>
       ${ord.length ? `<button class="btn grow" data-act="ordine-ripeti">Ripeti l'ultimo</button>` : ""}</div>
     ${inAgenda(p) ? `<div class="prossima" style="margin-top:12px"><span class="small">In agenda</span>
-      <span class="row prossima-testo" style="gap:6px;align-items:center"><b class="grow agenda-testo">${esc(testoProssima(p))}</b>
-        <button class="x" data-act="agenda-togli" data-id="${esc(p.id)}" aria-label="Togli dall'agenda">×</button></span>
+      ${testoAgendaScheda(p, `<button class="x" data-act="agenda-togli" data-id="${esc(p.id)}" aria-label="Togli dall'agenda">×</button>`)}
       <span class="row" style="gap:6px;margin-top:6px"><button class="btn small primary" data-act="agenda-fatto" data-id="${esc(p.id)}">Fatto</button>
         <button class="btn small" data-act="agenda" data-id="${esc(p.id)}">Cambia</button></span></div>` : ""}
     <div class="row wrap" style="gap:6px;margin-top:8px">

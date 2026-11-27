@@ -601,6 +601,13 @@ input.mini.prezzo{width:68px;text-align:right}
 .cal:hover{background:var(--bg)}
 .cal.on{background:var(--scelta-wash);border-color:var(--progresso);color:var(--progresso)}
 .agenda-testo{color:var(--progresso);font-weight:800}
+/* un testo su una riga sola: se non ci sta, i puntini (27 novembre 2026) */
+.una-riga{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+span.una-riga{display:inline-block;vertical-align:bottom}
+.persona:has(.una-riga),.persona:has(.una-riga) .grow{min-width:0}
+.persona .agenda-testo.una-riga{font-weight:700}
+.prossima-dettagli{display:block;margin-top:2px}
+.prossima-testo .una-riga{min-width:0}
 .risposte-agenda{display:grid;gap:8px;margin-top:12px}
 /* avviati (consegna 6): «Per iniziare», i nomi nuovi nel cruscotto, il link da salvare in «Da dove parti?» */
 .card.per-iniziare{display:flex;flex-direction:column;gap:8px}
