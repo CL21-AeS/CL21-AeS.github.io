@@ -3,6 +3,35 @@
 Ultimo aggiornamento: 27 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Chiusura come Partner = contatto, invito e piano fatti (27 novembre 2026, regola di Stefano, app v136, migrazione 070 DA APPLICARE)
+
+- **Regola di Stefano**: nessuno diventa Partner senza contatto, invito e piano. Il follow-up invece non è automatico (si può
+  sponsorizzare subito dopo il piano).
+- **Database (070, `070_chiusura_partner.sql`)**: quando si inserisce un passo «chiusura» con esito «partner», non importato,
+  il trigger `passi_chiusura_partner` aggiunge i passi che mancano tra contatto, invito e piano, ciascuno solo se la persona
+  non ne ha già almeno uno (importati compresi). Stessa data della chiusura, creati un istante prima e in quest'ordine
+  (contatto, invito, piano, poi la chiusura). Colonna nuova `passi.segnato_con` (l'id della chiusura): segna il passo come
+  automatico e lo collega; dal telefono non si scrive. `passi_prima` lascia ai passi automatici l'istante dato dal trigger.
+- **Conteggi**: contatto e piano automatici contano l'attività con la regola di sempre, l'invito no; la fase diventa «piano».
+  Scelta di Stefano del 27 novembre: contano anche dove i passi si contano già (gli «Invitati» del percorso di partenza, il
+  «primo piano» dei due binari, i piani del mese che vede l'upline). Niente doppioni; il follow-up mai.
+- **Cancellando la chiusura** si cancellano anche i passi automatici collegati (e le loro attività). «Riapri il percorso»
+  non li toglie. Solo l'esito Partner: Cliente, No, Non ora e Chiuso senza risposta come prima. Nessun dato cambiato: niente
+  passi aggiunti all'indietro alle chiusure già segnate.
+- **App**: tra «I passi» quelli automatici si leggono «Contatto» con sotto «segnato con la chiusura» (a 360 px «Contatto ·
+  segnato con la chiusura» su una riga non ci sta accanto a data e ×; lo screen reader legge «Contatto · segnato con la
+  chiusura»). Nel modulo «Segna un passo», scegliendo Chiusura → Partner, una riga piccola sotto la scelta: «Segna anche
+  contatto, invito e piano.» o solo quelli che mancano («Segna anche invito e piano.», «Segna anche il piano.»); niente se ci
+  sono tutti (`mancanoPerPartner`). La versione di prova (`prova/api-prova.js`) fa lo stesso del database.
+- Per toglierla: `070_chiusura_partner_togli.sql` (i passi già aggiunti restano come passi normali). Anche in
+  `installa_tutto.sql`. Revisione di sicurezza (controllo rapido): a posto, riga 070 in `SICUREZZA.md`.
+Test: `sh test/db.sh` (controlli 070: senza passi = +1 contatto e +1 piano, l'invito senza attività, ordine, data,
+proprietario e collegamento; con contatto e piano già segnati nessun conteggio in più; nessun doppione; follow-up mai;
+Riapri li lascia, cancellando la chiusura spariscono con le attività; Cliente, No, Non ora, Chiuso senza risposta e
+chiusure importate non aggiungono niente; sponsor, admin, altra linea e downline non li vedono né li cancellano; la colonna
+e la funzione non si usano dal telefono); interfaccia sezione 113 (la riga nel modulo, i passi nella scheda, i conteggi, la
+cancellazione, Riapri; anteprime `design/anteprime/113-partner-light/dark.png`).
+
 ## Lista: la scheda di una persona chiusa come Partner (27 novembre 2026, richiesta di Stefano, app v135, database non toccato)
 
 - Chiusa come **Partner** (e se posso invitare): «**Invitalo in Growup**» è il pulsante principale (`primary`, pesca) e sta
