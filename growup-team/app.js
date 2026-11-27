@@ -4966,13 +4966,16 @@ function inListaDa(p){
 }
 /* registrato come cliente sul sito Amway (ha il codice cliente) ma senza nessun ordine */
 function maiComprato(p){ return !!p.codice_cliente && p.esito !== "cliente" && !st.ordini.some(o => o.persona_id === p.id); }
+/* riga della Lista: i 5 pallini delle fasi solo per chi è ancora in percorso; chiusa come Partner o Cliente un piccolo ✓
+   verde, con gli altri esiti niente (27 novembre 2026, scelta di Stefano). Il testo sotto il nome non cambia. */
 function rigaPersona(p, suIo, tag){
   const f = FASI[indiceFase(p.fase)], fermo = giorniFermo(p);
   return `<li class="${suIo ? "su-io" : "con-cal"}${fermo ? " fermo" : ""}"><button class="persona" data-act="apri-persona" data-id="${esc(p.id)}">
       <span class="grow"><b>${esc(p.nome)}</b>${tag ? ` <span class="pill mini tag tag-lista">${esc(tag)}</span>` : ""}${maiComprato(p) ? ` <span class="pill g mini">Mai comprato</span>` : ""}${p.origine
         ? `<br><span class="small origine">${esc(p.origine)}</span>` : ""}<br><span class="small">${p.esito ? ESITI[p.esito] : p.fase === "lista" && !p.prossima_data && inListaDa(p) ? esc("In lista " + inListaDa(p)) : f.nome}${p.prossima_data ? ` · <span class="${inAgenda(p) ? "agenda-testo" : ""}">${esc(testoProssima(p))}</span>`
         : fermo ? ` · <span class="fermo-testo">fermo da ${fermo} giorni</span>` : ""}${scadenzaDi(p.id) !== null ? ` · <span class="scade">${testoScadenza(scadenzaDi(p.id))}</span>` : ""}</span></span>
-      <span class="punti" aria-hidden="true">${FASI.map((x, i) => `<i class="${i <= indiceFase(p.fase) ? "on" : ""}"></i>`).join("")}</span>
+      ${p.esito ? (p.esito === "partner" || p.esito === "cliente" ? `<span class="esito-si" role="img" aria-label="${ESITI[p.esito]}">✓</span>` : "")
+        : `<span class="punti" aria-hidden="true">${FASI.map((x, i) => `<i class="${i <= indiceFase(p.fase) ? "on" : ""}"></i>`).join("")}</span>`}
     </button>${suIo ? `<button class="x" data-act="togli-da-io" data-id="${esc(p.id)}" aria-label="Togli ${esc(p.nome)} da Io">×</button>` : btnAgenda(p)}</li>`;
 }
 
@@ -5025,7 +5028,7 @@ function rigaChiusura(p){
   else t = `${p.esito === "no" ? "Percorso chiuso · No" : ESITI[p.esito]}${quando ? " · " + dataIt(quando) : ""}`;
   return `<p class="chiusura-persona${p.esito === "partner" || p.esito === "cliente" ? " ok" : ""}">${esc(t)}</p>`;
 }
-if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { rigaChiusura });
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { rigaChiusura, rigaPersona });
 function vPersona(){
   const p = st.persone.find(x => x.id === st.personaId);
   if(!p) return `<button class="btn link" data-act="torna-lista" style="padding:0">‹ La mia lista</button><p class="muted">Nome non trovato.</p>`;
