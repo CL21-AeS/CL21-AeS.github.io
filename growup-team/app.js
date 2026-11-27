@@ -5034,6 +5034,9 @@ function vPersona(){
   if(!p) return `<button class="btn link" data-act="torna-lista" style="padding:0">‹ La mia lista</button><p class="muted">Nome non trovato.</p>`;
   const i = indiceFase(p.fase), passi = passiDi(p.id), tel = String(p.contatto || "").replace(/[^\d+]/g, "");
   const telefono = tel.replace(/\D/g, "").length >= 6;
+  /* chiusa come Partner (27 novembre 2026, scelta di Stefano): «Invitalo in Growup» è l'azione principale e sta sopra il passo;
+     a Partner e Cliente non si mandano le 8 domande (se l'invito Target c'è già, la sua riga resta) */
+  const invitalo = p.esito === "partner" && possoInvitare();
   return `<button class="btn link" data-act="torna-lista" style="padding:0">‹ La mia lista</button>
   <div class="card">
     <div class="spread"><h2><button class="nome-modifica" data-act="persona-modifica" aria-label="Modifica i dati di ${esc(p.nome)}">${esc(p.nome)} <span aria-hidden="true">✎</span></button></h2>${maiComprato(p) ? `<span class="pill g">Mai comprato</span>` : ""}${p.esito ? `<span class="pill ${p.esito === "partner" || p.esito === "cliente" ? "v" : p.esito === "no" ? "r" : "g"}">${ESITI[p.esito]}</span>` : ""}</div>
@@ -5044,6 +5047,7 @@ function vPersona(){
     ${(() => { const x = p.invito_target_id && st.inviti.find(y => y.id === p.invito_target_id);
       return x ? `<p class="small" style="margin:6px 0 0">Target: <b>${esc(statoInvito(x).txt)}</b>
         <button class="btn link small" data-act="apri-invito" data-id="${esc(x.id)}" style="min-height:0;padding:0 4px">${x.risposte ? "Vedi le risposte" : "Apri l'invito"}</button></p>`
+        : p.esito === "partner" || p.esito === "cliente" ? ""
         : `<button class="btn small ghost" style="margin-top:8px" data-act="target-da-persona">Manda le 8 domande (Target)</button>`; })()}
     ${telefono ? `<div class="row" style="gap:6px;margin-top:8px">
       <a class="btn small" href="tel:${esc(tel)}">Chiama</a>
@@ -5058,8 +5062,8 @@ function vPersona(){
         <button class="btn small" data-act="agenda" data-id="${esc(p.id)}">${p.prossima_data ? "Cambia" : "Metti in agenda"}</button>
         ${p.prossima_data ? `<button class="btn small ghost" data-act="persona-calendario">Nel calendario</button>` : ""}</span>
     </div>
-    <button class="btn primary wide" style="margin-top:12px" data-act="passo">Segna un passo · ${TIPI_PASSO[passoProposto(p)].nome}</button>
-    ${p.esito === "partner" && possoInvitare() ? `<button class="btn wa wide" style="margin-top:8px" data-act="invita" data-nome="${esc(p.nome)}">Invitalo in Growup</button>` : ""}
+    ${invitalo ? `<button class="btn primary wide" style="margin-top:12px" data-act="invita" data-nome="${esc(p.nome)}">Invitalo in Growup</button>` : ""}
+    <button class="btn${invitalo ? "" : " primary"} wide" style="margin-top:${invitalo ? 8 : 12}px" data-act="passo">Segna un passo · ${TIPI_PASSO[passoProposto(p)].nome}</button>
     ${p.esito === "cliente" ? `<button class="btn wide" style="margin-top:8px" data-act="apri-cliente" data-id="${esc(p.id)}">Apri nei Clienti</button>` : ""}
     ${p.esito ? `<button class="btn ghost wide" style="margin-top:8px" data-act="riapri-persona">Riapri il percorso</button>` : ""}
     ${p.note ? `<p class="small" style="margin:10px 0 0;white-space:pre-wrap">${esc(p.note)}</p>` : ""}

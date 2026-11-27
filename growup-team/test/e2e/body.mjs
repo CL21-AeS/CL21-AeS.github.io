@@ -8356,15 +8356,28 @@ function preparaChiusi(){
   passo(13, "contatto", 30); passo(13, "invito", 25); passo(13, "piano", 20); passo(13, "chiusura", 2, "non_ora");
   persona(14, "Elsa Piano", "piano", null); passo(14, "contatto", 12); passo(14, "invito", 8); passo(14, "piano", 3);
   persona(15, "Fabio Silenzio", "contattato", "senza_risposta"); passo(15, "contatto", 40); passo(15, "chiusura", 0, "senza_risposta");
+  persona(16, "Gina Cliente", "contattato", "cliente"); passo(16, "contatto", 6); passo(16, "chiusura", 1, "cliente");
+  // Bruno ha già l'invito Target collegato (la riga «Target: …» resta anche da Partner)
+  DB.inviti = (DB.inviti || []).filter(x => x.proprietario !== pid).concat([{ id:idChiusi(90), proprietario:pid, nome:"Bruno Completo", persona_id:idChiusi(11),
+    bloccato:false, risposte:null, risposto_il:null, creato_il:ora, scade:dataPiu(7) }]);
+  DB.persone.find(p => p.id === idChiusi(11)).invito_target_id = idChiusi(90);
 }
 const togliChiusi = () => { const pid = idChiusi(1);
   DB.partners = DB.partners.filter(p => p.id !== pid); DB.persone = (DB.persone || []).filter(p => p.proprietario !== pid);
-  DB.passi = (DB.passi || []).filter(p => p.proprietario !== pid); DB.activities = DB.activities.filter(a => a.partner_id !== pid); };
+  DB.passi = (DB.passi || []).filter(p => p.proprietario !== pid); DB.activities = DB.activities.filter(a => a.partner_id !== pid);
+  DB.inviti = (DB.inviti || []).filter(x => x.proprietario !== pid); };
 const apriChiusi = async () => { const r = await apri({ viewport:{ width:360, height:780 } }, "#chiave=" + chiaveChiusi);
   await r.page.locator(".testata h1").waitFor(); if(await r.page.locator(".sheet").count()) await r.page.click(".sheet [data-act=chiudi]").catch(() => {});
   await r.page.click("button[data-act=vista-persone]"); return r; };
 const schedaChiusi = async (pg, nome) => { if(await pg.locator("button[data-act=torna-lista]").count()) await pg.click("button[data-act=torna-lista]");
   await pg.locator("button[data-act=apri-persona]", { hasText:nome }).click(); await pg.locator("button[data-act=passo]").waitFor(); };
+/* i pulsanti e le righe di una parte della pagina che vanno a capo (come la sezione 66: più righe di testo) */
+const aCapoIn = (loc, sel) => loc.evaluate((root, sel) => [...root.querySelectorAll(sel)].filter(e => e.getBoundingClientRect().width > 0).filter(e => {
+  const rg = document.createRange(); rg.selectNodeContents(e);
+  const rr = [...rg.getClientRects()].filter(r => r.width > 1).sort((x, y) => x.top - y.top);
+  let righe = rr.length ? 1 : 0, fondo = rr.length ? rr[0].bottom : 0;
+  for(const r of rr){ if(r.top >= fondo - 2){ righe++; fondo = r.bottom; } else fondo = Math.max(fondo, r.bottom); }
+  return righe > 1; }).map(e => e.textContent.replace(/\s+/g, " ").trim()), sel);
 /* una tavola con più ritagli affiancati (le anteprime delle persone in un'immagine sola, in chiaro o in scuro) */
 async function tavola(path, ritagli, scuro){
   const c = await browser.newContext({ viewport:{ width:400, height:400 }, colorScheme:scuro ? "dark" : "light" }), pg = await c.newPage();
@@ -8455,6 +8468,55 @@ async function tavola(path, ritagli, scuro){
     await lista.screenshot({ path:S + `/e2e/111-lista-${tema}.png` });
   }
   await page.emulateMedia({ colorScheme:"light" });
+  await ctx.close();
+  togliChiusi();
+}
+
+// 112. Scheda di una persona chiusa come Partner (27 novembre 2026, richiesta di Stefano): «Invitalo in Growup» è il pulsante
+//      principale (pesca, primary) e sta sopra «Segna un passo · Nota», che diventa normale. Per Partner e Cliente niente «Manda
+//      le 8 domande (Target)»; se l'invito Target è già collegato la riga «Target: …» resta. Gli altri come prima.
+{
+  preparaChiusi();
+  ({ ctx, page } = await apriChiusi());
+  const ordine = async () => page.locator("#app .card").first().locator("button[data-act=invita], button[data-act=passo]")
+    .evaluateAll(l => l.map(b => b.dataset.act + (b.classList.contains("primary") ? ":primary" : "")));
+  await schedaChiusi(page, "Anna Partner");
+  check(JSON.stringify(await ordine()) === JSON.stringify(["invita:primary", "passo"]), "Partner: «Invitalo in Growup» principale e sopra, «Segna un passo» normale (" + (await ordine()).join(", ") + ")");
+  const inv = page.locator("button[data-act=invita]");
+  check((await inv.innerText()).trim() === "Invitalo in Growup" && !(await inv.evaluate(b => b.classList.contains("wa")))
+    && await inv.evaluate(b => { const x = document.createElement("i"); x.style.color = "var(--azione)"; document.body.append(x);
+      const c = getComputedStyle(x).color; x.remove(); return getComputedStyle(b).backgroundColor === c; }), "«Invitalo in Growup» è pesca (il colore dell'azione principale)");
+  check((await page.locator("button[data-act=passo]").innerText()).trim() === "Segna un passo · Nota", "sotto: «Segna un passo · Nota»");
+  check(!(await page.locator("button[data-act=target-da-persona]").count()), "Partner senza invito Target: niente «Manda le 8 domande (Target)»");
+  check(!(await aCapoIn(page.locator("#app .card").first(), "button, .chiusura-persona")).length, "Partner: a 360 px nessun pulsante va a capo");
+  await inv.click();
+  check(await page.locator(".sheet input[name=nome]").inputValue() === "Anna Partner", "«Invitalo in Growup» apre Invita con il nome già scritto");
+  await page.click(".sheet button[data-act=chiudi]");
+  await schedaChiusi(page, "Bruno Completo");
+  check(JSON.stringify(await ordine()) === JSON.stringify(["invita:primary", "passo"]), "Bruno (Partner con tutti i passi): stesso ordine");
+  check(/^Target: in attesa/.test((await page.locator("#app .card").first().getByText(/^Target:/).innerText()).trim())
+    && !(await page.locator("button[data-act=target-da-persona]").count()), "Partner con l'invito Target già collegato: la riga «Target: …» resta");
+  for(const nome of ["Carla No", "Dino Nonora", "Elsa Piano"]){
+    await schedaChiusi(page, nome);
+    check(JSON.stringify(await ordine()) === JSON.stringify(["passo:primary"]) && await page.locator("button[data-act=target-da-persona]").count() === 1,
+      `${nome}: «Segna un passo» principale e «Manda le 8 domande (Target)» come prima`);
+  }
+  // Cliente: niente Target (la scheda della Lista di una persona chiusa come Cliente)
+  await page.evaluate(id => { const st = GROWUP_TEST.st; st.personaId = id; document.dispatchEvent(new Event("visibilitychange")); }, idChiusi(16));
+  await page.locator("button[data-act=apri-cliente]").waitFor();
+  check(!(await page.locator("button[data-act=target-da-persona]").count()) && !(await page.locator("button[data-act=invita]").count())
+    && await page.locator("button[data-act=passo].primary").count() === 1, "Cliente: niente «Manda le 8 domande (Target)», «Segna un passo» resta principale");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "a 360 px: niente scorrimento di lato");
+  const ritagli = { light:[], dark:[] };
+  for(const nome of ANTEPRIMA_CHIUSI){
+    await schedaChiusi(page, nome);
+    for(const tema of ["light", "dark"]){
+      await page.emulateMedia({ colorScheme:tema }); await page.waitForTimeout(80);
+      ritagli[tema].push({ titolo:nome, png:await page.locator("#app .card").first().screenshot() });
+    }
+    await page.emulateMedia({ colorScheme:"light" });
+  }
+  await tavola(S + "/e2e/112-schede-light.png", ritagli.light); await tavola(S + "/e2e/112-schede-dark.png", ritagli.dark, true);
   await ctx.close();
   togliChiusi();
 }
