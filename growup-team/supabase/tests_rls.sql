@@ -2434,22 +2434,26 @@ begin
     perform growup_test.ok((select count(*) from public.activities where partner_id = a) = att70,
                            '070: cancellando la chiusura si tolgono anche le attività dei passi automatici');
 
-    -- con contatto e piano già segnati: nessun conteggio in più (si aggiunge solo l'invito, senza attività)
+    -- con contatto e piano già segnati (il piano ha già aggiunto l'invito che mancava, 071): la chiusura non aggiunge
+    -- niente e non conta niente in più
     perform growup_test.come(u2);
     insert into public.passi (persona_id, tipo, data) values (p70, 'contatto', current_date - 10);
     insert into public.passi (persona_id, tipo, data) values (p70, 'piano', current_date - 5) returning id into q70;
+    perform growup_test.ok((select count(*) from public.passi where segnato_con = q70) = 1
+                           and (select tipo from public.passi where segnato_con = q70) = 'invito',
+                           '071: il piano con il contatto già segnato aggiunge solo l''invito che manca');
     execute 'reset role';
     att70 := (select count(*) from public.activities where partner_id = a);
     perform growup_test.come(u2);
     insert into public.passi (persona_id, tipo, esito) values (p70, 'chiusura', 'partner') returning id into c70;
     perform growup_test.ok((select count(*) from public.passi where persona_id = p70 and tipo = 'contatto') = 1
+                           and (select count(*) from public.passi where persona_id = p70 and tipo = 'invito') = 1
                            and (select count(*) from public.passi where persona_id = p70 and tipo = 'piano') = 1
-                           and (select count(*) from public.passi where segnato_con = c70) = 1
-                           and (select tipo from public.passi where segnato_con = c70) = 'invito',
-                           '070: con contatto e piano già segnati si aggiunge solo l''invito che manca');
+                           and (select count(*) from public.passi where segnato_con = c70) = 0,
+                           '070: con contatto, invito e piano già segnati la chiusura Partner non aggiunge niente');
     execute 'reset role';
     perform growup_test.ok((select count(*) from public.activities where partner_id = a) = att70,
-                           '070: con contatto e piano già segnati: nessun conteggio in più');
+                           '070: con contatto, invito e piano già segnati: nessun conteggio in più');
     -- una seconda chiusura Partner non aggiunge niente (ci sono già tutti e tre)
     perform growup_test.come(u2);
     insert into public.passi (persona_id, tipo) values (p70, 'riapri');
@@ -2472,9 +2476,118 @@ begin
     perform growup_test.ok((select count(*) from public.passi where persona_id = r70) = 1, '070: una chiusura Partner importata non aggiunge passi');
     delete from public.persone where id in (p70, q70, r70);
     execute 'reset role';
-    perform growup_test.ok(not has_function_privilege('authenticated', 'public.passi_chiusura_partner()', 'execute')
-                           and not has_function_privilege('anon', 'public.passi_chiusura_partner()', 'execute'),
-                           '070: la funzione del trigger non si chiama dal telefono');
+    perform growup_test.ok(not has_function_privilege('authenticated', 'public.passi_precedenti()', 'execute')
+                           and not has_function_privilege('anon', 'public.passi_precedenti()', 'execute'),
+                           '070/071: la funzione del trigger non si chiama dal telefono');
+    perform growup_test.ok(to_regprocedure('public.passi_chiusura_partner()') is null
+                           and not exists (select 1 from pg_trigger where tgname = 'passi_chiusura_partner'),
+                           '071: la regola della 070 è allargata, non doppia (niente più passi_chiusura_partner)');
+  end;
+
+  -- ---- 071: i passi precedenti si spuntano da soli (invito, piano, follow-up; la chiusura Partner come nella 070) ----
+  declare
+    p71 uuid; q71 uuid; s71 uuid; con71 int; pia71 int; att71 int;
+  begin
+    execute 'reset role';
+    con71 := (select count(*) from public.activities where partner_id = a and tipo = 'contatto');
+    pia71 := (select count(*) from public.activities where partner_id = a and tipo = 'piano');
+    att71 := (select count(*) from public.activities where partner_id = a);
+    -- Piano su una persona In lista = +1 contatto e +1 piano (l'invito aggiunto senza attività)
+    perform growup_test.come(u2);  -- A
+    insert into public.persone (nome) values ('Lista Prova') returning id into p71;
+    insert into public.passi (persona_id, tipo, data) values (p71, 'piano', current_date - 1) returning id into s71;
+    perform growup_test.ok((select array_agg(tipo order by creato_il) from public.passi where persona_id = p71) = array['contatto', 'invito', 'piano'],
+                           '071: piano su una persona In lista: contatto, invito e piano, in quest''ordine');
+    perform growup_test.ok((select bool_and(segnato_con = s71 and data = current_date - 1 and proprietario = a and not importato)
+                              from public.passi where persona_id = p71 and id <> s71),
+                           '071: contatto e invito automatici sono di A, con la data del piano e collegati al piano');
+    perform growup_test.ok((select fase from public.persone where id = p71) = 'piano', '071: la fase diventa «piano»');
+    execute 'reset role';
+    perform growup_test.ok((select count(*) from public.activities where partner_id = a and tipo = 'contatto') = con71 + 1
+                           and (select count(*) from public.activities where partner_id = a and tipo = 'piano') = pia71 + 1
+                           and (select count(*) from public.activities where partner_id = a) = att71 + 2,
+                           '071: Piano su una persona In lista = +1 contatto e +1 piano');
+    -- Piano su una persona con il contatto già segnato = solo +1 piano (si aggiunge l'invito, che non conta)
+    perform growup_test.come(u2);
+    insert into public.persone (nome) values ('Contattata Prova') returning id into q71;
+    insert into public.passi (persona_id, tipo) values (q71, 'contatto');
+    execute 'reset role';
+    con71 := (select count(*) from public.activities where partner_id = a and tipo = 'contatto');
+    pia71 := (select count(*) from public.activities where partner_id = a and tipo = 'piano');
+    att71 := (select count(*) from public.activities where partner_id = a);
+    perform growup_test.come(u2);
+    insert into public.passi (persona_id, tipo) values (q71, 'piano') returning id into s71;
+    perform growup_test.ok((select count(*) from public.passi where persona_id = q71 and tipo = 'contatto') = 1
+                           and (select array_agg(tipo) from public.passi where segnato_con = s71) = array['invito'],
+                           '071: piano con il contatto già segnato: si aggiunge solo l''invito');
+    execute 'reset role';
+    perform growup_test.ok((select count(*) from public.activities where partner_id = a and tipo = 'contatto') = con71
+                           and (select count(*) from public.activities where partner_id = a and tipo = 'piano') = pia71 + 1
+                           and (select count(*) from public.activities where partner_id = a) = att71 + 1,
+                           '071: Piano su una persona con il contatto già segnato = solo +1 piano');
+    -- invito → solo il contatto; follow-up → contatto, invito, piano (mai il follow-up stesso)
+    perform growup_test.come(u2);
+    delete from public.persone where id in (p71, q71);
+    insert into public.persone (nome) values ('Invito Prova') returning id into p71;
+    insert into public.passi (persona_id, tipo) values (p71, 'invito') returning id into s71;
+    perform growup_test.ok((select array_agg(tipo order by creato_il) from public.passi where persona_id = p71) = array['contatto', 'invito']
+                           and (select segnato_con from public.passi where persona_id = p71 and tipo = 'contatto') = s71,
+                           '071: invito su una persona In lista: si aggiunge il contatto');
+    insert into public.persone (nome) values ('Followup Prova') returning id into q71;
+    insert into public.passi (persona_id, tipo) values (q71, 'followup') returning id into s71;
+    perform growup_test.ok((select array_agg(tipo order by creato_il) from public.passi where persona_id = q71) = array['contatto', 'invito', 'piano', 'followup']
+                           and (select count(*) from public.passi where segnato_con = s71) = 3,
+                           '071: follow-up su una persona In lista: contatto, invito e piano, in quest''ordine; un solo follow-up');
+    -- un secondo follow-up non aggiunge niente (nessun doppione)
+    insert into public.passi (persona_id, tipo) values (q71, 'followup') returning id into s71;
+    perform growup_test.ok((select count(*) from public.passi where segnato_con = s71) = 0
+                           and (select count(*) from public.passi where persona_id = q71 and tipo in ('contatto', 'invito', 'piano')) = 3,
+                           '071: niente doppioni con un secondo follow-up');
+    -- cancellando il passo che li ha creati se ne vanno anche quelli automatici, con le loro attività
+    s71 := (select id from public.passi where persona_id = q71 and tipo = 'followup' order by creato_il limit 1);
+    execute 'reset role';
+    att71 := (select count(*) from public.activities where partner_id = a);
+    perform growup_test.come(u2);
+    delete from public.passi where id = s71;
+    perform growup_test.ok((select array_agg(tipo) from public.passi where persona_id = q71) = array['followup'],
+                           '071: cancellando il follow-up si cancellano anche i passi automatici collegati');
+    execute 'reset role';
+    perform growup_test.ok((select count(*) from public.activities where partner_id = a) = att71 - 2,
+                           '071: con loro se ne vanno le attività del contatto e del piano automatici');
+    -- «Riapri il percorso» non li toglie; i passi importati, le note e il contatto non aggiungono niente
+    perform growup_test.come(u2);
+    insert into public.passi (persona_id, tipo, esito) values (p71, 'chiusura', 'no');
+    insert into public.passi (persona_id, tipo) values (p71, 'riapri');
+    perform growup_test.ok((select count(*) from public.passi where persona_id = p71 and segnato_con is not null) = 1,
+                           '071: «Riapri il percorso» lascia i passi automatici');
+    delete from public.persone where id in (p71, q71);
+    insert into public.persone (nome) values ('Importata Prova 71') returning id into p71;
+    insert into public.passi (persona_id, tipo, importato) values (p71, 'piano', true);
+    insert into public.passi (persona_id, tipo) values (p71, 'nota');
+    perform growup_test.ok((select count(*) from public.passi where persona_id = p71) = 2, '071: un piano importato e una nota non aggiungono passi');
+    insert into public.persone (nome) values ('Chiusure Prova 71') returning id into q71;
+    insert into public.passi (persona_id, tipo, esito) values (q71, 'chiusura', 'cliente');
+    insert into public.passi (persona_id, tipo) values (q71, 'riapri');
+    insert into public.passi (persona_id, tipo, esito) values (q71, 'chiusura', 'non_ora');
+    insert into public.passi (persona_id, tipo) values (q71, 'riapri');
+    insert into public.passi (persona_id, tipo, esito) values (q71, 'chiusura', 'senza_risposta');
+    perform growup_test.ok((select count(*) from public.passi where persona_id = q71 and segnato_con is not null) = 0,
+                           '071: le chiusure Cliente, Non ora e Chiuso senza risposta non aggiungono passi');
+    -- RLS: i passi automatici sono del proprietario della persona e nessun altro li vede
+    insert into public.passi (persona_id, tipo) values (q71, 'followup') returning id into s71;
+    perform growup_test.ok((select count(*) from public.passi where segnato_con = s71 and proprietario = a) = 3, '071: i passi automatici sono di A');
+    perform growup_test.come(u1);  -- R, sponsor di A e admin
+    perform growup_test.ok((select count(*) from public.passi where segnato_con = s71) = 0, '071: lo sponsor (anche admin) non vede i passi automatici di A');
+    perform growup_test.ok(growup_test.righe(format('delete from public.passi where segnato_con = %L', s71)) = 0, '071: lo sponsor non li cancella');
+    perform growup_test.come(u4);  -- C, altra linea
+    perform growup_test.ok((select count(*) from public.passi where segnato_con = s71) = 0, '071: un''altra linea non li vede');
+    perform growup_test.come(u3);  -- B, sotto A
+    perform growup_test.ok((select count(*) from public.passi where segnato_con = s71) = 0, '071: chi è sotto non li vede');
+    -- dal telefono non si segna un passo come automatico
+    perform growup_test.come(u2);
+    perform growup_test.deve_fallire(format('insert into public.passi (persona_id, tipo, segnato_con) values (%L, ''invito'', %L)', q71, s71),
+                                     '071: un passo automatico non si scrive dal telefono');
+    delete from public.persone where id in (p71, q71);
   end;
 
   -- ---- Nessuna tabella senza RLS ----

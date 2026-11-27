@@ -489,14 +489,17 @@
         if(t && !r.importato){ const a = { id:uid(), partner_id:pe.proprietario, tipo:t, quantita:1, data:r.data, inserito_da:pe.proprietario, inserito_il:new Date().toISOString() };
           db.activities.push(a); passo.attivita_id = a.id; }
         db.passi = (db.passi || []).concat([passo]);
-        /* 070: chiusa come Partner (non importata), i passi che mancano tra contatto, invito e piano, segnati in automatico,
-           collegati alla chiusura (segnato_con), con la sua data e un istante prima; contatto e piano contano l'attività */
-        if(r.tipo === "chiusura" && r.esito === "partner" && !r.importato){
+        /* 070/071: i passi precedenti che mancano si spuntano da soli (invito → contatto; piano → contatto, invito; follow-up e
+           chiusura come Partner → contatto, invito, piano), non importati; segnati in automatico, collegati al passo che li crea
+           (segnato_con), con la sua data e un istante prima; contatto e piano contano l'attività, l'invito no */
+        const prima = r.importato ? null : r.tipo === "invito" ? ["contatto"] : r.tipo === "piano" ? ["contatto", "invito"]
+          : r.tipo === "followup" || (r.tipo === "chiusura" && r.esito === "partner") ? ["contatto", "invito", "piano"] : null;
+        if(prima){
           const base = Date.parse(passo.creato_il.slice(0, 24)) || Date.now();
-          ["contatto", "invito", "piano"].forEach((tipo, k) => {
+          prima.forEach((tipo, k) => {
             if(db.passi.some(y => y.persona_id === pe.id && y.tipo === tipo)) return;
             const auto = { id:uid(), persona_id:pe.id, proprietario:pe.proprietario, tipo, data:r.data, come:null, reazione:null, esito:null, nota:null,
-              importato:false, segnato_con:passo.id, attivita_id:null, creato_il:new Date(base - (3 - k)).toISOString() + "0" };
+              importato:false, segnato_con:passo.id, attivita_id:null, creato_il:new Date(base - (prima.length - k)).toISOString() + "0" };
             if(tipo !== "invito"){ const a = { id:uid(), partner_id:pe.proprietario, tipo, quantita:1, data:r.data, inserito_da:pe.proprietario, inserito_il:new Date().toISOString() };
               db.activities.push(a); auto.attivita_id = a.id; }
             db.passi.push(auto);
@@ -507,7 +510,7 @@
       salva(); },
     cancellaPasso: async id => { const x = (db.passi || []).find(y => y.id === id);
       if(!x) return;
-      /* 070: con la chiusura se ne vanno anche i passi automatici collegati, con le loro attività */
+      /* 070/071: con il passo se ne vanno anche i passi automatici collegati, con le loro attività */
       const via = db.passi.filter(y => y.id === id || (y.segnato_con && y.segnato_con === id));
       db.passi = db.passi.filter(y => !via.includes(y));
       const att = via.map(y => y.attivita_id).filter(Boolean);
