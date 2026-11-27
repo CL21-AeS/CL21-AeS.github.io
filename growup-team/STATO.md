@@ -12,6 +12,10 @@ Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 Test: interfaccia sezione 112 (ordine e classi dei pulsanti, colore pesca, Invita con il nome già scritto, Partner con e senza
 Target collegato, Cliente, No, Non ora, aperta in fase Piano; nessun pulsante a capo a 360 px; anteprime
 `design/anteprime/112-schede-light/dark.png`).
+- **Da sistemare più avanti** (scelta di Stefano del 27 novembre: per ora restano così, c'erano già prima): a 360 px vanno a
+  capo «Piano fatto» sotto la barra delle fasi di una persona aperta, il testo sotto il nome nella riga della Lista di un
+  «Non ora» con la data dell'anno dopo («Non ora · 23 febbraio 2027 · da risentire il 25 febbraio») e «In agenda» nella
+  sua scheda.
 
 ## Lista: la riga di una persona chiusa (27 novembre 2026, richiesta di Stefano, app v134, database non toccato)
 
