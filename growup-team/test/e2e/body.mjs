@@ -2951,7 +2951,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   await page.getByText("In agenda: oggi alle 18:30").waitFor();
   await sync(page);
   check(String((DB.persone.find(x => x.id === pid) || {}).prossima_ora || "").startsWith("18:30"), "l'ora è salvata");
-  check(await page.getByText(/Oggi · .* · 18:30/).first().isVisible(), "l'ora si vede con il giorno");
+  check(await page.getByText(/Oggi · 18:30/).first().isVisible(), "l'ora si vede con il giorno («Oggi · 18:30», senza la data)");
   // la × toglie giorno, ora e nota della prossima cosa
   await page.click(".prossima button[data-act=togli-prossima]");
   await page.getByText("Tolto dall'agenda").waitFor();
@@ -3647,7 +3647,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   // dalla scheda: Fatto → Piano mostrato
   await page.click("button[data-act=vista-persone]");
   await page.locator("button[data-act=apri-persona]", { hasText:"Agenda Prova" }).click();
-  check(await page.locator(".prossima .agenda-testo").innerText().then(t => t.includes("piano")), "scheda: «In agenda» con il piano");
+  check(await page.locator(".prossima .prossima-dettagli").innerText().then(t => t.includes("piano")), "scheda: «In agenda» con il piano (sotto il giorno)");
   await page.click(".prossima button[data-act=agenda-fatto]");
   await page.click(".sheet button[data-r=piano_mostrato]");
   await page.locator(".sheet h2", { hasText:"Quando lo risenti?" }).waitFor();
@@ -5321,10 +5321,10 @@ for(const tema of ["light", "dark"]){
     if(tema === "light"){
       check(await motivo("c82a") === "Da contattare", "contatto: solo l'azione, senza data né giorni in lista né come la conosci (" + await motivo("c82a") + ")");
       check(await motivo("c82c") === "Da contattare", "contatto senza «Come lo conosci?»: lo stesso testo");
-      check(await motivo("c82d") === `Domani · ${it(giorno(1))} · telefono · contatto`, "contatto in agenda: solo l'appuntamento, non da quanto è in lista (" + await motivo("c82d") + ")");
+      check(await motivo("c82d") === `Domani · telefono · contatto`, "contatto in agenda: solo l'appuntamento, non da quanto è in lista (" + await motivo("c82d") + ")");
       check(await motivo("c82b") === null, "contatto già fatto (non più «In lista»): solo il nome");
       check(await motivo("f82a") === `In ritardo dal ${it(giorno(-2))} · Follow-up`, "follow-up in ritardo: lo stesso testo della lista di oggi (" + await motivo("f82a") + ")");
-      check(await motivo("f82b") === `Oggi · ${it(oggiG)} · 18:30 · telefono · piano`, "follow-up in agenda: il suo «per cosa» (" + await motivo("f82b") + ")");
+      check(await motivo("f82b") === `Oggi · 18:30 · telefono · piano`, "follow-up in agenda: il suo «per cosa» (" + await motivo("f82b") + ")");
       check(await motivo("f82c") === `${it(giorno(5))} · Chiusura`, "follow-up spostato: si vede la data di adesso (" + await motivo("f82c") + ")");
       check(/^Compleanno il \d+ \w+$/.test(await motivo("k82a") || ""), "cliente: il motivo dei clienti da sentire (" + await motivo("k82a") + ")");
       check(await motivo("k82b") === null, "cliente che non è più da sentire: solo il nome");
@@ -5358,7 +5358,7 @@ for(const tema of ["light", "dark"]){
   check(await sotto("c82a") === `In lista dal ${it(anno + "-01-05")} (${gg(anno + "-01-05")}\u00a0giorni)`, "Lista: «In lista dal … (N giorni)» (" + await sotto("c82a") + ")");
   check(await sotto("c82e") === "In lista da oggi", "Lista: scritto oggi, «In lista da oggi» (" + await sotto("c82e") + ")");
   check(await sotto("c82f") === `In lista dal ${it(giorno(-1))} (1\u00a0giorno)`, "Lista: scritto ieri, «(1 giorno)» (" + await sotto("c82f") + ")");
-  check(await sotto("c82d") === `In lista · Domani · ${it(giorno(1))} · telefono · contatto`, "Lista: in agenda solo l'appuntamento, come prima (" + await sotto("c82d") + ")");
+  check(await sotto("c82d") === `Domani · contatto`, "Lista: in agenda solo quando e per cosa, senza la fase (" + await sotto("c82d") + ")");
   check(/^Contattato · fermo da \d+ giorni$/.test(await sotto("c82b")), "Lista: chi ha già fatto un passo ha «fermo da», non da quando è in lista (" + await sotto("c82b") + ")");
   check(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Lista a 360 px: niente scorrimento orizzontale");
   await page.evaluate(() => document.querySelectorAll("body *").forEach(e => { const p = getComputedStyle(e).position;
@@ -8975,6 +8975,73 @@ async function tavola(path, ritagli, scuro){
   check(inviti(54).length === 1 && DB.persone.find(x => x.id === idChiusi(54)).prossima_per === "piano", "116: «Piano fissato» e poi «Quando è il piano?»: un invito solo");
   check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "116: a 360 px niente scorrimento di lato");
   await tavola(S + "/e2e/116-piano-light.png", ritagli.light); await tavola(S + "/e2e/116-piano-dark.png", ritagli.dark, true);
+  await ctx.close();
+  togliChiusi();
+}
+
+// 117. Il testo dell'appuntamento non va a capo a 360 px (27 novembre 2026, scelta di Stefano). Nella riga della Lista, con un
+//      appuntamento, al posto della fase (si vede dai pallini) solo quando e per cosa: «Domani · 18:30 · fissare il piano»;
+//      «Oggi» e «Domani» senza la data; in ritardo «In ritardo · follow-up» (nella scheda la data, senza l'ora). «Non ora · 25 febbraio». Nella scheda, in grassetto quando e
+//      sotto, piccolo, come, per cosa e nota. Se non ci sta, i puntini. Lo stesso nei Clienti.
+{
+  preparaChiusi();
+  const pid = idChiusi(1);
+  const nuova = (n, nome, extra) => DB.persone.push(Object.assign({ id:idChiusi(n), proprietario:pid, nome, fase:"contattato", esito:null, prossima_data:null,
+    prossima_nota:null, prossima_per:null, prossima_come:null, creato_il:new Date(Date.now() - 5 * 864e5).toISOString() }, extra || {}));
+  nuova(70, "Lia Domani", { prossima_data:dataPiu(1), prossima_ora:"18:30", prossima_come:"whatsapp", prossima_per:"fissare_piano" });
+  nuova(71, "Max Ritardo", { prossima_data:dataPiu(-3), prossima_ora:"18:30", prossima_come:"telefono", prossima_per:"followup" });
+  nuova(72, "Ada Lunga", { prossima_data:dataPiu(5), prossima_ora:"18:30", prossima_come:"persona", prossima_per:"contatto_persona",
+    prossima_nota:"portare il catalogo e i campioni della crema" });
+  nuova(73, "Rino Cliente", { fase:"lista", esito:"cliente", prossima_data:dataPiu(0), prossima_ora:"09:15", prossima_come:"telefono", prossima_per:"riordino" });
+  DB.passi.push({ id:idChiusi(73) + "-c", persona_id:idChiusi(73), proprietario:pid, tipo:"chiusura", esito:"cliente", data:dataPiu(-30), importato:false, attivita_id:null,
+    creato_il:new Date(Date.now() - 30 * 864e5).toISOString() });
+  ({ ctx, page } = await apriChiusi());
+  const ritagli = { light:[], dark:[] };
+  const foto = async (titolo, loc) => { for(const tema of ["light", "dark"]){ await page.emulateMedia({ colorScheme:tema }); await page.waitForTimeout(80);
+      ritagli[tema].push({ titolo, png:await page.locator(loc).first().screenshot() }); } await page.emulateMedia({ colorScheme:"light" }); };
+  const sotto = nome => page.locator(".persone li", { hasText:nome }).locator(".grow > .small").last();
+  const tagliato = loc => loc.evaluate(e => { const x = e.querySelector(".una-riga") || e; return x.scrollWidth > x.clientWidth + 1; });
+  const attese = { "Lia Domani":"Domani · 18:30 · fissare il piano", "Max Ritardo":"In ritardo · follow-up",
+    "Dino Nonora":"Non ora · " + risentiChiusi.replace("da risentire il ", "") };
+  for(const [nome, t] of Object.entries(attese)){
+    check((await sotto(nome).innerText()).trim() === t, `117: riga di ${nome}: «${t}» (${(await sotto(nome).innerText()).trim()})`);
+    check(!(await aCapoIn(page.locator(".persone li", { hasText:nome }), ".grow > .small")).length && !(await tagliato(sotto(nome))), `117: riga di ${nome}: una riga, senza puntini`);
+  }
+  check(!(await aCapoIn(page.locator(".persone li", { hasText:"Ada Lunga" }), ".grow > .small")).length, "117: riga di Ada (testo lungo): una riga sola (con i puntini)");
+  for(const nome of ["Ada Lunga", "Lia Domani", "Max Ritardo"])
+    check(await page.locator(".persone li", { hasText:nome }).evaluate(li => { const b = li.querySelector("button.cal"), r = li.getBoundingClientRect();
+      return !!b && b.getBoundingClientRect().right <= r.right + 0.5 && b.getBoundingClientRect().width > 30; }), `117: riga di ${nome}: l'icona del calendario resta tutta dentro`);
+  check(await page.locator(".persone li", { hasText:"Lia Domani" }).locator(".agenda-testo").count() === 1, "117: il testo dell'appuntamento resta verde");
+  await foto("La Lista", ".card:has(ul.persone)");
+  // la scheda: quando in grassetto, sotto come, per cosa e nota
+  const scheda = async (nome, quando, dettagli) => {
+    await schedaChiusi(page, nome);
+    const b = page.locator(".prossima .prossima-testo b"), d = page.locator(".prossima .prossima-dettagli");
+    check((await b.innerText()).trim() === quando && (await d.innerText()).trim() === dettagli, `117: scheda di ${nome}: «${quando}» / «${dettagli}» (${await b.innerText()} / ${await d.innerText()})`);
+    check(!(await aCapoIn(page.locator(".prossima"), ".prossima-testo b, .prossima-dettagli")).length, `117: scheda di ${nome}: niente a capo a 360 px`);
+    return tagliato(d);
+  };
+  check(!(await scheda("Lia Domani", "Domani · 18:30", "WhatsApp · fissare il piano")), "117: Lia: i dettagli stanno interi");
+  await foto("Lia: In agenda", ".prossima");
+  await scheda("Max Ritardo", `In ritardo · ${giornoMappaIt(dataPiu(-3) + "T12:00:00")}`, "Telefono · follow-up");
+  await foto("Max: in ritardo", ".prossima");
+  check(await scheda("Ada Lunga", `${giornoMappaIt(dataPiu(5) + "T12:00:00")} · 18:30`, "Di persona · contatto di persona · portare il catalogo e i campioni della crema"),
+    "117: Ada: la nota lunga finisce con i puntini");
+  await foto("Ada: nota lunga", ".prossima");
+  // nei Clienti lo stesso
+  await page.click("button[data-act=torna-lista]"); await page.click("button[data-sez=clienti]");
+  const cli = page.locator(".persone li", { hasText:"Rino Cliente" }).locator(".grow > .small").last();
+  check((await cli.innerText()).trim() === "Oggi · 09:15 · riordino" && !(await aCapoIn(page.locator(".persone li", { hasText:"Rino Cliente" }), ".grow > .small")).length,
+    "117: Clienti, riga: «Oggi · 09:15 · riordino» (" + (await cli.innerText()).trim() + ")");
+  await page.locator("button[data-act=apri-cliente]", { hasText:"Rino Cliente" }).click();
+  check((await page.locator(".prossima .prossima-testo b").innerText()).trim() === "Oggi · 09:15" && (await page.locator(".prossima .prossima-dettagli").innerText()).trim() === "Telefono · riordino",
+    "117: Clienti, scheda: «Oggi · 09:15» / «Telefono · riordino»");
+  await foto("Rino (cliente): In agenda", ".prossima");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "117: a 360 px niente scorrimento di lato");
+  // sicurezza: la nota scritta dall'utente passa per esc
+  check(await page.evaluate(() => { const h = GROWUP_TEST.testoAgendaScheda({ prossima_data:"2030-01-01", prossima_per:"altro", prossima_nota:"<img src=x onerror=alert(1)>" }, "");
+    return !h.includes("<img") && h.includes("&lt;img"); }), "117: una nota con codice si vede come testo");
+  await tavola(S + "/e2e/117-agenda-corta-light.png", ritagli.light); await tavola(S + "/e2e/117-agenda-corta-dark.png", ritagli.dark, true);
   await ctx.close();
   togliChiusi();
 }
