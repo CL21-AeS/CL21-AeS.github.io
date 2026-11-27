@@ -743,6 +743,9 @@ label.check.tutti{margin:8px 0 2px;font-weight:700;color:var(--ink)}
 .percorso-persona li i{width:100%;height:6px;border-radius:3px;background:var(--traccia)}
 .percorso-persona li.fatta i,.percorso-persona li.qui i{background:var(--progresso)}
 .percorso-persona li.qui{color:var(--ink);font-weight:700}
+/* persona chiusa: una riga al posto della barra (verde solo per Partner e Cliente, neutra per gli altri esiti) */
+.chiusura-persona{margin:14px 0 0;padding:9px 12px;border:1px solid var(--line);border-radius:12px;font-size:14px;font-weight:700;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chiusura-persona.ok{color:var(--verde);border-color:color-mix(in srgb,var(--verde) 35%,transparent)}
 .prossima{display:flex;flex-direction:column;margin-top:14px;padding:10px 12px;background:var(--bg);border-radius:10px}
 fieldset.field{border:0;padding:0;margin:14px 0 0;min-width:0}
 fieldset.field legend{padding:0;margin-bottom:6px;font-size:13px;font-weight:700;color:var(--ink2)}

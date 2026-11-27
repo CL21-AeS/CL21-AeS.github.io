@@ -5009,6 +5009,23 @@ function vPersone(){
   </div>`;
 }
 
+/* «dal 27 novembre», «dall'8 novembre», «dal 1° dicembre» */
+function dalGiorno(d){ const t = dataIt(d), n = parseInt(t, 10); return n === 1 ? "dal 1°" + t.slice(1) : n === 8 || n === 11 ? "dall'" + t : "dal " + t; }
+/* Scheda di una persona chiusa (27 novembre 2026, scelta di Stefano): al posto della barra delle fasi una sola riga, con la
+   data del passo di chiusura più recente. Solo visualizzazione: fase ed esito restano quelli calcolati dal database.
+   Partner e Cliente in verde; No, Chiuso senza risposta e Non ora neutri (Non ora con il giorno in cui risentirlo). */
+function rigaChiusura(p){
+  const c = passiDi(p.id).find(s => s.tipo === "chiusura"), quando = c ? c.data : null;
+  let t;
+  if(p.esito === "partner" || p.esito === "cliente") t = `✓ ${ESITI[p.esito]}${quando ? " " + dalGiorno(quando) : ""}`;
+  else if(p.esito === "non_ora"){
+    const m = /^da risentire il (.+)$/.exec(p.prossima_nota || "");
+    t = `Non ora${m ? " · da risentire il " + m[1] : p.prossima_data ? " · da risentire il " + dataIt(p.prossima_data) : quando ? " · " + dataIt(quando) : ""}`;
+  }
+  else t = `${p.esito === "no" ? "Percorso chiuso · No" : ESITI[p.esito]}${quando ? " · " + dataIt(quando) : ""}`;
+  return `<p class="chiusura-persona${p.esito === "partner" || p.esito === "cliente" ? " ok" : ""}">${esc(t)}</p>`;
+}
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { rigaChiusura });
 function vPersona(){
   const p = st.persone.find(x => x.id === st.personaId);
   if(!p) return `<button class="btn link" data-act="torna-lista" style="padding:0">‹ La mia lista</button><p class="muted">Nome non trovato.</p>`;
@@ -5028,7 +5045,7 @@ function vPersona(){
     ${telefono ? `<div class="row" style="gap:6px;margin-top:8px">
       <a class="btn small" href="tel:${esc(tel)}">Chiama</a>
       <a class="btn small wa" target="_blank" rel="noopener" href="https://wa.me/${esc(tel.replace(/^\+/, "").replace(/^(?=3)/, "39"))}">WhatsApp</a></div>` : ""}
-    <ol class="percorso-persona" aria-label="Percorso">${FASI.map((x, k) => `<li class="${k < i ? "fatta" : k === i ? "qui" : ""}"><i></i><span>${x.nome}</span></li>`).join("")}</ol>
+    ${p.esito ? rigaChiusura(p) : `<ol class="percorso-persona" aria-label="Percorso">${FASI.map((x, k) => `<li class="${k < i ? "fatta" : k === i ? "qui" : ""}"><i></i><span>${x.nome}</span></li>`).join("")}</ol>`}
     <div class="prossima">
       <span class="small">In agenda</span>
       ${p.prossima_data ? `<span class="row prossima-testo" style="gap:6px;align-items:center"><b class="grow${inAgenda(p) ? " agenda-testo" : ""}">${esc(testoProssima(p))}</b>
