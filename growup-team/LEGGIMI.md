@@ -150,6 +150,9 @@ Nel progetto: **SQL Editor → New query**. Incolla e lancia, **in quest'ordine*
 41r. `supabase/067_strategia_caselle.sql` — le caselle di «La tua strategia» (tabella `strategia_caselle`, solo del partner,
      3 caselle o 20 da Argento in su, persona solo nella propria downline, linea solo frontale); solo cose nuove. Per
      toglierla: `supabase/067_strategia_caselle_togli.sql`
+41s. `supabase/070_chiusura_partner.sql` — chiudendo come Partner il database segna da solo i passi che mancano tra
+     contatto, invito e piano (colonna `passi.segnato_con`, trigger `passi_chiusura_partner`); solo cose nuove e
+     `passi_prima` aggiornata. Per toglierla: `supabase/070_chiusura_partner_togli.sql`
 41n. `supabase/055b_contatti_cron.sql` — l'attività pianificata della cancellazione, ogni notte (solo su Supabase, come la 050b)
 42. `supabase/010_etichette.sql` — le soglie delle etichette del gruppo (Non aggiorna, Contatti / Piani / VP sotto soglia)
 20. `supabase/006b_chiusura_pianificata.sql` — l'attività pianificata che il giorno 5 chiude il mese precedente

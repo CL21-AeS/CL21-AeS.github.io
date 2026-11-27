@@ -1187,9 +1187,9 @@ check(await page.locator("button[data-act=passo]").innerText() === "Segna un pas
 await page.click("button[data-act=passo]");
 await page.click(".sheet button:has-text('Salva')");
 check(await page.locator(".sheet .errore").getByText("Scegli com'è finita").isVisible(), "chiusura: serve l'esito");
-check(!await page.locator(".sheet [data-per-esito=partner]").isVisible() && !await page.locator(".sheet [data-per-esito=non_ora]").isVisible(), "chiusura: senza esito niente prossima cosa");
+check(!await page.locator(".sheet div[data-per-esito=partner]").isVisible() && !await page.locator(".sheet [data-per-esito=non_ora]").isVisible(), "chiusura: senza esito niente prossima cosa");
 await page.click(".sheet label.chip:has-text('Partner')");
-check(await page.locator(".sheet [data-per-esito=partner]").isVisible(), "Partner: c'è la prossima cosa");
+check(await page.locator(".sheet div[data-per-esito=partner]").isVisible(), "Partner: c'è la prossima cosa");
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("Chiusura · Partner segnato").waitFor();
 await page.click("button[data-act=invita]:has-text('Invitalo in Growup')");
@@ -1223,7 +1223,7 @@ const chiudi = async (nome, esito) => {
   await page.locator(".sheet label.chip").filter({ hasText:new RegExp(`^${esito}$`) }).click();
 };
 await chiudi("Nina Nonora", "Non ora");
-check(await page.locator(".sheet [data-per-esito=non_ora]").isVisible() && !await page.locator(".sheet [data-per-esito=partner]").isVisible()
+check(await page.locator(".sheet [data-per-esito=non_ora]").isVisible() && !await page.locator(".sheet div[data-per-esito=partner]").isVisible()
   && !await page.locator(".sheet input[name=prossima_nota]").isVisible(), "Non ora: tra quanto risentirlo, senza prossima cosa");
 await page.click(".sheet label.chip:has-text('1 mese')");
 await page.fill(".sheet input[name=nota]", "ora ha il trasloco");
@@ -1266,7 +1266,7 @@ await page.click("button[data-filtro=riprendere]");
 check(await page.locator("button[data-act=apri-persona]", { hasText:"Nina Nonora" }).isVisible(), "Non ora: è in Da riprendere");
 await page.click("button[data-filtro=tutti]");
 await chiudi("Nico No", "No");
-check(!await page.locator(".sheet [data-per-esito=partner]").isVisible() && !await page.locator(".sheet [data-per-esito=non_ora]").isVisible()
+check(!await page.locator(".sheet div[data-per-esito=partner]").isVisible() && !await page.locator(".sheet [data-per-esito=non_ora]").isVisible()
   && await page.locator(".sheet input[name=nota]").isVisible(), "No: resta solo la nota");
 await page.click(".sheet button:has-text('Salva')");
 await page.getByText("Chiusura · No segnato").waitFor();
@@ -8517,6 +8517,120 @@ async function tavola(path, ritagli, scuro){
     await page.emulateMedia({ colorScheme:"light" });
   }
   await tavola(S + "/e2e/112-schede-light.png", ritagli.light); await tavola(S + "/e2e/112-schede-dark.png", ritagli.dark, true);
+  await ctx.close();
+  togliChiusi();
+}
+
+// 113. Chiusura come Partner = contatto, invito e piano fatti (27 novembre 2026, regola di Stefano, migrazione 070). Il
+//      database (qui l'API finta, che fa lo stesso) aggiunge i passi che mancano tra contatto, invito e piano, con la data
+//      della chiusura e un istante prima, collegati alla chiusura (segnato_con); contatto e piano contano l'attività, l'invito
+//      no; mai il follow-up; nessun doppione. Cancellando la chiusura spariscono; «Riapri il percorso» li lascia. Nella scheda
+//      «Contatto · segnato con la chiusura»; nel modulo, scegliendo Partner, «Segna anche contatto, invito e piano.».
+{
+  preparaChiusi();
+  const pid = idChiusi(1);
+  DB.persone.push({ id:idChiusi(20), proprietario:pid, nome:"Hugo Diretto", fase:"lista", esito:null, prossima_data:null, prossima_nota:null,
+    creato_il:new Date(Date.now() - 3 * 864e5).toISOString() });
+  ({ ctx, page } = await apriChiusi());
+  const conta = tipo => DB.activities.filter(a => a.partner_id === pid && a.tipo === tipo).length;
+  const chiudiPartner = async (nome, attesa) => {
+    await schedaChiusi(page, nome);
+    await page.click("button[data-act=passo]");
+    await page.click(".sheet button[data-tipo=chiusura]");
+    const nota = page.locator(".sheet p.nota[data-per-esito=partner]");
+    check(!(await nota.count()) || await nota.isHidden(), `${nome}: prima di scegliere l'esito la riga non si vede`);
+    await page.click(".sheet label.chip:has-text('Partner')");
+    if(attesa) check(await nota.isVisible() && (await nota.innerText()).trim() === attesa, `${nome}: scegliendo Partner «${attesa}» (${await nota.count() ? await nota.innerText() : "niente"})`);
+    else check(!(await nota.count()), `${nome}: ci sono già contatto, invito e piano: nessuna riga`);
+    if(attesa){
+      await page.click(".sheet label.chip:has(span:text-is('No'))");
+      check(await nota.isHidden(), `${nome}: con un altro esito la riga sparisce`);
+      await page.click(".sheet label.chip:has-text('Partner')");
+      check(!(await aCapoIn(page.locator(".sheet"), "p.nota[data-per-esito=partner]")).length, `${nome}: la riga non va a capo a 360 px`);
+    }
+    await page.click(".sheet button:has-text('Salva')");
+    await page.getByText("Chiusura · Partner segnato").waitFor();
+    await sync(page);
+  };
+  /* foto di tutta la scheda in chiaro e in scuro, senza il messaggio di conferma sopra */
+  const ritagli = { light:[], dark:[] };
+  const foto = async titolo => { await page.evaluate(() => { const t = document.getElementById("toast"); if(t) t.style.visibility = "hidden"; });
+    for(const tema of ["light", "dark"]){ await page.emulateMedia({ colorScheme:tema }); await page.waitForTimeout(80);
+      ritagli[tema].push({ titolo, png:await page.screenshot({ fullPage:true }) }); }
+    await page.emulateMedia({ colorScheme:"light" }); await page.evaluate(() => { const t = document.getElementById("toast"); if(t) t.style.visibility = ""; }); };
+  for(const nome of ["Bruno Completo", "Carla No", "Dino Nonora", "Elsa Piano"]){ await schedaChiusi(page, nome); await foto(nome); }
+  const passiScheda = async () => (await page.locator(".card", { hasText:"I passi" }).locator("li .grow").allInnerTexts()).map(x => x.replace(/\s+/g, " ").trim());
+
+  // Hugo, senza passi: +1 contatto e +1 piano, l'invito senza attività, fase «piano», niente follow-up
+  await sync(page);
+  const [c0, p0] = [conta("contatto"), conta("piano")];
+  await chiudiPartner("Hugo Diretto", "Segna anche contatto, invito e piano.");
+  const hugo = DB.passi.filter(x => x.persona_id === idChiusi(20)), chiusura = hugo.find(x => x.tipo === "chiusura");
+  const auto = hugo.filter(x => x.segnato_con === chiusura.id);
+  check(hugo.length === 4 && JSON.stringify(auto.map(x => x.tipo).sort()) === JSON.stringify(["contatto", "invito", "piano"])
+    && auto.every(x => x.data === chiusura.data && x.creato_il < chiusura.creato_il) && !hugo.some(x => x.tipo === "followup"),
+    "Hugo: contatto, invito e piano automatici, con la data della chiusura e un istante prima; niente follow-up");
+  check(conta("contatto") === c0 + 1 && conta("piano") === p0 + 1 && auto.find(x => x.tipo === "invito").attivita_id === null,
+    "chiusura Partner senza passi = +1 contatto e +1 piano (l'invito non conta attività)");
+  check(DB.persone.find(x => x.id === idChiusi(20)).fase === "piano", "Hugo: la fase diventa «piano»");
+  check(JSON.stringify(await passiScheda()) === JSON.stringify(["Chiusura · Partner", "Piano · segnato con la chiusura", "Invito · segnato con la chiusura", "Contatto · segnato con la chiusura"]),
+    "nella scheda, in sequenza: «Piano / Invito / Contatto · segnato con la chiusura» (" + (await passiScheda()).join(" | ") + ")");
+  check(!(await aCapoIn(page.locator(".card", { hasText:"I passi" }), "li .grow > b, li .grow > .segnato-chiusura")).length,
+    "i passi automatici non vanno a capo a 360 px (" + (await aCapoIn(page.locator(".card", { hasText:"I passi" }), "li .grow > b, li .grow > .segnato-chiusura")).join(" | ") + ")");
+  check((await page.locator(".chiusura-persona").innerText()).trim() === `✓ Partner ${dalIt(dataPiu(0))}`, "Hugo: la riga «✓ Partner dal …»");
+  await foto("Hugo: Partner senza passi");
+  for(const tema of ["light", "dark"]) ritagli[tema].unshift(ritagli[tema].pop());
+
+  // «Riapri il percorso» non toglie i passi automatici: la barra torna su «Piano fatto»
+  await page.click("button[data-act=riapri-persona]");
+  await page.locator("#app .card").first().locator(".percorso-persona").waitFor();
+  await sync(page);
+  check(DB.passi.filter(x => x.segnato_con === chiusura.id).length === 3
+    && await page.locator("#app .card").first().locator(".percorso-persona li.qui").innerText() === "Piano fatto", "«Riapri il percorso» lascia i passi automatici (barra su «Piano fatto»)");
+  // cancellando la chiusura spariscono i passi automatici e le loro attività
+  await page.locator(".card", { hasText:"I passi" }).locator("li", { hasText:"Chiusura · Partner" }).locator("button[data-act=togli-passo]").click();
+  await page.getByText("Passo tolto").waitFor();
+  await sync(page);
+  check(!DB.passi.some(x => x.persona_id === idChiusi(20) && x.tipo !== "riapri") && conta("contatto") === c0 && conta("piano") === p0
+    && DB.persone.find(x => x.id === idChiusi(20)).fase === "lista", "cancellando la chiusura spariscono i passi automatici e le loro attività");
+
+  // Elsa ha già contatto, invito e piano: nessuna riga, nessun passo né conteggio in più
+  const [c1, p1, n1] = [conta("contatto"), conta("piano"), DB.passi.filter(x => x.persona_id === idChiusi(14)).length];
+  await chiudiPartner("Elsa Piano", null);
+  check(DB.passi.filter(x => x.persona_id === idChiusi(14)).length === n1 + 1 && !DB.passi.some(x => x.persona_id === idChiusi(14) && x.segnato_con)
+    && conta("contatto") === c1 && conta("piano") === p1, "con contatto, invito e piano già segnati: nessun passo e nessun conteggio in più");
+  // Gina (solo il contatto): «Segna anche invito e piano.»; uno solo che manca: «Segna anche il piano.»
+  check(await page.evaluate(id => GROWUP_TEST.mancanoPerPartner({ id }), idChiusi(16)) === "Segna anche invito e piano.", "manca invito e piano: «Segna anche invito e piano.»");
+  check(await page.evaluate(id => { GROWUP_TEST.st.passi.push({ id:"x1", persona_id:id, tipo:"invito", data:"2026-01-01", creato_il:"2026-01-01" });
+    const t = GROWUP_TEST.mancanoPerPartner({ id }); GROWUP_TEST.st.passi.pop(); return t; }, idChiusi(16)) === "Segna anche il piano.", "manca solo il piano: «Segna anche il piano.»");
+  // le altre chiusure non aggiungono niente (Carla: riaperta e chiusa «No», niente riga nel modulo)
+  await schedaChiusi(page, "Carla No"); await page.click("button[data-act=riapri-persona]");
+  await page.locator("#app .card").first().locator(".percorso-persona").waitFor();
+  await page.click("button[data-act=passo]"); await page.click(".sheet button[data-tipo=chiusura]");
+  await page.click(".sheet label.chip:has(span:text-is('No'))");
+  check(await page.locator(".sheet p.nota[data-per-esito=partner]").isHidden(), "Carla, esito No: la riga non si vede");
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("Chiusura · No segnato").waitFor(); await sync(page);
+  check(!DB.passi.some(x => x.persona_id === idChiusi(12) && (x.segnato_con || x.tipo === "invito" || x.tipo === "piano")), "chiusura «No»: nessun passo aggiunto");
+
+  // il modulo con Chiusura → Partner per chi ha solo il contatto (Ivo): «Segna anche invito e piano.»
+  DB.persone.push({ id:idChiusi(21), proprietario:pid, nome:"Ivo Aperto", fase:"piano", esito:null, prossima_data:null, prossima_nota:null, creato_il:new Date().toISOString() });
+  DB.passi.push({ id:idChiusi(21) + "-1", persona_id:idChiusi(21), proprietario:pid, tipo:"contatto", data:dataPiu(-4), esito:null, importato:false, attivita_id:null,
+    creato_il:new Date(Date.now() - 4 * 864e5).toISOString() });
+  await ctx.close();
+  ({ ctx, page } = await apriChiusi());
+  await schedaChiusi(page, "Ivo Aperto");
+  await page.click("button[data-act=passo]"); await page.click(".sheet button[data-tipo=chiusura]");
+  await page.click(".sheet label.chip:has-text('Partner')");
+  check((await page.locator(".sheet p.nota[data-per-esito=partner]").innerText()).trim() === "Segna anche invito e piano.", "Ivo (solo il contatto): «Segna anche invito e piano.»");
+  for(const tema of ["light", "dark"]){ await page.emulateMedia({ colorScheme:tema }); await page.waitForTimeout(80);
+    ritagli[tema].push({ titolo:"Ivo: il modulo, Chiusura → Partner", png:await page.locator(".sheet-box").screenshot() }); }
+  await page.emulateMedia({ colorScheme:"light" });
+  await page.click(".sheet [data-act=chiudi]").catch(() => {});
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "a 360 px: niente scorrimento di lato");
+  // sicurezza: il testo scritto dall'utente nella riga di chiusura passa per esc (niente codice nella pagina)
+  check(await page.evaluate(() => { const h = GROWUP_TEST.rigaChiusura({ id:"x", esito:"non_ora", prossima_nota:"da risentire il <img src=x onerror=alert(1)>" });
+    return !h.includes("<img") && h.includes("&lt;img"); }), "riga di chiusura: un testo con codice viene mostrato come testo");
+  await tavola(S + "/e2e/113-partner-light.png", ritagli.light); await tavola(S + "/e2e/113-partner-dark.png", ritagli.dark, true);
   await ctx.close();
   togliChiusi();
 }

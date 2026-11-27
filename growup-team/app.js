@@ -4929,6 +4929,15 @@ function campoCerchie(t, scelte){
   return `<fieldset class="field cerchie-scelta"><span>Cerchie <i>(facoltativo)</i></span>
     <div class="row wrap" style="gap:6px;margin-top:4px">${cc.map(c => `<label class="chip"><input type="checkbox" name="cerchia" value="${esc(c.id)}"${scelte.includes(c.id) ? " checked" : ""}><span>${esc(c.nome)}</span></label>`).join("")}</div></fieldset>`;
 }
+/* 070 (27 novembre 2026, regola di Stefano: nessuno diventa Partner senza contatto, invito e piano): chiudendo come Partner il
+   database segna da solo i passi che mancano tra contatto, invito e piano (mai il follow-up). Nel modulo lo si dice prima:
+   «Segna anche contatto, invito e piano.», o solo quelli che mancano; niente se ci sono tutti. */
+function mancanoPerPartner(p){
+  const ci = new Set(passiDi(p.id).map(s => s.tipo)), m = ["contatto", "invito", "piano"].filter(t => !ci.has(t));
+  if(!m.length) return "";
+  if(m.length === 1) return `Segna anche ${{ contatto:"il contatto", invito:"l'invito", piano:"il piano" }[m[0]]}.`;
+  return `Segna anche ${m.slice(0, -1).join(", ")} e ${m[m.length - 1]}.`;
+}
 function passiDi(id){ return st.passi.filter(s => s.persona_id === id).sort((a, b) => a.data < b.data ? 1 : a.data > b.data ? -1 : a.creato_il < b.creato_il ? 1 : -1); }
 function indiceFase(f){ return Math.max(0, FASI.findIndex(x => x.id === f)); }
 function aperta(p){ return !p.esito || p.esito === "non_ora"; }
@@ -5028,7 +5037,7 @@ function rigaChiusura(p){
   else t = `${p.esito === "no" ? "Percorso chiuso · No" : ESITI[p.esito]}${quando ? " · " + dataIt(quando) : ""}`;
   return `<p class="chiusura-persona${p.esito === "partner" || p.esito === "cliente" ? " ok" : ""}">${esc(t)}</p>`;
 }
-if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { rigaChiusura, rigaPersona });
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { rigaChiusura, rigaPersona, mancanoPerPartner });
 function vPersona(){
   const p = st.persone.find(x => x.id === st.personaId);
   if(!p) return `<button class="btn link" data-act="torna-lista" style="padding:0">‹ La mia lista</button><p class="muted">Nome non trovato.</p>`;
@@ -5071,7 +5080,8 @@ function vPersona(){
   <div class="card">
     <span class="eyebrow">I passi</span>
     ${passi.length ? `<ul class="oggi">${passi.map(s => `<li>
-      <span class="grow"><b>${s.tipo === "chiusura" ? `Chiusura · ${ESITI[s.esito]}` : s.tipo === "riapri" ? "Percorso riaperto" : TIPI_PASSO[s.tipo].nome}</b>
+      <span class="grow"><b>${s.tipo === "chiusura" ? `Chiusura · ${ESITI[s.esito]}` : s.tipo === "riapri" ? "Percorso riaperto" : TIPI_PASSO[s.tipo].nome}</b>${s.segnato_con
+        ? `<span class="visually-hidden"> · </span><br><span class="small segnato-chiusura">segnato con la chiusura</span>` : ""}
         ${[s.come, s.reazione].filter(Boolean).length ? `<br><span class="small">${[s.come, s.reazione].filter(Boolean).map(esc).join(" · ")}</span>` : ""}
         ${s.nota ? `<br><span class="small">${esc(s.nota)}</span>` : ""}</span>
       <span class="small">${dataIt(s.data)}</span>
@@ -5726,7 +5736,8 @@ function vSheetPersone(s){
       <label class="field"><span>Quando</span><input type="date" name="data" max="${oggi()}" value="${oggi()}"></label>
       ${t.come ? `<fieldset class="field"><legend>Come</legend>${opzioni("come", t.come)}</fieldset>
         <fieldset class="field"><legend>${tipo === "piano" ? "Com'è andato" : "Come ha reagito"}</legend>${opzioni("reazione", t.reazione)}</fieldset>` : ""}
-      ${tipo === "chiusura" ? `<fieldset class="field"><legend>Com'è finita</legend>${opzioni("esito", Object.values(ESITI))}</fieldset>` : ""}
+      ${tipo === "chiusura" ? `<fieldset class="field"><legend>Com'è finita</legend>${opzioni("esito", Object.values(ESITI))}</fieldset>${
+        mancanoPerPartner(p) ? `<p class="nota" data-per-esito="partner" hidden>${esc(mancanoPerPartner(p))}</p>` : ""}` : ""}
       <label class="field"><span>Nota <i>(facoltativa)</i></span><input name="nota" maxlength="1000"></label>
       ${tipo === "chiusura" ? `<div data-per-esito="partner" hidden>${campiProssima("Prossima cosa", null, p)}</div>
         <fieldset class="field" data-per-esito="non_ora" hidden><legend>Tra quanto lo risenti</legend>
