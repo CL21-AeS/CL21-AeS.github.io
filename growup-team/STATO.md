@@ -52,7 +52,7 @@ scheda; spostando nessun invito in più, togliendo l'invito resta; con l'invito 
 «E adesso?» con Piano dopo un contatto; un invito segnato a mano; «Piano fissato» e «Quando è il piano?» = un invito solo;
 niente a capo nella scheda del calendario; anteprime `design/anteprime/116-piano-light/dark.png`).
 
-## I passi precedenti si spuntano da soli (27 novembre 2026, richiesta di Stefano, app v138, migrazione 071 da applicare)
+## I passi precedenti si spuntano da soli (27 novembre 2026, richiesta di Stefano, app v138, migrazione 071 applicata)
 
 - **Database (071, `071_passi_precedenti.sql`)**: allarga la regola della 070 (una funzione sola, `passi_precedenti`, al posto
   di `passi_chiusura_partner`; stesso campo `passi.segnato_con`). Quando si inserisce un passo non importato (e non a sua volta
@@ -68,8 +68,15 @@ niente a capo nella scheda del calendario; anteprime `design/anteprime/116-piano
   automatico»). Nel modulo, sotto la scelta del tipo, una riga piccola: «Segna anche il contatto.», «Segna anche contatto e
   invito.», «Segna anche contatto, invito e piano.»; niente se non manca niente (`mancanoPrima`). Per la chiusura resta la riga
   sotto l'esito Partner. La versione di prova fa lo stesso del database.
-- **Da applicare al database vero** dopo l'unione della PR (con l'ok di Stefano). Per toglierla:
-  `071_passi_precedenti_togli.sql` (torna la regola della 070; i passi già aggiunti restano). Anche in `installa_tutto.sql`.
+- **Applicata al database vero il 27 novembre 2026** (ok di Stefano, dopo l'unione delle PR #258-#262), con il connettore.
+  Prima controllato che ci fosse la regola della 070 e nient'altro. Dopo: trigger `passi_dopo`, `passi_precedenti`, `passi_prima`;
+  `passi_chiusura_partner` tolta; la funzione nuova è `security definer` con `search_path` fisso e non si chiama dal telefono;
+  `segnato_con` non si scrive né si cambia dal telefono. Nessun dato cambiato (stessi passi, attività e persone, nessun passo
+  automatico aggiunto all'indietro). Prova vera in un blocco annullato alla fine: un piano su una persona nuova → contatto e
+  invito automatici, fase «piano», +1 contatto e +1 piano; un invito → il contatto; cancellando il piano spariscono anche i
+  passi automatici e le loro attività. Avvisi di sicurezza di Supabase: gli stessi di prima, nessuno nuovo.
+- Per toglierla: `071_passi_precedenti_togli.sql` (torna la regola della 070; i passi già aggiunti restano). Anche in
+  `installa_tutto.sql`.
   Controllo di sicurezza rapido: a posto, riga 071 in `SICUREZZA.md`.
 Test: `sh test/db.sh` (controlli 071: Piano su una persona In lista = +1 contatto e +1 piano; con il contatto già segnato solo
 +1 piano; invito → contatto; follow-up → contatto, invito, piano in ordine; niente doppioni; cancellando il passo spariscono
