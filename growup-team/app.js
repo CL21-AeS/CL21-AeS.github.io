@@ -4930,15 +4930,18 @@ function campoCerchie(t, scelte){
   return `<fieldset class="field cerchie-scelta"><span>Cerchie <i>(facoltativo)</i></span>
     <div class="row wrap" style="gap:6px;margin-top:4px">${cc.map(c => `<label class="chip"><input type="checkbox" name="cerchia" value="${esc(c.id)}"${scelte.includes(c.id) ? " checked" : ""}><span>${esc(c.nome)}</span></label>`).join("")}</div></fieldset>`;
 }
-/* 070 (27 novembre 2026, regola di Stefano: nessuno diventa Partner senza contatto, invito e piano): chiudendo come Partner il
-   database segna da solo i passi che mancano tra contatto, invito e piano (mai il follow-up). Nel modulo lo si dice prima:
-   «Segna anche contatto, invito e piano.», o solo quelli che mancano; niente se ci sono tutti. */
-function mancanoPerPartner(p){
-  const ci = new Set(passiDi(p.id).map(s => s.tipo)), m = ["contatto", "invito", "piano"].filter(t => !ci.has(t));
+/* 070/071 (27 novembre 2026, regole di Stefano): segnando un passo il database spunta da solo i passi precedenti che mancano
+   (invito → contatto; piano → contatto, invito; follow-up e chiusura come Partner → contatto, invito, piano; mai il follow-up).
+   Nel modulo lo si dice prima: «Segna anche il contatto.», «Segna anche contatto e invito.»…; niente se non manca niente. */
+const PASSI_PRIMA = { invito:["contatto"], piano:["contatto", "invito"], followup:["contatto", "invito", "piano"], chiusura:["contatto", "invito", "piano"] };
+function mancanoPrima(p, tipo){
+  const ci = new Set(passiDi(p.id).map(s => s.tipo)), m = (PASSI_PRIMA[tipo] || []).filter(t => !ci.has(t));
   if(!m.length) return "";
   if(m.length === 1) return `Segna anche ${{ contatto:"il contatto", invito:"l'invito", piano:"il piano" }[m[0]]}.`;
   return `Segna anche ${m.slice(0, -1).join(", ")} e ${m[m.length - 1]}.`;
 }
+/* la chiusura solo con l'esito Partner */
+function mancanoPerPartner(p){ return mancanoPrima(p, "chiusura"); }
 function passiDi(id){ return st.passi.filter(s => s.persona_id === id).sort((a, b) => a.data < b.data ? 1 : a.data > b.data ? -1 : a.creato_il < b.creato_il ? 1 : -1); }
 function indiceFase(f){ return Math.max(0, FASI.findIndex(x => x.id === f)); }
 function aperta(p){ return !p.esito || p.esito === "non_ora"; }
@@ -5038,7 +5041,7 @@ function rigaChiusura(p){
   else t = `${p.esito === "no" ? "Percorso chiuso · No" : ESITI[p.esito]}${quando ? " · " + dataIt(quando) : ""}`;
   return `<p class="chiusura-persona${p.esito === "partner" || p.esito === "cliente" ? " ok" : ""}">${esc(t)}</p>`;
 }
-if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { rigaChiusura, rigaPersona, mancanoPerPartner });
+if(window.GROWUP_TEST) Object.assign(window.GROWUP_TEST, { rigaChiusura, rigaPersona, mancanoPerPartner, mancanoPrima });
 function vPersona(){
   const p = st.persone.find(x => x.id === st.personaId);
   if(!p) return `<button class="btn link" data-act="torna-lista" style="padding:0">‹ La mia lista</button><p class="muted">Nome non trovato.</p>`;
@@ -5082,7 +5085,7 @@ function vPersona(){
     <span class="eyebrow">I passi</span>
     ${passi.length ? `<ul class="oggi">${passi.map(s => `<li>
       <span class="grow"><b>${s.tipo === "chiusura" ? `Chiusura · ${ESITI[s.esito]}` : s.tipo === "riapri" ? "Percorso riaperto" : TIPI_PASSO[s.tipo].nome}</b>${s.segnato_con
-        ? `<span class="visually-hidden"> · </span><br><span class="small segnato-chiusura">segnato con la chiusura</span>` : ""}
+        ? `<span class="visually-hidden"> · </span><br><span class="small segnato-auto">segnato in automatico</span>` : ""}
         ${[s.come, s.reazione].filter(Boolean).length ? `<br><span class="small">${[s.come, s.reazione].filter(Boolean).map(esc).join(" · ")}</span>` : ""}
         ${s.nota ? `<br><span class="small">${esc(s.nota)}</span>` : ""}</span>
       <span class="small">${dataIt(s.data)}</span>
@@ -5755,6 +5758,7 @@ function vSheetPersone(s){
     const tipo = st.passoTipo || passoProposto(p), t = TIPI_PASSO[tipo];
     return `<h2>${esc(nomeSaluto(p.nome))}: segna un passo</h2>
     <div class="opzioni tipi">${Object.keys(TIPI_PASSO).map(k => `<button type="button" class="btn small${k === tipo ? " on" : ""}" data-act="tipo-passo" data-tipo="${k}" aria-pressed="${k === tipo}">${TIPI_PASSO[k].nome}</button>`).join("")}</div>
+    ${tipo !== "chiusura" && mancanoPrima(p, tipo) ? `<p class="nota passi-prima">${esc(mancanoPrima(p, tipo))}</p>` : ""}
     ${tipo === "nota" ? `<form data-form="passo" novalidate>
       <label class="field"><span>La nota</span><textarea name="nota" rows="5" maxlength="1000" aria-label="La nota"></textarea></label>
       <p class="nota">La nota compare tra i passi della scheda e nelle Note dei suoi dati (toccando il nome).</p>

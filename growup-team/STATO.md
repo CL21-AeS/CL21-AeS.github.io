@@ -3,6 +3,31 @@
 Ultimo aggiornamento: 27 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## I passi precedenti si spuntano da soli (27 novembre 2026, richiesta di Stefano, app v138, migrazione 071 da applicare)
+
+- **Database (071, `071_passi_precedenti.sql`)**: allarga la regola della 070 (una funzione sola, `passi_precedenti`, al posto
+  di `passi_chiusura_partner`; stesso campo `passi.segnato_con`). Quando si inserisce un passo non importato (e non a sua volta
+  automatico) si aggiungono i passi precedenti che mancano: **invito → contatto; piano → contatto, invito; follow-up → contatto,
+  invito, piano; chiusura Partner → contatto, invito, piano** (come prima). Ciascuno solo se la persona non ne ha già uno; il
+  follow-up mai; Cliente, No, Non ora e Chiuso senza risposta niente. Stessa data, un istante prima, in ordine, collegati al
+  passo che li crea.
+- **Conteggi**: contatto e piano automatici contano come gli altri, l'invito no; niente doppioni. Cancellando il passo che li
+  ha creati spariscono anche loro (e le loro attività); «Riapri il percorso» non li toglie. Vale per tutte le strade («Segna
+  un passo», «Com'è andata?», + Piano…) perché lo fa il database. Nessun dato già presente cambiato.
+- **App**: nella scheda i passi automatici si leggono «Contatto» con sotto «segnato in automatico» (anche quelli della
+  chiusura Partner; su una riga a 360 px non ci sta accanto a data e ×, lo screen reader legge «Contatto · segnato in
+  automatico»). Nel modulo, sotto la scelta del tipo, una riga piccola: «Segna anche il contatto.», «Segna anche contatto e
+  invito.», «Segna anche contatto, invito e piano.»; niente se non manca niente (`mancanoPrima`). Per la chiusura resta la riga
+  sotto l'esito Partner. La versione di prova fa lo stesso del database.
+- **Da applicare al database vero** dopo l'unione della PR (con l'ok di Stefano). Per toglierla:
+  `071_passi_precedenti_togli.sql` (torna la regola della 070; i passi già aggiunti restano). Anche in `installa_tutto.sql`.
+  Controllo di sicurezza rapido: a posto, riga 071 in `SICUREZZA.md`.
+Test: `sh test/db.sh` (controlli 071: Piano su una persona In lista = +1 contatto e +1 piano; con il contatto già segnato solo
++1 piano; invito → contatto; follow-up → contatto, invito, piano in ordine; niente doppioni; cancellando il passo spariscono
+con le attività; Riapri li lascia; importati, note e chiusure non Partner niente; sponsor, admin, altra linea e downline non li
+vedono né li cancellano; la regola della 070 non è doppia); interfaccia sezione 115 (la riga nel modulo, i passi nella scheda,
+i conteggi, la cancellazione, «Com'è andata?», Riapri; anteprime `design/anteprime/115-passi-light/dark.png`).
+
 ## «Segna un passo»: la prossima cosa è un vero appuntamento in agenda (27 novembre 2026, richiesta di Stefano, app v137, database non toccato)
 
 - **Il difetto**: in fondo a «Segna un passo» la «prossima cosa» salvava solo giorno, ora, nota e avviso, mai «per cosa» e

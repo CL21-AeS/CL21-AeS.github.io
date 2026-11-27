@@ -8525,7 +8525,7 @@ async function tavola(path, ritagli, scuro){
 //      database (qui l'API finta, che fa lo stesso) aggiunge i passi che mancano tra contatto, invito e piano, con la data
 //      della chiusura e un istante prima, collegati alla chiusura (segnato_con); contatto e piano contano l'attività, l'invito
 //      no; mai il follow-up; nessun doppione. Cancellando la chiusura spariscono; «Riapri il percorso» li lascia. Nella scheda
-//      «Contatto · segnato con la chiusura»; nel modulo, scegliendo Partner, «Segna anche contatto, invito e piano.».
+//      «Contatto · segnato in automatico» (071); nel modulo, scegliendo Partner, «Segna anche contatto, invito e piano.».
 {
   preparaChiusi();
   const pid = idChiusi(1);
@@ -8573,10 +8573,10 @@ async function tavola(path, ritagli, scuro){
   check(conta("contatto") === c0 + 1 && conta("piano") === p0 + 1 && auto.find(x => x.tipo === "invito").attivita_id === null,
     "chiusura Partner senza passi = +1 contatto e +1 piano (l'invito non conta attività)");
   check(DB.persone.find(x => x.id === idChiusi(20)).fase === "piano", "Hugo: la fase diventa «piano»");
-  check(JSON.stringify(await passiScheda()) === JSON.stringify(["Chiusura · Partner", "Piano · segnato con la chiusura", "Invito · segnato con la chiusura", "Contatto · segnato con la chiusura"]),
-    "nella scheda, in sequenza: «Piano / Invito / Contatto · segnato con la chiusura» (" + (await passiScheda()).join(" | ") + ")");
-  check(!(await aCapoIn(page.locator(".card", { hasText:"I passi" }), "li .grow > b, li .grow > .segnato-chiusura")).length,
-    "i passi automatici non vanno a capo a 360 px (" + (await aCapoIn(page.locator(".card", { hasText:"I passi" }), "li .grow > b, li .grow > .segnato-chiusura")).join(" | ") + ")");
+  check(JSON.stringify(await passiScheda()) === JSON.stringify(["Chiusura · Partner", "Piano · segnato in automatico", "Invito · segnato in automatico", "Contatto · segnato in automatico"]),
+    "nella scheda, in sequenza: «Piano / Invito / Contatto · segnato in automatico» (" + (await passiScheda()).join(" | ") + ")");
+  check(!(await aCapoIn(page.locator(".card", { hasText:"I passi" }), "li .grow > b, li .grow > .segnato-auto")).length,
+    "i passi automatici non vanno a capo a 360 px (" + (await aCapoIn(page.locator(".card", { hasText:"I passi" }), "li .grow > b, li .grow > .segnato-auto")).join(" | ") + ")");
   check((await page.locator(".chiusura-persona").innerText()).trim() === `✓ Partner ${dalIt(dataPiu(0))}`, "Hugo: la riga «✓ Partner dal …»");
   await foto("Hugo: Partner senza passi");
   for(const tema of ["light", "dark"]) ritagli[tema].unshift(ritagli[tema].pop());
@@ -8774,6 +8774,98 @@ async function tavola(path, ritagli, scuro){
   await page.click(".sheet [data-act=chiudi]").catch(() => {});
   check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "114: a 360 px niente scorrimento di lato");
   await tavola(S + "/e2e/114-agenda-light.png", ritagli.light); await tavola(S + "/e2e/114-agenda-dark.png", ritagli.dark, true);
+  await ctx.close();
+  togliChiusi();
+}
+
+// 115. I passi precedenti si spuntano da soli (27 novembre 2026, richiesta di Stefano, migrazione 071, che allarga la regola
+//      della 070). Il database (qui l'API finta, che fa lo stesso) aggiunge i passi che mancano: invito → contatto; piano →
+//      contatto, invito; follow-up → contatto, invito, piano; chiusura Partner come prima. Stessa data, un istante prima, in
+//      ordine, collegati al passo che li crea; contatto e piano contano, l'invito no; mai il follow-up. Nel modulo, sotto la
+//      scelta del tipo, «Segna anche il contatto.» (o quelli che mancano). Nella scheda «Contatto · segnato in automatico».
+{
+  preparaChiusi();
+  const pid = idChiusi(1);
+  const nuova = (n, nome, extra) => DB.persone.push(Object.assign({ id:idChiusi(n), proprietario:pid, nome, fase:"lista", esito:null, prossima_data:null,
+    prossima_nota:null, prossima_per:null, prossima_come:null, creato_il:new Date(Date.now() - 5 * 864e5).toISOString() }, extra || {}));
+  nuova(40, "Nico Nuovo"); nuova(41, "Olga Contattata", { fase:"contattato" }); nuova(42, "Pino Seguito", { prossima_data:dataPiu(0), prossima_per:"followup" });
+  DB.passi.push({ id:idChiusi(41) + "-1", persona_id:idChiusi(41), proprietario:pid, tipo:"contatto", data:dataPiu(-3), esito:null, importato:false, attivita_id:null,
+    creato_il:new Date(Date.now() - 3 * 864e5).toISOString() });
+  ({ ctx, page } = await apriChiusi());
+  const ritagli = { light:[], dark:[] };
+  const nascondiToast = v => page.evaluate(v => { const t = document.getElementById("toast"); if(t) t.style.visibility = v; }, v);
+  const foto = async (titolo, loc, alto) => { await nascondiToast("hidden"); if(alto) await page.setViewportSize({ width:360, height:2000 });
+    for(const tema of ["light", "dark"]){ await page.emulateMedia({ colorScheme:tema }); await page.waitForTimeout(80);
+      ritagli[tema].push({ titolo, png:await page.locator(loc).first().screenshot() }); }
+    await page.emulateMedia({ colorScheme:"light" }); if(alto) await page.setViewportSize({ width:360, height:780 }); await nascondiToast(""); };
+  const conta = tipo => DB.activities.filter(a => a.partner_id === pid && a.tipo === tipo).length;
+  const riga = page.locator(".sheet p.passi-prima");
+  const passiScheda = async () => (await page.locator(".card", { hasText:"I passi" }).locator("li .grow").allInnerTexts()).map(x => x.replace(/\s+/g, " ").trim());
+
+  // Nico, in lista: la riga sotto la scelta del tipo dice cosa verrà segnato in più
+  await schedaChiusi(page, "Nico Nuovo");
+  await page.click("button[data-act=passo]");
+  check(!(await riga.count()), "115: Contatto: nessuna riga (non manca niente)");
+  const attese = { invito:"Segna anche il contatto.", piano:"Segna anche contatto e invito.", followup:"Segna anche contatto, invito e piano." };
+  for(const [tipo, testo] of Object.entries(attese)){
+    await page.click(`.sheet button[data-tipo=${tipo}]`);
+    check(await riga.isVisible() && (await riga.innerText()).trim() === testo, `115: ${tipo}: «${testo}» (${await riga.count() ? await riga.innerText() : "niente"})`);
+    check(!(await aCapoIn(page.locator(".sheet"), "p.passi-prima")).length, `115: ${tipo}: la riga non va a capo a 360 px`);
+  }
+  await page.click(".sheet button[data-tipo=chiusura]");
+  check(!(await riga.count()), "115: Chiusura: la riga sotto il tipo non c'è (c'è quella sotto l'esito Partner, 070)");
+  await page.click(".sheet button[data-tipo=piano]");
+  await foto("Nico: Piano, cosa si segna in più", ".sheet-box", true);
+  // Piano su una persona In lista = +1 contatto e +1 piano; contatto e invito automatici, collegati al piano
+  await sync(page);
+  const [c0, p0] = [conta("contatto"), conta("piano")];
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("Piano segnato").waitFor(); await sync(page);
+  const nico = DB.passi.filter(x => x.persona_id === idChiusi(40)), piano = nico.find(x => x.tipo === "piano" && !x.segnato_con);
+  const auto = nico.filter(x => x.segnato_con === piano.id);
+  check(nico.length === 3 && JSON.stringify(auto.map(x => x.tipo).sort()) === JSON.stringify(["contatto", "invito"])
+    && auto.every(x => x.data === piano.data && x.creato_il < piano.creato_il), "115: Piano su Nico: contatto e invito automatici, stessa data, un istante prima");
+  check(conta("contatto") === c0 + 1 && conta("piano") === p0 + 1 && auto.find(x => x.tipo === "invito").attivita_id === null,
+    "115: Piano su una persona In lista = +1 contatto e +1 piano (l'invito non conta)");
+  check(JSON.stringify(await passiScheda()) === JSON.stringify(["Piano", "Invito · segnato in automatico", "Contatto · segnato in automatico"]),
+    "115: nella scheda «Invito / Contatto · segnato in automatico» (" + (await passiScheda()).join(" | ") + ")");
+  check(!(await aCapoIn(page.locator(".card", { hasText:"I passi" }), "li .grow > b, li .grow > .segnato-auto")).length, "115: i passi automatici non vanno a capo a 360 px");
+  check(await page.locator(".card", { hasText:"I passi" }).locator(".visually-hidden").first().evaluate(e => e.textContent) === " · ", "115: lo screen reader legge «Contatto · segnato in automatico»");
+  await foto("Nico: la scheda dopo il Piano", "#app .card >> nth=1");
+  // cancellando il piano spariscono anche contatto e invito automatici, con le attività
+  const primo = page.locator(".card", { hasText:"I passi" }).locator("li").first();   // il piano, il più recente
+  check((await primo.locator("b").innerText()).trim() === "Piano", "115: in cima ai passi c'è il piano");
+  await primo.locator("button[data-act=togli-passo]").click();
+  await page.getByText("Passo tolto").waitFor(); await sync(page);
+  check(!DB.passi.some(x => x.persona_id === idChiusi(40)) && conta("contatto") === c0 && conta("piano") === p0, "115: cancellando il piano si cancellano i passi automatici e le loro attività");
+
+  // Olga, con il contatto già segnato: Piano = solo +1 piano (si aggiunge l'invito)
+  await schedaChiusi(page, "Olga Contattata");
+  await page.click("button[data-act=passo]"); await page.click(".sheet button[data-tipo=piano]");
+  check((await riga.innerText()).trim() === "Segna anche l'invito.", "115: Olga (contatto già segnato): «Segna anche l'invito.»");
+  const [c1, p1] = [conta("contatto"), conta("piano")];
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("Piano segnato").waitFor(); await sync(page);
+  check(conta("contatto") === c1 && conta("piano") === p1 + 1 && DB.passi.filter(x => x.persona_id === idChiusi(41) && x.tipo === "contatto").length === 1
+    && DB.passi.filter(x => x.persona_id === idChiusi(41) && x.segnato_con).map(x => x.tipo).join() === "invito", "115: Piano con il contatto già segnato = solo +1 piano");
+  // il passo successivo non ripete la riga: dopo il piano il follow-up non deve segnare niente
+  await page.click("button[data-act=passo]");
+  check(await page.locator(".sheet button[data-tipo=followup].on").count() === 1 && !(await riga.count()), "115: Follow-up con contatto, invito e piano già segnati: nessuna riga");
+  await page.click(".sheet [data-act=chiudi]");
+
+  // «Com'è andata?» (Pino ha un follow-up in agenda oggi): «Fatto» segna il follow-up e il database spunta gli altri tre
+  await schedaChiusi(page, "Pino Seguito");
+  const c2 = conta("contatto"), p2 = conta("piano");
+  await page.click(".prossima button[data-act=agenda-fatto]");
+  await page.click(".sheet button[data-r=followup]"); await page.getByText("Follow-up segnato").waitFor(); await sync(page);
+  check(JSON.stringify(DB.passi.filter(x => x.persona_id === idChiusi(42)).sort((a, b) => a.creato_il < b.creato_il ? -1 : 1).map(x => x.tipo)) === JSON.stringify(["contatto", "invito", "piano", "followup"])
+    && conta("contatto") === c2 + 1 && conta("piano") === p2 + 1, "115: «Com'è andata?» → Fatto: follow-up più contatto, invito e piano automatici (+1 contatto, +1 piano)");
+  check(!DB.passi.some(x => x.persona_id === idChiusi(42) && x.tipo === "followup" && x.segnato_con), "115: il follow-up non si aggiunge mai da solo");
+  // «Riapri il percorso» non li toglie
+  await page.click("button[data-act=passo]"); await page.click(".sheet button[data-tipo=chiusura]");
+  await page.click(".sheet label.chip:has(span:text-is('No'))"); await page.click(".sheet button:has-text('Salva')"); await page.getByText("Chiusura · No segnato").waitFor();
+  await page.click("button[data-act=riapri-persona]"); await page.locator("#app .card").first().locator(".percorso-persona").waitFor(); await sync(page);
+  check(DB.passi.filter(x => x.persona_id === idChiusi(42) && x.segnato_con).length === 3, "115: «Riapri il percorso» lascia i passi automatici");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "115: a 360 px niente scorrimento di lato");
+  await tavola(S + "/e2e/115-passi-light.png", ritagli.light); await tavola(S + "/e2e/115-passi-dark.png", ritagli.dark, true);
   await ctx.close();
   togliChiusi();
 }
