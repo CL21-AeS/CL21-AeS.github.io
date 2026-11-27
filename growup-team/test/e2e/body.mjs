@@ -8870,6 +8870,115 @@ async function tavola(path, ritagli, scuro){
   togliChiusi();
 }
 
+// 116. Un Piano in calendario segna subito l'invito (27 novembre 2026, regola di Stefano). Salvando un appuntamento con Per
+//      cosa = «Piano» (scheda del calendario, «E adesso?» di «Segna un passo», «Quando è il piano?» dopo «Com'è andata?») per
+//      una persona della Lista senza esito che non ha ancora un invito: un passo «invito» di oggi, «Sì, appuntamento
+//      fissato»; il contatto, se manca, lo aggiunge il database (071). Mai due inviti; spostando o togliendo l'appuntamento
+//      l'invito resta; niente per Clienti e persone chiuse.
+{
+  preparaChiusi();
+  const pid = idChiusi(1);
+  const nuova = (n, nome, extra) => DB.persone.push(Object.assign({ id:idChiusi(n), proprietario:pid, nome, fase:"lista", esito:null, prossima_data:null,
+    prossima_nota:null, prossima_per:null, prossima_come:null, creato_il:new Date(Date.now() - 5 * 864e5).toISOString() }, extra || {}));
+  const passo = (n, tipo, extra) => DB.passi.push(Object.assign({ id:idChiusi(n) + "-" + tipo, persona_id:idChiusi(n), proprietario:pid, tipo, data:dataPiu(-2),
+    esito:null, importato:false, attivita_id:null, creato_il:new Date(Date.now() - 2 * 864e5).toISOString() }, extra || {}));
+  nuova(50, "Rita Lista"); nuova(51, "Sara Invitata", { fase:"invitato" }); passo(51, "contatto"); passo(51, "invito");
+  nuova(52, "Tino Contatto"); nuova(53, "Ugo Nonora", { fase:"contattato", esito:"non_ora" }); passo(53, "contatto"); passo(53, "chiusura", { esito:"non_ora" });
+  nuova(54, "Vera Fissare", { fase:"contattato", prossima_data:dataPiu(0), prossima_per:"fissare_piano" }); passo(54, "contatto");
+  ({ ctx, page } = await apriChiusi());
+  const ritagli = { light:[], dark:[] };
+  const nascondiToast = v => page.evaluate(v => { const t = document.getElementById("toast"); if(t) t.style.visibility = v; }, v);
+  const foto = async (titolo, loc, alto) => { await nascondiToast("hidden"); if(alto) await page.setViewportSize({ width:360, height:2000 });
+    for(const tema of ["light", "dark"]){ await page.emulateMedia({ colorScheme:tema }); await page.waitForTimeout(80);
+      ritagli[tema].push({ titolo, png:await page.locator(loc).first().screenshot() }); }
+    await page.emulateMedia({ colorScheme:"light" }); if(alto) await page.setViewportSize({ width:360, height:780 }); await nascondiToast(""); };
+  const conta = tipo => DB.activities.filter(a => a.partner_id === pid && a.tipo === tipo).length;
+  const passiDi = n => DB.passi.filter(x => x.persona_id === idChiusi(n));
+  const inviti = n => passiDi(n).filter(x => x.tipo === "invito");
+  const passiScheda = async () => (await page.locator(".card", { hasText:"I passi" }).locator("li .grow").allInnerTexts()).map(x => x.replace(/\s+/g, " ").trim());
+  const calendario = async (nome, per, giorno) => {
+    await schedaChiusi(page, nome);
+    await page.click(".prossima button[data-act=agenda]");
+    await page.check(`.sheet input[name=per][value=${per}]`, { force:true });
+    await page.click(`.sheet label.chip:has(span:text-is('${giorno || "Domani"}'))`);
+  };
+
+  // Rita, in lista: Piano in calendario = invito e contatto segnati, +1 contatto nei numeri (il piano no: non c'è ancora stato)
+  await sync(page);
+  const [c0, p0] = [conta("contatto"), conta("piano")];
+  await calendario("Rita Lista", "piano");
+  await page.fill(".sheet input[name=ora]", "20:30");
+  check(!(await aCapoIn(page.locator(".sheet"), "legend, label.chip span, .giorno-scelto .small, .avviso-ieri .grow .small")).length,
+    "116: la scheda del calendario con Per cosa = Piano non va a capo a 360 px (" + (await aCapoIn(page.locator(".sheet"), "legend, label.chip span, .giorno-scelto .small, .avviso-ieri .grow .small")).join(" | ") + ")");
+  await foto("Rita: calendario, Per cosa = Piano", ".sheet-box", true);
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("In agenda: domani").waitFor(); await sync(page);
+  const inv = inviti(50);
+  check(inv.length === 1 && inv[0].data === dataPiu(0) && inv[0].reazione === "Sì, appuntamento fissato" && !inv[0].segnato_con,
+    "116: Piano in agenda per Rita: un invito di oggi, «Sì, appuntamento fissato»");
+  check(passiDi(50).filter(x => x.tipo === "contatto").length === 1 && passiDi(50).find(x => x.tipo === "contatto").segnato_con === inv[0].id,
+    "116: il contatto che mancava lo aggiunge il database (collegato all'invito)");
+  check(conta("contatto") === c0 + 1 && conta("piano") === p0, "116: Piano in agenda per una persona In lista = +1 contatto nei numeri (il piano no)");
+  check(DB.persone.find(x => x.id === idChiusi(50)).fase === "invitato" && DB.persone.find(x => x.id === idChiusi(50)).prossima_per === "piano", "116: Rita è «Invitato», con il piano in agenda");
+  check(await page.locator(".prossima button[data-act=agenda-fatto]").isVisible(), "116: nella scheda «Fatto»");
+  check(JSON.stringify(await passiScheda()) === JSON.stringify(["Invito Sì, appuntamento fissato", "Contatto · segnato in automatico"]),
+    "116: tra i passi l'invito e il contatto automatico (" + (await passiScheda()).join(" | ") + ")");
+  await foto("Rita: la scheda dopo il salvataggio", "#app .card >> nth=0");
+  await foto("Rita: i passi", "#app .card >> nth=1");
+  await page.click("button[data-act=torna-lista]");
+  check(await page.locator(".persone li", { hasText:"Rita Lista" }).locator("button.cal.on").count() === 1, "116: nella Lista l'icona del calendario è accesa");
+  await foto("Rita nella Lista", ".persone li:has-text('Rita Lista')");
+
+  // spostando l'appuntamento (sempre Piano) nessun invito in più; togliendolo dall'agenda l'invito resta
+  await calendario("Rita Lista", "piano", "Oggi");
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("In agenda: oggi").waitFor(); await sync(page);
+  check(inviti(50).length === 1 && conta("contatto") === c0 + 1, "116: spostando il piano, mai due inviti");
+  await page.click(".prossima button[data-act=agenda]"); await page.click(".sheet button[data-act=agenda-togli]"); await page.getByText("Tolto dall'agenda").waitFor(); await sync(page);
+  check(inviti(50).length === 1 && !DB.persone.find(x => x.id === idChiusi(50)).prossima_per, "116: togliendo l'appuntamento dall'agenda l'invito resta");
+
+  // Sara ha già l'invito: niente in più
+  await sync(page);
+  const [c1, n1] = [conta("contatto"), passiDi(51).length];
+  await calendario("Sara Invitata", "piano");
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("In agenda: domani").waitFor(); await sync(page);
+  check(passiDi(51).length === n1 && conta("contatto") === c1, "116: Piano in agenda con l'invito già segnato = niente in più");
+
+  // Ugo è chiuso («Non ora»): niente invito
+  await calendario("Ugo Nonora", "piano");
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("In agenda: domani").waitFor(); await sync(page);
+  check(!inviti(53).length, "116: per una persona chiusa (Non ora) il piano in agenda non segna l'invito");
+
+  // «E adesso?» di «Segna un passo»: Tino, contatto e poi Piano in agenda (saltando «Fissare il piano") = un contatto, un invito
+  await sync(page);
+  const c2 = conta("contatto");
+  await schedaChiusi(page, "Tino Contatto");
+  await page.click("button[data-act=passo]");
+  await page.click(".sheet .agenda-dopo label.chip:has(span:text-is('Piano'))");
+  await page.click(".sheet .agenda-dopo label.chip:has(span:text-is('Domani'))");
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("Contatto segnato").waitFor(); await sync(page);
+  check(passiDi(52).filter(x => x.tipo === "contatto").length === 1 && inviti(52).length === 1 && inviti(52)[0].reazione === "Sì, appuntamento fissato"
+    && conta("contatto") === c2 + 1, "116: «E adesso?» con Piano: un contatto (il passo segnato) e un invito, nessun doppione");
+  // e se il passo segnato è proprio l'invito, non se ne aggiunge un secondo
+  await page.click("button[data-act=passo]");
+  check(await page.locator(".sheet button[data-tipo=piano].on").count() === 1, "116: dopo l'invito si propone il piano");
+  await page.click(".sheet button[data-tipo=invito]");
+  await page.click(".sheet .agenda-dopo label.chip:has(span:text-is('Domani'))");
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("Invito segnato").waitFor(); await sync(page);
+  check(inviti(52).length === 2 && inviti(52).filter(x => x.reazione === "Sì, appuntamento fissato").length === 1, "116: un invito segnato a mano con il piano in agenda: nessun invito automatico in più");
+
+  // «Com'è andata?» → «Piano fissato» segna l'invito; poi «Quando è il piano?» non ne aggiunge un altro
+  await schedaChiusi(page, "Vera Fissare");
+  await page.click(".prossima button[data-act=agenda-fatto]");
+  await page.click(".sheet button[data-r=piano_fissato]");
+  await page.locator(".sheet h2", { hasText:"Quando è il piano?" }).waitFor();
+  await page.click(".sheet label.chip:has(span:text-is('Domani'))");
+  await page.click(".sheet button:has-text('Salva')"); await page.getByText("In agenda: domani").waitFor(); await sync(page);
+  check(inviti(54).length === 1 && DB.persone.find(x => x.id === idChiusi(54)).prossima_per === "piano", "116: «Piano fissato» e poi «Quando è il piano?»: un invito solo");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= 360), "116: a 360 px niente scorrimento di lato");
+  await tavola(S + "/e2e/116-piano-light.png", ritagli.light); await tavola(S + "/e2e/116-piano-dark.png", ritagli.dark, true);
+  await ctx.close();
+  togliChiusi();
+}
+
 await browser.close();
 console.log(`controlli superati: ${ok}`);
 if(errori.length){ console.log("ERRORI CONSOLE:", errori); process.exitCode = 1; }

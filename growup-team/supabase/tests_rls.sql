@@ -2528,11 +2528,21 @@ begin
     -- invito → solo il contatto; follow-up → contatto, invito, piano (mai il follow-up stesso)
     perform growup_test.come(u2);
     delete from public.persone where id in (p71, q71);
+    execute 'reset role';
+    con71 := (select count(*) from public.activities where partner_id = a and tipo = 'contatto');
+    att71 := (select count(*) from public.activities where partner_id = a);
+    perform growup_test.come(u2);
     insert into public.persone (nome) values ('Invito Prova') returning id into p71;
-    insert into public.passi (persona_id, tipo) values (p71, 'invito') returning id into s71;
+    -- (è anche l'invito che l'app segna quando si mette un Piano in agenda: «Sì, appuntamento fissato», data di oggi)
+    insert into public.passi (persona_id, tipo, reazione) values (p71, 'invito', 'Sì, appuntamento fissato') returning id into s71;
     perform growup_test.ok((select array_agg(tipo order by creato_il) from public.passi where persona_id = p71) = array['contatto', 'invito']
                            and (select segnato_con from public.passi where persona_id = p71 and tipo = 'contatto') = s71,
                            '071: invito su una persona In lista: si aggiunge il contatto');
+    execute 'reset role';
+    perform growup_test.ok((select count(*) from public.activities where partner_id = a and tipo = 'contatto') = con71 + 1
+                           and (select count(*) from public.activities where partner_id = a) = att71 + 1,
+                           '071: Piano in agenda per una persona In lista (invito di oggi) = +1 contatto nei numeri, nient''altro');
+    perform growup_test.come(u2);
     insert into public.persone (nome) values ('Followup Prova') returning id into q71;
     insert into public.passi (persona_id, tipo) values (q71, 'followup') returning id into s71;
     perform growup_test.ok((select array_agg(tipo order by creato_il) from public.passi where persona_id = q71) = array['contatto', 'invito', 'piano', 'followup']
