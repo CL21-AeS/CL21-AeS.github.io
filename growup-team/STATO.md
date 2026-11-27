@@ -3,6 +3,16 @@
 Ultimo aggiornamento: 27 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
 
+## Lista: la scheda di una persona chiusa come Partner (27 novembre 2026, richiesta di Stefano, app v135, database non toccato)
+
+- Chiusa come **Partner** (e se posso invitare): «**Invitalo in Growup**» è il pulsante principale (`primary`, pesca) e sta
+  **sopra** «Segna un passo · Nota», che diventa un pulsante normale. Prima «Invitalo» era verde (stile WhatsApp) e sotto.
+- Per **Partner e Cliente** niente «Manda le 8 domande (Target)». Se l'invito Target è già collegato, la riga «Target: …»
+  resta. Gli altri esiti e le persone aperte come prima.
+Test: interfaccia sezione 112 (ordine e classi dei pulsanti, colore pesca, Invita con il nome già scritto, Partner con e senza
+Target collegato, Cliente, No, Non ora, aperta in fase Piano; nessun pulsante a capo a 360 px; anteprime
+`design/anteprime/112-schede-light/dark.png`).
+
 ## Lista: la riga di una persona chiusa (27 novembre 2026, richiesta di Stefano, app v134, database non toccato)
 
 - Nella riga della Lista (`rigaPersona`) una persona **con un esito** non ha più i 5 pallini delle fasi: chiusa come
