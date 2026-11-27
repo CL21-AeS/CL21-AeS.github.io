@@ -6941,12 +6941,12 @@ function vSheetClienti(s){
     <button class="btn ghost wide" style="margin-top:8px" data-act="chiudi">Chiudi</button>`;
   }
   if(s === "rimanda-cliente" && p) return `<h2>Rimanda ${esc(nomeSaluto(p.nome))}</h2>
-    <p class="small">Se ne ha ancora: fino a quella data non compare tra quelli da sentire.</p>
+    <p class="small">Se ne ha ancora: fino a quella data non compare tra quelli da sentire. Quel giorno lo trovi in agenda.</p>
     <form data-form="rimanda-cliente" novalidate>
       <div class="opzioni">${[["3", "3 giorni"], ["7", "1 settimana"], ["14", "2 settimane"], ["30", "1 mese"]].map(([v, t]) =>
         `<label class="chip"><input type="radio" name="giorni" value="${v}"${v === "7" ? " checked" : ""}><span>${t}</span></label>`).join("")}</div>
       <label class="field"><span>Perché <i>(facoltativo)</i></span><input name="nota" maxlength="200" placeholder="es. ne ha ancora mezzo flacone"></label>
-      ${p.prossima_data && p.prossima_data > oggi() ? `<button type="button" class="btn ghost wide" style="margin-top:8px" data-act="rimanda-togli">Togli il rinvio (oggi è da risentire il ${dataIt(p.prossima_data)})</button>` : ""}
+      ${p.prossima_data && p.prossima_data > oggi() ? `<button type="button" class="btn ghost wide" style="margin-top:8px" data-act="rimanda-togli">Togli il rinvio del ${dataIt(p.prossima_data)}</button>` : ""}
       <div class="row" style="margin-top:16px">${annulla}<button class="btn primary grow">Rimanda</button></div>
     </form>`;
   if(s === "compleanno-cliente" && p){ const [mm, gg] = (p.compleanno || "-").split("-");
@@ -6993,7 +6993,7 @@ async function salvaOrdine(pid, b){
   for(const r of b.righe){ const g = Math.max(1, Math.min(3650, Number(r.giorni) || DURATA_BASE));
     if(g !== giorniDi(r.codice)) await api.salvaDurata(r.codice, g); }
   /* un ordine nuovo: niente più rinvio */
-  if(!b.ordineId) await api.modificaPersona(pid, { prossima_data:null, prossima_nota:null, nascosta_io:false });   // un ordine nuovo la riporta su Io
+  if(!b.ordineId) await api.modificaPersona(pid, Object.assign({}, AGENDA_VUOTA, { nascosta_io:false }));   // un ordine nuovo la riporta su Io (e l'agenda si svuota del tutto)
 }
 async function dopoClienti(msg){ await caricaClienti(); await caricaPersone(); st.sheet = null; render(); if(msg) toast(msg); }
 function apriWa(tel, testo){ window.open(`https://wa.me/${tel || ""}?text=` + encodeURIComponent(testo), "_blank", "noopener"); }
@@ -7065,7 +7065,7 @@ Object.assign(AZIONI, {
   async "auguri-fatti"(){ const p = st.persone.find(x => x.id === st.personaId), c = compleannoDi(p);
     try{ await api.modificaPersona(p.id, { auguri_anno:c ? c.anno : Number(oggi().slice(0, 4)) }); await dopoClienti("Auguri fatti"); }catch(e){ toast(messaggio(e)); } },
   "rimanda-cliente"(){ st.sheet = "rimanda-cliente"; render(); },
-  async "rimanda-togli"(){ try{ await api.modificaPersona(st.personaId, { prossima_data:null, prossima_nota:null }); await dopoClienti("Rinvio tolto"); }catch(e){ toast(messaggio(e)); } },
+  async "rimanda-togli"(){ try{ await api.modificaPersona(st.personaId, AGENDA_VUOTA); await dopoClienti("Rinvio tolto"); }catch(e){ toast(messaggio(e)); } },
   "compleanno-cliente"(){ st.sheet = "compleanno-cliente"; render(); },
   async "cliente-non-compra"(){ const p = st.persone.find(x => x.id === st.personaId);
     try{ await api.modificaPersona(p.id, { non_compra:!p.non_compra }); await dopoClienti(p.non_compra ? "Di nuovo tra i clienti" : "Segnato: non compra più"); }catch(e){ toast(messaggio(e)); } }
@@ -7080,7 +7080,12 @@ Object.assign(MODULI, {
   },
   async "rimanda-cliente"(f){
     const g = Number((f.querySelector("input[name=giorni]:checked") || {}).value || 7);
-    try{ await api.modificaPersona(st.personaId, { prossima_data:piuGiorni(oggi(), g), prossima_nota:f.nota.value.trim() || null, nascosta_io:false }); await dopoClienti("Rimandato"); }
+    /* il rinvio è un vero appuntamento (27 novembre 2026, scelta di Stefano): con il suo «per cosa» (riordino, come si è trovato
+       o auguri, come nel calendario), così quel giorno ha l'icona accesa, «Fatto» e «Com'è andata?» */
+    const p = st.persone.find(x => x.id === st.personaId);
+    if(!p) return;
+    try{ await salvaAgenda(p, Object.assign({}, AGENDA_VUOTA, { prossima_data:piuGiorni(oggi(), g), prossima_per:perProposto(p),
+      prossima_nota:f.nota.value.trim() || null, nascosta_io:false })); await dopoClienti("Rimandato"); }
     catch(e){ mostraErroreForm(f, messaggio(e)); }
   },
   async "compleanno-cliente"(f){
