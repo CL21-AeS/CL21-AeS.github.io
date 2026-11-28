@@ -20,7 +20,8 @@
   Eccezione voluta da Stefano (13 novembre 2026): **«Da seguire oggi»** in «Il mio giorno», solo per chi ha qualcuno sotto
   (`haPartnerSotto`): le persone che segue e che oggi hanno un motivo, compreso **un complimento da fare**. Mostra solo il
   fatto (chi e perché), mai come fare; il testo non deve far credere che contatti o piani facciano ottenere la percentuale.
-  Eccezione voluta da Stefano (18 novembre 2026): **«La tua strategia»** in cima a Io (a partenza completata): le caselle di
+  Eccezione voluta da Stefano (18 novembre 2026): **«La tua strategia»** in cima a Io (a partenza completata; dal 28 novembre
+  2026 subito sotto «Oggi per la tua strategia», e con il Seguimi acceso sopra c'è «Da fare oggi»): le caselle di
   lavoro proposte dalla mappa (nuove linee frontali, persone da aiutare a fare il Path to Bronze, nuovi in profondità).
   Nella card niente premi, niente cifre in euro, niente proiezioni. Come tornare alla Io di prima:
   `TORNARE-INDIETRO-STRATEGIA.md`.

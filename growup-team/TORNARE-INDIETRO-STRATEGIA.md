@@ -57,6 +57,10 @@ per la 1 e la 2 vedi la regola 3 qui sopra.
 | 12 | [#246](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/246) | La strategia a schermo intero si apre solo con «Vedi tutto ›» (toccando la card non si apre niente); service worker v128 | nessuna | — |
 | 13 | [#247](https://github.com/CL21-AeS/CL21-AeS.github.io/pull/247) | La prova: «Pronte da guardare» (Valenti, un grande gruppo; Nadia, ha appena iniziato), con il Path to Bronze nuovo | nessuna | — |
 
+Dopo, il 28 novembre 2026 (app v142): **il nuovo ordine di Io**, «Oggi per la tua strategia» sopra «La tua strategia» (e
+con il Seguimi acceso «Da fare oggi» sopra i binari). Nessuna migrazione; un «Revert» di quella PR da solo rimette l'ordine
+di prima (strategia in cima, binari sotto il cruscotto), senza toccare il resto.
+
 Per tornare a tutto com'era: «Revert» delle PR dalla 13 alla 1 (o chiedere a Claude di riportare la cartella al tag),
 poi, se si vuole, gli script della 068 e della 067.
 

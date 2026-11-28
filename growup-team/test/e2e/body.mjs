@@ -2714,7 +2714,7 @@ check(DB.partners.find(p => p.id === pia.id).prossima_qualifica == null, "scende
   check(await dfo.locator("button.riga-apri", { hasText:"Altri 3 in corso nella Lista" }).isVisible(), "riga «Altri 3 in corso nella Lista»");
   const ordineBlocchi = await page.evaluate(() => [...document.querySelectorAll("#app .card")].map(c => c.classList.contains("da-fare-oggi") ? "fare"
     : c.classList.contains("miei-numeri") ? "numeri" : c.classList.contains("diario") ? "diario" : c.classList.contains("promemoria-import") ? "import" : "").filter(Boolean).join(","));
-  check(ordineBlocchi === "numeri,fare,import,diario", "Il mio giorno (consegna 2): cruscotto, Da fare oggi, promemoria, Diario (" + ordineBlocchi + ")");
+  check(ordineBlocchi === "fare,numeri,import,diario", "Il mio giorno (28 novembre 2026): Da fare oggi in cima con i binari, poi cruscotto, promemoria, Diario (" + ordineBlocchi + ")");
   check((await page.locator(".promemoria-import").innerText()).includes("8 giorni fa"), "promemoria: l'ultimo report ha 8 giorni");
   check(!(await page.locator(".tappa-aperta").count()) && !(await page.locator("ul.oggi").count()), "tappa e diario chiusi di base");
   await page.click("button[data-act=apri-tappa]");
@@ -6880,8 +6880,9 @@ for(const tema of ["light", "dark"]){
   ({ ctx, page } = await apriCome(20));
   const card = page.locator("#app .card.strategia");
   await card.waitFor();
-  check(await page.evaluate(() => { const c = document.querySelector("#app .card.strategia"), prima = document.querySelector("#app .card");
-    return c === prima; }), "strategia: la card è la prima di Io");
+  check(await page.evaluate(() => { const c = [...document.querySelectorAll("#app .card")];
+    return c[0] === document.querySelector("#app .card.oggi-strategia") && c[1] === document.querySelector("#app .card.strategia"); }),
+    "strategia: la card viene subito dopo «Oggi per la tua strategia», in cima a Io");
   check(await card.locator(".strategia-titolo").textContent() === "Fai il tuo Path to Bronze", "strategia: titolo «Fai il tuo Path to Bronze» (nessuna qualifica dichiarata)");
   check(await card.locator(".tappe4 .t4").count() === 4 && await card.locator(".t4.corso").getAttribute("aria-label") === "Path to Bronze: in corso"
     && (await card.locator(".t4.corso>span").textContent()).startsWith("● "), "strategia: la barra delle 4 tappe, quella in corso con ● (anche senza colore)");
@@ -7223,8 +7224,8 @@ for(const tema of ["light", "dark"]){
     "binari: al posto della lista di oggi; il riquadro «Da seguire oggi» non c'è più");
   check((await b.locator(".prossima-cosa .prossima-titolo").innerText()).startsWith("Anna Agenda") && await b.locator(".prossima-cosa button[data-act=agenda-fatto]").count() === 1,
     "binari: in cima «La prossima cosa» di sempre (il primo appuntamento di oggi, con Fatto e Più tardi)");
-  check(await page.evaluate(() => { const c = [...document.querySelectorAll("#app > .card, #app .card")]; return c.indexOf(document.querySelector(".card.strategia")) < c.indexOf(document.querySelector(".card.oggi-strategia")); }),
-    "binari: sotto la card della strategia");
+  check(await page.evaluate(() => { const c = [...document.querySelectorAll("#app > .card, #app .card")]; return c.indexOf(document.querySelector(".card.oggi-strategia")) < c.indexOf(document.querySelector(".card.strategia")); }),
+    "binari: sopra la card della strategia");
   const [pers, fatt] = [b.locator(".binario-oggi").nth(0), b.locator(".binario-oggi").nth(1)];
   check((await pers.locator("h3").textContent()) === "Persone" && (await fatt.locator("h3").textContent()) === "Fatturato", "binari: Persone e Fatturato");
   const tPers = (await pers.textContent()).replace(/\s+/g, " ");
@@ -9096,6 +9097,137 @@ async function tavola(path, ritagli, scuro){
   await tavola(S + "/e2e/118-rimanda-light.png", ritagli.light); await tavola(S + "/e2e/118-rimanda-dark.png", ritagli.dark, true);
   await ctx.close();
   togliChiusi();
+}
+
+// 119. L'ordine di Io (28 novembre 2026, scelta di Stefano). A partenza completata, sotto le due domande: prima «Oggi per la
+//      tua strategia» (i binari), poi «La tua strategia», poi tutto il resto nell'ordine di prima. Con il Seguimi acceso «Da
+//      fare oggi» sale in cima subito prima dei binari e non si ripete più in basso (i binari non ripetono Lista e Clienti).
+//      Con la partenza in corso Io resta com'era. Ogni sezione una volta sola, anche con «Come vuoi lavorare?» e senza mappa.
+//      Il tocco su un avviso che porta alla lista di oggi scorre ancora fino ai binari.
+{
+  const id = n => "a1190000-0000-4000-8000-0000000000" + String(n).padStart(2, "0");
+  const giorno = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), quando = n => new Date(Date.now() + n * 864e5).toISOString();
+  const ora = new Date().toISOString();
+  const spMese = (m, k) => { const [y, mm] = m.split("-").map(Number), t = y * 12 + mm - 1 + k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, "0")}`; };
+  const mesePrima = spMese(meseOra(), -1);
+  const oggiIt = new Intl.DateTimeFormat("en-CA", { timeZone:"Europe/Rome" }).format(new Date());
+  const cod = n => "7919" + String(n).padStart(3, "0");
+  const io = (n, nome, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:"R", stato:"attivo", codice_invito:"OR" + n + "XX", codice_amway:cod(n),
+    chiave:"9" + String(n).padStart(2, "0") + "0".repeat(29), privacy_accettata_il:quando(-300), confermato_il:ora, partenza_confermata_il:ora, creato_il:quando(-300),
+    ultimo_aggiornamento:ora, data_iscrizione:giorno(-700) }, extra));
+  const sotto = (n, nome, sponsor, extra) => DB.partners.push(Object.assign({ id:id(n), nome, sponsor_id:id(sponsor), stato:"gestito", gestore_id:id(sponsor),
+    codice_invito:"OR" + n + "XX", codice_amway:cod(n), partenza_confermata_il:ora, creato_il:quando(-300), data_iscrizione:giorno(-500) }, extra));
+  const linee = l => l.map(([n, vpg]) => ({ codice:cod(n), vpg }));
+  const tutti = []; for(let n = 10; n <= 80; n++) tutti.push(id(n));
+  const chiave = n => "9" + String(n).padStart(2, "0") + "0".repeat(29);
+  // Ugo: situazione B, con un appuntamento di oggi, un cliente da sentire e Dino da seguire
+  io(20, "Ugo Ordine"); sotto(21, "Lia Linea", 20); sotto(22, "Leo Linea", 20); sotto(23, "Max Poco", 20);
+  DB.partners.push({ id:id(24), nome:"Dino Fermo", sponsor_id:id(20), stato:"attivo", codice_invito:"OR24XX", codice_amway:cod(24), privacy_accettata_il:quando(-200),
+    creato_il:quando(-200), confermato_il:ora, partenza_confermata_il:ora, ultimo_aggiornamento:quando(-12), data_iscrizione:giorno(-210) });
+  mappa(id(20), 110, 600, { mese:mesePrima, linee:linee([[21, 300], [22, 150], [23, 40]]) });
+  mappa(id(20), 100, 500, { linee:linee([[21, 260], [22, 95], [23, 40], [24, 0]]) });
+  mappa(id(21), 80, 260); mappa(id(22), 100, 95);
+  // Cora: tre linee attive, «Come vuoi lavorare?»
+  io(30, "Cora Scelta", { qualifica_iniziale:"foundation_9" }); sotto(31, "Ivo Uno", 30); sotto(32, "Ada Due", 30); sotto(33, "Eva Tre", 30);
+  mappa(id(30), 150, 900, { mese:mesePrima, linee:linee([[31, 250], [32, 180], [33, 120]]) });
+  mappa(id(30), 150, 700, { linee:linee([[31, 220], [32, 150], [33, 110]]) });
+  // Furio: nessuna mappa
+  io(40, "Furio Senza");
+  // Gino: partenza in corso
+  io(50, "Gino Percorso", { data_iscrizione:giorno(-5), privacy_accettata_il:quando(-4), creato_il:quando(-4), conPercorso:true });
+  DB.obiettivi = (DB.obiettivi || []).concat([{ partner_id:id(50), cifra_mese:300, entro:"2027-06-01", perche:"Per la famiglia" }]);
+  DB.persone = (DB.persone || []).concat([
+    { id:"o119a", proprietario:id(20), nome:"Anna Agenda", fase:"contattato", esito:null, prossima_data:oggiIt, prossima_per:"fissare", creato_il:quando(-20) },
+    { id:"o119b", proprietario:id(20), nome:"Carlo Cliente", fase:"lista", esito:"cliente", prossima_data:oggiIt, prossima_per:"riordino", creato_il:quando(-40) },
+    { id:"o119c", proprietario:id(50), nome:"Gina Agenda", fase:"contattato", esito:null, prossima_data:oggiIt, prossima_per:"fissare", creato_il:quando(-3) }]);
+  const seguimi = (n, si) => { DB.seguimi = (DB.seguimi || []).filter(x => x.partner_id !== id(n)).concat(si ? [{ partner_id:id(n), attivo:true, condividi:true }] : []);
+    DB.seguimiGiorni = (DB.seguimiGiorni || []).filter(x => x.partner_id !== id(n)); };
+  const apriCome = async (n, dove) => { const r = await apri({ viewport:{ width:360, height:780 } }, (dove || "") + "#chiave=" + chiave(n));
+    await r.page.locator(".testata h1").waitFor(); await r.page.waitForTimeout(300); return r; };
+  /* le card di Io, dall'alto in basso (solo quelle di primo livello), col nome della sezione */
+  const ordine = pg => pg.evaluate(() => {
+    const k = ["domanda-condividi", "domanda-notifiche", "da-fare-oggi", "oggi-strategia", "strategia", "festa", "primi-passi", "per-iniziare", "percorso-partenza",
+      "miei-numeri", "oggi-lista", "da-seguire", "serie", "mio-mese", "promemoria-import", "diario"];
+    return [...document.querySelectorAll("#app .card")].filter(c => !c.parentElement.closest(".card"))
+      .map(c => k.find(x => c.classList.contains(x)) || "?" + c.className.replace(/\s+/g, ".")); });
+  const unaVolta = o => o.every((x, i) => o.indexOf(x) === i);
+  const ritagli = { light:[], dark:[] };
+  const foto = async (pg, titolo) => { for(const tema of ["light", "dark"]){ await pg.emulateMedia({ colorScheme:tema }); await pg.waitForTimeout(80);
+    ritagli[tema].push({ titolo, png:await pg.screenshot({ clip:{ x:0, y:0, width:360, height:780 } }) }); } await pg.emulateMedia({ colorScheme:"light" }); };
+
+  // Seguimi spento: binari, strategia, poi il resto
+  seguimi(20, false);
+  ({ ctx, page } = await apriCome(20));
+  let o = await ordine(page);
+  check(o.join(",") === "oggi-strategia,strategia,primi-passi,miei-numeri,serie,mio-mese,diario", "119 Seguimi spento: l'ordine completo di Io");
+  check(o[0] === "oggi-strategia" && o[1] === "strategia" && o.indexOf("miei-numeri") > 1 && unaVolta(o) && !o.includes("da-fare-oggi") && !o.includes("oggi-lista")
+    && !o.includes("da-seguire") && !o.some(x => x.startsWith("?")), "119 Seguimi spento: «Oggi per la tua strategia», «La tua strategia», poi il cruscotto; ogni sezione una volta (" + o.join(",") + ")");
+  check((await page.locator("#app .card.oggi-strategia .prossima-cosa").innerText()).includes("Anna Agenda")
+    && (await page.locator("#app .card.oggi-strategia").innerText()).includes("Carlo Cliente"), "119 Seguimi spento: nei binari la Lista e i Clienti di oggi");
+  await foto(page, "Seguimi spento");
+  await ctx.close();
+
+  // Seguimi acceso: «Da fare oggi» in cima, subito prima dei binari, una volta sola; i binari senza Lista e Clienti
+  seguimi(20, true);
+  ({ ctx, page } = await apriCome(20));
+  await page.locator("#app .card.da-fare-oggi").waitFor();
+  o = await ordine(page);
+  check(o.join(",") === "da-fare-oggi,oggi-strategia,strategia,primi-passi,miei-numeri,serie,mio-mese,diario", "119 Seguimi acceso: l'ordine completo di Io");
+  check(o[0] === "da-fare-oggi" && o[1] === "oggi-strategia" && o[2] === "strategia" && o.indexOf("miei-numeri") > 2 && unaVolta(o) && !o.includes("oggi-lista")
+    && !o.includes("da-seguire") && !o.some(x => x.startsWith("?")), "119 Seguimi acceso: «Da fare oggi», binari, strategia, poi il cruscotto; niente doppioni (" + o.join(",") + ")");
+  check(await page.locator("#app .card.da-fare-oggi").count() === 1 && !(await page.locator("#app .card.oggi-strategia .prossima-cosa").count())
+    && !(await page.locator("#app .card.oggi-strategia").innerText()).includes("Carlo Cliente"), "119 Seguimi acceso: i binari non ripetono Lista e Clienti");
+  await foto(page, "Seguimi acceso");
+  await ctx.close();
+  seguimi(20, false);
+
+  // «Come vuoi lavorare?»: nei binari la riga «Scegli», sotto la card con le quattro scelte; «Scegli» apre la strategia
+  ({ ctx, page } = await apriCome(30));
+  o = await ordine(page);
+  check(o[0] === "oggi-strategia" && o[1] === "strategia" && unaVolta(o) && await page.locator("#app .card.strategia.scegli").count() === 1,
+    "119 «Come vuoi lavorare?»: binari, poi la card della scelta (" + o.join(",") + ")");
+  await page.click("#app .card.oggi-strategia button[data-act=strategia-apri]");
+  check(await page.locator(".sheet .strategia-intera").count() === 1, "119 «Scegli» nei binari apre ancora la strategia");
+  await ctx.close();
+
+  // senza mappa: binari, poi «La tua strategia compare quando arriva la mappa»
+  ({ ctx, page } = await apriCome(40));
+  o = await ordine(page);
+  check(o[0] === "oggi-strategia" && o[1] === "strategia" && unaVolta(o) && await page.locator("#app .card.strategia.senza-mappa").count() === 1,
+    "119 senza mappa: binari, poi la strategia che aspetta la mappa (" + o.join(",") + ")");
+  await ctx.close();
+
+  // il tocco su un avviso che porta alla lista di oggi: scorre fino ai binari
+  ({ ctx, page } = await apriCome(20, "?apri=contatto&id=a1190000-0000-4000-8000-0000000000ff"));
+  await page.waitForTimeout(300);
+  const dove = await page.evaluate(() => Math.round(document.querySelector("#app .card.oggi-strategia").getBoundingClientRect().top));
+  check(Math.abs(dove) <= 2 && await page.evaluate(() => window.scrollY > 0), "119 avviso: la pagina scorre fino a «Oggi per la tua strategia» (" + dove + ")");
+  await ctx.close();
+
+  // partenza in corso: tutto com'era (percorso, poi la lista di oggi; niente binari, niente strategia)
+  ({ ctx, page } = await apriCome(50));
+  o = await ordine(page);
+  check(o.join(",") === "percorso-partenza,oggi-lista,serie,mio-mese,diario", "119 partenza in corso: l'ordine completo di Io, come prima");
+  check(o.includes("percorso-partenza") && o.indexOf("oggi-lista") === o.indexOf("percorso-partenza") + 1 && !o.includes("oggi-strategia") && !o.includes("strategia")
+    && unaVolta(o) && !o.some(x => x.startsWith("?")), "119 partenza in corso: Io com'era, il percorso e sotto la lista di oggi (" + o.join(",") + ")");
+  await foto(page, "Partenza in corso");
+  await ctx.close();
+  seguimi(50, true);
+  ({ ctx, page } = await apriCome(50));
+  o = await ordine(page);
+  check(o.join(",") === "percorso-partenza,da-fare-oggi,serie,mio-mese,diario", "119 partenza in corso con il Seguimi: l'ordine completo di Io, come prima");
+  check(!o.includes("oggi-strategia") && !o.includes("strategia") && unaVolta(o) && !o.some(x => x.startsWith("?"))
+    && (o.includes("da-fare-oggi") ? o.indexOf("da-fare-oggi") === o.indexOf("percorso-partenza") + 1 && !o.includes("oggi-lista") : o.indexOf("oggi-lista") === o.indexOf("percorso-partenza") + 1),
+    "119 partenza in corso con il Seguimi: «Da fare oggi» (o la lista di oggi) al suo posto di prima, sotto il percorso (" + o.join(",") + ")");
+  await ctx.close();
+  seguimi(50, false);
+
+  await tavola(S + "/e2e/119-ordine-io-light.png", ritagli.light); await tavola(S + "/e2e/119-ordine-io-dark.png", ritagli.dark, true);
+  check(!errori.length, "119: nessun errore nella pagina");
+  DB.partners = DB.partners.filter(p => !tutti.includes(p.id));
+  DB.numeri = DB.numeri.filter(x => !tutti.includes(x.partner_id));
+  DB.persone = DB.persone.filter(p => !["o119a", "o119b", "o119c"].includes(p.id));
+  DB.obiettivi = DB.obiettivi.filter(o => !tutti.includes(o.partner_id));
 }
 
 await browser.close();

@@ -1598,13 +1598,14 @@ function vHome(){
   ${vInvita()}` : st.sezIo === "guida" ? vGuida() : `
   ${vDomandaCondividi()}
   ${vDomandaNotifiche()}
+  ${vIoInCima()}
   ${vStrategia()}
   ${festaDaFare() ? vFesta() : ""}
   ${linkDaSalvare() && !percorsoAttivo() ? vPrimiPassi() : ""}
   ${vPerIniziare()}
   ${percorsoAttivo() ? vPercorso() : vCruscotto()}
-  ${st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : binariAttivi() ? "" : vOggiLista()}
-  ${binariAttivi() ? vBinari() : vDaSeguire()}
+  ${binariAttivi() ? "" : st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : vOggiLista()}
+  ${binariAttivi() ? "" : vDaSeguire()}
   ${vSerie()}
   ${linkDaSalvare() || percorsoAttivo() ? "" : vPrimiPassi()}
   ${vMioMese()}
@@ -8917,7 +8918,7 @@ document.addEventListener("visibilitychange", async () => {
    persone che aiuti «Senti…» con il loro Path to Bronze; gli appuntamenti della Lista; i motivi di «Da seguire oggi».
    FATTURATO (clienti e VP): i propri clienti (appuntamenti e da sentire); negli ultimi 10 giorni del mese anche le linee
    vicine alla soglia della tappa (meno del 10% che manca, come in «Da seguire oggi») e chi è vicino alla percentuale.
-   Con il Seguimi acceso «Da fare oggi» resta com'è e i binari vengono sotto, senza ripetere Lista e Clienti. */
+   Con il Seguimi acceso «Da fare oggi» sta subito sopra i binari (vIoInCima), che non ripetono Lista e Clienti. */
 function binariAttivi(){ return !!st.profilo && !percorsoAttivo() && st.vista === "io"; }
 const chiaveOggiStrategia = () => "growup-team.strategia-oggi." + st.profilo.id;
 function fattiOggiStrategia(){
@@ -9052,6 +9053,14 @@ function vBinari(){
     ${aperto ? [["Prossimi giorni", b.presto], ["In corso", b.corso]].filter(([, l]) => l.length).map(([t, l]) => `<p class="small da-fare-t">${t}</p>
       <ul class="persone">${l.map(p => rigaPersona(p, true)).join("")}</ul>`).join("") : ""}` : ""}
   </div>`;
+}
+/* L'ordine di Io (scelta di Stefano, 28 novembre 2026): a partenza completata, subito sotto le due domande, prima «Oggi per
+   la tua strategia» e poi «La tua strategia». Con il Seguimi acceso «Da fare oggi» sale qui, subito prima dei binari, e più
+   in basso non si ripete (i binari, come sempre, non ripetono Lista e Clienti). Con la partenza in corso non c'è niente
+   qui: Io resta com'era (lista di oggi, o «Da fare oggi», e «Da seguire oggi» al loro posto). */
+function vIoInCima(){
+  if(!binariAttivi()) return "";
+  return (st.seguimi.attivo && oggiSeguimi() ? vOggiPerTe() : "") + vBinari();
 }
 /* nella Lista, il motivo per cui ci si arriva dalla strategia */
 function vMotivoLista(){
