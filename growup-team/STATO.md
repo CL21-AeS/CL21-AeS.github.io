@@ -1,7 +1,27 @@
 # Growup Team — a che punto siamo
 
-Ultimo aggiornamento: 27 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
+Ultimo aggiornamento: 28 novembre 2026. Da leggere all'inizio di ogni nuova sessione con Claude Code.
 Il metodo e la tecnica usati (da riusare per altre app) sono in `METODO.md`.
+
+## Il nuovo ordine di Io (28 novembre 2026, scelta di Stefano, app v142, database non toccato)
+
+- **A partenza completata**, in cima a Io restano le due domande (condividere con l'upline, notifiche); subito sotto
+  **«Oggi per la tua strategia»** (i binari Persone e Fatturato, con «La prossima cosa»), poi **«La tua strategia»**, poi
+  tutto il resto nell'ordine di prima (primi passi, per iniziare, cruscotto, serie, il mio mese, promemoria dell'import,
+  diario). Prima la strategia stava sopra e i binari sotto il cruscotto.
+- **Con il Seguimi acceso** «Da fare oggi» sale in cima, subito prima dei binari, e più in basso non si ripete. Come prima,
+  con il Seguimi i binari non ripetono Lista e Clienti (niente «La prossima cosa»).
+- **Con la partenza in corso** Io resta com'era: il percorso di partenza, sotto la lista di oggi (o «Da fare oggi» con il
+  Seguimi) e «Da seguire oggi» al loro posto.
+- Ogni sezione compare una volta sola in tutti i casi: Seguimi acceso o spento, partenza in corso o finita, con «Come vuoi
+  lavorare?» e senza mappa (la riga «Scegli» nei binari apre ancora la strategia). Il tocco su un avviso che porta alla
+  lista di oggi scorre ancora fino ai binari. Contenuti, calcoli e grafica delle sezioni non cambiano.
+- Funzione nuova `vIoInCima()` (accanto a `vBinari`): sceglie cosa sta in cima; nella costruzione di Io lista di oggi e
+  «Da seguire oggi» compaiono più in basso solo quando i binari non ci sono.
+Test: interfaccia sezione 119 (ordine completo di Io con Seguimi spento e acceso, «Come vuoi lavorare?», senza mappa,
+partenza in corso con e senza Seguimi; niente doppioni; lo scorrimento dall'avviso; anteprime
+`design/anteprime/119-ordine-io-light/dark.png`). Aggiornati i controlli che aspettavano l'ordine di prima (sezioni 45, 98 e
+100). Per tornare indietro: «Revert» di questa PR (vedi anche `TORNARE-INDIETRO-STRATEGIA.md`).
 
 ## Clienti: il «Rimanda» è un vero appuntamento (27 novembre 2026, scelta di Stefano, app v141, database non toccato)
 
